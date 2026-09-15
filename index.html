@@ -1652,7 +1652,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.29</div>
+        <div class="sub">V0.30</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2096,7 +2096,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="topbar">
         <div><h1>Economía</h1><div class="desc">Presupuestos, facturas, cobros, gastos y rentabilidad</div></div>
         <div class="quickactions">
-          <button class="btn">+ Registrar gasto</button>
+          <button class="btn" onclick="abrirRegistrarGasto()">+ Registrar gasto</button>
           <button class="btn primary" onclick="openNewInvoiceModal()">+ Crear factura</button>
         </div>
       </div>
@@ -2815,6 +2815,33 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
         <button type="submit" class="btn primary" style="width:100%;">Crear trabajo</button>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: REGISTRAR GASTO ================= -->
+<div class="overlay" id="gasto-overlay" onclick="if(event.target===this) cerrarRegistrarGasto()">
+  <div class="drawer" style="max-width:420px;">
+    <div class="drawer-head">
+      <div><h2>Registrar gasto</h2></div>
+      <button class="close-x" onclick="cerrarRegistrarGasto()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field" style="margin-bottom:12px;"><div class="l">Concepto</div>
+        <input class="search-box" style="width:100%;" id="gasto-concepto" placeholder="Ej. Gasoil, repuesto retro, seguro...">
+      </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Proveedor (opcional)</div>
+        <input class="search-box" style="width:100%;" id="gasto-proveedor" placeholder="Escribe si aplica..." list="gasto-proveedores-list">
+        <datalist id="gasto-proveedores-list"></datalist>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div class="field" style="flex:1;"><div class="l">Importe (€)</div><input class="search-box" style="width:100%;" id="gasto-importe" type="number" step="0.01"></div>
+        <div class="field" style="flex:1;"><div class="l">Fecha</div><input class="search-box" style="width:100%;" id="gasto-fecha" type="date"></div>
+      </div>
+      <div class="state-row">
+        <button class="btn primary" style="width:100%;" onclick="guardarGasto()">Guardar gasto</button>
+      </div>
+      <div id="gasto-status" class="sub-t" style="margin-top:8px;"></div>
     </div>
   </div>
 </div>
@@ -5610,6 +5637,45 @@ function openNewInvoiceModal(contexto){
   if(contexto.clientName){ document.getElementById('ni-client').value = contexto.clientName; onClientChange(); }
   if(contexto.jobLabel){ document.getElementById('ni-job').value = contexto.jobLabel; }
   document.getElementById('newinvoice-overlay').classList.add('active');
+}
+/* ---------------- REGISTRAR GASTO (rápido, sin líneas) ---------------- */
+function abrirRegistrarGasto(){
+  document.getElementById('gasto-concepto').value = '';
+  document.getElementById('gasto-proveedor').value = '';
+  document.getElementById('gasto-importe').value = '';
+  document.getElementById('gasto-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('gasto-status').textContent = '';
+  document.getElementById('gasto-proveedores-list').innerHTML = clientes.map(c=>`<option value="${c.name}">`).join('');
+  document.getElementById('gasto-overlay').classList.add('active');
+}
+function cerrarRegistrarGasto(){ document.getElementById('gasto-overlay').classList.remove('active'); }
+
+async function guardarGasto(){
+  const statusEl = document.getElementById('gasto-status');
+  const concepto = document.getElementById('gasto-concepto').value.trim();
+  const importe = Number(document.getElementById('gasto-importe').value);
+  const fecha = document.getElementById('gasto-fecha').value;
+  const proveedorNombre = document.getElementById('gasto-proveedor').value.trim();
+  if(!concepto){ statusEl.textContent = 'Falta el concepto.'; statusEl.style.color = 'var(--red)'; return; }
+  if(!importe || importe<=0){ statusEl.textContent = 'Pon un importe válido.'; statusEl.style.color = 'var(--red)'; return; }
+  if(!sb){ statusEl.textContent = 'Supabase no está conectado.'; statusEl.style.color = 'var(--red)'; return; }
+  const entidad = proveedorNombre ? clientes.find(c=>c.name===proveedorNombre) : null;
+  const payload = {
+    tipo: 'gasto', estado: 'pagado', concepto,
+    fecha_devengo: fecha || null, anio: fecha ? Number(fecha.slice(0,4)) : null,
+    entidad_id: entidad ? entidad.id : null, importe,
+  };
+  try{
+    const {data, error} = await sb.from('documentos_economicos').insert(payload).select().single();
+    if(error){ statusEl.textContent = 'Error al guardar: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
+    const dRaw = new Date(fecha);
+    const dateLabel = isNaN(dRaw) ? fecha : dRaw.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][dRaw.getMonth()];
+    documentosRealesById[data.id] = {...payload, id:data.id, type:'gasto', client: proveedorNombre||'—', dateRaw:fecha, dateLabel, amountLabel: importe.toLocaleString('es-ES',{minimumFractionDigits:2})+' €', total: importe, status:'Pagado', num:'—'};
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${dateLabel}</td><td>${concepto}</td><td>${proveedorNombre||'—'}</td><td class="num">${importe.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>`;
+    document.getElementById('econ-gastos-tbody')?.prepend(row);
+    cerrarRegistrarGasto();
+  }catch(err){ statusEl.textContent = 'Error de red: '+errText(err); statusEl.style.color = 'var(--red)'; }
 }
 function closeNewInvoiceModal(){ document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); }
 
