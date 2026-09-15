@@ -1547,6 +1547,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 //# sourceMappingURL=jspdf.umd.min.js.map
 
 </script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <button id="editor-mode-btn" onclick="toggleEditorMode()">✏️ Modo editor</button>
@@ -1588,6 +1589,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="economia"><span class="ico">€</span><span class="label"> Economía</span></button>
       <button data-view="sistema"><span class="ico">◉</span><span class="label"> Sistema</span></button>
       <div class="grp-label">Cuenta</div>
+      <button data-view="correo"><span class="ico">✉</span><span class="label"> Correo</span></button>
       <button data-view="config"><span class="ico">⚙</span><span class="label"> Configuración</span></button>
     </div>
     <div class="sidebar-foot">Sesión iniciada<br><span style="cursor:pointer;text-decoration:underline;" onclick="doLogout()">Cerrar sesión</span></div>
@@ -2293,6 +2295,35 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     </div>
 
     <!-- ================= CONFIG ================= -->
+    <!-- ================= CORREO ================= -->
+    <div class="view" id="view-correo">
+      <div class="topbar">
+        <div><h1>Correo</h1><div class="desc">Gmail de la empresa — leer y enviar desde aquí</div></div>
+        <div class="quickactions" id="correo-auth-actions">
+          <button class="btn primary" id="correo-connect-btn" onclick="connectGmail()">Conectar con Gmail</button>
+        </div>
+      </div>
+      <div id="correo-body" style="display:none;">
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="panel-head"><h3>Redactar</h3></div>
+          <div class="panel-body">
+            <div class="field-grid">
+              <div class="field" style="grid-column:1/-1;"><div class="l">Para</div><input class="search-box" id="mail-to" style="width:100%;" placeholder="cliente@ejemplo.com"></div>
+              <div class="field" style="grid-column:1/-1;"><div class="l">Asunto</div><input class="search-box" id="mail-subject" style="width:100%;"></div>
+              <div class="field" style="grid-column:1/-1;"><div class="l">Mensaje</div><textarea class="search-box" id="mail-body" style="width:100%;height:100px;"></textarea></div>
+            </div>
+            <div style="margin-top:10px;"><button class="btn primary" onclick="sendGmail()">Enviar</button> <span id="mail-send-status" class="sub-t"></span></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Bandeja de entrada</h3><button class="btn" onclick="loadGmailInbox()">↻ Actualizar</button></div>
+          <div class="panel-body" id="correo-inbox">
+            <div class="empty">Cargando…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="view" id="view-config">
       <div class="topbar"><div><h1>Configuración</h1><div class="desc">Tarifas, usuarios y ajustes generales</div></div></div>
       <div class="panel">
@@ -3284,6 +3315,102 @@ async function borrarSistemaItem(id){
   loadSistema();
 }
 loadSistema();
+
+/* ---------------- CORREO (Gmail) ---------------- */
+const GMAIL_CLIENT_ID = '86457265161-d04tdo3paksi8v8qj05lnv3snf23me77.apps.googleusercontent.com';
+const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send';
+let gmailTokenClient = null;
+let gmailAccessToken = sessionStorage.getItem('gmail_token') || null;
+
+function initGmailAuth(){
+  if(typeof google === 'undefined' || !google.accounts) { setTimeout(initGmailAuth, 500); return; }
+  gmailTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GMAIL_CLIENT_ID,
+    scope: GMAIL_SCOPES,
+    callback: (resp)=>{
+      if(resp.error){ alert('No se pudo conectar con Gmail: '+resp.error); return; }
+      gmailAccessToken = resp.access_token;
+      sessionStorage.setItem('gmail_token', gmailAccessToken);
+      showGmailConnected();
+      loadGmailInbox();
+    },
+  });
+  if(gmailAccessToken) showGmailConnected();
+}
+function connectGmail(){
+  if(!gmailTokenClient){ alert('Todavía está cargando la conexión con Google, espera un segundo y vuelve a pulsar.'); return; }
+  gmailTokenClient.requestAccessToken();
+}
+function showGmailConnected(){
+  document.getElementById('correo-auth-actions').innerHTML = '<span class="sub-t" style="color:var(--green);font-weight:700;">✓ Conectado a Gmail</span>';
+  document.getElementById('correo-body').style.display = '';
+}
+
+async function loadGmailInbox(){
+  const box = document.getElementById('correo-inbox');
+  if(!gmailAccessToken){ box.innerHTML = '<div class="empty">Conecta primero con Gmail.</div>'; return; }
+  box.innerHTML = '<div class="empty">Cargando…</div>';
+  try{
+    const listRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&labelIds=INBOX', {
+      headers: {Authorization: 'Bearer '+gmailAccessToken}
+    });
+    const listData = await listRes.json();
+    if(listData.error){ box.innerHTML = `<div class="empty" style="color:var(--red);">Error: ${listData.error.message}</div>`; return; }
+    const messages = listData.messages || [];
+    if(!messages.length){ box.innerHTML = '<div class="empty">Sin mensajes.</div>'; return; }
+    const rows = [];
+    for(const m of messages){
+      const detRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, {
+        headers: {Authorization: 'Bearer '+gmailAccessToken}
+      });
+      const det = await detRes.json();
+      const headers = (det.payload && det.payload.headers) || [];
+      const get = (n)=> (headers.find(h=>h.name===n)||{}).value || '';
+      rows.push({from:get('From'), subject:get('Subject')||'(sin asunto)', date:get('Date'), snippet: det.snippet||''});
+    }
+    box.innerHTML = rows.map(r=>`
+      <div class="attention-row">
+        <div style="flex:1;">
+          <div class="t">${r.subject}</div>
+          <div class="s">${r.from} · ${r.date}</div>
+          <div class="s" style="color:var(--ink-soft);">${r.snippet}</div>
+        </div>
+      </div>`).join('');
+  }catch(err){
+    box.innerHTML = `<div class="empty" style="color:var(--red);">Error de red: ${err && err.message ? err.message : err}</div>`;
+  }
+}
+
+function b64urlEncode(str){
+  return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+async function sendGmail(){
+  const to = document.getElementById('mail-to').value.trim();
+  const subject = document.getElementById('mail-subject').value.trim();
+  const body = document.getElementById('mail-body').value;
+  const statusEl = document.getElementById('mail-send-status');
+  if(!to || !subject){ statusEl.textContent = 'Falta destinatario o asunto.'; statusEl.style.color = 'var(--red)'; return; }
+  if(!gmailAccessToken){ statusEl.textContent = 'Conecta primero con Gmail.'; statusEl.style.color = 'var(--red)'; return; }
+  const raw = b64urlEncode(`To: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n${body}`);
+  statusEl.textContent = 'Enviando…'; statusEl.style.color = 'var(--ink-soft)';
+  try{
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: {Authorization: 'Bearer '+gmailAccessToken, 'Content-Type': 'application/json'},
+      body: JSON.stringify({raw})
+    });
+    const data = await res.json();
+    if(data.error){ statusEl.textContent = 'Error: '+data.error.message; statusEl.style.color = 'var(--red)'; return; }
+    statusEl.textContent = 'Enviado ✓'; statusEl.style.color = 'var(--green)';
+    document.getElementById('mail-to').value = '';
+    document.getElementById('mail-subject').value = '';
+    document.getElementById('mail-body').value = '';
+  }catch(err){
+    statusEl.textContent = 'Error de red: '+(err && err.message ? err.message : err);
+    statusEl.style.color = 'var(--red)';
+  }
+}
+initGmailAuth();
 
 let documentosCache = [];
 let triageCurrentId = null;
