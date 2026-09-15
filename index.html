@@ -1652,7 +1652,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.25</div>
+        <div class="sub">V0.26</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1673,7 +1673,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="sistema" class="admin-only"><span class="ico">◉</span><span class="label"> Sistema</span></button>
       <button data-view="config" class="admin-only"><span class="ico">⚙</span><span class="label"> Configuración</span></button>
     </div>
-    <div class="sidebar-foot">Sesión iniciada<br><span style="cursor:pointer;text-decoration:underline;" onclick="doLogout()">Cerrar sesión</span></div>
+    <div class="sidebar-foot"><span id="sidebar-username">Sesión iniciada</span><br><span style="cursor:pointer;text-decoration:underline;" onclick="doLogout()">Cerrar sesión</span></div>
   </div>
 
   <!-- MAIN -->
@@ -3203,16 +3203,20 @@ function advanceJobState(code){
   renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
 }
 const filterStates = ['todos','posible','pendiente','planificado','porconfirmar','confirmado','encurso','terminado','facturado','cobrado'];
-document.getElementById('job-filters').innerHTML = filterStates.map((s,i)=>`
-  <div class="chip-filter ${i===0?'active':''}" data-f="${s}">${s==='todos'?'Todos':stateLabels[s]} (${s==='todos'?jobs.length:jobs.filter(j=>j.state===s).length})</div>
-`).join('');
-document.querySelectorAll('#job-filters .chip-filter').forEach(el=>{
-  el.addEventListener('click',()=>{
-    document.querySelectorAll('#job-filters .chip-filter').forEach(e=>e.classList.remove('active'));
-    el.classList.add('active');
-    renderJobs(el.dataset.f);
+function renderJobFilters(){
+  const activo = document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos';
+  document.getElementById('job-filters').innerHTML = filterStates.map((s,i)=>`
+    <div class="chip-filter ${s===activo?'active':''}" data-f="${s}">${s==='todos'?'Todos':stateLabels[s]} (${s==='todos'?jobs.length:jobs.filter(j=>j.state===s).length})</div>
+  `).join('');
+  document.querySelectorAll('#job-filters .chip-filter').forEach(el=>{
+    el.addEventListener('click',()=>{
+      document.querySelectorAll('#job-filters .chip-filter').forEach(e=>e.classList.remove('active'));
+      el.classList.add('active');
+      renderJobs(el.dataset.f);
+    });
   });
-});
+}
+renderJobFilters();
 renderJobs('todos');
 
 /* sin colocar (planificacion) */
@@ -3293,6 +3297,10 @@ async function checkSession(){
       if(!esAdmin){
         document.querySelectorAll('.admin-only').forEach(el=>el.style.display = 'none');
       }
+      const NOMBRES_USUARIO = {'dg':'Dani G','rg':'Rafa','mg':'Manolo'};
+      const userLocal = (data.session.user.email||'').split('@')[0];
+      const nombreEl = document.getElementById('sidebar-username');
+      if(nombreEl) nombreEl.textContent = NOMBRES_USUARIO[userLocal] || data.session.user.email || 'Sesión iniciada';
     }
   }catch(e){ console.error(e); }
 }
@@ -4401,6 +4409,7 @@ async function cargarDatosReales(){
           urgent: t.prioridad === 'Alta'
         });
       });
+      renderJobFilters();
       renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
     }
     const {data: flotaReal} = await sb.from('flota').select('*').order('created_at',{ascending:false});
@@ -5075,18 +5084,8 @@ function submitNewJob(ev){
       fecha_inicio: scheduledDate || null, presupuesto: price ? Number(price) : null, zona: zone
     }).then(({error})=>{ if(error) console.error('No se pudo guardar el trabajo en Supabase', error); });
   }
+  renderJobFilters();
   renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
-  document.getElementById('job-filters').innerHTML = filterStates.map((s,i)=>{
-    const active = document.querySelector('#job-filters .chip-filter.active')?.dataset.f === s;
-    return `<div class="chip-filter ${active?'active':''}" data-f="${s}">${s==='todos'?'Todos':stateLabels[s]} (${s==='todos'?jobs.length:jobs.filter(j=>j.state===s).length})</div>`;
-  }).join('');
-  document.querySelectorAll('#job-filters .chip-filter').forEach(el=>{
-    el.addEventListener('click',()=>{
-      document.querySelectorAll('#job-filters .chip-filter').forEach(e=>e.classList.remove('active'));
-      el.classList.add('active');
-      renderJobs(el.dataset.f);
-    });
-  });
   fillJobSelect();
   closeNewJobModal();
   document.querySelector('[data-view="trabajos"]').click();
