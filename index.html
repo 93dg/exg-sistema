@@ -1857,7 +1857,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div><h1>Flota y maquinaria</h1><div class="desc">Estado, mantenimiento, documentación y repuestos</div></div>
         <div class="quickactions">
           <button class="btn" style="border-color:var(--red);color:var(--red);" onclick="openBreakdownDrawer('B-014')">⚠ Avería</button>
-          <button class="btn primary">+ Añadir máquina</button>
+          <button class="btn primary" onclick="addMaquina()">+ Añadir máquina</button>
         </div>
       </div>
 
@@ -2939,7 +2939,7 @@ document.getElementById('wa-list').innerHTML = waMessages.map(m=>`
     <div class="main-t">${m.text}</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;">${m.actions.map(a=>`<button class="btn" style="padding:5px 9px;font-size:11px;" onclick="alert('${a} — creado a partir del mensaje de ${m.from}')">${a}</button>`).join('')}</div>
   </div>`).join('');
-const jobs = [
+let jobs = [
   {code:'J-0284', client:'Granja López', type:'Empresa', zone:'Zona Norte', machine:'Excavadora 1', date:'8-9 sept', state:'encurso', price:'2.800 €', urgent:true},
   {code:'J-0285', client:'Ayto. Villanueva', type:'Ayuntamiento', zone:'Zona Norte', machine:'Excavadora 1', date:'11-12 sept', state:'planificado', price:'1.940 €', urgent:false},
   {code:'J-0286', client:'Fam. Ortega', type:'Particular', zone:'Casco urbano', machine:'Retro 2', date:'8 sept', state:'terminado', price:'980 €', urgent:false},
@@ -3603,6 +3603,54 @@ document.getElementById('fleet-grid').innerHTML = fleet.map(m=>`
     <div class="metrics"><div>Uso<b>${m.hours}</b></div><div>Ubicación<b style="font-size:12px;">${m.loc}</b></div></div>
     <div class="foot">${m.next}</div>
   </div>`).join('');
+function renderFleetGrid(){
+  document.getElementById('fleet-grid').innerHTML = fleet.map(m=>`
+    <div class="machine-card">
+      <div class="top"><div><div class="mname">${m.name}</div><div class="mtype">${m.type}</div></div>${pill(m.state)}</div>
+      <div class="metrics"><div>Uso<b>${m.hours}</b></div><div>Ubicación<b style="font-size:12px;">${m.loc}</b></div></div>
+      <div class="foot">${m.next}</div>
+    </div>`).join('');
+}
+async function addMaquina(){
+  const name = prompt('Nombre de la máquina (ej. "Excavadora 3"):');
+  if(!name || !name.trim()) return;
+  const type = prompt('Tipo/modelo (ej. "CASE 580 Super LE"):') || '';
+  fleet.push({name: name.trim(), type, state:'disponible', hours:'—', loc:'Nave Calle Industria', next:'Sin asignar'});
+  renderFleetGrid();
+  if(sb){
+    const {error} = await sb.from('flota').insert({nombre: name.trim(), tipo: type, estado:'activo'});
+    if(error){ alert('Se añadió aquí, pero no se pudo guardar en Supabase: '+error.message); }
+  } else {
+    alert('Se añadió aquí, pero Supabase no está conectado — no quedará guardado al recargar.');
+  }
+}
+async function cargarDatosReales(){
+  if(!sb) return;
+  try{
+    const {data: trabajosReales} = await sb.from('trabajos').select('*').order('created_at',{ascending:false});
+    if(trabajosReales && trabajosReales.length){
+      trabajosReales.forEach(t=>{
+        if(jobs.some(j=>j.code===t.codigo)) return; // ya está (lo acabamos de crear nosotros mismos)
+        jobs.push({
+          code: t.codigo || ('T-'+t.id.slice(0,4)), client: t.nombre || 'Sin nombre', type:'Particular',
+          zone: t.zona || '—', machine: '— sin especificar —', date: t.fecha_inicio || 'sin fecha',
+          state: t.estado || 'pendiente', price: t.presupuesto ? Number(t.presupuesto).toLocaleString('es-ES',{minimumFractionDigits:2})+' €' : '— est.',
+          urgent: t.prioridad === 'Alta'
+        });
+      });
+      renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
+    }
+    const {data: flotaReal} = await sb.from('flota').select('*').order('created_at',{ascending:false});
+    if(flotaReal && flotaReal.length){
+      flotaReal.forEach(m=>{
+        if(fleet.some(f=>f.name===m.nombre)) return;
+        fleet.push({name: m.nombre, type: m.tipo || '', state: m.estado==='activo' ? 'disponible' : m.estado, hours:'—', loc:'Nave Calle Industria', next:'Sin asignar'});
+      });
+      renderFleetGrid();
+    }
+  }catch(err){ console.error('No se pudieron cargar los datos reales de Supabase', err); }
+}
+cargarDatosReales();
 
 /* ---------------- CUADRANTE DE PLANIFICACIÓN (flota real) ---------------- */
 const PLANNER_DAYS = ['Lun 8','Mar 9','Mié 10','Jue 11','Vie 12'];
@@ -4288,6 +4336,12 @@ function submitNewJob(ev){
     price: price ? Number(price).toLocaleString('es-ES',{minimumFractionDigits:2})+' €' : '— est.',
     urgent: priority==='Alta'
   });
+  if(sb){
+    sb.from('trabajos').insert({
+      codigo: code, nombre: client, estado: initialState, prioridad: priority,
+      fecha_inicio: scheduledDate || null, presupuesto: price ? Number(price) : null, zona: zone
+    }).then(({error})=>{ if(error) console.error('No se pudo guardar el trabajo en Supabase', error); });
+  }
   renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
   document.getElementById('job-filters').innerHTML = filterStates.map((s,i)=>{
     const active = document.querySelector('#job-filters .chip-filter.active')?.dataset.f === s;
