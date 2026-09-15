@@ -1571,7 +1571,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.3</div>
+        <div class="sub">V0.4</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2304,19 +2304,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
       </div>
       <div id="correo-body" style="display:none;">
-        <div class="panel" style="margin-bottom:16px;">
-          <div class="panel-head"><h3>Redactar</h3></div>
-          <div class="panel-body">
-            <div class="field-grid">
-              <div class="field" style="grid-column:1/-1;"><div class="l">Para</div><input class="search-box" id="mail-to" style="width:100%;" placeholder="cliente@ejemplo.com"></div>
-              <div class="field" style="grid-column:1/-1;"><div class="l">Asunto</div><input class="search-box" id="mail-subject" style="width:100%;"></div>
-              <div class="field" style="grid-column:1/-1;"><div class="l">Mensaje</div><textarea class="search-box" id="mail-body" style="width:100%;height:100px;"></textarea></div>
-            </div>
-            <div style="margin-top:10px;"><button class="btn primary" onclick="sendGmail()">Enviar</button> <span id="mail-send-status" class="sub-t"></span></div>
-          </div>
-        </div>
         <div class="panel">
-          <div class="panel-head"><h3>Bandeja de entrada</h3><button class="btn" onclick="loadGmailInbox()">↻ Actualizar</button></div>
+          <div class="panel-head">
+            <h3>Bandeja de entrada</h3>
+            <div style="display:flex;gap:8px;">
+              <button class="btn primary" onclick="openComposeDrawer()">✏️ Redactar</button>
+              <button class="btn" onclick="loadGmailInbox()">↻ Actualizar</button>
+            </div>
+          </div>
           <div class="filters" id="correo-filters" style="padding:0 16px;">
             <div class="chip-filter active" data-f="relevante">Relevante</div>
             <div class="chip-filter" data-f="sin_clasificar">Sin clasificar</div>
@@ -2325,6 +2320,42 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
           <div class="panel-body" id="correo-inbox">
             <div class="empty">Cargando…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="correo-overlay" onclick="if(event.target===this) closeCorreoDrawer()">
+      <div class="drawer">
+        <div class="drawer-head">
+          <div><div class="code" id="correo-d-from">—</div><h2 id="correo-d-subject">—</h2></div>
+          <button class="close-x" onclick="closeCorreoDrawer()">✕</button>
+        </div>
+        <div class="drawer-body">
+          <div class="sub-t" style="margin-bottom:14px;" id="correo-d-date"></div>
+          <div id="correo-d-content" style="white-space:pre-wrap;font-size:13.5px;line-height:1.6;max-height:50vh;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);padding:14px;background:var(--paper);"></div>
+          <div class="state-row" style="margin-top:14px;">
+            <button class="btn primary" onclick="replyToCorreo()">↩ Responder</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="compose-overlay" onclick="if(event.target===this) closeComposeDrawer()">
+      <div class="drawer">
+        <div class="drawer-head">
+          <div><h2>Redactar</h2></div>
+          <button class="close-x" onclick="closeComposeDrawer()">✕</button>
+        </div>
+        <div class="drawer-body">
+          <div class="field-grid">
+            <div class="field" style="grid-column:1/-1;"><div class="l">Para</div><input class="search-box" id="mail-to" style="width:100%;" placeholder="cliente@ejemplo.com"></div>
+            <div class="field" style="grid-column:1/-1;"><div class="l">Asunto</div><input class="search-box" id="mail-subject" style="width:100%;"></div>
+            <div class="field" style="grid-column:1/-1;"><div class="l">Mensaje</div><textarea class="search-box" id="mail-body" style="width:100%;height:160px;"></textarea></div>
+          </div>
+          <div class="state-row" style="margin-top:14px;">
+            <button class="btn primary" onclick="sendGmail()">Enviar</button>
+            <span id="mail-send-status" class="sub-t"></span>
           </div>
         </div>
       </div>
@@ -3375,7 +3406,9 @@ async function fetchMailDetail(m){
   const email = extraerEmail(fromHeader);
   const entidad = correoEntidadesCache.find(e=>(e.email||'').toLowerCase()===email);
   const estado = correoEstadoCache[m.id];
-  return {id:m.id, from:fromHeader, email, subject:get('Subject')||'(sin asunto)', date:get('Date'), snippet: det.snippet||'', entidad, categoria: estado ? estado.categoria : (entidad ? 'relevante' : 'sin_clasificar')};
+  const noLeido = (det.labelIds||[]).includes('UNREAD');
+  const nombreRemitente = fromHeader.replace(/<[^>]+>/,'').replace(/"/g,'').trim() || email;
+  return {id:m.id, from:fromHeader, nombreRemitente, email, subject:get('Subject')||'(sin asunto)', date:get('Date'), snippet: det.snippet||'', entidad, categoria: estado ? estado.categoria : (entidad ? 'relevante' : 'sin_clasificar'), noLeido};
 }
 
 async function loadGmailInbox(){
@@ -3431,11 +3464,12 @@ function renderCorreoInbox(){
   const rows = correoMessagesCache.filter(r=> f==='todo' || r.categoria===f);
   if(!rows.length){ box.innerHTML = '<div class="empty">Nada aquí.</div>'; return; }
   box.innerHTML = rows.map(r=>`
-    <div class="attention-row">
-      <div style="flex:1;">
-        <div class="t">${r.subject} ${r.entidad ? `<span class="tag" style="border-color:var(--green);color:var(--green);">${r.entidad.tipo==='proveedor'?'Proveedor':'Cliente'}: ${r.entidad.nombre}</span>` : ''}</div>
-        <div class="s">${r.from} · ${r.date}</div>
-        <div class="s" style="color:var(--ink-soft);">${r.snippet}</div>
+    <div class="attention-row" style="cursor:pointer;${r.noLeido?'background:var(--concrete-2);':''}" onclick="openCorreoDrawer('${r.id}')">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--asphalt-2);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">${(r.nombreRemitente||'?').charAt(0).toUpperCase()}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="t" style="${r.noLeido?'font-weight:800;':''}">${r.subject} ${r.entidad ? `<span class="tag" style="border-color:var(--green);color:var(--green);">${r.entidad.tipo==='proveedor'?'Proveedor':'Cliente'}: ${r.entidad.nombre}</span>` : ''}</div>
+        <div class="s">${r.nombreRemitente} · ${r.date}</div>
+        <div class="s" style="color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.snippet}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
         ${!r.entidad ? `<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();vincularCorreo('${r.id}')">Vincular a cliente</button>` : ''}
@@ -3488,6 +3522,71 @@ async function vincularCorreo(messageId){
 function b64urlEncode(str){
   return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
+function openComposeDrawer(){ document.getElementById('compose-overlay').classList.add('active'); }
+function closeComposeDrawer(){
+  document.getElementById('compose-overlay').classList.remove('active');
+  document.getElementById('mail-to').value = '';
+  document.getElementById('mail-subject').value = '';
+  document.getElementById('mail-body').value = '';
+  document.getElementById('mail-send-status').textContent = '';
+}
+
+let correoAbiertoActual = null;
+
+function extraerCuerpoMensaje(payload){
+  if(!payload) return '';
+  function decodeB64Url(data){
+    try{ return decodeURIComponent(escape(atob(data.replace(/-/g,'+').replace(/_/g,'/')))); }
+    catch(e){ return atob(data.replace(/-/g,'+').replace(/_/g,'/')); }
+  }
+  function buscar(parte, tipoDeseado){
+    if(parte.mimeType===tipoDeseado && parte.body && parte.body.data) return decodeB64Url(parte.body.data);
+    if(parte.parts){
+      for(const p of parte.parts){
+        const r = buscar(p, tipoDeseado);
+        if(r) return r;
+      }
+    }
+    return null;
+  }
+  let texto = buscar(payload, 'text/plain');
+  if(texto) return texto;
+  let html = buscar(payload, 'text/html');
+  if(html) return html.replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+\n/g,'\n').trim();
+  if(payload.body && payload.body.data) return decodeB64Url(payload.body.data);
+  return '(sin contenido de texto)';
+}
+
+async function openCorreoDrawer(messageId){
+  const msg = correoMessagesCache.find(r=>r.id===messageId);
+  if(!msg) return;
+  correoAbiertoActual = msg;
+  document.getElementById('correo-d-from').textContent = msg.from;
+  document.getElementById('correo-d-subject').textContent = msg.subject;
+  document.getElementById('correo-d-date').textContent = msg.date;
+  document.getElementById('correo-d-content').textContent = 'Cargando…';
+  document.getElementById('correo-overlay').classList.add('active');
+  try{
+    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`, {
+      headers: {Authorization: 'Bearer '+gmailAccessToken}
+    });
+    const data = await res.json();
+    document.getElementById('correo-d-content').textContent = extraerCuerpoMensaje(data.payload) || msg.snippet;
+  }catch(err){
+    document.getElementById('correo-d-content').textContent = 'Error al cargar el mensaje: '+(err && err.message ? err.message : err);
+  }
+}
+function closeCorreoDrawer(){ document.getElementById('correo-overlay').classList.remove('active'); }
+
+function replyToCorreo(){
+  if(!correoAbiertoActual) return;
+  closeCorreoDrawer();
+  openComposeDrawer();
+  document.getElementById('mail-to').value = correoAbiertoActual.email;
+  document.getElementById('mail-subject').value = /^re:/i.test(correoAbiertoActual.subject) ? correoAbiertoActual.subject : 'Re: '+correoAbiertoActual.subject;
+  document.getElementById('mail-body').value = '';
+}
+
 async function sendGmail(){
   const to = document.getElementById('mail-to').value.trim();
   const subject = document.getElementById('mail-subject').value.trim();
@@ -3506,9 +3605,7 @@ async function sendGmail(){
     const data = await res.json();
     if(data.error){ statusEl.textContent = 'Error: '+data.error.message; statusEl.style.color = 'var(--red)'; return; }
     statusEl.textContent = 'Enviado ✓'; statusEl.style.color = 'var(--green)';
-    document.getElementById('mail-to').value = '';
-    document.getElementById('mail-subject').value = '';
-    document.getElementById('mail-body').value = '';
+    setTimeout(closeComposeDrawer, 900);
   }catch(err){
     statusEl.textContent = 'Error de red: '+(err && err.message ? err.message : err);
     statusEl.style.color = 'var(--red)';
