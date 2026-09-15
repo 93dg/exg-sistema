@@ -1652,7 +1652,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.26</div>
+        <div class="sub">V0.27</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1762,10 +1762,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <!-- ================= PLANIFICACIÓN ================= -->
     <div class="view" id="view-planificacion">
       <div class="topbar">
-        <div><h1>Planificación</h1><div class="desc">Cuadrante semanal · 8–12 septiembre</div></div>
+        <div><h1>Planificación</h1><div class="desc" id="planif-week-desc">Cuadrante semanal</div></div>
         <div class="quickactions">
-          <button class="btn">◀ Semana anterior</button>
-          <button class="btn">Semana siguiente ▶</button>
+          <button class="btn" onclick="cambiarSemanaPlan(-1)">◀ Semana anterior</button>
+          <button class="btn" onclick="resetSemanaPlan()">Hoy</button>
+          <button class="btn" onclick="cambiarSemanaPlan(1)">Semana siguiente ▶</button>
           <button class="btn dark">Ver mapa</button>
         </div>
       </div>
@@ -4425,11 +4426,43 @@ async function cargarDatosReales(){
 cargarDatosReales();
 
 /* ---------------- CUADRANTE DE PLANIFICACIÓN (flota real) ---------------- */
-const PLANNER_DAYS = ['Lun 8','Mar 9','Mié 10','Jue 11','Vie 12'];
+let planWeekOffset = 0; // 0 = semana actual, +1 = siguiente, -1 = anterior...
+const DIAS_SEMANA_CORTOS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'];
+
+function getSemanaLaboral(offset){
+  const hoy = new Date();
+  const diaSemana = (hoy.getDay() + 6) % 7; // 0=lunes ... 6=domingo
+  const lunes = new Date(hoy);
+  lunes.setDate(hoy.getDate() - diaSemana + offset*7);
+  return [0,1,2,3,4].map(i=>{
+    const d = new Date(lunes);
+    d.setDate(lunes.getDate() + i);
+    return d;
+  });
+}
+function formatDiaCorto(d){ return DIAS_SEMANA_CORTOS[(d.getDay()+6)%7] + ' ' + d.getDate(); }
+
+function cambiarSemanaPlan(delta){
+  planWeekOffset += delta;
+  renderPlanner();
+  initWeather();
+}
+function resetSemanaPlan(){
+  planWeekOffset = 0;
+  renderPlanner();
+  initWeather();
+}
+
 const PLANNER_MACHINES = fleet.filter(m=>!m.name.startsWith('Coche')).map(m=>m.name);
 /* Agenda de ejemplo — se sustituirá por los trabajos reales planificados a medida que les pongas fecha */
 const PLANNER_DEMO = {};
 function renderPlanner(){
+  const dias = getSemanaLaboral(planWeekOffset);
+  document.getElementById('planner-body').closest('table').querySelector('tr').innerHTML =
+    '<th style="text-align:left;padding:8px;">Maquinaria</th>' + dias.map(d=>`<th>${formatDiaCorto(d)}</th>`).join('');
+  const desc = document.getElementById('planif-week-desc');
+  desc.textContent = `Cuadrante semanal · ${dias[0].getDate()}–${dias[4].getDate()} ${MESES_CORTOS[dias[4].getMonth()]}` + (planWeekOffset===0 ? ' (esta semana)' : '');
   document.getElementById('planner-body').innerHTML = PLANNER_MACHINES.map(machineName=>{
     const slots = PLANNER_DEMO[machineName] || [null,null,null,null,null];
     const cells = slots.map(s=>{
@@ -4481,10 +4514,11 @@ async function fetchWeatherReal(){
 }
 
 function renderWeather(){
+  const diasActuales = getSemanaLaboral(0).map(formatDiaCorto);
   document.getElementById('weather-strip').innerHTML = WEATHER_DATA.map((w,i)=>{
     const risky = w.rain>=50;
     return `<div class="weather-day ${risky?'risky':''}">
-      <div class="wd-label">${PLANNER_DAYS[i] || w.date}</div>
+      <div class="wd-label">${diasActuales[i] || w.date}</div>
       <div class="wd-icon">${w.icon}</div>
       <div class="wd-temp">${w.temp}</div>
       <div class="wd-rain">${w.rain}% lluvia</div>
@@ -4502,7 +4536,7 @@ function renderWeather(){
     });
     if(afectados.length){
       const entry = {
-        sev:'red', t:`Lluvia probable el ${PLANNER_DAYS[dayIdx] || w.date} (${w.rain}%)`,
+        sev:'red', t:`Lluvia probable el ${diasActuales[dayIdx] || w.date} (${w.rain}%)`,
         s:`Trabajos al aire libre en riesgo: ${afectados.join(', ')} — valora adelantarlos o moverlos`,
         action:()=>document.querySelector('[data-view="planificacion"]').click()
       };
@@ -4521,6 +4555,16 @@ function renderWeather(){
   }
 }
 async function initWeather(){
+  if(planWeekOffset !== 0){
+    // Open-Meteo solo da previsión real de días próximos — para otras semanas no inventamos datos
+    WEATHER_DATA = [];
+    weatherIsLive = false;
+    renderWeather();
+    const sourceNote = document.getElementById('weather-source');
+    if(sourceNote) sourceNote.textContent = 'La previsión del tiempo solo está disponible para la semana actual';
+    document.getElementById('weather-strip').innerHTML = '<div class="empty">Sin previsión para esta semana — vuelve a "Hoy" para verla.</div>';
+    return;
+  }
   renderWeather(); // pinta lo de ejemplo mientras llega la respuesta real
   try{
     const real = await fetchWeatherReal();
