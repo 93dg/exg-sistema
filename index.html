@@ -444,7 +444,8 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .explorer-crumbs .crumb:hover{background:var(--concrete-2);color:var(--ink);}
 .explorer-crumbs .sep{color:var(--line-dark);}
 .explorer-quick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
-.explorer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
+.explorer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;min-height:80px;border-radius:var(--radius);transition:background 0.15s,outline 0.15s;}
+.explorer-grid.drag-over{background:var(--orange-soft,#FCE8DA);outline:2px dashed var(--orange);outline-offset:-2px;}
 .explorer-item{
   border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);
   padding:10px;cursor:pointer;position:relative;text-align:center;
@@ -1837,12 +1838,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="panel-head">
           <div class="explorer-crumbs" id="explorer-crumbs"></div>
           <div class="quickactions">
-            <label class="btn" style="cursor:pointer;">⬆ Subir archivo<input type="file" id="explorer-upload-input" style="display:none;" onchange="explorerUploadFile(this.files[0])"></label>
+            <label class="btn" style="cursor:pointer;">⬆ Subir archivos<input type="file" id="explorer-upload-input" multiple style="display:none;" onchange="explorerUploadFiles(this.files)"></label>
+            <label class="btn" style="cursor:pointer;">📁 Subir carpeta<input type="file" id="explorer-upload-folder-input" webkitdirectory directory multiple style="display:none;" onchange="explorerUploadFiles(this.files)"></label>
             <button class="btn" onclick="explorerNewFolder()">+ Carpeta</button>
           </div>
         </div>
         <div class="panel-body">
-          <div class="explorer-grid" id="explorer-grid"></div>
+          <div class="explorer-grid" id="explorer-grid" ondragover="explorerDragOver(event)" ondragleave="explorerDragLeave(event)" ondrop="explorerDrop(event)"></div>
+          <div id="explorer-upload-status" class="sub-t" style="margin-top:8px;display:none;"></div>
         </div>
       </div>
       <div class="two-col-note">Esto muestra exactamente lo que hay en el bucket "documentos-exg" de Supabase — nada más. Las carpetas se crean subiendo un archivo dentro o con "+ Carpeta".</div>
@@ -3507,14 +3510,43 @@ function sanitizeFileName(name){
   return clean + ext;
 }
 
-async function explorerUploadFile(file){
-  if(!file) return;
+async function explorerUploadFiles(fileList){
+  if(!fileList || !fileList.length) return;
   if(!sb){ alert('Conecta Supabase primero.'); return; }
-  const safeName = sanitizeFileName(file.name);
-  const dest = (explorerPath ? explorerPath+'/' : '') + safeName;
-  const {error} = await sb.storage.from(DOC_BUCKET).upload(dest, file, {upsert:true});
-  if(error){ alert('Error al subir: '+error.message); return; }
+  const files = Array.from(fileList);
+  const statusEl = document.getElementById('explorer-upload-status');
+  statusEl.style.display = 'block';
+  let ok = 0, fail = 0;
+  for(let i=0; i<files.length; i++){
+    const file = files[i];
+    statusEl.textContent = `Subiendo ${i+1} de ${files.length}: ${file.name}`;
+    // si viene de "Subir carpeta", conserva la subcarpeta original (ya limpia el nombre de cada parte)
+    const relPath = file.webkitRelativePath || '';
+    const parts = relPath ? relPath.split('/').slice(0,-1).map(sanitizeFileName) : [];
+    const safeName = sanitizeFileName(file.name);
+    const dest = [...(explorerPath ? [explorerPath] : []), ...parts, safeName].join('/');
+    try{
+      const {error} = await sb.storage.from(DOC_BUCKET).upload(dest, file, {upsert:true});
+      if(error) fail++; else ok++;
+    }catch(e){ fail++; }
+  }
+  statusEl.textContent = `Listo: ${ok} subido(s)${fail ? `, ${fail} con error` : ''}.`;
+  setTimeout(()=>{ statusEl.style.display = 'none'; }, 4000);
   loadExplorer(explorerPath);
+}
+
+function explorerDragOver(e){
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+function explorerDragLeave(e){
+  e.currentTarget.classList.remove('drag-over');
+}
+function explorerDrop(e){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const files = e.dataTransfer.files;
+  if(files && files.length) explorerUploadFiles(files);
 }
 
 function explorerNewFolder(){
