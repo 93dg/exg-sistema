@@ -1571,7 +1571,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.5</div>
+        <div class="sub">V0.6</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2257,6 +2257,18 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <li><b>sin-clasificar/</b> → lo que no encaja en ninguna categoría todavía, nunca se inventa un cajón nuevo sobre la marcha.</li>
           </ul>
           <p class="two-col-note" style="margin-top:14px;">Regla para saber dónde va cada cosa: si es dinero → Economía o Facturas; si es una máquina → Flota; si es un sitio → Mapa; si es un documento → Archivos; si acaba de llegar y no está clasificado → Entradas. Nombres de carpeta: minúsculas, con guiones, sin acentos — igual siempre, sin excepciones sueltas.</p>
+
+          <p class="two-col-note" style="margin:18px 0 6px;"><b>Inventario técnico — con esto se puede reconstruir el sistema entero desde cero:</b></p>
+          <ul class="sis-list">
+            <li><b>Hosting web</b> — GitHub Pages. Repositorio: <code>github.com/93dg/exg-sistema</code>, rama <code>main</code>, archivo <code>index.html</code> en la raíz. URL pública: <code>https://93dg.github.io/exg-sistema/</code>. Cada versión estructural se etiqueta en el repo (v0.1, v0.2...) para poder volver atrás.</li>
+            <li><b>Base de datos</b> — Supabase, proyecto "EXG", ref <code>sshctqnpuolawtcujxkt</code>, región eu-central-1, plan Pro.</li>
+            <li><b>Tablas en Supabase</b> — <code>documentos</code> (bandeja de triage de Entradas), <code>sistema</code> (protocolos/mejora/decisiones), <code>entidades</code> (clientes y proveedores), <code>flota</code>, <code>trabajos</code>, <code>documentos_economicos</code> (facturas/albaranes/gastos/cobros/impuestos con flujo de 4 estados), <code>correo_estado</code> (categoría y entidad vinculada de cada correo). Todas con RLS activado, solo accesibles a usuarios autenticados.</li>
+            <li><b>Storage</b> — bucket <code>documentos-exg</code>, público, límite 500 MB por archivo. Ahí vive el archivo físico real (ver estructura de carpetas arriba).</li>
+            <li><b>Usuarios (Supabase Auth)</b> — <code>dg@exg.local</code> (admin, ve Sistema y Configuración), <code>rg@exg.local</code> y <code>mg@exg.local</code> (equipo). En pantalla solo se escribe el usuario corto (dg/rg/mg), la web añade <code>@exg.local</code> sola.</li>
+            <li><b>Correo</b> — Gmail API vía Google Identity Services (OAuth solo de cliente, sin backend). Proyecto de Google Cloud "EXG Sistema", cliente OAuth con origen autorizado <code>https://93dg.github.io</code>, permisos <code>gmail.readonly</code> y <code>gmail.send</code>. App en modo prueba: solo los correos añadidos como "usuarios de prueba" en Google Cloud pueden conectar.</li>
+            <li><b>Mapa</b> — Leaflet, capas en vivo del IGN: <code>IGNBaseTodo</code> (nombres/topónimos) vía WMS <code>wms-inspire/ign-base</code>, y <code>OI.OrthoimageCoverage</code> (satélite PNOA) vía WMS <code>wms-inspire/pnoa-ma</code>. Necesita internet.</li>
+            <li><b>Secciones de la web (menú)</b> — Centro de control, Planificación, Mapa, Trabajos, Entradas, Archivos, Flota, Clientes, Ayuntamiento, Facturas, Economía, Correo, y (solo admin) Sistema y Configuración.</li>
+          </ul>
         </div></div>
       </div>
 
@@ -3379,6 +3391,11 @@ const GMAIL_CLIENT_ID = '86457265161-d04tdo3paksi8v8qj05lnv3snf23me77.apps.googl
 const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send';
 let gmailTokenClient = null;
 let gmailAccessToken = sessionStorage.getItem('gmail_token') || null;
+let gmailTokenExpiry = Number(sessionStorage.getItem('gmail_token_expiry') || 0);
+
+function gmailTokenValido(){
+  return gmailAccessToken && Date.now() < gmailTokenExpiry - 30000; // 30s de margen
+}
 
 function initGmailAuth(){
   if(typeof google === 'undefined' || !google.accounts) { setTimeout(initGmailAuth, 500); return; }
@@ -3386,18 +3403,42 @@ function initGmailAuth(){
     client_id: GMAIL_CLIENT_ID,
     scope: GMAIL_SCOPES,
     callback: (resp)=>{
-      if(resp.error){ alert('No se pudo conectar con Gmail: '+resp.error); return; }
+      if(resp.error){
+        // el intento silencioso falló (o el usuario cerró la ventana) — mostramos el botón para que entre a mano
+        document.getElementById('correo-auth-actions').innerHTML = '<button class="btn primary" id="correo-connect-btn" onclick="connectGmail()">Conectar con Gmail</button>';
+        return;
+      }
       gmailAccessToken = resp.access_token;
+      gmailTokenExpiry = Date.now() + (Number(resp.expires_in || 3600) * 1000);
       sessionStorage.setItem('gmail_token', gmailAccessToken);
+      sessionStorage.setItem('gmail_token_expiry', String(gmailTokenExpiry));
       showGmailConnected();
       loadGmailInbox();
     },
   });
-  if(gmailAccessToken){ showGmailConnected(); loadGmailInbox(); }
+  if(gmailTokenValido()){
+    showGmailConnected();
+    loadGmailInbox();
+  } else if(gmailAccessToken){
+    // había sesión pero el token caducó (dura 1h) — pedimos uno nuevo en silencio, sin ventana emergente
+    gmailTokenClient.requestAccessToken({prompt:''});
+  }
 }
 function connectGmail(){
   if(!gmailTokenClient){ alert('Todavía está cargando la conexión con Google, espera un segundo y vuelve a pulsar.'); return; }
   gmailTokenClient.requestAccessToken();
+}
+async function asegurarTokenGmail(){
+  if(gmailTokenValido()) return true;
+  return new Promise((resolve)=>{
+    const original = gmailTokenClient.callback;
+    gmailTokenClient.callback = (resp)=>{
+      gmailTokenClient.callback = original;
+      original(resp);
+      resolve(!resp.error);
+    };
+    gmailTokenClient.requestAccessToken({prompt:''});
+  });
 }
 function showGmailConnected(){
   document.getElementById('correo-auth-actions').innerHTML = '<span class="sub-t" style="color:var(--green);font-weight:700;">✓ Conectado a Gmail</span>';
@@ -3435,6 +3476,7 @@ async function fetchMailDetail(m){
 async function loadGmailInbox(){
   const box = document.getElementById('correo-inbox');
   if(!gmailAccessToken){ box.innerHTML = '<div class="empty">Conecta primero con Gmail.</div>'; return; }
+  await asegurarTokenGmail();
   box.innerHTML = '<div class="empty">Cargando…</div>';
   try{
     if(sb){
@@ -3463,6 +3505,7 @@ async function loadGmailInbox(){
 
 async function loadMoreGmailInbox(){
   if(!correoNextPageToken) return;
+  await asegurarTokenGmail();
   const btn = document.getElementById('correo-load-more-btn');
   if(btn){ btn.disabled = true; btn.textContent = 'Cargando…'; }
   try{
@@ -3581,6 +3624,7 @@ function extraerCuerpoMensaje(payload){
 async function openCorreoDrawer(messageId){
   const msg = correoMessagesCache.find(r=>r.id===messageId);
   if(!msg) return;
+  await asegurarTokenGmail();
   correoAbiertoActual = msg;
   document.getElementById('correo-d-from').textContent = msg.from;
   document.getElementById('correo-d-subject').textContent = msg.subject;
@@ -3615,6 +3659,7 @@ async function sendGmail(){
   const statusEl = document.getElementById('mail-send-status');
   if(!to || !subject){ statusEl.textContent = 'Falta destinatario o asunto.'; statusEl.style.color = 'var(--red)'; return; }
   if(!gmailAccessToken){ statusEl.textContent = 'Conecta primero con Gmail.'; statusEl.style.color = 'var(--red)'; return; }
+  await asegurarTokenGmail();
   const raw = b64urlEncode(`To: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n${body}`);
   statusEl.textContent = 'Enviando…'; statusEl.style.color = 'var(--ink-soft)';
   try{
