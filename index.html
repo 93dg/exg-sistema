@@ -1571,7 +1571,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.7</div>
+        <div class="sub">V0.8</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2365,6 +2365,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div id="correo-d-content" style="max-height:55vh;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);"></div>
           <div class="state-row" style="margin-top:14px;">
             <button class="btn primary" onclick="replyToCorreo()">↩ Responder</button>
+            <button class="btn" onclick="archivarCorreo()">📥 Archivar</button>
+            <button class="btn" style="color:var(--red);" onclick="borrarCorreo()">🗑 Borrar</button>
           </div>
         </div>
       </div>
@@ -3388,7 +3390,7 @@ loadSistema();
 
 /* ---------------- CORREO (Gmail) ---------------- */
 const GMAIL_CLIENT_ID = '86457265161-d04tdo3paksi8v8qj05lnv3snf23me77.apps.googleusercontent.com';
-const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send';
+const GMAIL_SCOPES = 'https://mail.google.com/ https://www.googleapis.com/auth/gmail.settings.basic https://www.googleapis.com/auth/gmail.settings.sharing';
 let gmailTokenClient = null;
 let gmailAccessToken = sessionStorage.getItem('gmail_token') || null;
 let gmailTokenExpiry = Number(sessionStorage.getItem('gmail_token_expiry') || 0);
@@ -3657,6 +3659,29 @@ async function openCorreoDrawer(messageId){
   }
 }
 function closeCorreoDrawer(){ document.getElementById('correo-overlay').classList.remove('active'); }
+
+async function archivarCorreo(){
+  if(!correoAbiertoActual) return;
+  await asegurarTokenGmail();
+  await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${correoAbiertoActual.id}/modify`, {
+    method:'POST', headers:{Authorization:'Bearer '+gmailAccessToken,'Content-Type':'application/json'},
+    body: JSON.stringify({removeLabelIds:['INBOX']})
+  });
+  correoMessagesCache = correoMessagesCache.filter(r=>r.id!==correoAbiertoActual.id);
+  closeCorreoDrawer();
+  renderCorreoInbox();
+}
+async function borrarCorreo(){
+  if(!correoAbiertoActual) return;
+  if(!confirm('¿Mover este correo a la papelera?')) return;
+  await asegurarTokenGmail();
+  await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${correoAbiertoActual.id}/trash`, {
+    method:'POST', headers:{Authorization:'Bearer '+gmailAccessToken}
+  });
+  correoMessagesCache = correoMessagesCache.filter(r=>r.id!==correoAbiertoActual.id);
+  closeCorreoDrawer();
+  renderCorreoInbox();
+}
 
 function replyToCorreo(){
   if(!correoAbiertoActual) return;
