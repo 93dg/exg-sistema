@@ -1652,7 +1652,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.24</div>
+        <div class="sub">V0.25</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2936,6 +2936,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <button type="button" class="btn" id="ni-draft" onclick="submitNewInvoice(event, true)">Guardar como borrador</button>
         <button type="button" class="btn dark" id="ni-preview-btn" onclick="togglePreview()">Vista previa de impresión</button>
         <button type="button" class="btn dark" onclick="descargarPDF()">⬇ Descargar PDF</button>
+        <button type="button" class="btn primary" id="ni-convert-btn" style="display:none;" onclick="convertirDocumento()">Convertir en albarán</button>
         <button type="submit" class="btn primary ie-submit" id="ni-submit">Crear factura</button>
       </div>
     </form>
@@ -5734,6 +5735,46 @@ async function wizGuardar(isDraft){
 }
 
 
+let convirtiendoDesde = null; // {origenId, origenTipo} — para encadenar presupuesto→albarán→factura sin repetir datos
+
+function convertirDocumento(){
+  const origen = documentosRealesById[editingDocId];
+  if(!origen) return;
+  const siguienteTipo = origen.type==='albaran' ? 'factura' : 'albaran';
+  convirtiendoDesde = {origenId: origen.id, origenTipo: origen.type};
+  const items = origen.items.map(i=>({...i}));
+  closeNewInvoiceModal();
+  editingDocId = null;
+
+  if(window.matchMedia('(max-width: 768px)').matches){
+    openInvoiceWizard({tipo: siguienteTipo, clientName: origen.client, jobLabel: origen.job==='—' ? null : origen.job});
+    wiz.conceptos = items.map(i=>({desc: i.concept, cantidad: Number(i.qty)||1, precio: i.price}));
+    wiz.i = wiz.pasos.indexOf('revision');
+    wizRender();
+    return;
+  }
+
+  document.getElementById('ni-doctype').value = siguienteTipo;
+  document.getElementById('ni-doctype').disabled = false;
+  document.getElementById('ie-items-body').innerHTML = '';
+  document.getElementById('ie-iva-pct').value = origen.ivaPct || 21;
+  document.getElementById('ni-client').value = origen.client;
+  document.getElementById('ni-job').value = origen.job==='—' ? '' : origen.job;
+  document.getElementById('ni-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('ni-payment').value = origen.payment || 'Transferencia';
+  document.getElementById('ni-iban').value = origen.iban || 'ES40 3187 0588 5420 6788 5612';
+  document.getElementById('ni-titular').value = origen.titular || 'RAFAEL GÓMEZ MARTÍNEZ';
+  onClientChange();
+  items.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine));
+  const cfg = DOC_TYPES[siguienteTipo];
+  document.getElementById('ni-docnum').value = cfg.prefix + cfg.seqRef();
+  document.getElementById('ie-preview-pane').style.display = 'none';
+  document.getElementById('ie-paper-edit').style.display = 'block';
+  document.getElementById('ni-convert-btn').style.display = 'none';
+  onDocTypeChange();
+  document.getElementById('newinvoice-overlay').classList.add('active');
+}
+
 function openDocumentViewer(id){
   const doc = documentosRealesById[id];
   if(!doc){ alert('No se encuentra este documento.'); return; }
@@ -5761,6 +5802,14 @@ function openDocumentViewer(id){
   document.getElementById('ie-preview-pane').style.display = 'none';
   document.getElementById('ie-paper-edit').style.display = 'block';
   document.getElementById('ni-preview-btn').textContent = 'Vista previa de impresión';
+  const convBtn = document.getElementById('ni-convert-btn');
+  if(doc.type==='presupuesto' || doc.type==='proforma'){
+    convBtn.style.display = ''; convBtn.textContent = 'Convertir en albarán';
+  } else if(doc.type==='albaran'){
+    convBtn.style.display = ''; convBtn.textContent = 'Convertir en factura';
+  } else {
+    convBtn.style.display = 'none';
+  }
   recalcTotals();
   document.getElementById('newinvoice-overlay').classList.add('active');
 }
@@ -5811,6 +5860,10 @@ async function submitNewInvoice(ev, isDraft){
     trabajo_id: trabajo ? trabajo.id : null,
     importe: total, concepto: conceptoResumen, conceptos,
   };
+  if(convirtiendoDesde){
+    if(convirtiendoDesde.origenTipo==='albaran') payload.origen_albaran_ids = [convirtiendoDesde.origenId];
+    else payload.documento_relacionado_id = convirtiendoDesde.origenId;
+  }
 
   let savedId = editingDocId;
   try{
@@ -5862,6 +5915,7 @@ async function submitNewInvoice(ev, isDraft){
   }
 
   editingDocId = null;
+  convirtiendoDesde = null;
   closeNewInvoiceModal();
   return false;
 }
