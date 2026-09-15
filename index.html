@@ -1652,7 +1652,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.28</div>
+        <div class="sub">V0.29</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -4900,14 +4900,17 @@ function openClientDrawer(name){
   document.getElementById('c-tarifa').textContent = c.tarifa;
   document.getElementById('c-prio').textContent = c.prio;
   document.getElementById('c-pago').textContent = '—';
-  document.getElementById('c-fact').textContent = c.fact;
-  document.getElementById('c-pend').textContent = c.pend;
+  const cDocs = Object.values(documentosRealesById).filter(d=>d.entidad_id === c.id && d.type!=='albaran');
+  const facturasEsteAnio = cDocs.filter(d=>d.type==='factura' && d.status!=='Borrador' && new Date().getFullYear()===Number((d.dateRaw||'').slice(0,4)));
+  const totalFacturado = facturasEsteAnio.reduce((s,d)=>s+(d.total||0),0);
+  const totalPendiente = cDocs.filter(d=>d.type==='factura' && d.status==='Pendiente').reduce((s,d)=>s+(d.total||0),0);
+  document.getElementById('c-fact').textContent = totalFacturado.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+  document.getElementById('c-pend').textContent = totalPendiente.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
   const cJobs = jobs.filter(j=>j.client===name);
   document.getElementById('c-jobs-tbl').innerHTML = '<tr><th>Código</th><th>Fecha</th><th>Estado</th><th class="num">Precio</th></tr>' +
     (cJobs.length ? cJobs.map(j=>`<tr onclick="closeClientDrawer();openJobDrawer('${j.code}')"><td class="mono">${j.code}</td><td>${j.date}</td><td>${pill(j.state)}</td><td class="num">${j.price}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">Sin trabajos registrados</td></tr>');
-  const cDocs = facturasReales.filter(d=>d.cliente===name);
-  document.getElementById('c-docs-tbl').innerHTML = '<tr><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Archivo original</th></tr>' +
-    (cDocs.length ? cDocs.map(d=>`<tr><td class="mono">${d.num}</td><td>${d.fecha}</td><td class="num">${d.importe}</td><td class="mono" style="font-size:11.5px;">${d.archivo}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">Sin documentos en la muestra actual</td></tr>');
+  document.getElementById('c-docs-tbl').innerHTML = '<tr><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Tipo</th></tr>' +
+    (cDocs.length ? cDocs.map(d=>`<tr onclick="closeClientDrawer();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td class="mono">${d.num||'—'}</td><td>${d.dateLabel}</td><td class="num">${d.amountLabel}</td><td>${DOC_TYPES[d.type] ? DOC_TYPES[d.type].title : d.type}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">Sin documentos todavía</td></tr>');
   document.getElementById('client-overlay').classList.add('active');
 }
 function closeClientDrawer(){ document.getElementById('client-overlay').classList.remove('active'); }
@@ -6013,6 +6016,7 @@ async function cargarDocumentosEconomicosReales(){
         document.getElementById('econ-presupuestos-tbody')?.appendChild(row);
       }
     });
+    renderFacturasKPIs();
   }catch(err){ console.error('No se pudieron cargar los documentos reales', err); }
 }
 cargarDocumentosEconomicosReales();
