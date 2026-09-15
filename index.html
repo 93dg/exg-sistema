@@ -1652,7 +1652,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.31</div>
+        <div class="sub">V0.32</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1688,7 +1688,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
         <div class="quickactions">
           <button class="btn" onclick="openNewJobModal()">+ Nuevo trabajo</button>
-          <button class="btn" style="border-color:var(--red);color:var(--red);">⚠ Avería</button>
+          <button class="btn" style="border-color:var(--red);color:var(--red);" onclick="abrirAveria()">⚠ Avería</button>
           <button class="btn primary" onclick="openNewInvoiceModal()">+ Crear factura</button>
         </div>
       </div>
@@ -1959,7 +1959,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="topbar">
         <div><h1>Flota y maquinaria</h1><div class="desc">Estado, mantenimiento, documentación y repuestos</div></div>
         <div class="quickactions">
-          <button class="btn" style="border-color:var(--red);color:var(--red);" onclick="openBreakdownDrawer('B-014')">⚠ Avería</button>
+          <button class="btn" style="border-color:var(--red);color:var(--red);" onclick="abrirAveria()">⚠ Avería</button>
           <button class="btn primary" onclick="addMaquina()">+ Añadir máquina</button>
         </div>
       </div>
@@ -2627,19 +2627,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="drawer-body">
       <div class="block">
         <h4>Estado</h4>
-        <div class="state-row">
+        <div class="state-row" id="b-estado-row">
           <div class="state-btn current">Maquinaria no disponible</div>
         </div>
       </div>
       <div class="block">
         <h4>Diagnóstico</h4>
         <div class="field-grid">
-          <div class="field"><div class="l">Fecha</div><div class="v">9 sept 2026</div></div>
-          <div class="field"><div class="l">Reparó</div><div class="v">Rafa</div></div>
-          <div class="field"><div class="l">Síntoma</div><div class="v">Fuga hidráulica en el cazo</div></div>
-          <div class="field"><div class="l">Diagnóstico</div><div class="v">Latiguillo hidráulico dañado</div></div>
-          <div class="field"><div class="l">Tiempo parada</div><div class="v">2 días (en curso)</div></div>
-          <div class="field"><div class="l">Coste piezas</div><div class="v">— pendiente de cerrar</div></div>
+          <div class="field"><div class="l">Fecha</div><div class="v" id="b-fecha">—</div></div>
+          <div class="field"><div class="l">Síntoma</div><div class="v" id="b-sintoma">—</div></div>
+          <div class="field"><div class="l">Tiempo parada</div><div class="v" id="b-downtime">—</div></div>
         </div>
       </div>
       <div class="block">
@@ -2648,20 +2645,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <tr><th>Código</th><th>Cliente</th><th>Fecha prevista</th><th>Acción</th></tr>
           <tbody id="b-afectados-tbody"></tbody>
         </table>
-        <div style="margin-top:10px;"><button class="btn">Reasignar a otra máquina disponible</button></div>
       </div>
-      <div class="block">
-        <h4>Piezas utilizadas</h4>
-        <div class="docs-grid">
-          <div class="doc-chip">Latiguillo hidráulico 1/2" (stock -1)</div>
-        </div>
-      </div>
-      <div class="block">
-        <h4>Historial</h4>
-        <div class="alert-row"><div class="alert-dot red"></div><div><div class="t">Avería detectada — máquina bloqueada</div><div class="s">9 sept, 08:15</div></div></div>
-        <div class="alert-row"><div class="alert-dot yellow"></div><div><div class="t">Reparación en curso</div><div class="s">9 sept, 09:00</div></div></div>
-      </div>
-      <button class="btn primary" style="width:100%;">Marcar como reparada — volver a operativa</button>
+      <button class="btn primary" style="width:100%;" id="b-reparada-btn">Marcar como reparada — volver a operativa</button>
     </div>
   </div>
 </div>
@@ -3116,17 +3101,119 @@ setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-pr
 setupSubtabs('entradas-subtabs','entradas',{bandeja:'sub-bandeja',whatsapp:'sub-whatsapp'});
 setupSubtabs('sistema-subtabs','sis',{principios:'sis-principios',organizacion:'sis-organizacion',protocolos:'sis-protocolos',criterios:'sis-criterios',estandares:'sis-estandares',mejora:'sis-mejora',historial:'sis-historial'});
 
-/* ---------------- AVERÍAS ---------------- */
-const breakdowns = [];
-document.getElementById('breakdowns-tbl').innerHTML = breakdowns.map(b=>`
-  <tr onclick="openBreakdownDrawer('${b.code}')">
-    <td class="mono">${b.code}</td><td>${b.date}</td><td>${b.machine}</td><td>${b.symptom}</td><td>${b.who}</td>
-    <td class="num">${b.downtime}</td><td class="num">${b.cost}</td>
-    <td>${b.state==='encurso'?'<span class="pill encurso">Activa</span>':'<span class="pill terminado">Resuelta</span>'}</td>
-  </tr>`).join('');
+/* ---------------- AVERÍAS (reales, en Supabase) ---------------- */
+const averiasById = {};
 
-function openBreakdownDrawer(code){ document.getElementById('breakdown-overlay').classList.add('active'); }
+function renderBreakdownsTable(){
+  const rows = Object.values(averiasById).sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
+  document.getElementById('breakdowns-tbl').innerHTML = rows.map(b=>`
+    <tr onclick="openBreakdownDrawer('${b.id}')">
+      <td class="mono">${b.codigoCorto}</td><td>${b.fechaLabel}</td><td>${b.machineName}</td><td>${b.sintoma}</td><td>—</td>
+      <td class="num">${b.downtimeLabel}</td><td class="num">—</td>
+      <td>${b.resuelta_at ? '<span class="pill terminado">Resuelta</span>' : '<span class="pill encurso">Activa</span>'}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="empty">Sin averías registradas</td></tr>';
+}
+
+async function cargarAveriasReales(){
+  if(!sb) return;
+  try{
+    const {data, error} = await sb.from('averias').select('*').order('created_at',{ascending:false});
+    if(error || !data) return;
+    data.forEach(a=>{
+      const maquina = fleet.find(f=>f.id===a.flota_id);
+      const d = new Date(a.created_at);
+      const fechaLabel = d.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][d.getMonth()];
+      let downtimeLabel = '—';
+      if(a.resuelta_at){
+        const horas = Math.round((new Date(a.resuelta_at) - d) / 3600000);
+        downtimeLabel = horas < 24 ? horas+'h' : Math.round(horas/24)+' días';
+      } else {
+        downtimeLabel = 'en curso';
+      }
+      averiasById[a.id] = {...a, machineName: maquina ? maquina.name : 'Máquina eliminada', codigoCorto: 'B-'+a.id.slice(0,4), fechaLabel, downtimeLabel};
+    });
+    renderBreakdownsTable();
+  }catch(err){ console.error('No se pudieron cargar las averías', err); }
+}
+cargarAveriasReales();
+
+async function abrirAveria(){
+  if(!sb){ alert('Supabase no está conectado.'); return; }
+  const disponibles = fleet.filter(f=>f.state!=='averia');
+  if(!disponibles.length){ alert('No hay máquinas disponibles para marcar.'); return; }
+  const opciones = disponibles.map((m,i)=>`${i+1}. ${m.name}`).join('\n');
+  const resp = prompt(`¿Qué máquina tiene la avería? Escribe el número:\n\n${opciones}`);
+  if(!resp) return;
+  const num = parseInt(resp.trim(),10);
+  const maquina = disponibles[num-1];
+  if(!maquina){ alert('No he entendido cuál — vuelve a intentarlo.'); return; }
+  const sintoma = prompt('¿Qué le pasa? (síntoma)');
+  if(!sintoma || !sintoma.trim()) return;
+
+  const {data, error} = await sb.from('averias').insert({flota_id: maquina.id, sintoma: sintoma.trim()}).select().single();
+  if(error){ alert('Error al guardar: '+errText(error)); return; }
+  await sb.from('flota').update({estado:'averia'}).eq('id', maquina.id);
+  maquina.state = 'averia';
+  renderFleetGrid();
+
+  const d = new Date(data.created_at);
+  averiasById[data.id] = {...data, machineName: maquina.name, codigoCorto: 'B-'+data.id.slice(0,4),
+    fechaLabel: d.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][d.getMonth()], downtimeLabel:'en curso'};
+  renderBreakdownsTable();
+  openBreakdownDrawer(data.id);
+}
+
+function openBreakdownDrawer(id){
+  const b = averiasById[id];
+  if(!b){ alert('No se encuentra esta avería.'); return; }
+  document.getElementById('b-code').textContent = b.codigoCorto;
+  document.getElementById('b-machine').textContent = b.machineName;
+  document.getElementById('b-sintoma').textContent = b.sintoma || '—';
+  document.getElementById('b-fecha').textContent = b.fechaLabel;
+  document.getElementById('b-downtime').textContent = b.downtimeLabel;
+  document.getElementById('b-estado-row').innerHTML = b.resuelta_at
+    ? '<div class="state-btn current">Resuelta — máquina operativa</div>'
+    : '<div class="state-btn current">Maquinaria no disponible</div>';
+  const afectados = jobs.filter(j => (j.machines||[]).includes(b.machineName) && ['planificado','porconfirmar','confirmado','encurso'].includes(j.state));
+  document.getElementById('b-afectados-tbody').innerHTML = afectados.length
+    ? afectados.map(j=>`<tr><td class="mono">${j.code}</td><td>${j.client}</td><td>${j.date}</td><td><button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();reasignarMaquina('${j.code}','${b.machineName.replace(/'/g,"\\'")}')">Reasignar</button></td></tr>`).join('')
+    : '<tr><td colspan="4" class="empty">Sin trabajos afectados</td></tr>';
+  document.getElementById('b-reparada-btn').style.display = b.resuelta_at ? 'none' : '';
+  document.getElementById('b-reparada-btn').onclick = () => marcarReparada(id);
+  document.getElementById('breakdown-overlay').classList.add('active');
+}
 function closeBreakdownDrawer(){ document.getElementById('breakdown-overlay').classList.remove('active'); }
+
+async function marcarReparada(id){
+  const b = averiasById[id];
+  if(!b || !sb) return;
+  const {error} = await sb.from('averias').update({resuelta_at: new Date().toISOString()}).eq('id', id);
+  if(error){ alert('Error al guardar: '+errText(error)); return; }
+  await sb.from('flota').update({estado:'activo'}).eq('id', b.flota_id);
+  const maquina = fleet.find(f=>f.id===b.flota_id);
+  if(maquina) maquina.state = 'disponible';
+  renderFleetGrid();
+  b.resuelta_at = new Date().toISOString();
+  b.downtimeLabel = 'reparada';
+  renderBreakdownsTable();
+  closeBreakdownDrawer();
+}
+
+function reasignarMaquina(jobCode, maquinaVieja){
+  const j = jobs.find(x=>x.code===jobCode);
+  if(!j) return;
+  const disponibles = fleet.filter(f=>f.state!=='averia' && f.name!==maquinaVieja);
+  if(!disponibles.length){ alert('No hay otra máquina disponible ahora mismo.'); return; }
+  const opciones = disponibles.map((m,i)=>`${i+1}. ${m.name}`).join('\n');
+  const resp = prompt(`Reasignar "${j.code}" a qué máquina:\n\n${opciones}`);
+  if(!resp) return;
+  const maquina = disponibles[parseInt(resp.trim(),10)-1];
+  if(!maquina) return;
+  j.machines = (j.machines||[]).filter(m=>m!==maquinaVieja).concat([maquina.name]);
+  j.machine = j.machines.join(', ');
+  renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
+  alert(`Hecho — "${j.code}" reasignado a ${maquina.name}. (La asignación de máquina a un trabajo todavía no se guarda en Supabase, solo aquí en la sesión — es una limitación general, no solo de averías.)`);
+}
 
 /* ---------------- ENTRADA drawer ---------------- */
 function openEntryDrawer(src, title){
@@ -4414,11 +4501,13 @@ async function addMaquina(){
   const name = prompt('Nombre de la máquina (ej. "Excavadora 3"):');
   if(!name || !name.trim()) return;
   const type = prompt('Tipo/modelo (ej. "CASE 580 Super LE"):') || '';
-  fleet.push({name: name.trim(), type, state:'disponible', hours:'—', loc:'Nave Calle Industria', next:'Sin asignar'});
+  const nuevaMaquina = {name: name.trim(), type, state:'disponible', hours:'—', loc:'Nave Calle Industria', next:'Sin asignar'};
+  fleet.push(nuevaMaquina);
   renderFleetGrid();
   if(sb){
-    const {error} = await sb.from('flota').insert({nombre: name.trim(), tipo: type, estado:'activo'});
+    const {data, error} = await sb.from('flota').insert({nombre: name.trim(), tipo: type, estado:'activo'}).select().single();
     if(error){ alert('Se añadió aquí, pero no se pudo guardar en Supabase: '+error.message); }
+    else nuevaMaquina.id = data.id;
   } else {
     alert('Se añadió aquí, pero Supabase no está conectado — no quedará guardado al recargar.');
   }
@@ -4444,7 +4533,7 @@ async function cargarDatosReales(){
     if(flotaReal && flotaReal.length){
       flotaReal.forEach(m=>{
         if(fleet.some(f=>f.name===m.nombre)) return;
-        fleet.push({name: m.nombre, type: m.tipo || '', state: m.estado==='activo' ? 'disponible' : m.estado, hours:'—', loc:'Nave Calle Industria', next:'Sin asignar'});
+        fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', state: m.estado==='activo' ? 'disponible' : m.estado, hours:'—', loc:'Nave Calle Industria', next:'Sin asignar'});
       });
       renderFleetGrid();
     }
