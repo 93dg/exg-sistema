@@ -1571,7 +1571,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.6</div>
+        <div class="sub">V0.7</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2362,7 +2362,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
         <div class="drawer-body">
           <div class="sub-t" style="margin-bottom:14px;" id="correo-d-date"></div>
-          <div id="correo-d-content" style="white-space:pre-wrap;font-size:13.5px;line-height:1.6;max-height:50vh;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);padding:14px;background:var(--paper);"></div>
+          <div id="correo-d-content" style="max-height:55vh;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);"></div>
           <div class="state-row" style="margin-top:14px;">
             <button class="btn primary" onclick="replyToCorreo()">↩ Responder</button>
           </div>
@@ -3598,7 +3598,7 @@ function closeComposeDrawer(){
 let correoAbiertoActual = null;
 
 function extraerCuerpoMensaje(payload){
-  if(!payload) return '';
+  if(!payload) return {tipo:'texto', contenido:''};
   function decodeB64Url(data){
     try{ return decodeURIComponent(escape(atob(data.replace(/-/g,'+').replace(/_/g,'/')))); }
     catch(e){ return atob(data.replace(/-/g,'+').replace(/_/g,'/')); }
@@ -3613,12 +3613,21 @@ function extraerCuerpoMensaje(payload){
     }
     return null;
   }
-  let texto = buscar(payload, 'text/plain');
-  if(texto) return texto;
+  // preferimos el HTML real (se ve como un correo de verdad), el texto plano queda de reserva
   let html = buscar(payload, 'text/html');
-  if(html) return html.replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+\n/g,'\n').trim();
-  if(payload.body && payload.body.data) return decodeB64Url(payload.body.data);
-  return '(sin contenido de texto)';
+  if(html) return {tipo:'html', contenido: html};
+  let texto = buscar(payload, 'text/plain');
+  if(texto) return {tipo:'texto', contenido: texto};
+  if(payload.body && payload.body.data) return {tipo:'texto', contenido: decodeB64Url(payload.body.data)};
+  return {tipo:'texto', contenido:'(sin contenido)'};
+}
+
+function limpiarHtmlCorreo(html){
+  // quita scripts y manejadores de eventos in-line, básico pero suficiente para mostrar sin ejecutar nada
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi,'')
+    .replace(/\son\w+="[^"]*"/gi,'')
+    .replace(/\son\w+='[^']*'/gi,'');
 }
 
 async function openCorreoDrawer(messageId){
@@ -3626,19 +3635,25 @@ async function openCorreoDrawer(messageId){
   if(!msg) return;
   await asegurarTokenGmail();
   correoAbiertoActual = msg;
-  document.getElementById('correo-d-from').textContent = msg.from;
+  document.getElementById('correo-d-from').innerHTML = `<div style="display:flex;align-items:center;gap:8px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--asphalt-2);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;">${(msg.nombreRemitente||'?').charAt(0).toUpperCase()}</div><div><b>${msg.nombreRemitente}</b> <span style="color:var(--ink-soft);">&lt;${msg.email}&gt;</span></div></div>`;
   document.getElementById('correo-d-subject').textContent = msg.subject;
   document.getElementById('correo-d-date').textContent = msg.date;
-  document.getElementById('correo-d-content').textContent = 'Cargando…';
+  document.getElementById('correo-d-content').innerHTML = '<div class="empty">Cargando…</div>';
   document.getElementById('correo-overlay').classList.add('active');
   try{
     const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`, {
       headers: {Authorization: 'Bearer '+gmailAccessToken}
     });
     const data = await res.json();
-    document.getElementById('correo-d-content').textContent = extraerCuerpoMensaje(data.payload) || msg.snippet;
+    const cuerpo = extraerCuerpoMensaje(data.payload);
+    const box = document.getElementById('correo-d-content');
+    if(cuerpo.tipo==='html'){
+      box.innerHTML = `<iframe sandbox="allow-popups allow-popups-to-escape-sandbox" style="width:100%;height:50vh;border:none;background:#fff;" srcdoc="${limpiarHtmlCorreo(cuerpo.contenido).replace(/"/g,'&quot;')}"></iframe>`;
+    } else {
+      box.innerHTML = `<div style="white-space:pre-wrap;font-size:13.5px;line-height:1.6;padding:4px;">${(cuerpo.contenido || msg.snippet).replace(/</g,'&lt;')}</div>`;
+    }
   }catch(err){
-    document.getElementById('correo-d-content').textContent = 'Error al cargar el mensaje: '+(err && err.message ? err.message : err);
+    document.getElementById('correo-d-content').innerHTML = `<div class="empty" style="color:var(--red);">Error al cargar el mensaje: ${err && err.message ? err.message : err}</div>`;
   }
 }
 function closeCorreoDrawer(){ document.getElementById('correo-overlay').classList.remove('active'); }
