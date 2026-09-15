@@ -1642,7 +1642,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.18</div>
+        <div class="sub">V0.19</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -3484,6 +3484,16 @@ function guardarTokenGmail(access_token, expires_in){
   sessionStorage.setItem('gmail_token_expiry', String(gmailTokenExpiry));
 }
 
+async function leerErrorFuncion(error){
+  try{
+    if(error && error.context && typeof error.context.json === 'function'){
+      const body = await error.context.clone().json();
+      if(body && body.error) return body.error;
+    }
+  }catch(e){}
+  return error && error.message ? error.message : 'desconocido';
+}
+
 async function renovarTokenGmailServidor(){
   // pide un access_token nuevo a nuestra función de servidor, usando el refresh_token guardado — sin ventana de Google
   try{
@@ -3511,7 +3521,8 @@ async function initGmailAuth(){
       try{
         const {data, error} = await sb.functions.invoke('gmail-auth', {body:{action:'exchange', code: resp.code, redirect_uri: window.location.origin + window.location.pathname}});
         if(error || !data || data.error || !data.access_token){
-          alert('Error al conectar: ' + (data && data.error ? data.error : (error ? error.message : 'desconocido')));
+          const motivo = data && data.error ? data.error : await leerErrorFuncion(error);
+          alert('Error al conectar: ' + motivo);
           document.getElementById('correo-auth-actions').innerHTML = '<button class="btn primary" id="correo-connect-btn" onclick="connectGmail()">Conectar con Gmail</button>';
           return;
         }
