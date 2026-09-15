@@ -486,6 +486,7 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
   padding:10px;cursor:pointer;position:relative;text-align:center;
 }
 .explorer-item:hover{border-color:var(--orange);}
+.explorer-item.drag-over{border-color:var(--orange);background:var(--orange-soft,#FCE8DA);outline:2px dashed var(--orange);outline-offset:-2px;}
 .explorer-item .exp-icon{font-size:30px;margin-bottom:6px;}
 .explorer-item .exp-thumb{width:100%;height:70px;object-fit:cover;border-radius:3px;margin-bottom:6px;}
 .explorer-item .exp-name{font-size:11.5px;word-break:break-word;line-height:1.3;}
@@ -499,6 +500,7 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 }
 .explorer-item .exp-actions button:hover{background:var(--orange);}
 .explorer-empty{padding:30px;text-align:center;color:var(--ink-soft);font-size:13px;grid-column:1/-1;}
+.btn:disabled{opacity:0.35;cursor:not-allowed;}
 
 .sis-list{list-style:none;padding:0;margin:0;}
 .sis-list li{padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:1.5;}
@@ -1610,7 +1612,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.14</div>
+        <div class="sub">V0.15</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1873,7 +1875,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
       <div class="panel">
         <div class="panel-head">
-          <div class="explorer-crumbs" id="explorer-crumbs"></div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="btn" id="explorer-back-btn" onclick="explorerGoBack()" title="Atrás" style="padding:6px 10px;">◀</button>
+            <button class="btn" id="explorer-forward-btn" onclick="explorerGoForward()" title="Adelante" style="padding:6px 10px;">▶</button>
+            <div class="explorer-crumbs" id="explorer-crumbs"></div>
+          </div>
           <div class="quickactions">
             <label class="btn" style="cursor:pointer;">⬆ Subir archivos<input type="file" id="explorer-upload-input" multiple style="display:none;" onchange="explorerUploadFiles(this.files)"></label>
             <label class="btn" style="cursor:pointer;">📁 Subir carpeta<input type="file" id="explorer-upload-folder-input" webkitdirectory directory multiple style="display:none;" onchange="explorerUploadFiles(this.files)"></label>
@@ -3835,6 +3841,23 @@ async function confirmTriageAction(key, cfg){
 
 /* ---------------- EXPLORADOR DE ARCHIVOS (Supabase Storage) ---------------- */
 let explorerPath = '';
+let explorerHistory = [''];
+let explorerHistoryIndex = 0;
+
+function explorerGoBack(){
+  if(explorerHistoryIndex <= 0) return;
+  explorerHistoryIndex--;
+  loadExplorer(explorerHistory[explorerHistoryIndex], true);
+}
+function explorerGoForward(){
+  if(explorerHistoryIndex >= explorerHistory.length - 1) return;
+  explorerHistoryIndex++;
+  loadExplorer(explorerHistory[explorerHistoryIndex], true);
+}
+function explorerUpdateNavButtons(){
+  document.getElementById('explorer-back-btn').disabled = explorerHistoryIndex <= 0;
+  document.getElementById('explorer-forward-btn').disabled = explorerHistoryIndex >= explorerHistory.length - 1;
+}
 
 function explorerIconFor(name){
   if(/\.(jpg|jpeg|png|webp|gif)$/i.test(name)) return null; // se usa miniatura real
@@ -3854,8 +3877,16 @@ function explorerBreadcrumbs(path){
   return crumbs.join('');
 }
 
-async function loadExplorer(path){
+async function loadExplorer(path, fromHistory){
   explorerPath = path || '';
+  if(!fromHistory){
+    explorerHistory = explorerHistory.slice(0, explorerHistoryIndex + 1);
+    if(explorerHistory[explorerHistory.length-1] !== explorerPath){
+      explorerHistory.push(explorerPath);
+    }
+    explorerHistoryIndex = explorerHistory.length - 1;
+  }
+  explorerUpdateNavButtons();
   document.getElementById('explorer-crumbs').innerHTML = explorerBreadcrumbs(explorerPath);
   const grid = document.getElementById('explorer-grid');
   if(!sb){
@@ -3880,7 +3911,12 @@ async function loadExplorer(path){
     const fullPath = explorerPath ? explorerPath+'/'+item.name : item.name;
     if(isFolder){
       const displayName = item.name.charAt(0).toUpperCase() + item.name.slice(1);
-      return `<div class="explorer-item" onclick="loadExplorer('${fullPath}')">
+      return `<div class="explorer-item" draggable="true"
+        ondragstart="explorerDragStart(event,'${fullPath}',true)"
+        ondragover="explorerDragOverItem(event)"
+        ondragleave="explorerDragLeaveItem(event)"
+        ondrop="explorerDropOnFolder(event,'${fullPath}')"
+        onclick="loadExplorer('${fullPath}')">
         <div class="exp-icon">📁</div>
         <div class="exp-name">${displayName}</div>
       </div>`;
@@ -3888,7 +3924,9 @@ async function loadExplorer(path){
     const isImg = /\.(jpg|jpeg|png|webp|gif)$/i.test(item.name);
     const publicUrl = sb.storage.from(DOC_BUCKET).getPublicUrl(fullPath).data.publicUrl;
     const thumb = isImg ? `<img class="exp-thumb" src="${publicUrl}">` : `<div class="exp-icon">${explorerIconFor(item.name)||'📄'}</div>`;
-    return `<div class="explorer-item" onclick="window.open('${publicUrl}','_blank')">
+    return `<div class="explorer-item" draggable="true"
+      ondragstart="explorerDragStart(event,'${fullPath}',false)"
+      onclick="window.open('${publicUrl}','_blank')">
       <div class="exp-actions">
         <button title="Renombrar" onclick="event.stopPropagation();explorerRename('${fullPath}','${item.name}')">✎</button>
         <button title="Mover" onclick="event.stopPropagation();explorerMove('${fullPath}','${item.name}')">↦</button>
@@ -3898,6 +3936,67 @@ async function loadExplorer(path){
       <div class="exp-name">${item.name}</div>
     </div>`;
   }).join('');
+}
+
+let explorerDragData = null;
+function explorerDragStart(e, fullPath, isFolder){
+  explorerDragData = {fullPath, isFolder};
+  e.dataTransfer.effectAllowed = 'move';
+}
+function explorerDragOverItem(e){
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+function explorerDragLeaveItem(e){
+  e.currentTarget.classList.remove('drag-over');
+}
+async function explorerDropOnFolder(e, targetFolderPath){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if(!explorerDragData) return;
+  const {fullPath, isFolder} = explorerDragData;
+  explorerDragData = null;
+  if(fullPath === targetFolderPath || targetFolderPath.startsWith(fullPath+'/')){
+    alert('No puedes mover una carpeta dentro de sí misma.');
+    return;
+  }
+  if(!isFolder){
+    const name = fullPath.split('/').pop();
+    const newPath = targetFolderPath + '/' + name;
+    const {error} = await sb.storage.from(DOC_BUCKET).move(fullPath, newPath);
+    if(error){ alert('Error al mover: '+error.message); return; }
+    loadExplorer(explorerPath);
+    return;
+  }
+  // mover una carpeta entera: mueve cada archivo real dentro (recursivo), la API no tiene "mover carpeta"
+  const folderName = fullPath.split('/').pop();
+  const filesToMove = await explorerListRecursive(fullPath);
+  if(!filesToMove.length){ alert('Esa carpeta está vacía, nada que mover.'); return; }
+  let fallos = 0;
+  for(const f of filesToMove){
+    const relative = f.slice(fullPath.length + 1);
+    const newPath = targetFolderPath + '/' + folderName + '/' + relative;
+    const {error} = await sb.storage.from(DOC_BUCKET).move(f, newPath);
+    if(error) fallos++;
+  }
+  if(fallos) alert(`Movido con ${fallos} error(es) — revisa la carpeta.`);
+  loadExplorer(explorerPath);
+}
+async function explorerListRecursive(folderPath){
+  const results = [];
+  const {data, error} = await sb.storage.from(DOC_BUCKET).list(folderPath, {limit:1000});
+  if(error || !data) return results;
+  for(const item of data){
+    if(item.name.startsWith('.')) continue;
+    const itemPath = folderPath + '/' + item.name;
+    if(item.id === null){
+      const nested = await explorerListRecursive(itemPath);
+      results.push(...nested);
+    } else {
+      results.push(itemPath);
+    }
+  }
+  return results;
 }
 
 function sanitizeFileName(name){
