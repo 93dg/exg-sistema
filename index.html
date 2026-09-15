@@ -1550,7 +1550,19 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <body>
 <button id="editor-mode-btn" onclick="toggleEditorMode()">✏️ Modo editor</button>
 
-<div class="app" id="app">
+<div id="login-screen" style="position:fixed;inset:0;background:var(--asphalt);display:flex;align-items:center;justify-content:center;z-index:9999;">
+  <div style="background:var(--paper);border-radius:var(--radius);padding:32px;width:100%;max-width:340px;box-shadow:0 10px 40px rgba(0,0,0,0.4);">
+    <div style="font-family:'Archivo',sans-serif;font-weight:800;font-size:20px;margin-bottom:4px;">EXCAVACIONES GÓMEZ</div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:20px;">Inicia sesión para entrar</div>
+    <input id="login-email" type="email" placeholder="usuario@exg.local" class="search-box" style="width:100%;margin-bottom:10px;">
+    <input id="login-pass" type="password" placeholder="Contraseña" class="search-box" style="width:100%;margin-bottom:14px;" onkeydown="if(event.key==='Enter') doLogin();">
+    <button class="btn primary" style="width:100%;" onclick="doLogin()">Entrar</button>
+    <div id="login-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;"></div>
+  </div>
+</div>
+
+<div class="app" id="app" style="display:none;">
+
 
   <!-- SIDEBAR -->
   <div class="sidebar" id="sidebar">
@@ -1577,7 +1589,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="grp-label">Cuenta</div>
       <button data-view="config"><span class="ico">⚙</span><span class="label"> Configuración</span></button>
     </div>
-    <div class="sidebar-foot">Daniel G. · admin<br>Última sync: hoy 08:41</div>
+    <div class="sidebar-foot">Sesión iniciada<br><span style="cursor:pointer;text-decoration:underline;" onclick="doLogout()">Cerrar sesión</span></div>
   </div>
 
   <!-- MAIN -->
@@ -3125,6 +3137,41 @@ try{
     sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { fetch: safeFetch } });
   }
 }catch(err){ console.error('No se pudo inicializar Supabase', err); }
+
+/* ---------------- LOGIN ---------------- */
+async function checkSession(){
+  if(!sb) return;
+  try{
+    const {data} = await sb.auth.getSession();
+    if(data && data.session){
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').style.display = '';
+    }
+  }catch(e){ console.error(e); }
+}
+checkSession();
+
+async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if(!sb){ errEl.textContent = 'Supabase no está conectado.'; errEl.style.display = 'block'; return; }
+  try{
+    const {error} = await sb.auth.signInWithPassword({email, password: pass});
+    if(error){ errEl.textContent = error.message; errEl.style.display = 'block'; return; }
+    window.location.reload();
+  }catch(err){
+    errEl.textContent = (err && err.message) ? err.message : 'Error de red al iniciar sesión';
+    errEl.style.display = 'block';
+  }
+}
+
+async function doLogout(){
+  if(!sb) return;
+  await sb.auth.signOut();
+  window.location.reload();
+}
 
 /* ---------------- SISTEMA: Protocolos / Mejora continua / Historial de decisiones (Supabase) ---------------- */
 let SISTEMA_CACHE = {protocolo:[], mejora:[], decision:[]};
