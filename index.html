@@ -408,6 +408,15 @@ table{border-collapse:collapse;width:100%;}
 }
 #editor-mode-btn:hover{background:var(--orange);}
 #editor-mode-btn.active{background:var(--orange);}
+#report-bug-btn{
+  position:fixed;bottom:20px;right:170px;z-index:4000;
+  background:var(--asphalt);color:#fff;border:none;border-radius:24px;
+  padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;
+  box-shadow:0 4px 14px rgba(0,0,0,0.3);
+}
+#report-bug-btn:hover{background:var(--red);}
+#report-bug-mic.recording{background:var(--red);animation:pulse-rec 1s infinite;}
+@keyframes pulse-rec{0%,100%{opacity:1;}50%{opacity:0.5;}}
 body.editor-mode-on{padding-top:30px;}
 body.editor-mode-on::before{
   content:'MODO EDITOR ACTIVO — arrastra los bloques para moverlos, tira de la esquina para cambiar su tamaño, ✕ para borrarlos';
@@ -1588,6 +1597,27 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 </head>
 <body>
 <button id="editor-mode-btn" onclick="toggleEditorMode()">✏️ Modo editor</button>
+<button id="report-bug-btn" onclick="openReportBug()">🐞 Reportar</button>
+
+<div class="overlay" id="report-bug-overlay" onclick="if(event.target===this) closeReportBug()">
+  <div class="drawer" style="max-width:420px;">
+    <div class="drawer-head">
+      <div><h2>¿Qué falla?</h2></div>
+      <button class="close-x" onclick="closeReportBug()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="sub-t" id="report-bug-seccion" style="margin-bottom:10px;"></div>
+      <div style="position:relative;">
+        <textarea id="report-bug-text" class="search-box" style="width:100%;height:100px;padding-right:40px;" placeholder="Escribe o dicta el fallo..."></textarea>
+        <button id="report-bug-mic" onclick="toggleDictado()" title="Dictar" style="position:absolute;right:8px;bottom:8px;width:30px;height:30px;border-radius:50%;border:none;background:var(--orange);color:#fff;font-size:14px;cursor:pointer;">🎤</button>
+      </div>
+      <div class="state-row" style="margin-top:14px;">
+        <button class="btn primary" onclick="guardarReporteBug()">Guardar</button>
+        <span id="report-bug-status" class="sub-t"></span>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="login-screen" style="position:fixed;inset:0;background:var(--asphalt);display:flex;align-items:center;justify-content:center;z-index:9999;">
   <div style="background:var(--paper);border-radius:var(--radius);padding:32px;width:100%;max-width:340px;box-shadow:0 10px 40px rgba(0,0,0,0.4);">
@@ -1612,7 +1642,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.15</div>
+        <div class="sub">V0.16</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2308,7 +2338,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <li><b>Colores de estado</b> — rojo = urgente/alta prioridad, amarillo = media, verde = baja/ok.</li>
             <li><b>Fechas</b> — formato día mes corto (ej. "9 sept"), nunca numérico ambiguo (09/09).</li>
             <li><b>Códigos</b> — trabajos como J-XXXX, averías como B-XXX, siempre con guión y ceros a la izquierda.</li>
-            <li><b>Nombres de archivo y carpeta</b> — minúsculas, con guiones en vez de espacios, sin acentos ni eñes. Se limpian solos al subir, pero las carpetas creadas a mano deben seguir el mismo patrón.</li>
+            <li><b>Nombres de archivo y carpeta</b> — MAYÚSCULAS, con guiones en vez de espacios, sin acentos ni eñes (esto último por limitación técnica real de las URLs, no por estilo). Se limpian solos al subir, pero las carpetas creadas a mano deben seguir el mismo patrón.</li>
             <li><b>Acceso</b> — Sistema y Configuración solo los ve el usuario administrador (dg). El resto del equipo (rg, mg) ve el día a día, no la lógica de fondo de la empresa.</li>
             <li><b>Móvil y escritorio por igual</b> — cualquier sección nueva tiene que funcionar bien tanto en iPhone/móvil como en ordenador, no solo en uno de los dos.</li>
           </ul>
@@ -2401,6 +2431,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
     <div class="view" id="view-config">
       <div class="topbar"><div><h1>Configuración</h1><div class="desc">Tarifas, usuarios y ajustes generales</div></div></div>
+      <div class="panel">
+        <div class="panel-head"><h3>Reorganizar archivo histórico</h3></div>
+        <div class="panel-body">
+          <p class="two-col-note" style="margin-bottom:12px;">Mueve el histórico viejo (2005-2019, albaranes, fotos, documentos de máquinas...) a la estructura oficial de Sistema. Usa el método real que mueve el archivo de verdad, no solo el nombre — seguro para volver a ejecutar si se corta a medias.</p>
+          <button class="btn primary" onclick="reorganizarArchivo()">🗂 Reorganizar ahora</button>
+          <div id="reorganizar-status" class="sub-t" style="margin-top:10px;"></div>
+        </div>
+      </div>
       <div class="panel">
         <div class="panel-head"><h3>Tarifas</h3><span class="count">derivadas de 67 facturas reales 2023-2026</span></div>
         <div class="panel-body" style="padding:0;">
@@ -3317,6 +3355,74 @@ async function addMejora(){
   loadSistema();
 }
 
+/* ---------------- REPORTAR FALLO (con dictado) ---------------- */
+let reconocimientoVoz = null;
+let dictadoActivo = false;
+
+function seccionActualNombre(){
+  const btn = document.querySelector('.nav button.active .label');
+  return btn ? btn.textContent.trim() : 'Sistema';
+}
+
+function openReportBug(){
+  document.getElementById('report-bug-seccion').textContent = 'Sección: ' + seccionActualNombre();
+  document.getElementById('report-bug-text').value = '';
+  document.getElementById('report-bug-status').textContent = '';
+  document.getElementById('report-bug-overlay').classList.add('active');
+}
+function closeReportBug(){
+  if(dictadoActivo) toggleDictado();
+  document.getElementById('report-bug-overlay').classList.remove('active');
+}
+
+function toggleDictado(){
+  const micBtn = document.getElementById('report-bug-mic');
+  const Reconocedor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!Reconocedor){
+    alert('Este navegador no permite dictar por voz. Escribe el fallo a mano.');
+    return;
+  }
+  if(dictadoActivo){
+    if(reconocimientoVoz) reconocimientoVoz.stop();
+    dictadoActivo = false;
+    micBtn.classList.remove('recording');
+    return;
+  }
+  reconocimientoVoz = new Reconocedor();
+  reconocimientoVoz.lang = 'es-ES';
+  reconocimientoVoz.continuous = true;
+  reconocimientoVoz.interimResults = false;
+  reconocimientoVoz.onresult = (event)=>{
+    const textarea = document.getElementById('report-bug-text');
+    let nuevoTexto = '';
+    for(let i=event.resultIndex; i<event.results.length; i++){
+      nuevoTexto += event.results[i][0].transcript;
+    }
+    textarea.value = (textarea.value ? textarea.value + ' ' : '') + nuevoTexto.trim();
+  };
+  reconocimientoVoz.onerror = ()=>{ dictadoActivo = false; micBtn.classList.remove('recording'); };
+  reconocimientoVoz.onend = ()=>{ if(dictadoActivo){ dictadoActivo = false; micBtn.classList.remove('recording'); } };
+  reconocimientoVoz.start();
+  dictadoActivo = true;
+  micBtn.classList.add('recording');
+}
+
+async function guardarReporteBug(){
+  const texto = document.getElementById('report-bug-text').value.trim();
+  const statusEl = document.getElementById('report-bug-status');
+  if(!texto){ statusEl.textContent = 'Escribe o dicta algo primero.'; statusEl.style.color = 'var(--red)'; return; }
+  if(!sb){ statusEl.textContent = 'Supabase no conectado.'; statusEl.style.color = 'var(--red)'; return; }
+  const seccion = seccionActualNombre();
+  try{
+    const {error} = await sb.from('sistema').insert({tipo:'mejora', data:{texto: `[${seccion}] ${texto}`}});
+    if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
+    statusEl.textContent = 'Guardado ✓'; statusEl.style.color = 'var(--green)';
+    setTimeout(closeReportBug, 800);
+  }catch(err){
+    statusEl.textContent = 'Error de red: '+errText(err); statusEl.style.color = 'var(--red)';
+  }
+}
+
 function renderHistorial(){
   const list = SISTEMA_CACHE.decision;
   document.getElementById('historial-list').innerHTML = list.length ? list.map(d=>`
@@ -4007,7 +4113,7 @@ function sanitizeFileName(name){
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quita acentos (á→a, ñ→n)
     .replace(/[^a-zA-Z0-9]+/g, '-') // cualquier cosa rara → guión
     .replace(/^-+|-+$/g, '') // sin guiones al principio/final
-    .toLowerCase() || 'archivo';
+    .toUpperCase() || 'ARCHIVO';
   return clean + ext;
 }
 
