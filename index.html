@@ -1652,7 +1652,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.23</div>
+        <div class="sub">V0.24</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2492,6 +2492,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
       <button class="close-x" onclick="closeDrawer()">✕</button>
     </div>
+    <div class="state-row" style="padding:0 20px 14px;gap:6px;">
+      <button class="btn" style="flex:1;font-size:12px;padding:6px;" onclick="crearDocumentoDesdeTrabajo('presupuesto')">+ Presupuesto</button>
+      <button class="btn" style="flex:1;font-size:12px;padding:6px;" onclick="crearDocumentoDesdeTrabajo('albaran')">+ Albarán</button>
+      <button class="btn primary" style="flex:1;font-size:12px;padding:6px;" onclick="crearDocumentoDesdeTrabajo('factura')">+ Factura</button>
+    </div>
     <div class="drawer-body">
       <div class="block">
         <h4>Estado</h4>
@@ -2809,6 +2814,21 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
         <button type="submit" class="btn primary" style="width:100%;">Crear trabajo</button>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ASISTENTE MÓVIL: NUEVO DOCUMENTO ================= -->
+<div class="overlay" id="wizard-doc-overlay" onclick="if(event.target===this) closeInvoiceWizard()">
+  <div class="drawer" style="max-width:460px;">
+    <div class="drawer-head">
+      <div><h2 id="wiz-title">Nuevo documento</h2><div class="sub-t" id="wiz-progress"></div></div>
+      <button class="close-x" onclick="closeInvoiceWizard()">✕</button>
+    </div>
+    <div class="drawer-body" id="wiz-step-body"></div>
+    <div class="state-row" style="padding:16px 20px;gap:8px;">
+      <button class="btn" id="wiz-back-btn" onclick="wizBack()">Atrás</button>
+      <button class="btn primary" id="wiz-next-btn" style="flex:1;" onclick="wizNext()">Siguiente</button>
     </div>
   </div>
 </div>
@@ -5504,9 +5524,14 @@ document.querySelectorAll('#cierre-filters .chip-filter').forEach(el=>{
 calcularCierre(4);
 
 
-function openNewInvoiceModal(){
+function openNewInvoiceModal(contexto){
+  contexto = contexto || {};
+  if(window.matchMedia('(max-width: 768px)').matches){
+    openInvoiceWizard(contexto);
+    return;
+  }
   editingDocId = null;
-  document.getElementById('ni-doctype').value = 'factura';
+  document.getElementById('ni-doctype').value = contexto.tipo || 'factura';
   document.getElementById('ni-doctype').disabled = false;
   document.getElementById('ie-items-body').innerHTML = '';
   document.getElementById('ie-iva-pct').value = 21;
@@ -5523,9 +5548,191 @@ function openNewInvoiceModal(){
   document.getElementById('ni-preview-btn').textContent = 'Vista previa de impresión';
   addItemRow();
   onDocTypeChange();
+  if(contexto.clientName){ document.getElementById('ni-client').value = contexto.clientName; onClientChange(); }
+  if(contexto.jobLabel){ document.getElementById('ni-job').value = contexto.jobLabel; }
   document.getElementById('newinvoice-overlay').classList.add('active');
 }
 function closeNewInvoiceModal(){ document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); }
+
+/* ---------------- ASISTENTE MÓVIL — mismo motor, mismo guardado real, solo cambia cómo se pide ---------------- */
+let wiz = null; // estado del asistente actual
+
+function wizPasosActivos(){
+  // se saltan los pasos para los que ya tenemos contexto (ej. venimos de un trabajo concreto)
+  const pasos = [];
+  if(!wiz.ctx.tipo) pasos.push('tipo');
+  if(!wiz.ctx.clientName) pasos.push('cliente');
+  if(!wiz.ctx.jobLabel) pasos.push('trabajo');
+  pasos.push('datos','conceptos','revision');
+  return pasos;
+}
+
+function openInvoiceWizard(contexto){
+  editingDocId = null;
+  wiz = {
+    ctx: {tipo: contexto.tipo || null, clientName: contexto.clientName || null, jobLabel: contexto.jobLabel || null},
+    tipo: contexto.tipo || 'factura',
+    clientName: contexto.clientName || '',
+    jobLabel: contexto.jobLabel || '',
+    fecha: new Date().toISOString().slice(0,10),
+    conceptos: [],
+    i: 0,
+  };
+  wiz.pasos = wizPasosActivos();
+  document.getElementById('wizard-doc-overlay').classList.add('active');
+  wizRender();
+}
+function closeInvoiceWizard(){ document.getElementById('wizard-doc-overlay').classList.remove('active'); wiz = null; }
+
+function wizRender(){
+  const paso = wiz.pasos[wiz.i];
+  document.getElementById('wiz-progress').textContent = `Paso ${wiz.i+1} de ${wiz.pasos.length}`;
+  document.getElementById('wiz-back-btn').style.visibility = wiz.i===0 ? 'hidden' : 'visible';
+  const body = document.getElementById('wiz-step-body');
+  const nextBtn = document.getElementById('wiz-next-btn');
+  nextBtn.textContent = 'Siguiente';
+  nextBtn.onclick = wizNext;
+
+  if(paso==='tipo'){
+    document.getElementById('wiz-title').textContent = '¿Qué documento es?';
+    body.innerHTML = ['factura','presupuesto','albaran'].map(t=>`
+      <div class="explorer-item" style="height:auto;padding:16px;margin-bottom:8px;${wiz.tipo===t?'border-color:var(--orange);':''}" onclick="wiz.tipo='${t}';wizRender();">
+        <div style="font-weight:700;">${DOC_TYPES[t].title}</div>
+        <div class="sub-t" style="margin-top:4px;">${DOC_TYPES[t].explain}</div>
+      </div>`).join('');
+    nextBtn.textContent = 'Siguiente';
+
+  } else if(paso==='cliente'){
+    document.getElementById('wiz-title').textContent = '¿Para quién es?';
+    body.innerHTML = `
+      <input class="search-box" style="width:100%;margin-bottom:10px;" id="wiz-client-input" placeholder="Escribe el nombre del cliente..." value="${wiz.clientName}" oninput="wizRenderClienteCombo()" autofocus>
+      <div id="wiz-client-combo"></div>
+      <button class="btn" style="width:100%;margin-top:10px;" onclick="wizNuevoCliente()">+ Cliente nuevo</button>`;
+    setTimeout(wizRenderClienteCombo, 0);
+
+  } else if(paso==='trabajo'){
+    document.getElementById('wiz-title').textContent = '¿Trabajo relacionado?';
+    body.innerHTML = `
+      <input class="search-box" style="width:100%;margin-bottom:10px;" id="wiz-job-input" placeholder="Escribe o deja en blanco si no aplica..." value="${wiz.jobLabel}" oninput="wizRenderJobCombo()">
+      <div id="wiz-job-combo"></div>`;
+    setTimeout(wizRenderJobCombo, 0);
+
+  } else if(paso==='datos'){
+    document.getElementById('wiz-title').textContent = 'Fecha del documento';
+    body.innerHTML = `<input class="search-box" style="width:100%;" type="date" id="wiz-fecha-input" value="${wiz.fecha}">`;
+
+  } else if(paso==='conceptos'){
+    document.getElementById('wiz-title').textContent = 'Conceptos';
+    body.innerHTML = `
+      <div id="wiz-conceptos-list"></div>
+      <div class="panel" style="margin-top:10px;padding:14px;">
+        <input class="search-box" style="width:100%;margin-bottom:8px;" id="wiz-c-desc" placeholder="Ej. Excavación 10m³" list="wiz-tarifas-list">
+        <datalist id="wiz-tarifas-list">${TARIFAS_SUGERIDAS.map(t=>`<option value="${t.texto}">`).join('')}</datalist>
+        <div style="display:flex;gap:8px;">
+          <input class="search-box" style="width:80px;" id="wiz-c-cant" type="number" step="0.01" placeholder="Cant." value="1">
+          <input class="search-box" style="flex:1;" id="wiz-c-precio" type="number" step="0.01" placeholder="Precio €">
+        </div>
+        <button class="btn primary" style="width:100%;margin-top:8px;" onclick="wizAddConcepto()">+ Añadir línea</button>
+      </div>`;
+    wizRenderConceptos();
+    nextBtn.textContent = 'Revisar';
+
+  } else if(paso==='revision'){
+    document.getElementById('wiz-title').textContent = 'Revisar y guardar';
+    const total = wiz.conceptos.reduce((s,c)=>s+c.cantidad*c.precio,0);
+    body.innerHTML = `
+      <div class="field"><div class="l">Documento</div><div class="v">${DOC_TYPES[wiz.tipo].title}</div></div>
+      <div class="field"><div class="l">Cliente</div><div class="v">${wiz.clientName||'—'}</div></div>
+      <div class="field"><div class="l">Trabajo</div><div class="v">${wiz.jobLabel||'— sin asociar —'}</div></div>
+      <div class="field"><div class="l">Fecha</div><div class="v">${wiz.fecha}</div></div>
+      <div style="margin:14px 0;">${wiz.conceptos.map(c=>`<div class="task-row"><span style="flex:1;">${c.desc} (${c.cantidad} × ${c.precio}€)</span><b>${(c.cantidad*c.precio).toLocaleString('es-ES',{minimumFractionDigits:2})} €</b></div>`).join('')}</div>
+      <div class="field"><div class="l">Total</div><div class="v" style="font-size:20px;font-weight:800;">${total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+      <div class="state-row" style="margin-top:16px;gap:8px;">
+        <button class="btn" style="flex:1;" onclick="wizGuardar(true)">Guardar borrador</button>
+        <button class="btn primary" style="flex:1;" onclick="wizGuardar(false)">Emitir</button>
+      </div>`;
+    nextBtn.style.display = 'none';
+    document.getElementById('wiz-back-btn').style.display = '';
+    return;
+  }
+  nextBtn.style.display = '';
+}
+
+function wizRenderClienteCombo(){
+  const q = document.getElementById('wiz-client-input').value;
+  wiz.clientName = q;
+  const box = document.getElementById('wiz-client-combo');
+  const matches = clientes.filter(c => q && c.name.toLowerCase().includes(q.toLowerCase())).slice(0,6);
+  box.innerHTML = matches.map(c=>`<div class="combo-item" onmousedown="wiz.clientName='${c.name.replace(/'/g,"\\'")}';wizNext();">${c.name}</div>`).join('');
+}
+function wizNuevoCliente(){
+  const nombre = prompt('Nombre del cliente nuevo:');
+  if(!nombre || !nombre.trim()) return;
+  clientes.push({name: nombre.trim(), type:'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'});
+  if(sb) sb.from('entidades').insert({nombre: nombre.trim(), tipo:'cliente'}).then(({data,error})=>{
+    if(!error && data) { /* se recarga con el resto de entidades la próxima vez */ }
+  });
+  wiz.clientName = nombre.trim();
+  wizNext();
+}
+function wizRenderJobCombo(){
+  const q = document.getElementById('wiz-job-input').value;
+  wiz.jobLabel = q;
+  const box = document.getElementById('wiz-job-combo');
+  const matches = jobs.filter(j => q && (j.code.toLowerCase().includes(q.toLowerCase()) || j.client.toLowerCase().includes(q.toLowerCase()))).slice(0,6);
+  box.innerHTML = matches.map(j=>`<div class="combo-item" onmousedown="wiz.jobLabel='${(j.code+' — '+j.client).replace(/'/g,"\\'")}';wizNext();">${j.code} <span class="sub">— ${j.client}</span></div>`).join('');
+}
+function wizRenderConceptos(){
+  document.getElementById('wiz-conceptos-list').innerHTML = wiz.conceptos.map((c,i)=>`
+    <div class="task-row"><span style="flex:1;">${c.desc} (${c.cantidad} × ${c.precio}€)</span><b>${(c.cantidad*c.precio).toLocaleString('es-ES',{minimumFractionDigits:2})} €</b>
+    <button class="btn" style="padding:2px 8px;margin-left:8px;" onclick="wiz.conceptos.splice(${i},1);wizRenderConceptos();">✕</button></div>`).join('');
+}
+function wizAddConcepto(){
+  const desc = document.getElementById('wiz-c-desc').value.trim();
+  const cantidad = Number(document.getElementById('wiz-c-cant').value)||1;
+  const precio = Number(document.getElementById('wiz-c-precio').value)||0;
+  if(!desc){ alert('Escribe qué es esta línea.'); return; }
+  wiz.conceptos.push({desc, cantidad, precio});
+  document.getElementById('wiz-c-desc').value = '';
+  document.getElementById('wiz-c-precio').value = '';
+  document.getElementById('wiz-c-cant').value = 1;
+  wizRenderConceptos();
+}
+function wizNext(){
+  const paso = wiz.pasos[wiz.i];
+  if(paso==='cliente' && !wiz.clientName.trim()){ alert('Falta el cliente.'); return; }
+  if(paso==='conceptos' && !wiz.conceptos.length){ alert('Añade al menos una línea.'); return; }
+  if(paso==='datos') wiz.fecha = document.getElementById('wiz-fecha-input').value || wiz.fecha;
+  wiz.i++;
+  wizRender();
+}
+function wizBack(){
+  if(wiz.i===0) return;
+  wiz.i--;
+  wizRender();
+}
+
+async function wizGuardar(isDraft){
+  // Rellena el formulario real (oculto) y usa el mismo guardado de siempre — un único motor
+  document.getElementById('ni-doctype').value = wiz.tipo;
+  document.getElementById('ni-client').value = wiz.clientName;
+  document.getElementById('ni-job').value = wiz.jobLabel || '—';
+  document.getElementById('ni-date').value = wiz.fecha;
+  document.getElementById('ie-items-body').innerHTML = '';
+  wiz.conceptos.forEach(c => addItemRow(c.cantidad, c.desc, c.precio, ''));
+  document.getElementById('ie-iva-pct').value = 21;
+  document.getElementById('ni-iban').value = 'ES40 3187 0588 5420 6788 5612';
+  document.getElementById('ni-titular').value = 'RAFAEL GÓMEZ MARTÍNEZ';
+  document.getElementById('ni-payment').value = 'Transferencia';
+  const cfg = DOC_TYPES[wiz.tipo];
+  document.getElementById('ni-docnum').value = cfg.prefix + cfg.seqRef();
+  updateConceptoTransferencia();
+  recalcTotals();
+
+  const ok = await submitNewInvoice(null, isDraft);
+  closeInvoiceWizard();
+}
+
 
 function openDocumentViewer(id){
   const doc = documentosRealesById[id];
@@ -5772,6 +5979,14 @@ function openJobDrawer(code){
   document.getElementById('drawer-overlay').classList.add('active');
 }
 function closeDrawer(){ document.getElementById('drawer-overlay').classList.remove('active'); }
+
+function crearDocumentoDesdeTrabajo(tipo){
+  const code = document.getElementById('d-code').textContent;
+  const j = jobs.find(x=>x.code===code);
+  if(!j){ alert('No se encuentra este trabajo.'); return; }
+  closeDrawer();
+  openNewInvoiceModal({tipo, clientName: j.client, jobLabel: j.code+' — '+j.client});
+}
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
