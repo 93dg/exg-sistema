@@ -1642,7 +1642,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.17</div>
+        <div class="sub">V0.18</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -3466,10 +3466,10 @@ async function borrarSistemaItem(id){
 }
 loadSistema();
 
-/* ---------------- CORREO (Gmail) ---------------- */
+/* ---------------- CORREO (Gmail) — con refresh_token en servidor, conecta una vez para siempre ---------------- */
 const GMAIL_CLIENT_ID = '86457265161-d04tdo3paksi8v8qj05lnv3snf23me77.apps.googleusercontent.com';
 const GMAIL_SCOPES = 'https://mail.google.com/ https://www.googleapis.com/auth/gmail.settings.basic https://www.googleapis.com/auth/gmail.settings.sharing';
-let gmailTokenClient = null;
+let gmailCodeClient = null;
 let gmailAccessToken = sessionStorage.getItem('gmail_token') || null;
 let gmailTokenExpiry = Number(sessionStorage.getItem('gmail_token_expiry') || 0);
 
@@ -3477,48 +3477,70 @@ function gmailTokenValido(){
   return gmailAccessToken && Date.now() < gmailTokenExpiry - 30000; // 30s de margen
 }
 
-function initGmailAuth(){
+function guardarTokenGmail(access_token, expires_in){
+  gmailAccessToken = access_token;
+  gmailTokenExpiry = Date.now() + (Number(expires_in || 3600) * 1000);
+  sessionStorage.setItem('gmail_token', gmailAccessToken);
+  sessionStorage.setItem('gmail_token_expiry', String(gmailTokenExpiry));
+}
+
+async function renovarTokenGmailServidor(){
+  // pide un access_token nuevo a nuestra función de servidor, usando el refresh_token guardado — sin ventana de Google
+  try{
+    const {data, error} = await sb.functions.invoke('gmail-auth', {body:{action:'refresh'}});
+    if(error || !data || data.error || !data.access_token) return false;
+    guardarTokenGmail(data.access_token, data.expires_in);
+    return true;
+  }catch(e){ return false; }
+}
+
+async function initGmailAuth(){
   if(typeof google === 'undefined' || !google.accounts) { setTimeout(initGmailAuth, 500); return; }
-  gmailTokenClient = google.accounts.oauth2.initTokenClient({
+  gmailCodeClient = google.accounts.oauth2.initCodeClient({
     client_id: GMAIL_CLIENT_ID,
     scope: GMAIL_SCOPES,
-    callback: (resp)=>{
-      if(resp.error){
-        // el intento silencioso falló (o el usuario cerró la ventana) — mostramos el botón para que entre a mano
+    ux_mode: 'popup',
+    access_type: 'offline',
+    prompt: 'consent',
+    callback: async (resp)=>{
+      if(resp.error || !resp.code){
         document.getElementById('correo-auth-actions').innerHTML = '<button class="btn primary" id="correo-connect-btn" onclick="connectGmail()">Conectar con Gmail</button>';
         return;
       }
-      gmailAccessToken = resp.access_token;
-      gmailTokenExpiry = Date.now() + (Number(resp.expires_in || 3600) * 1000);
-      sessionStorage.setItem('gmail_token', gmailAccessToken);
-      sessionStorage.setItem('gmail_token_expiry', String(gmailTokenExpiry));
-      showGmailConnected();
-      loadGmailInbox();
+      document.getElementById('correo-auth-actions').innerHTML = '<span class="sub-t">Conectando…</span>';
+      try{
+        const {data, error} = await sb.functions.invoke('gmail-auth', {body:{action:'exchange', code: resp.code, redirect_uri: window.location.origin + window.location.pathname}});
+        if(error || !data || data.error || !data.access_token){
+          alert('Error al conectar: ' + (data && data.error ? data.error : (error ? error.message : 'desconocido')));
+          document.getElementById('correo-auth-actions').innerHTML = '<button class="btn primary" id="correo-connect-btn" onclick="connectGmail()">Conectar con Gmail</button>';
+          return;
+        }
+        guardarTokenGmail(data.access_token, data.expires_in);
+        showGmailConnected();
+        loadGmailInbox();
+      }catch(e){
+        alert('Error de red al conectar: ' + (e && e.message ? e.message : e));
+        document.getElementById('correo-auth-actions').innerHTML = '<button class="btn primary" id="correo-connect-btn" onclick="connectGmail()">Conectar con Gmail</button>';
+      }
     },
   });
   if(gmailTokenValido()){
     showGmailConnected();
     loadGmailInbox();
-  } else if(gmailAccessToken){
-    // había sesión pero el token caducó (dura 1h) — pedimos uno nuevo en silencio, sin ventana emergente
-    gmailTokenClient.requestAccessToken({prompt:''});
+  } else {
+    // token caducado o no lo hay en este navegador — probamos a renovar en silencio con el servidor, sin pedirte nada
+    const ok = await renovarTokenGmailServidor();
+    if(ok){ showGmailConnected(); loadGmailInbox(); }
+    else { document.getElementById('correo-auth-actions').innerHTML = '<button class="btn primary" id="correo-connect-btn" onclick="connectGmail()">Conectar con Gmail</button>'; }
   }
 }
 function connectGmail(){
-  if(!gmailTokenClient){ alert('Todavía está cargando la conexión con Google, espera un segundo y vuelve a pulsar.'); return; }
-  gmailTokenClient.requestAccessToken();
+  if(!gmailCodeClient){ alert('Todavía está cargando la conexión con Google, espera un segundo y vuelve a pulsar.'); return; }
+  gmailCodeClient.requestCode();
 }
 async function asegurarTokenGmail(){
   if(gmailTokenValido()) return true;
-  return new Promise((resolve)=>{
-    const original = gmailTokenClient.callback;
-    gmailTokenClient.callback = (resp)=>{
-      gmailTokenClient.callback = original;
-      original(resp);
-      resolve(!resp.error);
-    };
-    gmailTokenClient.requestAccessToken({prompt:''});
-  });
+  return await renovarTokenGmailServidor();
 }
 function showGmailConnected(){
   document.getElementById('correo-auth-actions').innerHTML = '<span class="sub-t" style="color:var(--green);font-weight:700;">✓ Conectado a Gmail</span> <button class="btn" style="padding:3px 10px;font-size:11.5px;" onclick="desconectarGmail()">Desconectar Gmail</button>';
@@ -3526,7 +3548,6 @@ function showGmailConnected(){
 }
 
 function desconectarGmail(){
-  const token = gmailAccessToken;
   gmailAccessToken = null;
   gmailTokenExpiry = 0;
   sessionStorage.removeItem('gmail_token');
