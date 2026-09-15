@@ -3495,10 +3495,23 @@ async function loadExplorer(path){
   }).join('');
 }
 
+function sanitizeFileName(name){
+  const dot = name.lastIndexOf('.');
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot).toLowerCase() : '';
+  const clean = base
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quita acentos (á→a, ñ→n)
+    .replace(/[^a-zA-Z0-9]+/g, '-') // cualquier cosa rara → guión
+    .replace(/^-+|-+$/g, '') // sin guiones al principio/final
+    .toLowerCase() || 'archivo';
+  return clean + ext;
+}
+
 async function explorerUploadFile(file){
   if(!file) return;
   if(!sb){ alert('Conecta Supabase primero.'); return; }
-  const dest = (explorerPath ? explorerPath+'/' : '') + file.name;
+  const safeName = sanitizeFileName(file.name);
+  const dest = (explorerPath ? explorerPath+'/' : '') + safeName;
   const {error} = await sb.storage.from(DOC_BUCKET).upload(dest, file, {upsert:true});
   if(error){ alert('Error al subir: '+error.message); return; }
   loadExplorer(explorerPath);
