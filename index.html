@@ -1571,7 +1571,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.2</div>
+        <div class="sub">V0.3</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -3341,7 +3341,7 @@ function initGmailAuth(){
       loadGmailInbox();
     },
   });
-  if(gmailAccessToken) showGmailConnected();
+  if(gmailAccessToken){ showGmailConnected(); loadGmailInbox(); }
 }
 function connectGmail(){
   if(!gmailTokenClient){ alert('Todavía está cargando la conexión con Google, espera un segundo y vuelve a pulsar.'); return; }
@@ -3360,6 +3360,22 @@ let correoFiltroActivo = 'relevante';
 function extraerEmail(fromHeader){
   const m = (fromHeader||'').match(/<([^>]+)>/);
   return (m ? m[1] : fromHeader || '').trim().toLowerCase();
+}
+
+let correoNextPageToken = null;
+
+async function fetchMailDetail(m){
+  const detRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, {
+    headers: {Authorization: 'Bearer '+gmailAccessToken}
+  });
+  const det = await detRes.json();
+  const headers = (det.payload && det.payload.headers) || [];
+  const get = (n)=> (headers.find(h=>h.name===n)||{}).value || '';
+  const fromHeader = get('From');
+  const email = extraerEmail(fromHeader);
+  const entidad = correoEntidadesCache.find(e=>(e.email||'').toLowerCase()===email);
+  const estado = correoEstadoCache[m.id];
+  return {id:m.id, from:fromHeader, email, subject:get('Subject')||'(sin asunto)', date:get('Date'), snippet: det.snippet||'', entidad, categoria: estado ? estado.categoria : (entidad ? 'relevante' : 'sin_clasificar')};
 }
 
 async function loadGmailInbox(){
@@ -3382,25 +3398,30 @@ async function loadGmailInbox(){
     const listData = await listRes.json();
     if(listData.error){ box.innerHTML = `<div class="empty" style="color:var(--red);">Error: ${listData.error.message}</div>`; return; }
     const messages = listData.messages || [];
+    correoNextPageToken = listData.nextPageToken || null;
     if(!messages.length){ box.innerHTML = '<div class="empty">Sin mensajes.</div>'; return; }
-    const rows = [];
-    for(const m of messages){
-      const detRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, {
-        headers: {Authorization: 'Bearer '+gmailAccessToken}
-      });
-      const det = await detRes.json();
-      const headers = (det.payload && det.payload.headers) || [];
-      const get = (n)=> (headers.find(h=>h.name===n)||{}).value || '';
-      const fromHeader = get('From');
-      const email = extraerEmail(fromHeader);
-      const entidad = correoEntidadesCache.find(e=>(e.email||'').toLowerCase()===email);
-      const estado = correoEstadoCache[m.id];
-      rows.push({id:m.id, from:fromHeader, email, subject:get('Subject')||'(sin asunto)', date:get('Date'), snippet: det.snippet||'', entidad, categoria: estado ? estado.categoria : (entidad ? 'relevante' : 'sin_clasificar')});
-    }
-    correoMessagesCache = rows;
+    correoMessagesCache = await Promise.all(messages.map(fetchMailDetail));
     renderCorreoInbox();
   }catch(err){
     box.innerHTML = `<div class="empty" style="color:var(--red);">Error de red: ${err && err.message ? err.message : err}</div>`;
+  }
+}
+
+async function loadMoreGmailInbox(){
+  if(!correoNextPageToken) return;
+  const btn = document.getElementById('correo-load-more-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Cargando…'; }
+  try{
+    const listRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=30&labelIds=INBOX&pageToken=${correoNextPageToken}`, {
+      headers: {Authorization: 'Bearer '+gmailAccessToken}
+    });
+    const listData = await listRes.json();
+    correoNextPageToken = listData.nextPageToken || null;
+    const nuevos = await Promise.all((listData.messages||[]).map(fetchMailDetail));
+    correoMessagesCache = correoMessagesCache.concat(nuevos);
+    renderCorreoInbox();
+  }catch(err){
+    alert('Error al cargar más: '+(err && err.message ? err.message : err));
   }
 }
 
@@ -3420,7 +3441,7 @@ function renderCorreoInbox(){
         ${!r.entidad ? `<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();vincularCorreo('${r.id}')">Vincular a cliente</button>` : ''}
         ${r.categoria!=='basura' ? `<button class="btn" style="padding:3px 8px;font-size:11px;color:var(--red);" onclick="event.stopPropagation();marcarCorreo('${r.id}','basura')">🗑 Basura</button>` : `<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();marcarCorreo('${r.id}','sin_clasificar')">↺ No es basura</button>`}
       </div>
-    </div>`).join('');
+    </div>`).join('') + (correoNextPageToken ? `<div style="text-align:center;padding:14px;"><button class="btn" id="correo-load-more-btn" onclick="loadMoreGmailInbox()">Cargar más</button></div>` : '');
 }
 
 document.querySelectorAll('#correo-filters .chip-filter').forEach(el=>{
