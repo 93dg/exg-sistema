@@ -2317,6 +2317,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
         <div class="panel">
           <div class="panel-head"><h3>Bandeja de entrada</h3><button class="btn" onclick="loadGmailInbox()">↻ Actualizar</button></div>
+          <div class="filters" id="correo-filters" style="padding:0 16px;">
+            <div class="chip-filter active" data-f="relevante">Relevante</div>
+            <div class="chip-filter" data-f="sin_clasificar">Sin clasificar</div>
+            <div class="chip-filter" data-f="basura">Basura</div>
+            <div class="chip-filter" data-f="todo">Todo</div>
+          </div>
           <div class="panel-body" id="correo-inbox">
             <div class="empty">Cargando…</div>
           </div>
@@ -3346,12 +3352,31 @@ function showGmailConnected(){
   document.getElementById('correo-body').style.display = '';
 }
 
+let correoMessagesCache = [];
+let correoEstadoCache = {};
+let correoEntidadesCache = [];
+let correoFiltroActivo = 'relevante';
+
+function extraerEmail(fromHeader){
+  const m = (fromHeader||'').match(/<([^>]+)>/);
+  return (m ? m[1] : fromHeader || '').trim().toLowerCase();
+}
+
 async function loadGmailInbox(){
   const box = document.getElementById('correo-inbox');
   if(!gmailAccessToken){ box.innerHTML = '<div class="empty">Conecta primero con Gmail.</div>'; return; }
   box.innerHTML = '<div class="empty">Cargando…</div>';
   try{
-    const listRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&labelIds=INBOX', {
+    if(sb){
+      const [{data: entidades}, {data: estados}] = await Promise.all([
+        sb.from('entidades').select('*'),
+        sb.from('correo_estado').select('*'),
+      ]);
+      correoEntidadesCache = entidades || [];
+      correoEstadoCache = {};
+      (estados||[]).forEach(e=>{ correoEstadoCache[e.message_id] = e; });
+    }
+    const listRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=30&labelIds=INBOX', {
       headers: {Authorization: 'Bearer '+gmailAccessToken}
     });
     const listData = await listRes.json();
@@ -3366,19 +3391,77 @@ async function loadGmailInbox(){
       const det = await detRes.json();
       const headers = (det.payload && det.payload.headers) || [];
       const get = (n)=> (headers.find(h=>h.name===n)||{}).value || '';
-      rows.push({from:get('From'), subject:get('Subject')||'(sin asunto)', date:get('Date'), snippet: det.snippet||''});
+      const fromHeader = get('From');
+      const email = extraerEmail(fromHeader);
+      const entidad = correoEntidadesCache.find(e=>(e.email||'').toLowerCase()===email);
+      const estado = correoEstadoCache[m.id];
+      rows.push({id:m.id, from:fromHeader, email, subject:get('Subject')||'(sin asunto)', date:get('Date'), snippet: det.snippet||'', entidad, categoria: estado ? estado.categoria : (entidad ? 'relevante' : 'sin_clasificar')});
     }
-    box.innerHTML = rows.map(r=>`
-      <div class="attention-row">
-        <div style="flex:1;">
-          <div class="t">${r.subject}</div>
-          <div class="s">${r.from} · ${r.date}</div>
-          <div class="s" style="color:var(--ink-soft);">${r.snippet}</div>
-        </div>
-      </div>`).join('');
+    correoMessagesCache = rows;
+    renderCorreoInbox();
   }catch(err){
     box.innerHTML = `<div class="empty" style="color:var(--red);">Error de red: ${err && err.message ? err.message : err}</div>`;
   }
+}
+
+function renderCorreoInbox(){
+  const box = document.getElementById('correo-inbox');
+  const f = correoFiltroActivo;
+  const rows = correoMessagesCache.filter(r=> f==='todo' || r.categoria===f);
+  if(!rows.length){ box.innerHTML = '<div class="empty">Nada aquí.</div>'; return; }
+  box.innerHTML = rows.map(r=>`
+    <div class="attention-row">
+      <div style="flex:1;">
+        <div class="t">${r.subject} ${r.entidad ? `<span class="tag" style="border-color:var(--green);color:var(--green);">${r.entidad.tipo==='proveedor'?'Proveedor':'Cliente'}: ${r.entidad.nombre}</span>` : ''}</div>
+        <div class="s">${r.from} · ${r.date}</div>
+        <div class="s" style="color:var(--ink-soft);">${r.snippet}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        ${!r.entidad ? `<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();vincularCorreo('${r.id}')">Vincular a cliente</button>` : ''}
+        ${r.categoria!=='basura' ? `<button class="btn" style="padding:3px 8px;font-size:11px;color:var(--red);" onclick="event.stopPropagation();marcarCorreo('${r.id}','basura')">🗑 Basura</button>` : `<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();marcarCorreo('${r.id}','sin_clasificar')">↺ No es basura</button>`}
+      </div>
+    </div>`).join('');
+}
+
+document.querySelectorAll('#correo-filters .chip-filter').forEach(el=>{
+  el.addEventListener('click', ()=>{
+    document.querySelectorAll('#correo-filters .chip-filter').forEach(e=>e.classList.remove('active'));
+    el.classList.add('active');
+    correoFiltroActivo = el.dataset.f;
+    renderCorreoInbox();
+  });
+});
+
+async function marcarCorreo(messageId, categoria){
+  const msg = correoMessagesCache.find(r=>r.id===messageId);
+  if(msg) msg.categoria = categoria;
+  renderCorreoInbox();
+  if(!sb) return;
+  const {error} = await sb.from('correo_estado').upsert({message_id: messageId, categoria});
+  if(error) console.error('No se pudo guardar la categoría del correo', error);
+}
+
+async function vincularCorreo(messageId){
+  const msg = correoMessagesCache.find(r=>r.id===messageId);
+  if(!msg) return;
+  const nombreExistente = correoEntidadesCache.map(e=>e.nombre).join(', ');
+  const nombre = prompt(`¿A qué cliente/proveedor pertenece ${msg.email}?\n\nYa tienes guardados: ${nombreExistente || '(ninguno todavía)'}\n\nEscribe el nombre exacto de uno ya existente, o uno nuevo para crearlo:`);
+  if(!nombre || !nombre.trim()) return;
+  let entidad = correoEntidadesCache.find(e=>e.nombre.toLowerCase()===nombre.trim().toLowerCase());
+  if(!entidad){
+    const tipo = confirm('¿Es un proveedor? (Aceptar = proveedor, Cancelar = cliente)') ? 'proveedor' : 'cliente';
+    const {data, error} = await sb.from('entidades').insert({nombre: nombre.trim(), tipo, email: msg.email}).select().single();
+    if(error){ alert('Error al crear: '+error.message); return; }
+    entidad = data;
+    correoEntidadesCache.push(entidad);
+  } else if(!entidad.email){
+    await sb.from('entidades').update({email: msg.email}).eq('id', entidad.id);
+    entidad.email = msg.email;
+  }
+  msg.entidad = entidad;
+  msg.categoria = 'relevante';
+  renderCorreoInbox();
+  await sb.from('correo_estado').upsert({message_id: messageId, categoria:'relevante', entidad_id: entidad.id});
 }
 
 function b64urlEncode(str){
