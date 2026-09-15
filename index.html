@@ -1652,7 +1652,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.27</div>
+        <div class="sub">V0.28</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -4964,8 +4964,15 @@ function submitNewClient(){
   const nif = document.getElementById('nc-nif').value.trim();
   const addr = document.getElementById('nc-addr').value.trim();
   const zone = document.getElementById('nc-zone').value.trim() || 'Fuente Obejuna';
-  clientes.push({name, type, zone, tarifa:type, fact:'0,00 €', pend:'—', prio:'Media'});
+  const nuevoCliente = {name, type, zone, tarifa:type, fact:'0,00 €', pend:'—', prio:'Media'};
+  clientes.push(nuevoCliente);
   if(nif || addr) clientFiscalData[name] = {nif, addr};
+  if(sb){
+    sb.from('entidades').insert({nombre: name, tipo: type==='Proveedor' ? 'proveedor' : 'cliente'}).select().single().then(({data, error})=>{
+      if(error){ console.error('No se pudo guardar el cliente en Supabase', error); return; }
+      nuevoCliente.id = data.id;
+    });
+  }
   document.getElementById('clientes-tbl').innerHTML = clientes.map(c=>`
     <tr onclick="openClientDrawer('${c.name}')"><td><b>${c.name}</b></td><td><span class="zone-badge">${c.type}</span></td><td>${c.zone}</td><td>${c.tarifa}</td>
     <td class="num">${c.fact}</td><td class="num">${c.pend}</td>
@@ -5114,19 +5121,24 @@ function submitNewJob(ev){
     }
   }
 
-  jobs.push({
+  const nuevoJob = {
     code, client, type:'Particular', zone, machines, accessories, priority, duration, worker, beneficiary, tasks, rainSensitive, note,
     scheduledDate, dateTentative,
     machine: machines.join(', ') || '— sin especificar —',
     date: dateLabel, state:initialState,
     price: price ? Number(price).toLocaleString('es-ES',{minimumFractionDigits:2})+' €' : '— est.',
     urgent: priority==='Alta'
-  });
+  };
+  jobs.push(nuevoJob);
   if(sb){
+    const entidad = clientes.find(c=>c.name===client);
     sb.from('trabajos').insert({
-      codigo: code, nombre: client, estado: initialState, prioridad: priority,
+      codigo: code, nombre: client, entidad_id: entidad ? entidad.id : null, estado: initialState, prioridad: priority,
       fecha_inicio: scheduledDate || null, presupuesto: price ? Number(price) : null, zona: zone
-    }).then(({error})=>{ if(error) console.error('No se pudo guardar el trabajo en Supabase', error); });
+    }).select().single().then(({data, error})=>{
+      if(error){ console.error('No se pudo guardar el trabajo en Supabase', error); return; }
+      nuevoJob.id = data.id; // así "Crear factura desde este trabajo" funciona sin tener que recargar la página
+    });
   }
   renderJobFilters();
   renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
@@ -5712,9 +5724,11 @@ function wizRenderClienteCombo(){
 function wizNuevoCliente(){
   const nombre = prompt('Nombre del cliente nuevo:');
   if(!nombre || !nombre.trim()) return;
-  clientes.push({name: nombre.trim(), type:'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'});
-  if(sb) sb.from('entidades').insert({nombre: nombre.trim(), tipo:'cliente'}).then(({data,error})=>{
-    if(!error && data) { /* se recarga con el resto de entidades la próxima vez */ }
+  const nuevoCliente = {name: nombre.trim(), type:'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'};
+  clientes.push(nuevoCliente);
+  if(sb) sb.from('entidades').insert({nombre: nombre.trim(), tipo:'cliente'}).select().single().then(({data,error})=>{
+    if(error){ console.error('No se pudo guardar el cliente en Supabase', error); return; }
+    nuevoCliente.id = data.id;
   });
   wiz.clientName = nombre.trim();
   wizNext();
@@ -6005,7 +6019,14 @@ cargarDocumentosEconomicosReales();
 
 function changeJobState(code, newState){
   const j = jobs.find(x=>x.code===code);
-  if(j){ j.state = newState; }
+  if(j){
+    j.state = newState;
+    if(sb && j.id){
+      sb.from('trabajos').update({estado: newState}).eq('id', j.id).then(({error})=>{
+        if(error) console.error('No se pudo guardar el cambio de estado en Supabase', error);
+      });
+    }
+  }
   openJobDrawer(code);
   renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
 }
