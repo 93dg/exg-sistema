@@ -1571,7 +1571,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.4</div>
+        <div class="sub">V0.5</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1587,10 +1587,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="ayuntamiento"><span class="ico">⌂</span><span class="label"> Ayuntamiento</span></button>
       <button data-view="facturas"><span class="ico">🧾</span><span class="label"> Facturas</span></button>
       <button data-view="economia"><span class="ico">€</span><span class="label"> Economía</span></button>
-      <button data-view="sistema"><span class="ico">◉</span><span class="label"> Sistema</span></button>
-      <div class="grp-label">Cuenta</div>
       <button data-view="correo"><span class="ico">✉</span><span class="label"> Correo</span></button>
-      <button data-view="config"><span class="ico">⚙</span><span class="label"> Configuración</span></button>
+      <div class="grp-label">Cuenta</div>
+      <button data-view="sistema" class="admin-only"><span class="ico">◉</span><span class="label"> Sistema</span></button>
+      <button data-view="config" class="admin-only"><span class="ico">⚙</span><span class="label"> Configuración</span></button>
     </div>
     <div class="sidebar-foot">Sesión iniciada<br><span style="cursor:pointer;text-decoration:underline;" onclick="doLogout()">Cerrar sesión</span></div>
   </div>
@@ -2238,14 +2238,25 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
       <div class="sub-view" id="sis-organizacion" style="display:none;">
         <div class="panel"><div class="panel-body">
+          <p class="two-col-note" style="margin-bottom:14px;"><b>Tres capas separadas, para no tener que rehacer nada cuando esto crezca:</b> ARCHIVO = dónde se guarda físicamente el archivo · SUPABASE = qué es y con qué se relaciona · WEB = cómo se ve, se filtra y se compara. Un documento vive en un solo sitio físico, pero puede aparecer en varias fichas (un trabajo, una máquina, un cliente) sin duplicarse, porque esas fichas solo leen la relación en Supabase.</p>
           <ul class="sis-list">
-            <li><b>Trabajos</b> — la unidad central. Todo lo demás (entradas, mapa, facturas, flota) cuelga de un trabajo o de un cliente.</li>
+            <li><b>Trabajos</b> — la unidad central. Todo lo demás (entradas, mapa, facturas, flota) cuelga de un trabajo o de una entidad (cliente/proveedor). Tabla real: <code>trabajos</code>.</li>
+            <li><b>Entidades</b> — clientes y proveedores en la misma tabla, distinguidos por tipo. Tabla real: <code>entidades</code>.</li>
+            <li><b>Flota</b> — camiones y máquinas como registros reales, no texto fijo. Tabla real: <code>flota</code>.</li>
+            <li><b>Documentos económicos</b> — facturas, albaranes, gastos, cobros e impuestos, todos en una tabla con tipo, estado y relaciones a trabajo/vehículo. Tabla real: <code>documentos_economicos</code>.</li>
             <li><b>Entradas</b> — todo lo que llega de fuera (WhatsApp, fotos, audios) entra aquí primero, sin excepción, antes de convertirse en algo concreto.</li>
-            <li><b>Archivos</b> — donde vive de forma permanente cualquier documento ya clasificado. Nada se archiva sin pasar antes por Entradas.</li>
+            <li><b>Archivos</b> — el archivo físico real (Supabase Storage). Nada se archiva sin pasar antes por Entradas, salvo el histórico ya digitalizado que se sube directo.</li>
+            <li><b>Correo</b> — se cruza con Entidades: un correo solo es "relevante" si el remitente ya está vinculado a un cliente o proveedor guardado.</li>
             <li><b>Mapa</b> — ubicación real de trabajos, maquinaria y personas. Es una vista, no una fuente de datos propia.</li>
-            <li><b>Flota / Clientes / Facturas / Economía</b> — catálogos y registros que los trabajos van referenciando.</li>
           </ul>
-          <p class="two-col-note" style="margin-top:14px;">Regla para saber dónde va cada cosa: si es dinero → Economía o Facturas; si es una máquina → Flota; si es un sitio → Mapa; si es un documento → Archivos; si acaba de llegar y no está clasificado → Entradas.</p>
+          <p class="two-col-note" style="margin:14px 0;"><b>Estructura del archivo físico</b> (carpetas en Supabase Storage):</p>
+          <ul class="sis-list">
+            <li><b>economia/AAAA/</b> → facturas, gastos, cobros, albaranes, impuestos, trabajos, bancos — una carpeta por año.</li>
+            <li><b>flota/nombre-maquina/</b> → documentación, mantenimiento, averías, fotos.</li>
+            <li><b>empresa/</b> → contratos, licencias, seguros, documentación legal.</li>
+            <li><b>sin-clasificar/</b> → lo que no encaja en ninguna categoría todavía, nunca se inventa un cajón nuevo sobre la marcha.</li>
+          </ul>
+          <p class="two-col-note" style="margin-top:14px;">Regla para saber dónde va cada cosa: si es dinero → Economía o Facturas; si es una máquina → Flota; si es un sitio → Mapa; si es un documento → Archivos; si acaba de llegar y no está clasificado → Entradas. Nombres de carpeta: minúsculas, con guiones, sin acentos — igual siempre, sin excepciones sueltas.</p>
         </div></div>
       </div>
 
@@ -2264,6 +2275,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <li><b>Prioridad baja</b> — se hace cuando no hay nada más urgente ni cercano pendiente.</li>
             <li><b>Qué se archiva</b> — todo lo que sea gasto, factura, albarán o documento con valor legal/contable. Fotos sueltas sin relevancia, no.</li>
             <li><b>Qué es urgente</b> — lo que para el trabajo de otro (avería de máquina en uso) o tiene fecha límite real (plazo de ayuntamiento).</li>
+            <li><b>Año de archivo de un documento</b> — se decide por la <b>fecha de devengo</b> (la fecha del propio documento), nunca por la fecha de inicio o fin del trabajo. Es el criterio legal en España, el que sigue cualquier gestoría.</li>
+            <li><b>Flujo de un documento económico</b> — 4 estados: <b>Borrador</b> (editable, sin fecha fijada, no archivable) → <b>Albarán emitido</b> (cerrado, fecha real) → <b>Factura emitida</b> (generada desde uno o varios albaranes, fecha y numeración propia) → <b>Anulado/rectificado</b> (el original nunca se borra ni se edita; se enlaza un documento nuevo que lo corrige).</li>
+            <li><b>Facturas vienen de albaranes</b> — nunca se crea una factura directamente; siempre a partir de uno o varios albaranes ya cerrados, para que el importe nunca sea inventado.</li>
+            <li><b>Correo relevante</b> — solo cuenta como relevante el correo de un remitente ya vinculado a una entidad (cliente/proveedor) guardada. Lo demás es "sin clasificar" hasta que se decida, o "basura" si se marca así.</li>
           </ul>
         </div></div>
       </div>
@@ -2275,6 +2290,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <li><b>Colores de estado</b> — rojo = urgente/alta prioridad, amarillo = media, verde = baja/ok.</li>
             <li><b>Fechas</b> — formato día mes corto (ej. "9 sept"), nunca numérico ambiguo (09/09).</li>
             <li><b>Códigos</b> — trabajos como J-XXXX, averías como B-XXX, siempre con guión y ceros a la izquierda.</li>
+            <li><b>Nombres de archivo y carpeta</b> — minúsculas, con guiones en vez de espacios, sin acentos ni eñes. Se limpian solos al subir, pero las carpetas creadas a mano deben seguir el mismo patrón.</li>
+            <li><b>Acceso</b> — Sistema y Configuración solo los ve el usuario administrador (dg). El resto del equipo (rg, mg) ve el día a día, no la lógica de fondo de la empresa.</li>
           </ul>
         </div></div>
       </div>
@@ -3217,6 +3234,10 @@ async function checkSession(){
     if(data && data.session){
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app').style.display = '';
+      const esAdmin = (data.session.user.user_metadata || {}).rol === 'admin';
+      if(!esAdmin){
+        document.querySelectorAll('.admin-only').forEach(el=>el.style.display = 'none');
+      }
     }
   }catch(e){ console.error(e); }
 }
