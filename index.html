@@ -1737,7 +1737,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.90</div>
+        <div class="sub">V0.91</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2045,6 +2045,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <option value="img">Fotos</option>
             <option value="doc">Word</option>
           </select>
+          <select id="explorer-sort" class="search-box" onchange="renderExplorerGrid()">
+            <option value="tipo">Ordenar por tipo</option>
+            <option value="nombre">Ordenar por nombre</option>
+          </select>
+          <button class="btn" onclick="toggleSeleccionarTodoExplorer()">☑ Seleccionar todo</button>
           <button class="btn" style="display:none;" id="explorer-cortar-sel-btn" onclick="cortarSeleccionExplorer()">✂ Cortar (<span id="explorer-sel-count">0</span>)</button>
           <button class="btn" style="display:none;color:var(--red);" id="explorer-borrar-sel-btn" onclick="borrarSeleccionExplorer()">✕ Borrar (<span id="explorer-sel-count-del">0</span>)</button>
           <button class="btn primary" style="display:none;" id="explorer-pegar-btn" onclick="pegarEnExplorer()">📋 Pegar aquí (<span id="explorer-clipboard-count">0</span>)</button>
@@ -5201,6 +5206,18 @@ function renderExplorerGrid(){
   });
   if(!visibleData.length){ grid.innerHTML = `<div class="explorer-empty">${busqueda || tipo ? 'Nada coincide con la búsqueda/filtro.' : 'Carpeta vacía.'}</div>`; return; }
 
+  const ordenPor = document.getElementById('explorer-sort')?.value || 'tipo';
+  visibleData.sort((a,b)=>{
+    const aFolder = a.id === null, bFolder = b.id === null;
+    if(aFolder !== bFolder) return aFolder ? -1 : 1; // carpetas siempre primero
+    if(ordenPor === 'tipo' && !aFolder && !bFolder){
+      const extA = (a.name.split('.').pop()||'').toLowerCase();
+      const extB = (b.name.split('.').pop()||'').toLowerCase();
+      if(extA !== extB) return extA.localeCompare(extB);
+    }
+    return a.name.localeCompare(b.name, 'es', {numeric:true});
+  });
+
   grid.innerHTML = visibleData.map(item=>{
     const isFolder = item.id === null; // Supabase Storage devuelve las "carpetas" como entradas sin metadata
     const fullPath = explorerPath ? explorerPath+'/'+item.name : item.name;
@@ -5215,6 +5232,9 @@ function renderExplorerGrid(){
         <span class="exp-sel-wrap" onclick="event.stopPropagation();">
           <input type="checkbox" class="explorer-sel-chk" data-path="${fullPath}" data-folder="1" onchange="actualizarSeleccionExplorer()">
         </span>
+        <div class="exp-actions">
+          <button title="Renombrar" onclick="event.stopPropagation();explorerRenameFolder('${fullPath}','${item.name}')">✎</button>
+        </div>
         <div class="exp-icon">📁</div>
         <div class="exp-name">${displayName}</div>
       </div>`;
@@ -5460,8 +5480,29 @@ async function explorerRename(fullPath, oldName){
   if(error){ mostrarToast('Error al renombrar: '+error.message); return; }
   loadExplorer(explorerPath);
 }
+async function explorerRenameFolder(fullPath, oldName){
+  const r = await pedirCampos('Renombrar carpeta', [{id:'newName', label:'Nuevo nombre', valor:oldName, requerido:true}]);
+  if(!r || r.newName===oldName) return;
+  const dir = fullPath.substring(0, fullPath.length - oldName.length);
+  const nuevaRuta = dir + r.newName;
+  const dentro = await explorerListRecursive(fullPath);
+  let ok = 0, fallos = 0;
+  for(const f of dentro){
+    const rel = f.slice(fullPath.length);
+    const {error} = await sb.storage.from(DOC_BUCKET).move(f, nuevaRuta+rel);
+    if(error) fallos++; else ok++;
+  }
+  mostrarToast(`Carpeta renombrada — ${ok} archivo(s) movido(s)${fallos ? `, ${fallos} con error` : ''}.`, fallos ? 'err' : 'ok');
+  loadExplorer(explorerPath);
+}
 
 let explorerClipboard = []; // [{path, isFolder}]
+let explorerTodoSeleccionado = false;
+function toggleSeleccionarTodoExplorer(){
+  explorerTodoSeleccionado = !explorerTodoSeleccionado;
+  document.querySelectorAll('.explorer-sel-chk').forEach(chk=>chk.checked = explorerTodoSeleccionado);
+  actualizarSeleccionExplorer();
+}
 function actualizarSeleccionExplorer(){
   const marcados = Array.from(document.querySelectorAll('.explorer-sel-chk:checked'));
   document.getElementById('explorer-sel-count').textContent = marcados.length;
