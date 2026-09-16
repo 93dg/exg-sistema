@@ -456,11 +456,14 @@ table{border-collapse:collapse;width:100%;}
 @keyframes pulse-rec{0%,100%{opacity:1;}50%{opacity:0.5;}}
 body.editor-mode-on{padding-top:30px;}
 body.editor-mode-on::before{
-  content:'MODO EDITOR ACTIVO — arrastra los bloques para moverlos, tira de la esquina para cambiar su tamaño, ✕ para borrarlos';
+  content:'MODO EDITOR ACTIVO — arrastra los bloques (o las secciones del menú) para moverlos, tira de la esquina para cambiar su tamaño, ✕ para borrarlos';
   position:fixed;top:0;left:0;right:0;z-index:4001;
   background:var(--orange);color:#fff;text-align:center;
   font-size:12px;font-weight:700;padding:6px;letter-spacing:0.02em;
 }
+.nav-editable button[data-view]{cursor:grab;}
+.nav-editable button[data-view].dragging{opacity:0.4;}
+.nav-editable button[data-view]:hover{outline:1px dashed var(--orange);outline-offset:2px;}
 body.editor-mode-on .layout-block{
   position:relative;outline:1px dashed var(--orange);outline-offset:3px;
   resize:both;overflow:auto;min-width:180px;min-height:80px;
@@ -1708,7 +1711,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.71</div>
+        <div class="sub">V0.72</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -3307,30 +3310,112 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 let editorModeOn = false;
 let dragSrcBlock = null;
 
+let UI_CONFIG_ID = null;
+let UI_CONFIG = {orden_menu: null, bloques_ocultos: []};
+
+async function cargarUIConfig(){
+  if(!sb) return;
+  const {data} = await sb.from('sistema').select('*').eq('tipo','ui_config').limit(1).maybeSingle();
+  if(data){
+    UI_CONFIG_ID = data.id;
+    UI_CONFIG = {orden_menu: data.data.orden_menu || null, bloques_ocultos: data.data.bloques_ocultos || []};
+  }
+  aplicarUIConfig();
+}
+function aplicarUIConfig(){
+  // orden del menú lateral
+  if(UI_CONFIG.orden_menu && UI_CONFIG.orden_menu.length){
+    const nav = document.getElementById('nav');
+    UI_CONFIG.orden_menu.forEach(viewKey=>{
+      const btn = nav.querySelector(`button[data-view="${viewKey}"]`);
+      if(btn) nav.appendChild(btn);
+    });
+  }
+  // bloques borrados de forma permanente
+  UI_CONFIG.bloques_ocultos.forEach(blockId=>{
+    document.querySelectorAll(`[data-block-id="${blockId}"]`).forEach(el=>el.remove());
+  });
+}
+async function guardarUIConfig(){
+  if(!sb) return;
+  const payload = {orden_menu: UI_CONFIG.orden_menu, bloques_ocultos: UI_CONFIG.bloques_ocultos};
+  if(UI_CONFIG_ID){
+    await sb.from('sistema').update({data: payload}).eq('id', UI_CONFIG_ID);
+  } else {
+    const {data} = await sb.from('sistema').insert({tipo:'ui_config', data: payload}).select().single();
+    if(data) UI_CONFIG_ID = data.id;
+  }
+}
+cargarUIConfig();
+
 function toggleEditorMode(){
   editorModeOn = !editorModeOn;
   document.body.classList.toggle('editor-mode-on', editorModeOn);
   const btn = document.getElementById('editor-mode-btn');
   btn.textContent = editorModeOn ? '✅ Salir del modo editor' : '✏️ Modo editor';
   btn.classList.toggle('active', editorModeOn);
-  if(editorModeOn) prepareEditableBlocks();
+  if(editorModeOn){ prepareEditableBlocks(); prepareEditableNav(); }
+  document.getElementById('nav').classList.toggle('nav-editable', editorModeOn);
+}
+
+let dragSrcNavBtn = null;
+function prepareEditableNav(){
+  document.querySelectorAll('#nav button[data-view]').forEach(btn=>{
+    if(btn.dataset.navReady) return;
+    btn.dataset.navReady = '1';
+    btn.setAttribute('draggable','true');
+    btn.addEventListener('dragstart',(ev)=>{
+      if(!editorModeOn) return;
+      dragSrcNavBtn = btn;
+      btn.classList.add('dragging');
+    });
+    btn.addEventListener('dragend', async ()=>{
+      btn.classList.remove('dragging');
+      dragSrcNavBtn = null;
+      // guarda el nuevo orden completo
+      UI_CONFIG.orden_menu = Array.from(document.querySelectorAll('#nav button[data-view]')).map(b=>b.dataset.view);
+      await guardarUIConfig();
+    });
+    btn.addEventListener('dragover',(ev)=>{
+      if(!editorModeOn || !dragSrcNavBtn || dragSrcNavBtn===btn) return;
+      ev.preventDefault();
+    });
+    btn.addEventListener('drop',(ev)=>{
+      if(!editorModeOn || !dragSrcNavBtn || dragSrcNavBtn===btn) return;
+      ev.preventDefault();
+      const nav = document.getElementById('nav');
+      const rect = btn.getBoundingClientRect();
+      const before = (ev.clientY - rect.top) < rect.height/2;
+      nav.insertBefore(dragSrcNavBtn, before ? btn : btn.nextSibling);
+    });
+  });
 }
 
 function prepareEditableBlocks(){
   // marca como "bloque editable" cada .panel y cada tarjeta suelta dentro de las vistas, una sola vez
-  document.querySelectorAll('.view .panel, .view .kpi-strip, .view .weather-strip, .view #real-map').forEach(el=>{
+  document.querySelectorAll('.view .panel, .view .kpi-strip, .view .weather-strip, .view #real-map').forEach((el,i)=>{
     if(el.classList.contains('layout-block')) return; // ya preparado
     el.classList.add('layout-block');
     el.setAttribute('draggable','true');
+    if(!el.dataset.blockId){
+      const view = el.closest('.view')?.id || 'view';
+      el.dataset.blockId = view + '-block-' + i;
+    }
 
     const toolbar = document.createElement('div');
     toolbar.className = 'layout-toolbar';
     toolbar.innerHTML = `<span class="drag-handle" title="Arrastrar para mover">⠿</span><span class="del-handle" title="Borrar este bloque">✕</span>`;
     el.prepend(toolbar);
 
-    toolbar.querySelector('.del-handle').addEventListener('click', (ev)=>{
+    toolbar.querySelector('.del-handle').addEventListener('click', async (ev)=>{
       ev.stopPropagation();
-      if(confirm('¿Quitar este bloque de la pantalla?')) el.remove();
+      const opcion = await elegirDeLista('¿Cómo quieres borrar esto?', ['Solo por ahora (vuelve si recargo la página)', 'Del todo (no debe volver a salir nunca)']);
+      if(!opcion) return;
+      if(opcion.startsWith('Del todo')){
+        UI_CONFIG.bloques_ocultos.push(el.dataset.blockId);
+        await guardarUIConfig();
+      }
+      el.remove();
     });
 
     el.addEventListener('dragstart', (ev)=>{
