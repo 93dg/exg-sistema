@@ -420,7 +420,8 @@ table{border-collapse:collapse;width:100%;}
 .combo-item:hover, .combo-item.hl{background:var(--concrete);}
 .combo-item .sub{font-size:11px;color:var(--ink-soft);}
 
-.ie-dictado{margin-top:16px;padding:14px;border:1px dashed var(--line);border-radius:var(--radius);background:var(--concrete);}
+.ie-dictado{margin:0 24px 16px 24px;padding:14px;border:1px dashed var(--line);border-radius:var(--radius);background:var(--concrete);display:none;}
+.ie-dictado.open{display:block;}
 .ie-dictado h4{font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);margin-bottom:8px;}
 
 .mini-modal-body .field{margin-bottom:12px;}
@@ -1711,7 +1712,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.72</div>
+        <div class="sub">V0.73</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -3186,7 +3187,18 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <option value="albaran">Albarán</option>
       </select>
       <span class="ie-doc-explain" id="ni-explain"></span>
+      <button type="button" class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="document.getElementById('ie-dictado').classList.toggle('open')">📝 Rellenar desde texto o foto</button>
       <button class="close-x" onclick="closeNewInvoiceModal()">✕</button>
+    </div>
+
+    <div class="ie-dictado" id="ie-dictado">
+      <h4>Rellenar desde texto o imagen</h4>
+      <textarea id="ie-dictado-text" class="search-box" style="width:100%;min-height:60px;resize:vertical;" placeholder="Pega o escribe, por ejemplo:&#10;3 m³ de excavación a 30&#10;490 m² de desbroce a 2,50"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+        <button type="button" class="btn" onclick="parseDictado()">Generar líneas desde el texto</button>
+        <label class="btn" style="cursor:pointer;">📷 Adjuntar foto de nota/albarán<input type="file" accept="image/*" style="display:none;" onchange="onImageAttach(this)"></label>
+      </div>
+      <div class="two-col-note" id="ie-dictado-note">La lectura automática de fotos (OCR) todavía no está conectada — de momento solo guarda la imagen adjunta como referencia. Cuando conectemos IA con visión, esto rellenará las líneas solo.</div>
     </div>
 
     <form id="newinvoice-form" onsubmit="return submitNewInvoice(event)">
@@ -3235,16 +3247,6 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         </table>
         <button type="button" class="btn" onclick="addItemRow()">+ Añadir línea</button>
         <div class="two-col-note">La columna "Maquinaria" es para tu control interno — no sale impresa en la factura, pero ayuda a que el precio salga bien (una retro con martillo no cuesta igual que sola).</div>
-
-        <div class="ie-dictado">
-          <h4>Rellenar desde texto o imagen</h4>
-          <textarea id="ie-dictado-text" class="search-box" style="width:100%;min-height:60px;resize:vertical;" placeholder="Pega o escribe, por ejemplo:&#10;3 m³ de excavación a 30&#10;490 m² de desbroce a 2,50"></textarea>
-          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
-            <button type="button" class="btn" onclick="parseDictado()">Generar líneas desde el texto</button>
-            <label class="btn" style="cursor:pointer;">📷 Adjuntar foto de nota/albarán<input type="file" accept="image/*" style="display:none;" onchange="onImageAttach(this)"></label>
-          </div>
-          <div class="two-col-note" id="ie-dictado-note">La lectura automática de fotos (OCR) todavía no está conectada — de momento solo guarda la imagen adjunta como referencia. Cuando conectemos IA con visión, esto rellenará las líneas solo.</div>
-        </div>
 
         <div class="ie-footer" id="ie-payment-block">
           <div class="ie-payment" id="ie-payment-fields">
@@ -7011,7 +7013,7 @@ async function guardarGasto(){
     cerrarRegistrarGasto();
   }catch(err){ statusEl.textContent = 'Error de red: '+errText(err); statusEl.style.color = 'var(--red)'; }
 }
-function closeNewInvoiceModal(){ document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); }
+function closeNewInvoiceModal(){ document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); document.getElementById('ie-dictado').classList.remove('open'); }
 
 /* ---------------- ASISTENTE MÓVIL — mismo motor, mismo guardado real, solo cambia cómo se pide ---------------- */
 let wiz = null; // estado del asistente actual
@@ -7255,6 +7257,7 @@ function openDocumentViewer(id){
   document.getElementById('ni-suggest').textContent = doc.status==='Borrador' ? '(borrador sin numerar en firme)' : '';
   document.getElementById('ni-concepto-transf').value = doc.concepto;
   document.getElementById('ie-iva-row').style.display = DOC_TYPES[doc.type].hasIva ? 'flex' : 'none';
+  document.getElementById('ie-payment-fields').style.display = (doc.type==='albaran') ? 'none' : '';
   document.getElementById('ni-title').textContent = DOC_TYPES[doc.type].title;
   document.getElementById('ni-explain').textContent = DOC_TYPES[doc.type].explain;
   document.getElementById('ni-submit').textContent = doc.status==='Borrador' ? 'Guardar y numerar en firme' : 'Guardar cambios';
