@@ -1738,7 +1738,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.96</div>
+        <div class="sub">V0.97</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5249,7 +5249,7 @@ function renderExplorerGrid(){
   const busqueda = (document.getElementById('explorer-search').value || '').trim().toLowerCase();
   const tipo = document.getElementById('explorer-type-filter').value;
   const visibleData = explorerCurrentData.filter(item=>{
-    const isFolder = item.id === null;
+    const isFolder = item.id === null && !item.metadata;
     if(busqueda && !item.name.toLowerCase().includes(busqueda)) return false;
     if(!explorerMatchesTypeFilter(item.name, isFolder, tipo)) return false;
     return true;
@@ -5269,7 +5269,7 @@ function renderExplorerGrid(){
   });
 
   grid.innerHTML = visibleData.map(item=>{
-    const isFolder = item.id === null; // Supabase Storage devuelve las "carpetas" como entradas sin metadata
+    const isFolder = item.id === null && !item.metadata; // Supabase Storage devuelve las "carpetas" como entradas sin metadata (y sin id, aunque el id a veces tarda un poco tras mover muchos archivos seguidos)
     const fullPath = explorerPath ? explorerPath+'/'+item.name : item.name;
     if(isFolder){
       const displayName = item.name.charAt(0).toUpperCase() + item.name.slice(1);
@@ -5450,7 +5450,7 @@ async function explorerListRecursive(folderPath){
   for(const item of data){
     if(item.name.startsWith('.')) continue;
     const itemPath = folderPath + '/' + item.name;
-    if(item.id === null){
+    if(item.id === null && !item.metadata){
       const nested = await explorerListRecursive(itemPath);
       results.push(...nested);
     } else {
