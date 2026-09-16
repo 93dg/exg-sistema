@@ -1682,7 +1682,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.39</div>
+        <div class="sub">V0.40</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1794,6 +1794,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="topbar">
         <div><h1>Planificación</h1><div class="desc" id="planif-week-desc">Cuadrante semanal</div></div>
         <div class="quickactions">
+          <button class="btn" id="cal-volver-btn" style="display:none;" onclick="volverASemana()">◀ Volver</button>
           <button class="btn" onclick="cambiarSemanaPlan(-1)">◀ Anterior</button>
           <button class="btn" onclick="resetSemanaPlan()">Hoy</button>
           <button class="btn" onclick="cambiarSemanaPlan(1)">Siguiente ▶</button>
@@ -1804,8 +1805,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="panel">
         <div class="panel-head">
           <h3>Calendario de trabajos</h3>
-          <span style="display:flex;align-items:center;gap:10px;">
+          <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <span class="count" id="calendar-count"></span>
+            <div class="filters" id="calendar-worker-filter" style="margin:0;">
+              <div class="chip-filter active" data-cw="">Todos</div>
+              <div class="chip-filter" data-cw="Rafa">Rafa</div>
+              <div class="chip-filter" data-cw="Manolo">Manolo</div>
+            </div>
             <div class="filters" id="calendar-view-tabs" style="margin:0;">
               <div class="chip-filter active" data-cv="semana">Semana</div>
               <div class="chip-filter" data-cv="mes">Mes</div>
@@ -2853,6 +2859,20 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <button class="btn primary" style="width:100%;" onclick="guardarGasto()">Guardar gasto</button>
       </div>
       <div id="gasto-status" class="sub-t" style="margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MENÚ AL PINCHAR UN DÍA DEL CALENDARIO ================= -->
+<div class="overlay" id="dia-menu-overlay" onclick="if(event.target===this) cerrarMenuDia()">
+  <div class="drawer" style="max-width:340px;">
+    <div class="drawer-head">
+      <div><h2 id="dia-menu-fecha">—</h2></div>
+      <button class="close-x" onclick="cerrarMenuDia()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <button class="btn primary" style="width:100%;margin-bottom:10px;" onclick="menuDiaVerDia()">📅 Ver este día</button>
+      <button class="btn" style="width:100%;" onclick="menuDiaNuevoTrabajo()">+ Nuevo trabajo este día</button>
     </div>
   </div>
 </div>
@@ -4565,7 +4585,7 @@ async function cargarDatosReales(){
         const dateLabel = dRaw && !isNaN(dRaw) ? dRaw.getDate()+' '+MESES_CORTOS[dRaw.getMonth()] : 'sin fecha';
         jobs.push({
           id: t.id, code: t.codigo || ('T-'+t.id.slice(0,4)), client: t.nombre || 'Sin nombre', type:'Particular',
-          zone: t.zona || '—', machine: '— sin especificar —', machines: [], date: dateLabel, scheduledDate: t.fecha_inicio || '', horaInicio: t.hora_inicio ? t.hora_inicio.slice(0,5) : null,
+          zone: t.zona || '—', machine: '— sin especificar —', machines: [], date: dateLabel, scheduledDate: t.fecha_inicio || '', horaInicio: t.hora_inicio ? t.hora_inicio.slice(0,5) : null, worker: t.operario || '',
           state: t.estado || 'pendiente', price: t.presupuesto ? Number(t.presupuesto).toLocaleString('es-ES',{minimumFractionDigits:2})+' €' : '— est.',
           urgent: t.prioridad === 'Alta'
         });
@@ -4593,6 +4613,7 @@ const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sept','oc
 const MESES_LARGOS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
 let calVista = 'semana'; // 'semana' | 'mes' | 'dia'
+let calFiltroWorker = ''; // '' = todos, o 'Rafa' / 'Manolo'
 let weatherByDate = {}; // se rellena cuando llega el tiempo real, pero el calendario no espera a esto para pintarse
 let calFecha = new Date(); calFecha.setHours(0,0,0,0); // fecha de referencia (día concreto en vista día, cualquier día de la semana/mes en las otras)
 
@@ -4605,6 +4626,9 @@ function getSemanaDe(d){
   return [0,1,2,3,4].map(i=>{ const x = new Date(lunes); x.setDate(lunes.getDate()+i); return x; });
 }
 function formatDiaCorto(d){ return DIAS_SEMANA_CORTOS[(d.getDay()+6)%7] + ' ' + d.getDate(); }
+function jobsFiltrados(){
+  return calFiltroWorker ? jobs.filter(j=>j.worker===calFiltroWorker) : jobs;
+}
 
 document.querySelectorAll('#calendar-view-tabs .chip-filter').forEach(el=>{
   el.addEventListener('click', ()=>{
@@ -4614,6 +4638,21 @@ document.querySelectorAll('#calendar-view-tabs .chip-filter').forEach(el=>{
     renderCalendar();
   });
 });
+document.querySelectorAll('#calendar-worker-filter .chip-filter').forEach(el=>{
+  el.addEventListener('click', ()=>{
+    document.querySelectorAll('#calendar-worker-filter .chip-filter').forEach(e=>e.classList.remove('active'));
+    el.classList.add('active');
+    calFiltroWorker = el.dataset.cw;
+    renderCalendar();
+  });
+});
+
+function cambiarVistaCalendario(v){
+  document.querySelectorAll('#calendar-view-tabs .chip-filter').forEach(e=>e.classList.toggle('active', e.dataset.cv===v));
+  calVista = v;
+  renderCalendar();
+}
+function volverASemana(){ cambiarVistaCalendario('semana'); }
 
 function cambiarSemanaPlan(delta){
   if(calVista==='mes') calFecha.setMonth(calFecha.getMonth()+delta);
@@ -4630,16 +4669,24 @@ function jobCardHtml(j){
   return `<div class="calendar-job ${j.urgent?'urgent':''}" draggable="true"
     ondragstart="calDragStart(event,'${j.code}')"
     onclick="event.stopPropagation();openJobDrawer('${j.code}')">
-    <div class="cj-cl">${j.client}</div><div class="cj-zn">${j.zone||''}${j.machine && j.machine!=='— sin especificar —' ? ' · '+j.machine : ''}</div>
+    <div class="cj-cl">${j.client}</div><div class="cj-zn">${j.zone||''}${j.machine && j.machine!=='— sin especificar —' ? ' · '+j.machine : ''}${j.worker ? ' · 👤 '+j.worker : ''}</div>
   </div>`;
 }
 function irADia(iso){
   calFecha = new Date(iso+'T00:00:00');
-  document.querySelectorAll('#calendar-view-tabs .chip-filter').forEach(e=>e.classList.remove('active'));
-  document.querySelector('#calendar-view-tabs [data-cv="dia"]').classList.add('active');
-  calVista = 'dia';
-  renderCalendar();
+  cambiarVistaCalendario('dia');
 }
+
+let calDiaMenuIso = null;
+function clicEnDia(iso){
+  calDiaMenuIso = iso;
+  const d = new Date(iso+'T00:00:00');
+  document.getElementById('dia-menu-fecha').textContent = DIAS_SEMANA_CORTOS[(d.getDay()+6)%7]+' '+d.getDate()+' de '+MESES_LARGOS[d.getMonth()];
+  document.getElementById('dia-menu-overlay').classList.add('active');
+}
+function cerrarMenuDia(){ document.getElementById('dia-menu-overlay').classList.remove('active'); }
+function menuDiaVerDia(){ cerrarMenuDia(); irADia(calDiaMenuIso); }
+function menuDiaNuevoTrabajo(){ const iso = calDiaMenuIso; cerrarMenuDia(); openNewJobModal(iso); }
 
 let calDragCode = null;
 function calDragStart(e, code){ calDragCode = code; e.dataTransfer.effectAllowed = 'move'; }
@@ -4669,6 +4716,7 @@ function renderCalendar(){
   const cont = document.getElementById('calendar-container');
   if(!cont) return;
   const desc = document.getElementById('planif-week-desc');
+  document.getElementById('cal-volver-btn').style.display = calVista==='dia' ? '' : 'none';
   if(calVista==='semana') renderCalendarSemana(cont, desc);
   else if(calVista==='mes') renderCalendarMes(cont, desc);
   else renderCalendarDia(cont, desc);
@@ -4687,9 +4735,9 @@ function renderCalendarSemana(cont, desc){
   let total = 0;
   cont.innerHTML = `<div class="calendar-grid">` + dias.map(d=>{
     const iso = isoDeFecha(d);
-    const trabajosDia = jobs.filter(j=>j.scheduledDate===iso);
+    const trabajosDia = jobsFiltrados().filter(j=>j.scheduledDate===iso);
     total += trabajosDia.length;
-    return `<div class="calendar-day ${iso===hoyIso?'today':''}" onclick="irADia('${iso}')" style="cursor:pointer;" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnDia(event,'${iso}')">
+    return `<div class="calendar-day ${iso===hoyIso?'today':''}" onclick="clicEnDia('${iso}')" style="cursor:pointer;" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnDia(event,'${iso}')">
       <div class="calendar-day-head"><span>${DIAS_SEMANA_CORTOS[(d.getDay()+6)%7]} ${d.getDate()} ${MESES_CORTOS[d.getMonth()]}</span>${weatherChipHtml(iso)}</div>
       ${trabajosDia.length ? trabajosDia.map(jobCardHtml).join('') : '<div class="calendar-day-empty">Sin trabajos</div>'}
     </div>`;
@@ -4709,9 +4757,9 @@ function renderCalendarMes(cont, desc){
     const d = new Date(inicioGrid); d.setDate(inicioGrid.getDate()+i);
     const iso = isoDeFecha(d);
     const fueraDeMes = d.getMonth()!==month;
-    const trabajosDia = jobs.filter(j=>j.scheduledDate===iso);
+    const trabajosDia = jobsFiltrados().filter(j=>j.scheduledDate===iso);
     total += (!fueraDeMes ? trabajosDia.length : 0);
-    celdas += `<div class="calendar-day calendar-day-mes ${iso===hoyIso?'today':''} ${fueraDeMes?'fuera-mes':''}" onclick="irADia('${iso}')" style="cursor:pointer;" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnDia(event,'${iso}')">
+    celdas += `<div class="calendar-day calendar-day-mes ${iso===hoyIso?'today':''} ${fueraDeMes?'fuera-mes':''}" onclick="clicEnDia('${iso}')" style="cursor:pointer;" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnDia(event,'${iso}')">
       <div class="calendar-day-head"><span class="n">${d.getDate()}</span>${weatherChipHtml(iso)}</div>
       ${trabajosDia.slice(0,3).map(jobCardHtml).join('')}
       ${trabajosDia.length>3 ? `<div class="calendar-day-mas">+${trabajosDia.length-3} más</div>` : ''}
@@ -4731,7 +4779,7 @@ function renderCalendarDia(cont, desc){
   desc.textContent = `${DIAS_SEMANA_CORTOS[(calFecha.getDay()+6)%7]} ${calFecha.getDate()} de ${MESES_LARGOS[calFecha.getMonth()]}` + (iso===hoyIso ? ' (hoy)' : '');
   const chipDia = weatherChipHtml(iso);
   if(chipDia) desc.innerHTML += ' &nbsp;' + chipDia;
-  const trabajosDia = jobs.filter(j=>j.scheduledDate===iso);
+  const trabajosDia = jobsFiltrados().filter(j=>j.scheduledDate===iso);
   const conHora = trabajosDia.filter(j=>j.horaInicio).sort((a,b)=>a.horaInicio.localeCompare(b.horaInicio));
   const sinHora = trabajosDia.filter(j=>!j.horaInicio);
   document.getElementById('calendar-count').textContent = trabajosDia.length + (trabajosDia.length===1 ? ' trabajo' : ' trabajos') + ' ese día';
@@ -5365,7 +5413,7 @@ function onJobStateChange(){
   document.getElementById('nj-date-wrap').style.display = isPlanificado ? 'grid' : 'none';
 }
 
-function openNewJobModal(){
+function openNewJobModal(presetDate){
   njExtraAccessories = [];
   njTasks = [];
   renderExtraAccessories();
@@ -5378,7 +5426,7 @@ function openNewJobModal(){
   document.getElementById('nj-beneficiary').value = 'Empresa';
   document.getElementById('nj-state').value = 'pendiente';
   document.getElementById('nj-note').value = '';
-  document.getElementById('nj-date').value = '';
+  document.getElementById('nj-date').value = typeof presetDate === 'string' ? presetDate : '';
   document.getElementById('nj-date-tentative').checked = false;
   onJobStateChange();
   document.getElementById('newjob-overlay').classList.add('active');
@@ -5430,7 +5478,7 @@ function submitNewJob(ev){
   if(sb){
     const entidad = clientes.find(c=>c.name===client);
     sb.from('trabajos').insert({
-      codigo: code, nombre: client, entidad_id: entidad ? entidad.id : null, estado: initialState, prioridad: priority,
+      codigo: code, nombre: client, entidad_id: entidad ? entidad.id : null, estado: initialState, prioridad: priority, operario: worker || null,
       fecha_inicio: scheduledDate || null, presupuesto: price ? Number(price) : null, zona: zone
     }).select().single().then(({data, error})=>{
       if(error){ console.error('No se pudo guardar el trabajo en Supabase', error); return; }
