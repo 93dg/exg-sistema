@@ -1712,7 +1712,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.83</div>
+        <div class="sub">V0.84</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2638,7 +2638,15 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <div class="panel">
             <div class="panel-body" style="padding:0;">
               <table class="tbl">
-                <tr><th>Archivo</th><th>Tipo</th><th>Nº</th><th>Fecha</th><th>Cliente</th><th class="num">Importe</th><th>Estado</th></tr>
+                <tr>
+                  <th class="ord" onclick="ordenarTabla('historico-tbl',0,'text')">Archivo ⇅</th>
+                  <th class="ord" onclick="ordenarTabla('historico-tbl',1,'text')">Tipo ⇅</th>
+                  <th class="ord" onclick="ordenarTabla('historico-tbl',2,'text')">Nº ⇅</th>
+                  <th class="ord" onclick="ordenarTabla('historico-tbl',3,'text')">Fecha ⇅</th>
+                  <th class="ord" onclick="ordenarTabla('historico-tbl',4,'text')">Cliente ⇅</th>
+                  <th class="num ord" onclick="ordenarTabla('historico-tbl',5,'num')">Importe ⇅</th>
+                  <th class="ord" onclick="ordenarTabla('historico-tbl',6,'text')">Estado ⇅</th>
+                </tr>
                 <tbody id="historico-tbl"></tbody>
               </table>
             </div>
@@ -2659,10 +2667,17 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
             <div class="chip-filter" data-mf="revisado">Revisados</div>
             <div class="chip-filter" data-mf="">Todos</div>
           </div>
+          <input type="text" id="mejora-search" class="search-box" style="width:220px;" placeholder="Buscar..." oninput="renderMejora()">
         </div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
-            <tr><th>Reporte</th><th>Sección</th><th>Fecha</th><th>Estado</th><th></th></tr>
+            <tr>
+              <th>Reporte</th>
+              <th class="ord" onclick="ordenarTabla('mejora-list',1,'text')">Sección ⇅</th>
+              <th class="ord" onclick="ordenarTabla('mejora-list',2,'text')">Fecha ⇅</th>
+              <th class="ord" onclick="ordenarTabla('mejora-list',3,'text')">Estado ⇅</th>
+              <th></th>
+            </tr>
             <tbody id="mejora-list"></tbody>
           </table>
         </div>
@@ -4199,7 +4214,12 @@ function parsearReporte(m){
   return match ? {seccion: match[1], cuerpo: match[2]} : {seccion: '—', cuerpo: m.texto||''};
 }
 function renderMejora(){
-  const list = SISTEMA_CACHE.mejora.filter(m => !mejoraFiltro || (m.estado||'pendiente')===mejoraFiltro);
+  const busqueda = (document.getElementById('mejora-search')?.value || '').trim().toLowerCase();
+  const list = SISTEMA_CACHE.mejora.filter(m => {
+    if(mejoraFiltro && (m.estado||'pendiente')!==mejoraFiltro) return false;
+    if(busqueda && !(m.texto||'').toLowerCase().includes(busqueda)) return false;
+    return true;
+  });
   document.getElementById('mejora-list').innerHTML = list.length ? list.map(m=>{
     const {seccion, cuerpo} = parsearReporte(m);
     const estado = m.estado || 'pendiente';
