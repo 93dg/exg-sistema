@@ -1696,7 +1696,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.55</div>
+        <div class="sub">V0.58</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1938,11 +1938,20 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
 
       <div class="sub-view active" id="sub-bandeja">
-        <div class="filters">
-          <div class="chip-filter active" data-i="todas">Todas <span id="inbox-count-todas"></span></div>
-          <div class="chip-filter" data-i="pendiente">Pendiente</div>
-          <div class="chip-filter" data-i="revisar">Revisar</div>
-          <div class="chip-filter" data-i="validado">Validado</div>
+        <div class="filters" style="justify-content:space-between;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <div class="chip-filter active" data-i="todas">Todas <span id="inbox-count-todas"></span></div>
+            <div class="chip-filter" data-i="pendiente">Pendiente</div>
+            <div class="chip-filter" data-i="revisar">Revisar</div>
+            <div class="chip-filter" data-i="validado">Validado</div>
+          </div>
+          <div id="inbox-select-bar" style="display:flex;gap:8px;align-items:center;">
+            <label id="inbox-select-all-wrap" style="display:none;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);">
+              <input type="checkbox" id="inbox-select-all" onchange="toggleInboxSelectAll(this.checked)"> Todo
+            </label>
+            <button class="btn" id="inbox-select-toggle" onclick="toggleInboxSelectMode()">Seleccionar</button>
+            <button class="btn" id="inbox-select-delete" style="display:none;color:var(--red);border-color:var(--red);" onclick="borrarSeleccionInbox()">🗑 Eliminar (<span id="inbox-select-count">0</span>)</button>
+          </div>
         </div>
         <div class="panel">
           <div class="panel-body" style="padding:0;" id="inbox-list"></div>
@@ -4330,17 +4339,84 @@ async function loadInbox(){
 const DOC_STATE_LABELS = {pendiente:'Sin revisar', revisar:'Revisar', validado:'Validado', descartado:'Descartado'};
 function docPill(state){ return `<span class="pill ${state}">${DOC_STATE_LABELS[state]||state}</span>`; }
 
+let inboxSelectMode = false;
+let inboxSelected = new Set();
+
+function toggleInboxSelectMode(){
+  inboxSelectMode = !inboxSelectMode;
+  inboxSelected.clear();
+  document.getElementById('inbox-select-toggle').textContent = inboxSelectMode ? 'Cancelar' : 'Seleccionar';
+  document.getElementById('inbox-select-all-wrap').style.display = inboxSelectMode ? 'flex' : 'none';
+  document.getElementById('inbox-select-all').checked = false;
+  updateInboxSelectBar();
+  const activeFilter = document.querySelector('#sub-bandeja .chip-filter.active')?.dataset.i || 'todas';
+  renderInbox(activeFilter);
+}
+
+function toggleInboxSelectAll(checked){
+  const activeFilter = document.querySelector('#sub-bandeja .chip-filter.active')?.dataset.i || 'todas';
+  const rows = activeFilter==='todas' ? documentosCache : documentosCache.filter(d=>d.status===activeFilter);
+  rows.forEach(d => { if(checked) inboxSelected.add(d.id); else inboxSelected.delete(d.id); });
+  updateInboxSelectBar();
+  renderInbox(activeFilter);
+}
+window.toggleInboxSelectAll = toggleInboxSelectAll;
+
+function toggleInboxItemSelected(id, checked){
+  if(checked) inboxSelected.add(id); else inboxSelected.delete(id);
+  updateInboxSelectBar();
+}
+window.toggleInboxItemSelected = toggleInboxItemSelected;
+
+function updateInboxSelectBar(){
+  document.getElementById('inbox-select-count').textContent = inboxSelected.size;
+  document.getElementById('inbox-select-delete').style.display = (inboxSelectMode && inboxSelected.size>0) ? 'inline-flex' : 'none';
+}
+
+async function borrarDocumento(id){
+  if(!sb) return;
+  const d = documentosCache.find(x=>x.id===id);
+  if(d && d.storage_path){
+    await sb.storage.from('documentos-exg').remove([d.storage_path]);
+  }
+  await sb.from('documentos').delete().eq('id', id);
+}
+
+async function borrarUnDocumento(id, ev){
+  if(ev) ev.stopPropagation();
+  if(!confirm('¿Eliminar este documento? No se puede deshacer.')) return;
+  await borrarDocumento(id);
+  loadInbox();
+}
+window.borrarUnDocumento = borrarUnDocumento;
+
+async function borrarSeleccionInbox(){
+  if(inboxSelected.size===0) return;
+  if(!confirm(`¿Eliminar ${inboxSelected.size} documento(s)? No se puede deshacer.`)) return;
+  for(const id of Array.from(inboxSelected)){
+    await borrarDocumento(id);
+  }
+  inboxSelectMode = false;
+  inboxSelected.clear();
+  document.getElementById('inbox-select-toggle').textContent = 'Seleccionar';
+  updateInboxSelectBar();
+  loadInbox();
+}
+window.borrarSeleccionInbox = borrarSeleccionInbox;
+
 function renderInbox(filter){
   const rows = filter==='todas' ? documentosCache : documentosCache.filter(d=>d.status===filter);
   const list = document.getElementById('inbox-list');
   if(!rows.length){ list.innerHTML = `<div style="padding:20px;color:var(--ink-soft);">No hay documentos en esta vista.</div>`; return; }
   list.innerHTML = rows.map(d=>`
-    <div class="inbox-row" onclick="openTriageDrawer(${d.id})">
+    <div class="inbox-row" style="${inboxSelectMode ? 'grid-template-columns:28px 90px 1fr 1fr 1fr 120px 34px;' : 'grid-template-columns:90px 1fr 1fr 1fr 120px 34px;'}" onclick="${inboxSelectMode ? `toggleInboxItemSelected(${d.id}, !this.querySelector('input').checked); this.querySelector('input').checked = !this.querySelector('input').checked;` : `openTriageDrawer(${d.id})`}">
+      ${inboxSelectMode ? `<input type="checkbox" onclick="event.stopPropagation()" ${inboxSelected.has(d.id)?'checked':''} onchange="toggleInboxItemSelected(${d.id}, this.checked)">` : ''}
       <div class="inbox-src">${SRC_ICON[d.source]||'📄'} ${d.source||'—'}</div>
       <div><div class="main-t">${d.file_name||'Documento sin nombre'}</div></div>
       <div class="sub-t">${d.sender||'—'} · ${d.created_at ? new Date(d.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'}) : ''}</div>
       <div class="sub-t">${d.linked_label || 'Sin relacionar'}</div>
       <div>${docPill(d.status||'pendiente')}</div>
+      <button class="btn" style="padding:5px 8px;color:var(--red);border-color:var(--red);" onclick="borrarUnDocumento(${d.id}, event)" title="Eliminar">🗑</button>
     </div>`).join('');
 }
 loadInbox();
@@ -4373,6 +4449,9 @@ const TRIAGE_ACTIONS = {
   editar_estado:     {label:'Editar estado de algo existente', fields:[
     {id:'ref', label:'Trabajo', type:'select', options:()=>jobs.map(j=>j.code+' — '+j.client)},
     {id:'estado', label:'Nuevo estado', type:'select', options:()=>jobStates.map(s=>stateLabels[s])}
+  ]},
+  otra_categoria:    {label:'Es otra cosa (crear categoría)', fields:[
+    {id:'categoria', label:'¿Qué tipo de documento es?', type:'text'}
   ]},
   descartar:         {label:'Descartar — sin acción', fields:[]},
 };
@@ -4407,6 +4486,7 @@ function showTriageMenu(){
 
 function selectTriageAction(key){
   const cfg = TRIAGE_ACTIONS[key];
+  const d = documentosCache.find(x=>x.id===triageCurrentId);
   document.getElementById('e-menu-block').style.display = 'none';
   const formBlock = document.getElementById('e-form-block');
   formBlock.style.display = 'block';
@@ -4416,7 +4496,11 @@ function selectTriageAction(key){
       const opts = f.options();
       return `<div class="field"><div class="l">${f.label}</div><select class="search-box" style="width:100%;" id="ef-${f.id}">${opts.map(o=>`<option>${o}</option>`).join('')}</select></div>`;
     }
-    return `<div class="field"><div class="l">${f.label}</div><input class="search-box" style="width:100%;" type="${f.type}" id="ef-${f.id}"></div>`;
+    let sugerido = '';
+    if(f.id==='categoria' && d && d.analisis_ia && !d.analisis_ia.error){
+      sugerido = d.analisis_ia.concepto || d.analisis_ia.tipo_sugerido || '';
+    }
+    return `<div class="field"><div class="l">${f.label}</div><input class="search-box" style="width:100%;" type="${f.type}" id="ef-${f.id}" value="${(sugerido||'').replace(/"/g,'&quot;')}" placeholder="${sugerido?'':'Ej: certificado, seguro, ITV...'}">${sugerido?`<div class="sub-t" style="margin-top:4px;">Sugerido por la IA — puedes cambiarlo</div>`:''}</div>`;
   }).join('') || '<div class="sub-t">Sin datos adicionales — confirma para aplicar.</div>';
   document.getElementById('e-form-confirm').onclick = ()=>confirmTriageAction(key, cfg);
 }
@@ -4436,10 +4520,11 @@ async function confirmTriageAction(key, cfg){
     case 'pendiente_cobro': linked_label = 'Pendiente de cobro — '+(values.ref||'sin cliente')+(values.amount?' · '+values.amount+' €':''); break;
     case 'gasto': linked_label = 'Gasto — '+(values.ref||'Otros')+(values.amount?' · '+values.amount+' €':''); break;
     case 'editar_estado': linked_label = values.ref+' → '+values.estado; break;
+    case 'otra_categoria': linked_label = 'Categoría: '+(values.categoria||'Sin especificar'); break;
     case 'descartar': status = 'descartado'; linked_label = 'Descartado'; break;
   }
 
-  const payload = {status, action_type:key, linked_label, amount: values.amount ? Number(values.amount) : null};
+  const payload = {status, action_type:key, linked_label, amount: values.amount ? Number(values.amount) : null, categoria_libre: key==='otra_categoria' ? (values.categoria||null) : null};
   if(!sb){ alert('Conecta Supabase (SUPABASE_URL / SUPABASE_ANON_KEY) para guardar este cambio.'); return; }
   const {error} = await sb.from('documentos').update(payload).eq('id', triageCurrentId);
   if(error){ alert('Error al guardar: '+error.message); return; }
