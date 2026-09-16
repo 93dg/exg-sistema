@@ -241,23 +241,38 @@ main{
 #estado-general.error{color:var(--red);}
 #estado-general.cargando{color:var(--ink-soft);}
 
-/* -------- Barra inferior fija con Subir -------- */
+/* -------- Barra inferior fija: caja de texto tipo chat -------- */
 #barra-inferior{
   position:fixed;left:0;right:0;bottom:0;
-  padding:14px 18px calc(14px + env(safe-area-inset-bottom));
+  padding:10px 18px calc(10px + env(safe-area-inset-bottom));
   background:var(--paper);
   border-top:1px solid var(--line);
-  display:none;
 }
-#barra-inferior.activo{display:block;}
-#btn-subir-todo{
+#chat-bar{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  max-width:480px;margin:0 auto;
+}
+#chat-texto{
+  flex:1;
+  border:1.5px solid var(--line);
+  border-radius:22px;
+  padding:11px 16px;
+  font-family:'Inter',sans-serif;
+  font-size:15px;
+  color:var(--ink);
+  background:#fff;
+}
+#chat-texto:focus{outline:none;border-color:var(--orange);}
+#btn-enviar{
   -webkit-appearance:none;appearance:none;border:none;
-  width:100%;max-width:480px;margin:0 auto;display:block;
-  padding:15px;border-radius:10px;
-  background:var(--orange);color:#fff;
-  font-size:16px;font-weight:700;
+  width:42px;height:42px;border-radius:50%;flex:0 0 42px;
+  background:var(--orange);
+  display:flex;align-items:center;justify-content:center;
 }
-#btn-subir-todo:disabled{background:var(--line);color:var(--ink-soft);}
+#btn-enviar:disabled{background:var(--line);}
+#btn-enviar svg{width:19px;height:19px;}
 
 footer{
   text-align:center;
@@ -322,12 +337,6 @@ footer{
     <div id="lista-titulo">Fotos listas para subir</div>
     <div id="lista-fotos"></div>
 
-    <div id="nota-wrap">
-      <label for="nota">Nota (opcional)</label>
-      <textarea id="nota" placeholder="Ej: albarán de la obra del Ayuntamiento, hoja 2"></textarea>
-      <div class="sub-t" style="font-size:11.5px;color:var(--ink-soft);">Tip: toca el micrófono del teclado para dictarla en vez de escribir</div>
-    </div>
-
     <div id="estado-general"></div>
   </div>
 </main>
@@ -338,7 +347,15 @@ footer{
 </div>
 
 <div id="barra-inferior">
-  <button type="button" id="btn-subir-todo">Subir</button>
+  <div id="chat-bar">
+    <input type="text" id="chat-texto" placeholder="Escribe un mensaje…" autocomplete="off">
+    <button type="button" id="btn-enviar" aria-label="Enviar">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4 12l16-8-6 8 6 8-16-8z" fill="white"/>
+      </svg>
+    </button>
+  </div>
+  <div class="sub-t" style="font-size:11px;color:var(--ink-soft);text-align:center;margin-top:6px;">Toca el micrófono del teclado para dictarlo</div>
 </div>
 
 <div id="lightbox">
@@ -363,10 +380,10 @@ footer{
   const campoGaleria = document.getElementById("campo-galeria");
   const listaWrap = document.getElementById("lista-wrap");
   const listaFotos = document.getElementById("lista-fotos");
-  const nota = document.getElementById("nota");
+  const chatTexto = document.getElementById("chat-texto");
+  const btnEnviar = document.getElementById("btn-enviar");
   const estadoGeneral = document.getElementById("estado-general");
   const barraInferior = document.getElementById("barra-inferior");
-  const btnSubirTodo = document.getElementById("btn-subir-todo");
   const historialLista = document.getElementById("historial-lista");
   const historialVacio = document.getElementById("historial-vacio");
   const LS_KEY = "exg_historial_subidas";
@@ -376,6 +393,7 @@ footer{
     document.getElementById("vista-historial").classList.toggle("activa", v === "historial");
     document.getElementById("tab-subir").classList.toggle("active", v === "subir");
     document.getElementById("tab-historial").classList.toggle("active", v === "historial");
+    barraInferior.style.display = (v === "subir") ? "block" : "none";
     if (v === "historial") renderHistorial();
     render();
   }
@@ -405,15 +423,16 @@ footer{
     historialVacio.style.display = "none";
     historialLista.innerHTML = lista.map(h => {
       const fecha = h.created_at ? new Date(h.created_at).toLocaleString("es-ES", {day:"numeric", month:"short", hour:"2-digit", minute:"2-digit"}) : "";
-      const thumb = h.kind === "audio"
-        ? `<div class="hist-thumb">🎙</div>`
+      const thumb = h.kind === "audio" ? `<div class="hist-thumb">🎙</div>`
+        : h.kind === "texto" ? `<div class="hist-thumb">💬</div>`
         : `<img class="hist-thumb" src="${h.file_url}" alt="">`;
+      const etiqueta = h.kind === "audio" ? "Audio" : h.kind === "texto" ? "Mensaje" : "Foto";
       return `
       <div class="hist-item" data-doc-id="${h.documento_id}">
         ${thumb}
         <div class="hist-info">
-          <div class="hist-nombre">${h.kind === "audio" ? "Audio" : "Foto"} · ${fecha}</div>
-          ${h.nota ? `<div class="hist-nota">"${h.nota}"</div>` : ""}
+          <div class="hist-nombre">${etiqueta} · ${fecha}</div>
+          ${h.nota ? `<div class="hist-nota">${h.kind === "texto" ? h.nota : `"${h.nota}"`}</div>` : ""}
         </div>
         <button type="button" class="hist-borrar" onclick="borrarDelHistorial(${h.documento_id})">✕</button>
       </div>`;
@@ -540,19 +559,12 @@ footer{
   window.quitarFotoPendiente = quitar;
 
   function render(){
-    const enVistaSubir = document.getElementById("vista-subir").classList.contains("activa");
-    if (pendientes.length === 0 || !enVistaSubir){
+    if (pendientes.length === 0){
       listaWrap.classList.remove("activo");
-      barraInferior.classList.remove("activo");
-      if (pendientes.length === 0) return;
     } else {
       listaWrap.classList.add("activo");
-      barraInferior.classList.add("activo");
     }
-    btnSubirTodo.disabled = subiendo;
-    btnSubirTodo.textContent = subiendo
-      ? "Subiendo…"
-      : `Subir ${pendientes.length} elemento${pendientes.length > 1 ? "s" : ""}`;
+    btnEnviar.disabled = subiendo || (pendientes.length === 0 && chatTexto.value.trim() === "");
 
     listaFotos.innerHTML = pendientes.map(p => {
       if (p.kind === "audio") {
@@ -602,17 +614,75 @@ footer{
   }
   window.verFotoPendiente = verFoto;
 
-  btnSubirTodo.addEventListener("click", subirTodo);
+  btnEnviar.addEventListener("click", enviarMensaje);
+  chatTexto.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); enviarMensaje(); }
+  });
+  chatTexto.addEventListener("input", () => {
+    btnEnviar.disabled = subiendo || (pendientes.length === 0 && chatTexto.value.trim() === "");
+  });
 
-  async function subirTodo(){
-    if (subiendo || pendientes.length === 0) return;
+  async function enviarMensaje(){
+    if (subiendo) return;
+    const notaTexto = chatTexto.value.trim() || null;
+    if (pendientes.length === 0 && !notaTexto) return;
+
     subiendo = true;
-    estadoGeneral.textContent = "Subiendo…";
+    btnEnviar.disabled = true;
+    estadoGeneral.textContent = "Enviando…";
     estadoGeneral.className = "cargando";
     render();
 
-    const notaTexto = nota.value.trim() || null;
     const loteId = crypto.randomUUID ? crypto.randomUUID() : (Date.now() + "-" + Math.random().toString(36).slice(2));
+
+    // Mensaje de solo texto, sin fotos ni audio
+    if (pendientes.length === 0){
+      try {
+        const ahora = new Date();
+        const filaResp = await fetch(`${SUPABASE_URL}/rest/v1/documentos`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            "apikey": SUPABASE_ANON_KEY,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+          },
+          body: JSON.stringify({
+            tipo: "otro",
+            fecha: ahora.toISOString().slice(0,10),
+            source: "texto",
+            status: "pendiente",
+            lote_id: loteId,
+            nota: notaTexto
+          })
+        });
+        if (!filaResp.ok) throw new Error("tabla " + filaResp.status);
+        const filaCreada = await filaResp.json();
+        const documentoId = filaCreada && filaCreada[0] && filaCreada[0].id;
+        if (documentoId) {
+          añadirAlHistorial([{
+            documento_id: documentoId,
+            kind: "texto",
+            nota: notaTexto,
+            created_at: ahora.toISOString()
+          }]);
+        }
+        estadoGeneral.textContent = "✅ Enviado";
+        estadoGeneral.className = "ok";
+      } catch (err) {
+        estadoGeneral.textContent = "No se pudo enviar. Inténtalo otra vez.";
+        estadoGeneral.className = "error";
+      }
+      setTimeout(() => {
+        estadoGeneral.textContent = "";
+        estadoGeneral.className = "";
+        subiendo = false;
+        chatTexto.value = "";
+        render();
+      }, 1400);
+      return;
+    }
+
     const subidas = pendientes.length;
     let fallos = 0;
     const nuevosHistorial = [];
@@ -720,7 +790,7 @@ footer{
 
     setTimeout(() => {
       pendientes = [];
-      nota.value = "";
+      chatTexto.value = "";
       estadoGeneral.textContent = "";
       estadoGeneral.className = "";
       subiendo = false;
