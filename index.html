@@ -1712,7 +1712,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.73</div>
+        <div class="sub">V0.74</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2658,23 +2658,16 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     </div>
 
     <div class="view" id="view-config">
-      <div class="topbar"><div><h1>Configuración</h1><div class="desc">Tarifas, usuarios y ajustes generales</div></div></div>
+      <div class="topbar"><div><h1>Configuración</h1><div class="desc">Qué secciones puede ver cada usuario</div></div></div>
       <div class="panel">
-        <div class="panel-head"><h3>Tarifas</h3><span class="count">derivadas de 67 facturas reales 2023-2026</span></div>
+        <div class="panel-head"><h3>Permisos por usuario</h3><span class="count">Dani G ve siempre todo</span></div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
-            <tr><th>Concepto</th><th>Unidad</th><th class="num">Precio observado</th><th>Rango real</th></tr>
-            <tr><td>Excavación de tierra</td><td>m³</td><td class="num">30,06 €</td><td class="tag">estable</td></tr>
-            <tr><td>Explanación y nivelación (motoniveladora)</td><td>m²</td><td class="num">25,05 €</td><td class="tag">estable</td></tr>
-            <tr><td>Relleno y compactado</td><td>m³</td><td class="num">29,63 €</td><td class="tag">estable</td></tr>
-            <tr><td>Desbroce y limpieza mecánica</td><td>m²</td><td class="num">2,50 €</td><td class="tag" style="border-color:var(--orange);color:var(--orange);">varía 2,50 – 2.200 €</td></tr>
-            <tr><td>Aporte de zahorra</td><td>m³ / lote</td><td class="num">30,00 €</td><td class="tag" style="border-color:var(--orange);color:var(--orange);">varía 15 – 1.600 €</td></tr>
-            <tr><td>Cuba de agua (riego/suministro)</td><td>servicio</td><td class="num">60,00 €</td><td class="tag" style="border-color:var(--orange);color:var(--orange);">varía 1,16 – 90 €</td></tr>
-            <tr><td>Alquiler de máquina</td><td>hora</td><td class="num">40,00 €</td><td class="tag">1 sola muestra</td></tr>
-            <tr><td>Reparación de camino (obra completa)</td><td>obra</td><td class="num">4.888 €</td><td class="tag" style="border-color:var(--orange);color:var(--orange);">varía 1.950 – 4.888 €</td></tr>
+            <tr><th>Sección</th><th style="text-align:center;">Rafa</th><th style="text-align:center;">Manolo</th></tr>
+            <tbody id="permisos-tbl"></tbody>
           </table>
         </div>
-        <div class="two-col-note">Precios extraídos automáticamente de las 782 líneas de concepto de las facturas reales de 2023-2026. Las que tienen "varía" mezclan trabajos muy distintos bajo el mismo nombre (ej. "zahorra" a veces es por m³ y a veces una obra cerrada) — antes de usar estas tarifas para calcular presupuestos automáticos, conviene que las revises y separes bien por tipo de trabajo.</div>
+        <div class="two-col-note" style="margin-top:10px;">Sistema, Reportes, Histórico y Configuración son siempre solo para Dani G, no aparecen aquí porque no se pueden ceder.</div>
       </div>
     </div>
 
@@ -4020,10 +4013,63 @@ async function checkSession(){
       const userLocal = (data.session.user.email||'').split('@')[0];
       const nombreEl = document.getElementById('user-badge-name');
       if(nombreEl) nombreEl.textContent = NOMBRES_USUARIO[userLocal] || data.session.user.email || 'Sesión iniciada';
+
+      if(!esAdmin && (userLocal==='rg' || userLocal==='mg')){
+        const {data: cfgRow} = await sb.from('sistema').select('*').eq('tipo','ui_config').limit(1).maybeSingle();
+        const permisos = cfgRow?.data?.permisos || {};
+        const permitidas = permisos[userLocal] || SECCIONES_CEDIBLES.map(s=>s.key); // por defecto, todo permitido salvo admin-only
+        SECCIONES_CEDIBLES.forEach(s=>{
+          if(!permitidas.includes(s.key)){
+            document.querySelectorAll(`[data-view="${s.key}"]`).forEach(el=>el.style.display='none');
+          }
+        });
+      }
     }
   }catch(e){ console.error(e); }
 }
 checkSession();
+
+const SECCIONES_CEDIBLES = [
+  {key:'control', label:'Centro de control'},
+  {key:'planificacion', label:'Planificación'},
+  {key:'mapa', label:'Mapa'},
+  {key:'trabajos', label:'Trabajos'},
+  {key:'entradas', label:'Entradas'},
+  {key:'archivos', label:'Archivos'},
+  {key:'flota', label:'Flota'},
+  {key:'clientes', label:'Clientes'},
+  {key:'ayuntamiento', label:'Ayuntamiento'},
+  {key:'facturas', label:'Facturas'},
+  {key:'presupuestos', label:'Presupuestos'},
+  {key:'tarifas', label:'Tarifas'},
+  {key:'economia', label:'Economía'},
+  {key:'correo', label:'Correo'},
+];
+async function cargarPermisos(){
+  if(!sb) return;
+  const {data} = await sb.from('sistema').select('*').eq('tipo','ui_config').limit(1).maybeSingle();
+  const permisos = data?.data?.permisos || {};
+  const rg = permisos.rg || SECCIONES_CEDIBLES.map(s=>s.key);
+  const mg = permisos.mg || SECCIONES_CEDIBLES.map(s=>s.key);
+  document.getElementById('permisos-tbl').innerHTML = SECCIONES_CEDIBLES.map(s=>`
+    <tr><td>${s.label}</td>
+      <td style="text-align:center;"><input type="checkbox" data-key="${s.key}" data-user="rg" ${rg.includes(s.key)?'checked':''} onchange="guardarPermisos()"></td>
+      <td style="text-align:center;"><input type="checkbox" data-key="${s.key}" data-user="mg" ${mg.includes(s.key)?'checked':''} onchange="guardarPermisos()"></td>
+    </tr>`).join('');
+}
+async function guardarPermisos(){
+  if(!sb) return;
+  const rg = Array.from(document.querySelectorAll('#permisos-tbl input[data-user="rg"]:checked')).map(c=>c.dataset.key);
+  const mg = Array.from(document.querySelectorAll('#permisos-tbl input[data-user="mg"]:checked')).map(c=>c.dataset.key);
+  const {data: cfgRow} = await sb.from('sistema').select('*').eq('tipo','ui_config').limit(1).maybeSingle();
+  const nuevaData = {...(cfgRow?.data||{}), permisos: {rg, mg}};
+  if(cfgRow){
+    await sb.from('sistema').update({data: nuevaData}).eq('id', cfgRow.id);
+  } else {
+    await sb.from('sistema').insert({tipo:'ui_config', data: nuevaData});
+  }
+}
+cargarPermisos();
 
 async function doLogin(){
   let user = document.getElementById('login-email').value.trim().toLowerCase();
