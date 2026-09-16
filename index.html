@@ -4926,7 +4926,7 @@ function renderInbox(filter){
     <div class="inbox-row" style="${inboxSelectMode ? 'grid-template-columns:28px 90px 1fr 1fr 1fr 120px 34px;' : 'grid-template-columns:90px 1fr 1fr 1fr 120px 34px;'}" onclick="${inboxSelectMode ? `toggleInboxItemSelected(${d.id}, !this.querySelector('input').checked); this.querySelector('input').checked = !this.querySelector('input').checked;` : `openTriageDrawer(${d.id})`}">
       ${inboxSelectMode ? `<input type="checkbox" onclick="event.stopPropagation()" ${inboxSelected.has(d.id)?'checked':''} onchange="toggleInboxItemSelected(${d.id}, this.checked)">` : ''}
       <div class="inbox-src">${SRC_ICON[d.source]||'📄'} ${d.source||'—'}</div>
-      <div><div class="main-t">${d.file_name || d.nota || 'Documento sin nombre'}</div></div>
+      <div><div class="main-t">${d.nota || d.transcripcion || d.file_name || 'Documento sin nombre'}</div></div>
       <div class="sub-t">${d.sender||'—'} · ${d.created_at ? new Date(d.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'}) : ''}</div>
       <div class="sub-t">${d.linked_label || 'Sin relacionar'}</div>
       <div>${docPill(d.status||'pendiente')}</div>
@@ -4980,7 +4980,10 @@ function openTriageDrawer(id){
   if(d.file_url && /\.(jpg|jpeg|png|webp)$/i.test(d.file_url)){
     preview.innerHTML = `<img src="${d.file_url}" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--line);">`;
   } else if(d.file_url && /\.(webm|m4a|aac|mp3|wav)$/i.test(d.file_url)){
-    preview.innerHTML = `<audio controls style="width:100%;" src="${d.file_url}"></audio>`;
+    const textoTranscrito = d.transcripcion || d.transcripcion_bruta;
+    preview.innerHTML = `<audio controls style="width:100%;" src="${d.file_url}"></audio>`
+      + (textoTranscrito ? `<div class="doc-chip" style="margin-top:10px;padding:14px;text-align:left;white-space:pre-wrap;">📝 ${textoTranscrito}</div>`
+         : `<div class="sub-t" style="margin-top:8px;">Transcribiendo…</div>`);
   } else if(d.file_url){
     preview.innerHTML = `<a class="doc-chip" style="padding:14px 8px;" href="${d.file_url}" target="_blank">📄 Abrir archivo original</a>`;
   } else if(d.nota){
