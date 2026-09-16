@@ -1738,7 +1738,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.01</div>
+        <div class="sub">V1.02</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5196,8 +5196,10 @@ function explorerBreadcrumbs(path){
   return crumbs.join('');
 }
 
+let explorerRequestToken = 0;
 async function loadExplorer(path, fromHistory){
   explorerPath = path || '';
+  const miToken = ++explorerRequestToken;
   if(!fromHistory){
     explorerHistory = explorerHistory.slice(0, explorerHistoryIndex + 1);
     if(explorerHistory[explorerHistory.length-1] !== explorerPath){
@@ -5220,9 +5222,11 @@ async function loadExplorer(path, fromHistory){
   try{
     ({data, error} = await sb.storage.from(DOC_BUCKET).list(explorerPath, {limit:500, sortBy:{column:'name',order:'asc'}}));
   }catch(err){
+    if(miToken !== explorerRequestToken) return; // llegó tarde y ya no es la carpeta que se está mirando, se ignora
     grid.innerHTML = `<div class="explorer-empty" style="color:var(--red);">Error de red: ${err && err.message ? err.message : 'no se pudo conectar con Supabase'}</div>`;
     return;
   }
+  if(miToken !== explorerRequestToken) return; // una respuesta más nueva ya ganó, esta llegó tarde — se descarta sin pintar nada
   if(error){ grid.innerHTML = `<div class="explorer-empty" style="color:var(--red);">Error: ${error.message}</div>`; return; }
   if(!data || !data.length){ explorerCurrentData = []; grid.innerHTML = `<div class="explorer-empty">Carpeta vacía.</div>`; return; }
 
