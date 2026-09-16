@@ -97,6 +97,11 @@ main{
 .opcion .ico svg{width:20px;height:20px;}
 .opcion .t1{font-size:14.5px;font-weight:700;color:var(--ink);}
 .opcion.principal .t1{color:#fff;}
+.opcion.grabando{background:var(--red);border-color:var(--red);}
+.opcion.grabando .ico{background:rgba(255,255,255,0.2);}
+.opcion.grabando .t1{color:#fff;}
+@keyframes pulso-grabar{0%,100%{opacity:1;}50%{opacity:0.55;}}
+.opcion.grabando .ico{animation:pulso-grabar 1s infinite;}
 
 #campo-camara,#campo-galeria{display:none;}
 
@@ -139,6 +144,13 @@ main{
 .foto-item .estado-mini.ok{background:rgba(60,110,71,0.85);color:#fff;}
 .foto-item .estado-mini.error{background:rgba(178,58,46,0.85);color:#fff;}
 .foto-item .estado-mini.subiendo{background:rgba(27,31,36,0.75);color:#fff;}
+
+.foto-item.es-audio{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;background:var(--asphalt);
+}
+.foto-item.es-audio .ico-audio{font-size:26px;}
+.foto-item.es-audio .dur-audio{font-size:11px;color:#C9CCD1;font-family:'IBM Plex Mono',monospace;}
 
 #lightbox{
   display:none;
@@ -243,6 +255,17 @@ footer{
       </span>
       <span class="t1">Subir foto</span>
     </button>
+
+    <button type="button" class="opcion" id="btn-audio">
+      <span class="ico">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="9" y="3" width="6" height="11" rx="3" stroke="#1B1F24" stroke-width="1.8"/>
+          <path d="M5.5 11a6.5 6.5 0 0013 0" stroke="#1B1F24" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M12 17.5V21" stroke="#1B1F24" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="t1" id="btn-audio-texto">Grabar audio</span>
+    </button>
   </div>
 
   <input id="campo-camara" type="file" accept="image/*" capture="environment">
@@ -255,6 +278,7 @@ footer{
     <div id="nota-wrap">
       <label for="nota">Nota (opcional)</label>
       <textarea id="nota" placeholder="Ej: albarán de la obra del Ayuntamiento, hoja 2"></textarea>
+      <div class="sub-t" style="font-size:11.5px;color:var(--ink-soft);">Tip: toca el micrófono del teclado para dictarla en vez de escribir</div>
     </div>
 
     <div id="estado-general"></div>
@@ -268,6 +292,7 @@ footer{
 <div id="lightbox">
   <button type="button" id="lightbox-cerrar">✕</button>
   <img id="lightbox-img" alt="Foto ampliada">
+  <audio id="lightbox-audio" controls style="display:none;width:280px;max-width:80vw;"></audio>
 </div>
 
 <footer>Excavaciones Gómez</footer>
@@ -280,6 +305,8 @@ footer{
 
   const btnCamara = document.getElementById("btn-camara");
   const btnGaleria = document.getElementById("btn-galeria");
+  const btnAudio = document.getElementById("btn-audio");
+  const btnAudioTexto = document.getElementById("btn-audio-texto");
   const campoCamara = document.getElementById("campo-camara");
   const campoGaleria = document.getElementById("campo-galeria");
   const listaWrap = document.getElementById("lista-wrap");
@@ -289,9 +316,15 @@ footer{
   const barraInferior = document.getElementById("barra-inferior");
   const btnSubirTodo = document.getElementById("btn-subir-todo");
 
-  // Cada elemento: { file, previewUrl, id (interno) }
+  // Cada elemento: { id, kind: 'foto'|'audio', file, previewUrl, duracion }
   let pendientes = [];
   let subiendo = false;
+  let grabando = false;
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let audioStream = null;
+  let grabarInicio = null;
+  let grabarTimer = null;
 
   btnCamara.addEventListener("click", () => campoCamara.click());
   btnGaleria.addEventListener("click", () => campoGaleria.click());
@@ -309,11 +342,64 @@ footer{
     Array.from(fileList).forEach(f => {
       pendientes.push({
         id: "f" + Date.now() + Math.random().toString(36).slice(2),
+        kind: "foto",
         file: f,
         previewUrl: URL.createObjectURL(f)
       });
     });
     render();
+  }
+
+  btnAudio.addEventListener("click", () => {
+    if (grabando) pararGrabacion(); else empezarGrabacion();
+  });
+
+  async function empezarGrabacion(){
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      estadoGeneral.textContent = "No se pudo acceder al micrófono";
+      estadoGeneral.className = "error";
+      return;
+    }
+    const mimeCandidatos = ["audio/mp4", "audio/webm", "audio/aac"];
+    const mime = mimeCandidatos.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
+    mediaRecorder = mime ? new MediaRecorder(audioStream, { mimeType: mime }) : new MediaRecorder(audioStream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      const tipo = mediaRecorder.mimeType || "audio/webm";
+      const blob = new Blob(audioChunks, { type: tipo });
+      const duracionSeg = grabarInicio ? Math.round((Date.now() - grabarInicio) / 1000) : 0;
+      const extension = tipo.includes("mp4") ? "m4a" : tipo.includes("aac") ? "aac" : "webm";
+      const file = new File([blob], `audio-${Date.now()}.${extension}`, { type: tipo });
+      pendientes.push({
+        id: "a" + Date.now() + Math.random().toString(36).slice(2),
+        kind: "audio",
+        file,
+        previewUrl: URL.createObjectURL(blob),
+        duracion: duracionSeg
+      });
+      audioStream.getTracks().forEach(t => t.stop());
+      audioStream = null;
+      render();
+    };
+    mediaRecorder.start();
+    grabarInicio = Date.now();
+    grabando = true;
+    btnAudio.classList.add("grabando");
+    grabarTimer = setInterval(() => {
+      const seg = Math.round((Date.now() - grabarInicio) / 1000);
+      btnAudioTexto.textContent = `Grabando… ${seg}s (toca para parar)`;
+    }, 500);
+  }
+
+  function pararGrabacion(){
+    if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+    grabando = false;
+    btnAudio.classList.remove("grabando");
+    btnAudioTexto.textContent = "Grabar audio";
+    if (grabarTimer) { clearInterval(grabarTimer); grabarTimer = null; }
   }
 
   function quitar(id){
@@ -333,29 +419,52 @@ footer{
     btnSubirTodo.disabled = subiendo;
     btnSubirTodo.textContent = subiendo
       ? "Subiendo…"
-      : `Subir ${pendientes.length} foto${pendientes.length > 1 ? "s" : ""}`;
+      : `Subir ${pendientes.length} elemento${pendientes.length > 1 ? "s" : ""}`;
 
-    listaFotos.innerHTML = pendientes.map(p => `
+    listaFotos.innerHTML = pendientes.map(p => {
+      if (p.kind === "audio") {
+        const mm = String(Math.floor((p.duracion||0)/60)).padStart(1,"0");
+        const ss = String((p.duracion||0)%60).padStart(2,"0");
+        return `
+      <div class="foto-item es-audio" data-id="${p.id}" onclick="verFotoPendiente('${p.id}')">
+        <span class="ico-audio">🎙</span>
+        <span class="dur-audio">${mm}:${ss}</span>
+        ${!subiendo ? `<button type="button" class="borrar" onclick="event.stopPropagation();quitarFotoPendiente('${p.id}')">✕</button>` : ""}
+      </div>`;
+      }
+      return `
       <div class="foto-item" data-id="${p.id}">
         <img src="${p.previewUrl}" alt="Foto" onclick="verFotoPendiente('${p.id}')">
         ${!subiendo ? `<button type="button" class="borrar" onclick="quitarFotoPendiente('${p.id}')">✕</button>` : ""}
-      </div>
-    `).join("");
+      </div>`;
+    }).join("");
   }
 
   const lightbox = document.getElementById("lightbox");
   const lightboxImg = document.getElementById("lightbox-img");
+  const lightboxAudio = document.getElementById("lightbox-audio");
   document.getElementById("lightbox-cerrar").addEventListener("click", () => {
     lightbox.classList.remove("activo");
+    lightboxAudio.pause();
   });
   lightbox.addEventListener("click", (e) => {
-    if (e.target === lightbox) lightbox.classList.remove("activo");
+    if (e.target === lightbox) { lightbox.classList.remove("activo"); lightboxAudio.pause(); }
   });
 
   function verFoto(id){
     const p = pendientes.find(x => x.id === id);
     if (!p) return;
-    lightboxImg.src = p.previewUrl;
+    if (p.kind === "audio") {
+      lightboxImg.style.display = "none";
+      lightboxAudio.style.display = "block";
+      lightboxAudio.src = p.previewUrl;
+      lightboxAudio.play().catch(() => {});
+    } else {
+      lightboxAudio.style.display = "none";
+      lightboxAudio.pause();
+      lightboxImg.style.display = "block";
+      lightboxImg.src = p.previewUrl;
+    }
     lightbox.classList.add("activo");
   }
   window.verFotoPendiente = verFoto;
@@ -379,8 +488,9 @@ footer{
       try {
         const ahora = new Date();
         const fecha = ahora.toISOString().slice(0,10);
-        const extension = (p.file.name.split(".").pop() || "jpg").toLowerCase();
-        const nombreArchivo = `sin-clasificar/gastos/${fecha}/${ahora.getTime()}-${Math.random().toString(36).slice(2,7)}.${extension}`;
+        const extension = (p.file.name.split(".").pop() || (p.kind === "audio" ? "webm" : "jpg")).toLowerCase();
+        const carpeta = p.kind === "audio" ? "audios" : "gastos";
+        const nombreArchivo = `sin-clasificar/${carpeta}/${fecha}/${ahora.getTime()}-${Math.random().toString(36).slice(2,7)}.${extension}`;
 
         const subidaResp = await fetch(
           `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${nombreArchivo}`,
@@ -389,7 +499,7 @@ footer{
             headers: {
               "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
               "apikey": SUPABASE_ANON_KEY,
-              "Content-Type": p.file.type || "image/jpeg"
+              "Content-Type": p.file.type || (p.kind === "audio" ? "audio/webm" : "image/jpeg")
             },
             body: p.file
           }
@@ -412,7 +522,7 @@ footer{
             storage_path: nombreArchivo,
             file_name: p.file.name,
             file_url: fileUrl,
-            source: "foto",
+            source: p.kind === "audio" ? "audio" : "foto",
             status: "pendiente",
             lote_id: loteId,
             nota: notaTexto
@@ -430,7 +540,8 @@ footer{
           item.appendChild(mini);
         }
 
-        if (documentoId) {
+        // El análisis automático por IA solo aplica a imágenes, no a audios
+        if (documentoId && p.kind === "foto") {
           fetch(`${SUPABASE_URL}/functions/v1/clasificar-documento`, {
             method: "POST",
             headers: {
@@ -453,10 +564,10 @@ footer{
     }
 
     if (fallos === 0){
-      estadoGeneral.textContent = `✅ ${subidas} foto${subidas > 1 ? "s" : ""} subida${subidas > 1 ? "s" : ""}`;
+      estadoGeneral.textContent = `✅ ${subidas} elemento${subidas > 1 ? "s" : ""} subido${subidas > 1 ? "s" : ""}`;
       estadoGeneral.className = "ok";
     } else {
-      estadoGeneral.textContent = `${subidas - fallos} subidas, ${fallos} con error`;
+      estadoGeneral.textContent = `${subidas - fallos} subidos, ${fallos} con error`;
       estadoGeneral.className = "error";
     }
 
