@@ -1737,9 +1737,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.91</div>
+        <div class="sub">V0.92</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
+      <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
     </div>
     <div class="user-badge" onclick="doLogout()" title="Clic para cambiar de usuario (cierra sesión)">
       <div class="user-badge-dot"></div>
@@ -1830,7 +1831,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
 
         <div>
-          <button class="btn" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="padding:4px 8px;font-size:11px;margin-bottom:8px;">🌓 Tema</button>
           <div class="panel">
             <div class="panel-head"><h3>Requiere atención</h3><span class="count">7</span></div>
             <div class="panel-body" id="atencion-list"></div>
@@ -3054,6 +3054,26 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         </div>
         <button type="submit" class="btn primary" style="width:100%;">Crear trabajo</button>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: DETALLE DE REPORTE ================= -->
+<div class="overlay" id="reporte-detalle-overlay" onclick="if(event.target===this) cerrarDetalleReporte()">
+  <div class="drawer" style="max-width:460px;">
+    <div class="drawer-head">
+      <div><h2 id="reporte-detalle-seccion">—</h2></div>
+      <button class="close-x" onclick="cerrarDetalleReporte()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field" style="margin-bottom:12px;"><div class="l">Reporte (puedes editarlo o añadir una corrección)</div>
+        <textarea class="search-box" style="width:100%;height:120px;" id="reporte-detalle-texto"></textarea>
+      </div>
+      <div id="reporte-detalle-captura"></div>
+      <div class="state-row" style="gap:8px;margin-top:10px;">
+        <button class="btn primary" style="flex:1;" onclick="guardarDetalleReporte()">Guardar cambios</button>
+      </div>
+      <div class="sub-t" id="reporte-detalle-status" style="margin-top:8px;"></div>
     </div>
   </div>
 </div>
@@ -4286,6 +4306,33 @@ async function addProtocolo(){
   loadSistema();
 }
 
+let reporteDetalleId = null;
+function abrirDetalleReporte(id){
+  const m = SISTEMA_CACHE.mejora.find(x=>x.id===id);
+  if(!m) return;
+  reporteDetalleId = id;
+  const {seccion} = parsearReporte(m);
+  document.getElementById('reporte-detalle-seccion').textContent = seccion;
+  document.getElementById('reporte-detalle-texto').value = m.texto || '';
+  document.getElementById('reporte-detalle-captura').innerHTML = m.captura_url ? `<a href="${m.captura_url}" target="_blank">📷 Ver captura</a>` : '';
+  document.getElementById('reporte-detalle-status').textContent = '';
+  document.getElementById('reporte-detalle-overlay').classList.add('active');
+}
+function cerrarDetalleReporte(){ document.getElementById('reporte-detalle-overlay').classList.remove('active'); reporteDetalleId = null; }
+async function guardarDetalleReporte(){
+  const m = SISTEMA_CACHE.mejora.find(x=>x.id===reporteDetalleId);
+  const statusEl = document.getElementById('reporte-detalle-status');
+  if(!m || !sb){ statusEl.textContent = 'Supabase no está conectado.'; return; }
+  const nuevoTexto = document.getElementById('reporte-detalle-texto').value.trim();
+  if(!nuevoTexto){ statusEl.textContent = 'No puede quedar vacío.'; statusEl.style.color = 'var(--red)'; return; }
+  const nuevaData = {...m, texto: nuevoTexto, estado: 'pendiente'}; delete nuevaData.id; delete nuevaData.created_at;
+  const {error} = await sb.from('sistema').update({data: nuevaData}).eq('id', m.id);
+  if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
+  m.texto = nuevoTexto; m.estado = 'pendiente';
+  statusEl.textContent = 'Guardado ✓ — vuelve a quedar pendiente de revisar'; statusEl.style.color = 'var(--green)';
+  renderMejora();
+}
+
 let mejoraFiltro = 'pendiente';
 document.getElementById('mejora-filter').addEventListener('click', (ev)=>{
   const chip = ev.target.closest('.chip-filter');
@@ -4311,12 +4358,12 @@ function renderMejora(){
     const {seccion, cuerpo} = parsearReporte(m);
     const estado = m.estado || 'pendiente';
     const fecha = m.created_at ? new Date(m.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'}) : '—';
-    return `<tr>
-      <td>${cuerpo}${m.captura_url ? ` — <a href="${m.captura_url}" target="_blank">📷 captura</a>` : ''}</td>
+    return `<tr onclick="abrirDetalleReporte('${m.id}')" style="cursor:pointer;">
+      <td>${cuerpo}${m.captura_url ? ` — <a href="${m.captura_url}" target="_blank" onclick="event.stopPropagation();">📷 captura</a>` : ''}</td>
       <td>${seccion}</td>
       <td>${fecha}</td>
       <td><span class="pill ${estado==='revisado'?'terminado':'pendiente'}">${estado==='revisado'?'Revisado':'Pendiente'}</span></td>
-      <td style="white-space:nowrap;">
+      <td style="white-space:nowrap;" onclick="event.stopPropagation();">
         ${estado==='revisado'
           ? `<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="reabrirReporte('${m.id}')">Reabrir</button>`
           : `<button class="btn primary" style="padding:3px 8px;font-size:11px;" onclick="marcarRevisado('${m.id}')">Revisado ✓</button>`}
