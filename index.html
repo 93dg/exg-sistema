@@ -180,6 +180,7 @@ table{border-collapse:collapse;width:100%;}
 .pill.facturado{background:#E4DEF7;color:#5A3FA0;}
 .pill.cobrado{background:var(--green-soft);color:var(--green);}
 .pill.cancelado{background:var(--red-soft);color:var(--red);}
+.pill.descartado{background:var(--red-soft);color:var(--red);}
 .pill.urgente{background:var(--red-soft);color:var(--red);}
 .pill.disponible{background:var(--green-soft);color:var(--green);}
 .pill.trabajando{background:var(--blue-soft);color:var(--blue);}
@@ -4301,17 +4302,20 @@ async function loadInbox(){
   renderInbox(activeFilter);
 }
 
+const DOC_STATE_LABELS = {pendiente:'Sin revisar', revisar:'Revisar', validado:'Validado', descartado:'Descartado'};
+function docPill(state){ return `<span class="pill ${state}">${DOC_STATE_LABELS[state]||state}</span>`; }
+
 function renderInbox(filter){
   const rows = filter==='todas' ? documentosCache : documentosCache.filter(d=>d.status===filter);
   const list = document.getElementById('inbox-list');
   if(!rows.length){ list.innerHTML = `<div style="padding:20px;color:var(--ink-soft);">No hay documentos en esta vista.</div>`; return; }
   list.innerHTML = rows.map(d=>`
-    <div class="inbox-row" onclick="openTriageDrawer('${d.id}')">
+    <div class="inbox-row" onclick="openTriageDrawer(${d.id})">
       <div class="inbox-src">${SRC_ICON[d.source]||'📄'} ${d.source||'—'}</div>
       <div><div class="main-t">${d.file_name||'Documento sin nombre'}</div></div>
       <div class="sub-t">${d.sender||'—'} · ${d.created_at ? new Date(d.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'}) : ''}</div>
       <div class="sub-t">${d.linked_label || 'Sin relacionar'}</div>
-      <div>${pill(d.status||'pendiente')}</div>
+      <div>${docPill(d.status||'pendiente')}</div>
     </div>`).join('');
 }
 loadInbox();
@@ -4362,7 +4366,7 @@ function openTriageDrawer(id){
   } else {
     preview.innerHTML = `<div class="doc-chip" style="padding:30px 8px;">${SRC_ICON[d.source]||'📄'} Sin vista previa</div>`;
   }
-  document.getElementById('e-status-current').innerHTML = pill(d.status||'pendiente') + (d.linked_label ? ` <span class="sub-t" style="margin-left:8px;">${d.linked_label}</span>` : '');
+  document.getElementById('e-status-current').innerHTML = docPill(d.status||'pendiente') + (d.linked_label ? ` <span class="sub-t" style="margin-left:8px;">${d.linked_label}</span>` : '');
   showTriageMenu();
   document.getElementById('entry-overlay').classList.add('active');
 }
