@@ -246,7 +246,7 @@ footer{
           "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
           "apikey": SUPABASE_ANON_KEY,
           "Content-Type": "application/json",
-          "Prefer": "return=minimal"
+          "Prefer": "return=representation"
         },
         body: JSON.stringify({
           tipo: "otro",
@@ -258,8 +258,24 @@ footer{
       });
       if (!filaResp.ok) throw new Error("tabla " + filaResp.status);
 
+      const filaCreada = await filaResp.json();
+      const documentoId = filaCreada && filaCreada[0] && filaCreada[0].id;
+
       estado.textContent = "✅ Subido";
       estado.className = "ok";
+
+      // Dispara el análisis automático sin bloquear ni esperar la respuesta
+      if (documentoId) {
+        fetch(`${SUPABASE_URL}/functions/v1/clasificar-documento`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            "apikey": SUPABASE_ANON_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ documento_id: documentoId })
+        }).catch(() => {});
+      }
     } catch (err) {
       estado.textContent = "No se pudo subir. Inténtalo otra vez.";
       estado.className = "error";
