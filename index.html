@@ -1712,7 +1712,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.75</div>
+        <div class="sub">V0.76</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -3286,6 +3286,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <button type="button" class="btn dark" id="ni-preview-btn" onclick="togglePreview()">Vista previa de impresión</button>
         <button type="button" class="btn dark" onclick="descargarPDF()">⬇ Descargar PDF</button>
         <button type="button" class="btn primary" id="ni-convert-btn" style="display:none;" onclick="convertirDocumento()">Convertir en albarán</button>
+        <button type="button" class="btn" id="ni-deshacer-btn" style="display:none;color:var(--red);" onclick="deshacerConversion()">↺ Deshacer — volver a albarán</button>
         <button type="submit" class="btn primary ie-submit" id="ni-submit">Crear factura</button>
       </div>
     </form>
@@ -6424,24 +6425,29 @@ function submitNewJob(ev){
 }
 
 /* ---------------- EDITOR DE FACTURA / PROFORMA / PRESUPUESTO / ALBARÁN ---------------- */
-let invSeq = 46, proSeq = 6, presSeq = 19, albSeq = 3;
 let itemSeq = 0;
+
+function proximoNumero(tipoDoc){
+  // cuenta de verdad los documentos de este tipo que ya existen, y devuelve el siguiente número con ceros a la izquierda
+  const existentes = Object.values(documentosRealesById).filter(d=>d.type===tipoDoc).length;
+  return String(existentes + 1).padStart(3,'0');
+}
 
 const DOC_TYPES = {
   factura: {
-    title:'FACTURA', button:'Crear factura', prefix:'F-2026-0', seqRef:()=>invSeq, hasIva:true,
+    title:'FACTURA', button:'Crear factura', prefix:'F', seqRef:()=>proximoNumero('factura'), hasIva:true,
     explain:'Documento fiscal definitivo. Genera obligación de cobro y de declarar IVA.',
   },
   proforma: {
-    title:'PROFORMA', button:'Crear proforma', prefix:'PF-2026-0', seqRef:()=>proSeq, hasIva:true,
+    title:'PROFORMA', button:'Crear proforma', prefix:'PF', seqRef:()=>proximoNumero('proforma'), hasIva:true,
     explain:'Anticipo informativo sin validez fiscal, antes de que el cliente se comprometa.',
   },
   presupuesto: {
-    title:'PRESUPUESTO', button:'Crear presupuesto', prefix:'P-2026-0', seqRef:()=>presSeq, hasIva:true,
+    title:'PRESUPUESTO', button:'Crear presupuesto', prefix:'P', seqRef:()=>proximoNumero('presupuesto'), hasIva:true,
     explain:'Propuesta de precio. No obliga a nada — si se acepta, se convierte en trabajo.',
   },
   albaran: {
-    title:'ALBARÁN', button:'Crear albarán', prefix:'ALB-2026-0', seqRef:()=>albSeq, hasIva:false,
+    title:'ALBARÁN', button:'Crear albarán', prefix:'ALB', seqRef:()=>proximoNumero('albaran'), hasIva:false,
     explain:'Justificante de entrega/trabajo realizado. No es un documento fiscal, así que no lleva IVA ni desglose.',
   },
 };
@@ -6587,7 +6593,8 @@ function onDocTypeChange(){
     document.getElementById('ni-suggest').textContent = '(los albaranes no se numeran — son borradores de trabajo)';
   } else {
     document.getElementById('ni-docnum').value = cfg.prefix + cfg.seqRef();
-    document.getElementById('ni-suggest').textContent = '(último usado: '+cfg.prefix+(cfg.seqRef()-1)+')';
+    const existentes = Object.values(documentosRealesById).filter(d=>d.type===t).length;
+    document.getElementById('ni-suggest').textContent = existentes ? ('(último usado: '+cfg.prefix+String(existentes).padStart(3,'0')+')') : '';
   }
   document.getElementById('ie-iva-row').style.display = cfg.hasIva ? 'flex' : 'none';
   document.getElementById('ie-payment-fields').style.display = (t==='albaran') ? 'none' : '';
@@ -7324,15 +7331,31 @@ function openDocumentViewer(id){
   document.getElementById('ie-paper-edit').style.display = 'block';
   document.getElementById('ni-preview-btn').textContent = 'Vista previa de impresión';
   const convBtn = document.getElementById('ni-convert-btn');
+  const deshacerBtn = document.getElementById('ni-deshacer-btn');
+  deshacerBtn.style.display = 'none';
   if(doc.type==='presupuesto' || doc.type==='proforma'){
     convBtn.style.display = ''; convBtn.textContent = 'Convertir en albarán';
   } else if(doc.type==='albaran'){
     convBtn.style.display = ''; convBtn.textContent = 'Convertir en factura';
+  } else if(doc.type==='factura' && doc.origen_albaran_ids && doc.origen_albaran_ids.length){
+    convBtn.style.display = 'none';
+    deshacerBtn.style.display = '';
   } else {
     convBtn.style.display = 'none';
   }
   recalcTotals();
   document.getElementById('newinvoice-overlay').classList.add('active');
+}
+async function deshacerConversion(){
+  const doc = documentosRealesById[editingDocId];
+  if(!doc || !sb) return;
+  if(!confirm(`¿Deshacer esta factura y volver a dejarla como el albarán original? La factura "${doc.num}" se borrará.`)) return;
+  const {error} = await sb.from('documentos_economicos').delete().eq('id', editingDocId);
+  if(error){ alert('Error al deshacer: '+errText(error)); return; }
+  delete documentosRealesById[editingDocId];
+  document.getElementById('docrow-'+editingDocId)?.remove();
+  renderAlbaranesAbiertos();
+  closeNewInvoiceModal();
 }
 
 async function submitNewInvoice(ev, isDraft){
