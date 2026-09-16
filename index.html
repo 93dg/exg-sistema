@@ -462,9 +462,9 @@ body.editor-mode-on::before{
   background:var(--orange);color:#fff;text-align:center;
   font-size:12px;font-weight:700;padding:6px;letter-spacing:0.02em;
 }
-.nav-editable button[data-view]{cursor:grab;}
-.nav-editable button[data-view].dragging{opacity:0.4;}
-.nav-editable button[data-view]:hover{outline:1px dashed var(--orange);outline-offset:2px;}
+.nav-editable button[data-view], .nav-editable .grp-label[data-view]{cursor:grab;}
+.nav-editable button[data-view].dragging, .nav-editable .grp-label[data-view].dragging{opacity:0.4;}
+.nav-editable button[data-view]:hover, .nav-editable .grp-label[data-view]:hover{outline:1px dashed var(--orange);outline-offset:2px;}
 body.editor-mode-on .layout-block{
   position:relative;outline:1px dashed var(--orange);outline-offset:3px;
   resize:both;overflow:auto;min-width:180px;min-height:80px;
@@ -1712,7 +1712,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.82</div>
+        <div class="sub">V0.83</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1736,7 +1736,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="tarifas"><span class="ico">💶</span><span class="label"> Tarifas</span></button>
       <button data-view="economia"><span class="ico">€</span><span class="label"> Economía</span></button>
       <button data-view="correo"><span class="ico">✉</span><span class="label"> Correo</span></button>
-      <div class="grp-label">Cuenta</div>
+      <div class="grp-label" data-view="__label_cuenta">Cuenta</div>
       <button data-view="sistema" class="admin-only"><span class="ico">◉</span><span class="label"> Sistema</span></button>
       <button data-view="reportes" class="admin-only"><span class="ico">🐞</span><span class="label"> Reportes</span></button>
       <button data-view="historico" class="admin-only"><span class="ico">📜</span><span class="label"> Histórico</span></button>
@@ -3340,7 +3340,7 @@ function aplicarUIConfig(){
   if(UI_CONFIG.orden_menu && UI_CONFIG.orden_menu.length){
     const nav = document.getElementById('nav');
     UI_CONFIG.orden_menu.forEach(viewKey=>{
-      const btn = nav.querySelector(`button[data-view="${viewKey}"]`);
+      const btn = nav.querySelector(`[data-view="${viewKey}"]`);
       if(btn) nav.appendChild(btn);
     });
   }
@@ -3376,7 +3376,7 @@ function toggleEditorMode(){
 
 let dragSrcNavBtn = null;
 function prepareEditableNav(){
-  document.querySelectorAll('#nav button[data-view]').forEach(btn=>{
+  document.querySelectorAll('#nav button[data-view], #nav .grp-label[data-view]').forEach(btn=>{
     if(btn.dataset.navReady) return;
     btn.dataset.navReady = '1';
     btn.setAttribute('draggable','true');
@@ -3388,8 +3388,8 @@ function prepareEditableNav(){
     btn.addEventListener('dragend', async ()=>{
       btn.classList.remove('dragging');
       dragSrcNavBtn = null;
-      // guarda el nuevo orden completo
-      UI_CONFIG.orden_menu = Array.from(document.querySelectorAll('#nav button[data-view]')).map(b=>b.dataset.view);
+      // guarda el nuevo orden completo, botones y separadores incluidos
+      UI_CONFIG.orden_menu = Array.from(document.querySelectorAll('#nav [data-view]')).map(b=>b.dataset.view);
       await guardarUIConfig();
     });
     btn.addEventListener('dragover',(ev)=>{
