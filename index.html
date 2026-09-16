@@ -1712,7 +1712,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.77</div>
+        <div class="sub">V0.78</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -5380,6 +5380,10 @@ function renderFleetGrid(){
         <div class="field" style="margin-bottom:10px;"><div class="l">Ficha técnica</div>
           <textarea class="search-box" style="width:100%;height:120px;font-family:'IBM Plex Mono',monospace;font-size:12px;" id="mq-ficha-${m.id}">${m.fichaTecnica||''}</textarea>
         </div>
+        <div class="field" style="margin-bottom:10px;"><div class="l">Documentos (ficha técnica, permiso de circulación, seguro...)</div>
+          <div id="mq-docs-${m.id}">${(m.documentos||[]).map(d=>`<div class="task-row"><a href="${d.url}" target="_blank" style="flex:1;">${d.nombre}</a><span style="cursor:pointer;color:var(--red);font-weight:800;" onclick="borrarDocMaquina('${m.id}','${d.path}')">✕</span></div>`).join('') || '<span class="sub-t">Sin documentos todavía</span>'}</div>
+          <label class="btn" style="cursor:pointer;margin-top:6px;display:inline-block;">📎 Adjuntar documento<input type="file" accept="image/*,application/pdf" style="display:none;" onchange="subirDocMaquina('${m.id}',this)"></label>
+        </div>
         <div class="state-row" style="gap:8px;">
           <button class="btn" style="flex:1;" onclick="copiarFichaMaquinaInline('${m.id}')">📋 Copiar todo</button>
           <button class="btn primary" style="flex:1;" onclick="guardarFichaMaquinaInline('${m.id}')">Guardar</button>
@@ -5388,6 +5392,33 @@ function renderFleetGrid(){
       </div>` : ''}
     </div>`;
   }).join('');
+}
+async function subirDocMaquina(id, input){
+  const file = input.files[0];
+  if(!file || !sb) return;
+  const m = fleet.find(f=>f.id===id);
+  if(!m) return;
+  const statusEl = document.getElementById('mq-status-'+id);
+  statusEl.textContent = 'Subiendo...'; statusEl.style.color = 'var(--ink-soft)';
+  const path = `flota-docs/${id}/${Date.now()}-${sanitizeFileName(file.name)}`;
+  const {error} = await sb.storage.from(DOC_BUCKET).upload(path, file);
+  if(error){ statusEl.textContent = 'Error al subir: '+error.message; statusEl.style.color = 'var(--red)'; return; }
+  const url = sb.storage.from(DOC_BUCKET).getPublicUrl(path).data.publicUrl;
+  m.documentos = m.documentos || [];
+  m.documentos.push({nombre: file.name, path, url});
+  const {error: dbErr} = await sb.from('flota').update({documentos: m.documentos}).eq('id', id);
+  if(dbErr){ statusEl.textContent = 'Se subió, pero no se pudo guardar el enlace: '+dbErr.message; statusEl.style.color = 'var(--orange)'; }
+  else { statusEl.textContent = 'Adjuntado ✓'; statusEl.style.color = 'var(--green)'; }
+  renderFleetGrid();
+}
+async function borrarDocMaquina(id, path){
+  const m = fleet.find(f=>f.id===id);
+  if(!m || !sb) return;
+  if(!confirm('¿Borrar este documento?')) return;
+  await sb.storage.from(DOC_BUCKET).remove([path]);
+  m.documentos = (m.documentos||[]).filter(d=>d.path!==path);
+  await sb.from('flota').update({documentos: m.documentos}).eq('id', id);
+  renderFleetGrid();
 }
 function toggleMaquinaExpandida(id){
   if(!id){ alert('Esta máquina todavía no tiene id real — espera a que cargue o recarga la página.'); return; }
@@ -5456,7 +5487,7 @@ async function cargarDatosReales(){
     if(flotaReal && flotaReal.length){
       flotaReal.forEach(m=>{
         if(fleet.some(f=>f.name===m.nombre)) return;
-        fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', state: m.estado==='activo' ? 'disponible' : m.estado, hours:'—', loc:'Nave Calle Industria', next:'Sin asignar', matricula: m.matricula||'', fichaTecnica: m.ficha_tecnica||''});
+        fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', state: m.estado==='activo' ? 'disponible' : m.estado, hours:'—', loc:'Nave Calle Industria', next:'Sin asignar', matricula: m.matricula||'', fichaTecnica: m.ficha_tecnica||'', documentos: m.documentos||[]});
       });
       renderFleetGrid();
     }
