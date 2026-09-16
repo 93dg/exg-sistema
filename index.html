@@ -1652,7 +1652,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.32</div>
+        <div class="sub">V0.33</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1880,7 +1880,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="view" id="view-entradas">
       <div class="topbar">
         <div><h1>Entradas</h1><div class="desc">Bandeja universal — WhatsApp, llamadas, fotos, documentos</div></div>
-        <div class="quickactions"><button class="btn">+ Añadir documento</button></div>
+        <div class="quickactions"><button class="btn" onclick="document.getElementById('inbox-file-input').click()">+ Añadir documento</button>
+          <input type="file" id="inbox-file-input" style="display:none;" multiple onchange="subirDocumentoATriage(this.files)"></div>
       </div>
       <div class="client-tabs" id="entradas-subtabs">
         <div class="client-tab active" data-sub="bandeja">Bandeja</div>
@@ -2079,7 +2080,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="view" id="view-ayuntamiento">
       <div class="topbar">
         <div><h1>Ayuntamiento · Expedientes</h1><div class="desc">Ofertas y peticiones de trabajo municipales</div></div>
-        <div class="quickactions"><button class="btn primary">+ Nuevo expediente</button></div>
+        <div class="quickactions"><button class="btn primary" onclick="abrirNuevoExpediente()">+ Nuevo expediente</button></div>
       </div>
       <div class="panel">
         <div class="panel-body" style="padding:0;">
@@ -4007,6 +4008,23 @@ let triageCurrentId = null;
 
 const SRC_ICON = {whatsapp:'💬', foto:'📷', pdf:'📄', llamada:'📞'};
 
+async function subirDocumentoATriage(fileList){
+  if(!fileList || !fileList.length) return;
+  if(!sb){ alert('Supabase no está conectado.'); return; }
+  for(const file of Array.from(fileList)){
+    const safeName = sanitizeFileName(file.name);
+    const dest = 'sin-clasificar/' + Date.now() + '-' + safeName;
+    const {error: upErr} = await sb.storage.from(DOC_BUCKET).upload(dest, file, {upsert:true});
+    if(upErr){ alert('Error al subir '+file.name+': '+upErr.message); continue; }
+    const {error: insErr} = await sb.from('documentos').insert({
+      storage_path: dest, nombre_archivo_original: file.name,
+    });
+    if(insErr){ alert('El archivo se subió, pero no se pudo apuntar en la bandeja: '+insErr.message); }
+  }
+  document.getElementById('inbox-file-input').value = '';
+  loadInbox();
+}
+
 async function loadInbox(){
   const list = document.getElementById('inbox-list');
   if(!sb){
@@ -4405,8 +4423,7 @@ function sanitizeFileName(name){
   return clean + ext;
 }
 
-async function explorerUploadFiles(fileList){
-  if(!fileList || !fileList.length) return;
+async function explorerUploadFiles(fileList){  if(!fileList || !fileList.length) return;
   if(!sb){ alert('Conecta Supabase primero.'); return; }
   const files = Array.from(fileList);
   const statusEl = document.getElementById('explorer-upload-status');
@@ -5031,13 +5048,43 @@ function openClientDrawer(name){
 }
 function closeClientDrawer(){ document.getElementById('client-overlay').classList.remove('active'); }
 
-/* Expedientes */
-const expedientes = [];
-document.getElementById('expedientes-tbl').innerHTML = expedientes.map(e=>`
-  <tr><td class="mono">${e.id}</td><td>${e.ayto}</td><td>${e.desc}</td><td class="num">${e.limit}</td><td class="num">${e.importe}</td>
-  <td>${pill(e.state)}</td>
-  <td>${e.state==='adjudicado'?'<button class="btn primary" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();alert(\'Trabajo creado a partir del expediente '+e.id+'\')">Convertir en trabajo</button>':''}</td></tr>
-`).join('');
+/* Expedientes (reales, en Supabase) */
+const expedientesById = {};
+function renderExpedientesTabla(){
+  const rows = Object.values(expedientesById).sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
+  document.getElementById('expedientes-tbl').innerHTML = rows.map(e=>`
+    <tr><td class="mono">${e.titulo}</td><td>Ayuntamiento de Fuente Obejuna</td><td>${e.descripcion||'—'}</td><td class="num">${e.fecha||'—'}</td><td class="num">—</td>
+    <td>${pill(e.estado)}</td>
+    <td>${e.estado==='adjudicado'?`<button class="btn primary" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();crearDocumentoDesdeExpediente('${e.id}')">Crear trabajo</button>`:''}</td></tr>
+  `).join('') || '<tr><td colspan="7" class="empty">Sin expedientes todavía</td></tr>';
+}
+async function cargarExpedientesReales(){
+  if(!sb) return;
+  try{
+    const {data, error} = await sb.from('expedientes').select('*').order('created_at',{ascending:false});
+    if(error || !data) return;
+    data.forEach(e=>{ expedientesById[e.id] = e; });
+    renderExpedientesTabla();
+  }catch(err){ console.error('No se pudieron cargar los expedientes', err); }
+}
+cargarExpedientesReales();
+
+async function abrirNuevoExpediente(){
+  if(!sb){ alert('Supabase no está conectado.'); return; }
+  const titulo = prompt('Título del expediente (ej. "Mantenimiento caminos rurales 2026"):');
+  if(!titulo || !titulo.trim()) return;
+  const descripcion = prompt('Descripción breve (opcional):') || '';
+  const fecha = prompt('Fecha límite (AAAA-MM-DD, opcional):') || null;
+  const {data, error} = await sb.from('expedientes').insert({titulo: titulo.trim(), descripcion: descripcion.trim(), fecha}).select().single();
+  if(error){ alert('Error al guardar: '+errText(error)); return; }
+  expedientesById[data.id] = data;
+  renderExpedientesTabla();
+}
+function crearDocumentoDesdeExpediente(id){
+  const e = expedientesById[id];
+  if(!e) return;
+  alert('Para crear el trabajo, ve a Trabajos → "+ Nuevo trabajo" y usa los datos de este expediente ("'+e.titulo+'"). La conexión automática todavía no está montada.');
+}
 
 /* ---------------- NUEVO TRABAJO ---------------- */
 let jobSeq = 296;
