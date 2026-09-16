@@ -265,6 +265,15 @@ main{
   background:#fff;
 }
 #chat-texto:focus{outline:none;border-color:var(--orange);}
+#btn-dictar{
+  -webkit-appearance:none;appearance:none;border:none;
+  width:42px;height:42px;border-radius:50%;flex:0 0 42px;
+  background:var(--asphalt);
+  display:flex;align-items:center;justify-content:center;
+}
+#btn-dictar svg{width:18px;height:18px;}
+#btn-dictar.escuchando{background:var(--red);}
+#btn-dictar.escuchando svg{animation:pulso-grabar 1s infinite;}
 #btn-enviar{
   -webkit-appearance:none;appearance:none;border:none;
   width:42px;height:42px;border-radius:50%;flex:0 0 42px;
@@ -349,6 +358,13 @@ footer{
 <div id="barra-inferior">
   <div id="chat-bar">
     <input type="text" id="chat-texto" placeholder="Escribe un mensaje…" autocomplete="off">
+    <button type="button" id="btn-dictar" aria-label="Dictar">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="9" y="3" width="6" height="11" rx="3" stroke="white" stroke-width="1.8"/>
+        <path d="M5.5 11a6.5 6.5 0 0013 0" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M12 17.5V21" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </button>
     <button type="button" id="btn-enviar" aria-label="Enviar">
       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M4 12l16-8-6 8 6 8-16-8z" fill="white"/>
@@ -381,6 +397,7 @@ footer{
   const listaWrap = document.getElementById("lista-wrap");
   const listaFotos = document.getElementById("lista-fotos");
   const chatTexto = document.getElementById("chat-texto");
+  const btnDictar = document.getElementById("btn-dictar");
   const btnEnviar = document.getElementById("btn-enviar");
   const estadoGeneral = document.getElementById("estado-general");
   const barraInferior = document.getElementById("barra-inferior");
@@ -620,6 +637,54 @@ footer{
   });
   chatTexto.addEventListener("input", () => {
     btnEnviar.disabled = subiendo || (pendientes.length === 0 && chatTexto.value.trim() === "");
+  });
+
+  // -------- Dictado por voz --------
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let reconocimiento = null;
+  let dictando = false;
+  let textoAntesDeDictar = "";
+
+  if (SpeechRec) {
+    reconocimiento = new SpeechRec();
+    reconocimiento.lang = "es-ES";
+    reconocimiento.continuous = true;
+    reconocimiento.interimResults = true;
+
+    reconocimiento.onresult = (e) => {
+      let texto = "";
+      for (let i = 0; i < e.results.length; i++) texto += e.results[i][0].transcript;
+      chatTexto.value = (textoAntesDeDictar + " " + texto).trim();
+      btnEnviar.disabled = subiendo || chatTexto.value.trim() === "";
+    };
+    reconocimiento.onerror = () => {
+      pararDictado();
+      estadoGeneral.textContent = "No se pudo dictar. Inténtalo otra vez.";
+      estadoGeneral.className = "error";
+      setTimeout(() => { estadoGeneral.textContent = ""; estadoGeneral.className = ""; }, 2000);
+    };
+    reconocimiento.onend = () => { if (dictando) pararDictado(); };
+  }
+
+  function empezarDictado(){
+    if (!reconocimiento) {
+      estadoGeneral.textContent = "Este navegador no permite dictar aquí — usa el micrófono del teclado.";
+      estadoGeneral.className = "error";
+      setTimeout(() => { estadoGeneral.textContent = ""; estadoGeneral.className = ""; }, 3000);
+      return;
+    }
+    textoAntesDeDictar = chatTexto.value;
+    dictando = true;
+    btnDictar.classList.add("escuchando");
+    try { reconocimiento.start(); } catch(e){}
+  }
+  function pararDictado(){
+    dictando = false;
+    btnDictar.classList.remove("escuchando");
+    if (reconocimiento) { try { reconocimiento.stop(); } catch(e){} }
+  }
+  btnDictar.addEventListener("click", () => {
+    if (dictando) pararDictado(); else empezarDictado();
   });
 
   async function enviarMensaje(){
