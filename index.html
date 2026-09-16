@@ -1712,7 +1712,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.76</div>
+        <div class="sub">V0.77</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -3400,14 +3400,15 @@ function prepareEditableNav(){
 }
 
 function prepareEditableBlocks(){
-  // marca como "bloque editable" cada .panel y cada tarjeta suelta dentro de las vistas, una sola vez
-  document.querySelectorAll('.view .panel, .view .kpi-strip, .view .weather-strip, .view #real-map').forEach((el,i)=>{
+  // marca como "bloque editable" cada .panel, cada tarjeta KPI suelta, y cada tarjeta suelta dentro de las vistas, una sola vez
+  document.querySelectorAll('.view .panel, .view .kpi-strip .kpi, .view .weather-strip, .view #real-map').forEach((el,i)=>{
     if(el.classList.contains('layout-block')) return; // ya preparado
     el.classList.add('layout-block');
     el.setAttribute('draggable','true');
     if(!el.dataset.blockId){
       const view = el.closest('.view')?.id || 'view';
-      el.dataset.blockId = view + '-block-' + i;
+      const etiqueta = el.querySelector('.lbl')?.textContent || el.querySelector('h3')?.textContent || ('block-'+i);
+      el.dataset.blockId = view + '-' + etiqueta.trim().toLowerCase().replace(/\s+/g,'-');
     }
 
     const toolbar = document.createElement('div');
@@ -3417,7 +3418,7 @@ function prepareEditableBlocks(){
 
     toolbar.querySelector('.del-handle').addEventListener('click', async (ev)=>{
       ev.stopPropagation();
-      const opcion = await elegirDeLista('¿Cómo quieres borrar esto?', ['Solo por ahora (vuelve si recargo la página)', 'Del todo (no debe volver a salir nunca)']);
+      const opcion = await elegirDeLista('¿Solo por ahora o del todo?', ['Solo por ahora', 'Del todo']);
       if(!opcion) return;
       if(opcion.startsWith('Del todo')){
         UI_CONFIG.bloques_ocultos.push(el.dataset.blockId);
