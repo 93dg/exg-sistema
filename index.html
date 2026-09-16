@@ -41,6 +41,15 @@
   --blue-soft:#D9E4EA;
   --radius:3px;
 }
+body[data-theme="dark"]{
+  --concrete:#15181C;
+  --concrete-2:#1E2227;
+  --paper:#1B1F24;
+  --line:#3A414A;
+  --ink:#EAEAEA;
+  --ink-soft:#9099A3;
+}
+body[data-theme="dark"] .sidebar{background:#0E1013;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{
   font-family:'Inter',sans-serif;
@@ -1719,7 +1728,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.87</div>
+        <div class="sub">V0.88</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1812,6 +1821,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
 
         <div>
+          <button class="btn" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="padding:4px 8px;font-size:11px;margin-bottom:8px;">🌓 Tema</button>
           <div class="panel">
             <div class="panel-head"><h3>Requiere atención</h3><span class="count">7</span></div>
             <div class="panel-body" id="atencion-list"></div>
@@ -2007,6 +2017,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div style="display:flex;align-items:center;gap:8px;">
             <button class="btn" id="explorer-back-btn" onclick="explorerGoBack()" title="Atrás" style="padding:6px 10px;">◀</button>
             <button class="btn" id="explorer-forward-btn" onclick="explorerGoForward()" title="Adelante" style="padding:6px 10px;">▶</button>
+            <button class="btn" onclick="loadExplorer(explorerPath)" title="Actualizar" style="padding:6px 10px;">↻</button>
             <div class="explorer-crumbs" id="explorer-crumbs"></div>
           </div>
           <div class="quickactions">
@@ -2025,7 +2036,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <option value="img">Fotos</option>
             <option value="doc">Word</option>
           </select>
-          <button class="btn" style="display:none;" id="explorer-mover-sel-btn" onclick="moverSeleccionExplorer()">↦ Mover seleccionados (<span id="explorer-sel-count">0</span>)</button>
+          <button class="btn" style="display:none;" id="explorer-cortar-sel-btn" onclick="cortarSeleccionExplorer()">✂ Cortar (<span id="explorer-sel-count">0</span>)</button>
+          <button class="btn" style="display:none;color:var(--red);" id="explorer-borrar-sel-btn" onclick="borrarSeleccionExplorer()">✕ Borrar (<span id="explorer-sel-count-del">0</span>)</button>
+          <button class="btn primary" style="display:none;" id="explorer-pegar-btn" onclick="pegarEnExplorer()">📋 Pegar aquí (<span id="explorer-clipboard-count">0</span>)</button>
         </div>
         <div class="panel-body">
           <div class="explorer-grid" id="explorer-grid" ondragover="explorerDragOver(event)" ondragleave="explorerDragLeave(event)" ondrop="explorerDrop(event)"></div>
@@ -3762,6 +3775,18 @@ function calcularKPIsReales(){
   setTxt('dash-margen', euro(margenMes));
 }
 
+function toggleTema(){
+  const actual = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.body.dataset.theme = actual;
+  try{ localStorage.setItem('exg-tema', actual); }catch(e){}
+}
+(function aplicarTemaGuardado(){
+  try{
+    const guardado = localStorage.getItem('exg-tema');
+    if(guardado === 'dark') document.body.dataset.theme = 'dark';
+  }catch(e){}
+})();
+
 function copiarPromptInicio(){
   const texto = document.getElementById('prompt-inicio-texto').textContent;
   navigator.clipboard.writeText(texto).then(()=>{
@@ -5026,9 +5051,9 @@ async function confirmTriageAction(key, cfg){
 }
 
 /* ---------------- EXPLORADOR DE ARCHIVOS (Supabase Storage) ---------------- */
-let explorerPath = '';
+let explorerPath = 'EXCAVACIONES-GOMEZ';
 let explorerCurrentData = [];
-let explorerHistory = [''];
+let explorerHistory = ['EXCAVACIONES-GOMEZ'];
 let explorerHistoryIndex = 0;
 
 function explorerGoBack(){
@@ -5054,11 +5079,11 @@ function explorerIconFor(name){
 }
 
 function explorerBreadcrumbs(path){
-  const parts = path ? path.split('/').filter(Boolean) : [];
-  let acc = '';
-  const crumbs = [`<span class="crumb" onclick="loadExplorer('')">raíz</span>`];
+  const parts = (path ? path.split('/').filter(Boolean) : []).filter(p=>p.toUpperCase()!=='EXCAVACIONES-GOMEZ');
+  let acc = 'EXCAVACIONES-GOMEZ';
+  const crumbs = [`<span class="crumb" onclick="loadExplorer('EXCAVACIONES-GOMEZ')">EXCAVACIONES-GOMEZ</span>`];
   parts.forEach(p=>{
-    acc = acc ? acc+'/'+p : p;
+    acc = acc+'/'+p;
     crumbs.push(`<span class="sep">/</span><span class="crumb" onclick="loadExplorer('${acc}')">${p}</span>`);
   });
   return crumbs.join('');
@@ -5110,7 +5135,9 @@ function explorerMatchesTypeFilter(name, isFolder, tipo){
 }
 
 function renderExplorerGrid(){
-  document.getElementById('explorer-mover-sel-btn').style.display = 'none';
+  document.getElementById('explorer-cortar-sel-btn').style.display = 'none';
+  document.getElementById('explorer-borrar-sel-btn').style.display = 'none';
+  document.getElementById('explorer-pegar-btn').style.display = explorerClipboard.length ? '' : 'none';
   const grid = document.getElementById('explorer-grid');
   const busqueda = (document.getElementById('explorer-search').value || '').trim().toLowerCase();
   const tipo = document.getElementById('explorer-type-filter').value;
@@ -5133,6 +5160,9 @@ function renderExplorerGrid(){
         ondragleave="explorerDragLeaveItem(event)"
         ondrop="explorerDropOnFolder(event,'${fullPath}')"
         onclick="loadExplorer('${fullPath}')">
+        <span class="exp-sel-wrap" onclick="event.stopPropagation();">
+          <input type="checkbox" class="explorer-sel-chk" data-path="${fullPath}" data-folder="1" onchange="actualizarSeleccionExplorer()">
+        </span>
         <div class="exp-icon">📁</div>
         <div class="exp-name">${displayName}</div>
       </div>`;
@@ -5379,35 +5409,71 @@ async function explorerRename(fullPath, oldName){
   loadExplorer(explorerPath);
 }
 
+let explorerClipboard = []; // [{path, isFolder}]
 function actualizarSeleccionExplorer(){
-  const marcados = document.querySelectorAll('.explorer-sel-chk:checked');
-  const btn = document.getElementById('explorer-mover-sel-btn');
+  const marcados = Array.from(document.querySelectorAll('.explorer-sel-chk:checked'));
   document.getElementById('explorer-sel-count').textContent = marcados.length;
-  btn.style.display = marcados.length ? '' : 'none';
+  document.getElementById('explorer-sel-count-del').textContent = marcados.length;
+  document.getElementById('explorer-cortar-sel-btn').style.display = marcados.length ? '' : 'none';
+  document.getElementById('explorer-borrar-sel-btn').style.display = marcados.length ? '' : 'none';
 }
-async function moverSeleccionExplorer(){
+function cortarSeleccionExplorer(){
   const marcados = Array.from(document.querySelectorAll('.explorer-sel-chk:checked'));
   if(!marcados.length) return;
-  const r = await pedirCampos('Mover '+marcados.length+' archivo(s) a qué carpeta', [{id:'dest', label:'Ruta destino', valor:explorerPath, placeholder:'ej. gastos/2026/2026-09', requerido:true}]);
-  if(!r) return;
+  explorerClipboard = marcados.map(chk=>({path: chk.dataset.path, isFolder: chk.dataset.folder==='1'}));
+  document.getElementById('explorer-clipboard-count').textContent = explorerClipboard.length;
+  document.getElementById('explorer-pegar-btn').style.display = '';
+  alert(`${explorerClipboard.length} elemento(s) cortado(s). Ve a la carpeta donde quieras dejarlos y pulsa "Pegar aquí".`);
+}
+async function pegarEnExplorer(){
+  if(!explorerClipboard.length) return;
   let ok = 0, fallos = 0;
-  for(const chk of marcados){
-    const fullPath = chk.dataset.path;
-    const nombre = fullPath.split('/').pop();
-    const newPath = (r.dest ? r.dest+'/' : '') + nombre;
-    const {error} = await sb.storage.from(DOC_BUCKET).move(fullPath, newPath);
-    if(error) fallos++; else ok++;
+  for(const item of explorerClipboard){
+    const nombre = item.path.split('/').pop();
+    const newPath = explorerPath + '/' + nombre;
+    if(newPath === item.path) continue;
+    if(item.isFolder){
+      // mover carpeta entera: recorrer todo lo de dentro y moverlo, conservando su estructura interna
+      const dentro = await explorerListRecursive(item.path);
+      for(const f of dentro){
+        const rel = f.slice(item.path.length);
+        const {error} = await sb.storage.from(DOC_BUCKET).move(f, newPath+rel);
+        if(error) fallos++; else ok++;
+      }
+    } else {
+      const {error} = await sb.storage.from(DOC_BUCKET).move(item.path, newPath);
+      if(error) fallos++; else ok++;
+    }
   }
-  alert(`Movidos ${ok}${fallos ? `, ${fallos} con error` : ''}.`);
+  explorerClipboard = [];
+  document.getElementById('explorer-pegar-btn').style.display = 'none';
+  alert(`Pegado — ${ok} movido(s)${fallos ? `, ${fallos} con error` : ''}.`);
   loadExplorer(explorerPath);
 }
-async function explorerMove(fullPath, name){
-  const r = await pedirCampos('Mover a qué carpeta', [{id:'dest', label:'Ruta destino', valor:explorerPath, placeholder:'ej. gastos/2026/2026-09'}]);
-  if(!r) return;
-  const newPath = (r.dest ? r.dest+'/' : '') + name;
-  const {error} = await sb.storage.from(DOC_BUCKET).move(fullPath, newPath);
-  if(error){ alert('Error al mover: '+error.message); return; }
+async function borrarSeleccionExplorer(){
+  const marcados = Array.from(document.querySelectorAll('.explorer-sel-chk:checked'));
+  if(!marcados.length) return;
+  if(!confirm(`¿Borrar ${marcados.length} elemento(s)? No se puede deshacer.`)) return;
+  let ok = 0, fallos = 0;
+  for(const chk of marcados){
+    const path = chk.dataset.path;
+    if(chk.dataset.folder==='1'){
+      const dentro = await explorerListRecursive(path);
+      const {error} = await sb.storage.from(DOC_BUCKET).remove(dentro);
+      if(error) fallos++; else ok++;
+    } else {
+      const {error} = await sb.storage.from(DOC_BUCKET).remove([path]);
+      if(error) fallos++; else ok++;
+    }
+  }
+  alert(`Borrados ${ok}${fallos ? `, ${fallos} con error` : ''}.`);
   loadExplorer(explorerPath);
+}
+function explorerMove(fullPath, name){
+  explorerClipboard = [{path: fullPath, isFolder: false}];
+  document.getElementById('explorer-clipboard-count').textContent = 1;
+  document.getElementById('explorer-pegar-btn').style.display = '';
+  alert(`"${name}" cortado. Ve a la carpeta donde quieras dejarlo y pulsa "Pegar aquí".`);
 }
 
 async function explorerDelete(fullPath){
