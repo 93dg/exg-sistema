@@ -56,6 +56,48 @@ header .sub{
   margin-top:3px;
 }
 
+#tabs{
+  display:flex;
+  gap:0;
+  border-bottom:1px solid var(--line);
+  background:var(--paper);
+  position:sticky;top:65px;z-index:9;
+}
+.tab-btn{
+  -webkit-appearance:none;appearance:none;border:none;background:none;
+  flex:1;padding:13px 10px;
+  font-family:'Inter',sans-serif;font-size:14px;font-weight:600;
+  color:var(--ink-soft);
+  border-bottom:2.5px solid transparent;
+}
+.tab-btn.active{color:var(--ink);border-bottom-color:var(--orange);}
+
+.vista{display:none;}
+.vista.activa{display:block;}
+
+/* -------- Historial -------- */
+#historial-lista{display:flex;flex-direction:column;gap:10px;padding:18px;max-width:480px;margin:0 auto;width:100%;}
+.hist-item{
+  display:flex;align-items:center;gap:12px;
+  padding:10px;border-radius:10px;
+  background:var(--paper);border:1.5px solid var(--line);
+}
+.hist-item .hist-thumb{
+  width:52px;height:52px;border-radius:8px;object-fit:cover;flex:0 0 52px;
+  background:var(--asphalt);display:flex;align-items:center;justify-content:center;
+  font-size:20px;
+}
+.hist-item .hist-info{flex:1;min-width:0;}
+.hist-item .hist-nombre{font-size:13.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hist-item .hist-meta{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+.hist-item .hist-nota{font-size:11.5px;color:var(--ink-soft);font-style:italic;margin-top:2px;}
+.hist-item .hist-borrar{
+  flex:0 0 auto;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid var(--red-soft);background:var(--red-soft);color:var(--red);
+  font-size:15px;display:flex;align-items:center;justify-content:center;
+}
+#historial-vacio{padding:40px 20px;text-align:center;color:var(--ink-soft);font-size:14px;}
+
 main{
   flex:1;
   display:flex;
@@ -233,7 +275,12 @@ footer{
   <div class="sub">SUBIR DOCUMENTO</div>
 </header>
 
-<main>
+<div id="tabs">
+  <button type="button" class="tab-btn active" id="tab-subir" onclick="cambiarVista('subir')">Subir</button>
+  <button type="button" class="tab-btn" id="tab-historial" onclick="cambiarVista('historial')">Historial</button>
+</div>
+
+<main id="vista-subir" class="vista activa">
   <div class="opciones">
     <button type="button" class="opcion principal" id="btn-camara">
       <span class="ico">
@@ -285,6 +332,11 @@ footer{
   </div>
 </main>
 
+<div id="vista-historial" class="vista">
+  <div id="historial-lista"></div>
+  <div id="historial-vacio" style="display:none;">Aún no has subido nada desde este móvil.</div>
+</div>
+
 <div id="barra-inferior">
   <button type="button" id="btn-subir-todo">Subir</button>
 </div>
@@ -315,6 +367,85 @@ footer{
   const estadoGeneral = document.getElementById("estado-general");
   const barraInferior = document.getElementById("barra-inferior");
   const btnSubirTodo = document.getElementById("btn-subir-todo");
+  const historialLista = document.getElementById("historial-lista");
+  const historialVacio = document.getElementById("historial-vacio");
+  const LS_KEY = "exg_historial_subidas";
+
+  function cambiarVista(v){
+    document.getElementById("vista-subir").classList.toggle("activa", v === "subir");
+    document.getElementById("vista-historial").classList.toggle("activa", v === "historial");
+    document.getElementById("tab-subir").classList.toggle("active", v === "subir");
+    document.getElementById("tab-historial").classList.toggle("active", v === "historial");
+    if (v === "historial") renderHistorial();
+    render();
+  }
+  window.cambiarVista = cambiarVista;
+
+  function leerHistorial(){
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
+    catch(e) { return []; }
+  }
+  function guardarHistorial(lista){
+    try { localStorage.setItem(LS_KEY, JSON.stringify(lista.slice(0, 200))); }
+    catch(e) {}
+  }
+  function añadirAlHistorial(entradas){
+    const actual = leerHistorial();
+    guardarHistorial([...entradas, ...actual]);
+  }
+
+  function renderHistorial(){
+    const lista = leerHistorial();
+    if (lista.length === 0){
+      historialLista.style.display = "none";
+      historialVacio.style.display = "block";
+      return;
+    }
+    historialLista.style.display = "flex";
+    historialVacio.style.display = "none";
+    historialLista.innerHTML = lista.map(h => {
+      const fecha = h.created_at ? new Date(h.created_at).toLocaleString("es-ES", {day:"numeric", month:"short", hour:"2-digit", minute:"2-digit"}) : "";
+      const thumb = h.kind === "audio"
+        ? `<div class="hist-thumb">🎙</div>`
+        : `<img class="hist-thumb" src="${h.file_url}" alt="">`;
+      return `
+      <div class="hist-item" data-doc-id="${h.documento_id}">
+        ${thumb}
+        <div class="hist-info">
+          <div class="hist-nombre">${h.kind === "audio" ? "Audio" : "Foto"} · ${fecha}</div>
+          ${h.nota ? `<div class="hist-nota">"${h.nota}"</div>` : ""}
+        </div>
+        <button type="button" class="hist-borrar" onclick="borrarDelHistorial(${h.documento_id})">✕</button>
+      </div>`;
+    }).join("");
+  }
+
+  async function borrarDelHistorial(documentoId){
+    if (!confirm("¿Borrar esto? No se puede deshacer.")) return;
+    const lista = leerHistorial();
+    const entrada = lista.find(h => h.documento_id === documentoId);
+    try {
+      if (entrada && entrada.storage_path) {
+        await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${entrada.storage_path}`, {
+          method: "DELETE",
+          headers: {
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            "apikey": SUPABASE_ANON_KEY
+          }
+        });
+      }
+      await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=eq.${documentoId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          "apikey": SUPABASE_ANON_KEY
+        }
+      });
+    } catch(e) {}
+    guardarHistorial(lista.filter(h => h.documento_id !== documentoId));
+    renderHistorial();
+  }
+  window.borrarDelHistorial = borrarDelHistorial;
 
   // Cada elemento: { id, kind: 'foto'|'audio', file, previewUrl, duracion }
   let pendientes = [];
@@ -409,13 +540,15 @@ footer{
   window.quitarFotoPendiente = quitar;
 
   function render(){
-    if (pendientes.length === 0){
+    const enVistaSubir = document.getElementById("vista-subir").classList.contains("activa");
+    if (pendientes.length === 0 || !enVistaSubir){
       listaWrap.classList.remove("activo");
       barraInferior.classList.remove("activo");
-      return;
+      if (pendientes.length === 0) return;
+    } else {
+      listaWrap.classList.add("activo");
+      barraInferior.classList.add("activo");
     }
-    listaWrap.classList.add("activo");
-    barraInferior.classList.add("activo");
     btnSubirTodo.disabled = subiendo;
     btnSubirTodo.textContent = subiendo
       ? "Subiendo…"
@@ -482,6 +615,7 @@ footer{
     const loteId = crypto.randomUUID ? crypto.randomUUID() : (Date.now() + "-" + Math.random().toString(36).slice(2));
     const subidas = pendientes.length;
     let fallos = 0;
+    const nuevosHistorial = [];
 
     for (const p of pendientes.slice()){
       const item = listaFotos.querySelector(`.foto-item[data-id="${p.id}"]`);
@@ -540,6 +674,17 @@ footer{
           item.appendChild(mini);
         }
 
+        if (documentoId) {
+          nuevosHistorial.push({
+            documento_id: documentoId,
+            kind: p.kind,
+            file_url: fileUrl,
+            storage_path: nombreArchivo,
+            nota: notaTexto,
+            created_at: new Date().toISOString()
+          });
+        }
+
         // El análisis automático por IA solo aplica a imágenes, no a audios
         if (documentoId && p.kind === "foto") {
           fetch(`${SUPABASE_URL}/functions/v1/clasificar-documento`, {
@@ -562,6 +707,8 @@ footer{
         }
       }
     }
+
+    if (nuevosHistorial.length > 0) añadirAlHistorial(nuevosHistorial);
 
     if (fallos === 0){
       estadoGeneral.textContent = `✅ ${subidas} elemento${subidas > 1 ? "s" : ""} subido${subidas > 1 ? "s" : ""}`;
