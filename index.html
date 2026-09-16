@@ -498,6 +498,16 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .calendar-day-head{font-weight:700;font-size:12.5px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line-dark);display:flex;justify-content:space-between;align-items:center;}
 .cal-weather{font-size:11px;font-weight:600;color:var(--ink-soft);white-space:nowrap;}
 .cal-weather.risky{color:var(--red);}
+.check-dropdown{position:relative;display:inline-block;}
+.check-dropdown-menu{
+  display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:500;
+  background:var(--paper);border:1px solid var(--line-dark);border-radius:8px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.15);padding:8px;min-width:170px;
+}
+.check-dropdown.open .check-dropdown-menu{display:block;}
+.check-dropdown-menu label{display:flex;align-items:center;gap:8px;padding:5px 4px;font-size:12.5px;cursor:pointer;white-space:nowrap;}
+.check-dropdown-menu label:hover{background:var(--concrete-2);border-radius:4px;}
+.check-dropdown-menu hr{border:none;border-top:1px solid var(--line-dark);margin:6px 0;}
 .calendar-day-head .n{color:var(--ink-soft);font-weight:500;}
 .calendar-job{background:var(--concrete-2);border-radius:6px;padding:6px 8px;margin-bottom:6px;font-size:11.5px;cursor:pointer;border-left:3px solid var(--orange);}
 .calendar-job:hover{background:var(--concrete-3,#e8e5e0);}
@@ -1684,7 +1694,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.48</div>
+        <div class="sub">V0.49</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1705,6 +1715,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="correo"><span class="ico">✉</span><span class="label"> Correo</span></button>
       <div class="grp-label">Cuenta</div>
       <button data-view="sistema" class="admin-only"><span class="ico">◉</span><span class="label"> Sistema</span></button>
+      <button data-view="reportes" class="admin-only"><span class="ico">🐞</span><span class="label"> Reportes</span></button>
       <button data-view="config" class="admin-only"><span class="ico">⚙</span><span class="label"> Configuración</span></button>
     </div>
     <div class="sidebar-foot"><span id="sidebar-username">Sesión iniciada</span><br><span style="cursor:pointer;text-decoration:underline;" onclick="doLogout()">Cerrar sesión</span></div>
@@ -1817,10 +1828,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <h3>Calendario de trabajos</h3>
           <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <span class="count" id="calendar-count"></span>
-            <div class="filters" id="calendar-worker-filter" style="margin:0;">
-              <div class="chip-filter active" data-cw="">Todos</div>
-              <div class="chip-filter" data-cw="Rafa">Rafa</div>
-              <div class="chip-filter" data-cw="Manolo">Manolo</div>
+            <div class="check-dropdown" id="cal-worker-dropdown">
+              <button class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="toggleCheckDropdown('cal-worker-dropdown')">👤 Personas ▾</button>
+              <div class="check-dropdown-menu"></div>
+            </div>
+            <div class="check-dropdown" id="cal-machine-dropdown">
+              <button class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="toggleCheckDropdown('cal-machine-dropdown')">🚜 Maquinaria ▾</button>
+              <div class="check-dropdown-menu"></div>
             </div>
             <div class="filters" id="calendar-view-tabs" style="margin:0;">
               <div class="chip-filter active" data-cv="semana">Semana</div>
@@ -2348,7 +2362,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="client-tab" data-sub="protocolos">Protocolos</div>
         <div class="client-tab" data-sub="criterios">Criterios</div>
         <div class="client-tab" data-sub="estandares">Estándares</div>
-        <div class="client-tab" data-sub="mejora">Reportes</div>
         <div class="client-tab" data-sub="historial">Historial de decisiones</div>
       </div>
 
@@ -2445,28 +2458,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div></div>
       </div>
 
-      <div class="sub-view" id="sis-mejora" style="display:none;">
-        <div class="panel">
-          <div class="panel-head">
-            <h3>Reportes</h3>
-            <span style="display:flex;align-items:center;gap:10px;">
-              <div class="filters" id="mejora-filter" style="margin:0;">
-                <div class="chip-filter active" data-mf="pendiente">Pendientes</div>
-                <div class="chip-filter" data-mf="revisado">Revisados</div>
-                <div class="chip-filter" data-mf="">Todos</div>
-              </div>
-              <button class="btn" onclick="addMejora()">+ Añadir</button>
-            </span>
-          </div>
-          <div class="panel-body" style="padding:0;">
-            <table class="tbl">
-              <tr><th>Reporte</th><th>Sección</th><th>Fecha</th><th>Estado</th><th></th></tr>
-              <tbody id="mejora-list"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
       <div class="sub-view" id="sis-historial" style="display:none;">
         <div class="panel">
           <div class="panel-head"><h3>Historial de decisiones</h3><button class="btn" onclick="addDecision()">+ Añadir</button></div>
@@ -2540,6 +2531,30 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <button class="btn primary" onclick="sendGmail()">Enviar</button>
             <span id="mail-send-status" class="sub-t"></span>
           </div>
+        </div>
+      </div>
+    </div>
+
+        <!-- ================= REPORTES ================= -->
+    <div class="view" id="view-reportes">
+      <div class="topbar">
+        <div><h1>Reportes</h1><div class="desc">Lo que has ido reportando desde la web, con captura y estado</div></div>
+        <div class="quickactions"><button class="btn" onclick="addMejora()">+ Añadir</button></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Reportes</h3>
+          <div class="filters" id="mejora-filter" style="margin:0;">
+            <div class="chip-filter active" data-mf="pendiente">Pendientes</div>
+            <div class="chip-filter" data-mf="revisado">Revisados</div>
+            <div class="chip-filter" data-mf="">Todos</div>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0;">
+          <table class="tbl">
+            <tr><th>Reporte</th><th>Sección</th><th>Fecha</th><th>Estado</th><th></th></tr>
+            <tbody id="mejora-list"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -2889,6 +2904,32 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   </div>
 </div>
 
+<!-- ================= MODAL: TARIFA ================= -->
+<div class="overlay" id="tarifa-overlay" onclick="if(event.target===this) cerrarTarifaModal()">
+  <div class="drawer" style="max-width:420px;">
+    <div class="drawer-head">
+      <div><h2 id="tarifa-modal-title">Nueva tarifa</h2></div>
+      <button class="close-x" onclick="cerrarTarifaModal()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field" style="margin-bottom:12px;"><div class="l">Concepto</div>
+        <input class="search-box" style="width:100%;" id="tarifa-concepto" placeholder="Ej. M³ de excavación en terreno medio">
+      </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Palabras clave (para que se sugiera solo, separadas por coma)</div>
+        <input class="search-box" style="width:100%;" id="tarifa-kw" placeholder="excava, m3, m³">
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div class="field" style="flex:1;"><div class="l">Precio particular (€)</div><input class="search-box" style="width:100%;" id="tarifa-precio-particular" type="number" step="0.01"></div>
+        <div class="field" style="flex:1;"><div class="l">Precio ayuntamiento (€)</div><input class="search-box" style="width:100%;" id="tarifa-precio-ayto" type="number" step="0.01"></div>
+      </div>
+      <div class="state-row">
+        <button class="btn primary" style="width:100%;" onclick="guardarTarifaModal()">Guardar</button>
+      </div>
+      <div id="tarifa-modal-status" class="sub-t" style="margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ================= MODAL: REGISTRAR GASTO ================= -->
 <div class="overlay" id="gasto-overlay" onclick="if(event.target===this) cerrarRegistrarGasto()">
   <div class="drawer" style="max-width:420px;">
@@ -3213,7 +3254,7 @@ function setupSubtabs(navId, prefix, mapping){
 setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimiento:'flota-mantenimiento',averias:'flota-averias',documentacion:'flota-documentacion',repuestos:'flota-repuestos'});
 setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',cobros:'econ-cobros',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad',cierre:'econ-cierre'});
 setupSubtabs('entradas-subtabs','entradas',{bandeja:'sub-bandeja',whatsapp:'sub-whatsapp'});
-setupSubtabs('sistema-subtabs','sis',{principios:'sis-principios',organizacion:'sis-organizacion',protocolos:'sis-protocolos',criterios:'sis-criterios',estandares:'sis-estandares',mejora:'sis-mejora',historial:'sis-historial'});
+setupSubtabs('sistema-subtabs','sis',{principios:'sis-principios',organizacion:'sis-organizacion',protocolos:'sis-protocolos',criterios:'sis-criterios',estandares:'sis-estandares',historial:'sis-historial'});
 
 /* ---------------- AVERÍAS (reales, en Supabase) ---------------- */
 const averiasById = {};
@@ -4696,8 +4737,6 @@ async function cargarDatosReales(){
       });
       renderJobFilters();
       renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
-      renderCalendar();
-      
     }
     const {data: flotaReal} = await sb.from('flota').select('*').order('created_at',{ascending:false});
     if(flotaReal && flotaReal.length){
@@ -4707,6 +4746,8 @@ async function cargarDatosReales(){
       });
       renderFleetGrid();
     }
+    renderFiltrosCalendario();
+    renderCalendar();
   }catch(err){ console.error('No se pudieron cargar los datos reales de Supabase', err); }
 }
 cargarDatosReales();
@@ -4717,7 +4758,6 @@ const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sept','oc
 const MESES_LARGOS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
 let calVista = 'semana'; // 'semana' | 'mes' | 'dia'
-let calFiltroWorker = ''; // '' = todos, o 'Rafa' / 'Manolo'
 let weatherByDate = {}; // se rellena cuando llega el tiempo real, pero el calendario no espera a esto para pintarse
 let calFecha = new Date(); calFecha.setHours(0,0,0,0); // fecha de referencia (día concreto en vista día, cualquier día de la semana/mes en las otras)
 
@@ -4730,8 +4770,14 @@ function getSemanaDe(d){
   return [0,1,2,3,4].map(i=>{ const x = new Date(lunes); x.setDate(lunes.getDate()+i); return x; });
 }
 function formatDiaCorto(d){ return DIAS_SEMANA_CORTOS[(d.getDay()+6)%7] + ' ' + d.getDate(); }
+
+let calFiltroWorkers = new Set(); // vacío = todos
+let calFiltroMachines = new Set(); // vacío = todas
 function jobsFiltrados(){
-  return calFiltroWorker ? jobs.filter(j=>j.worker===calFiltroWorker) : jobs;
+  let r = jobs;
+  if(calFiltroWorkers.size) r = r.filter(j=>calFiltroWorkers.has(j.worker));
+  if(calFiltroMachines.size) r = r.filter(j=>(j.machines||[]).some(m=>calFiltroMachines.has(m)));
+  return r;
 }
 
 document.querySelectorAll('#calendar-view-tabs .chip-filter').forEach(el=>{
@@ -4742,14 +4788,48 @@ document.querySelectorAll('#calendar-view-tabs .chip-filter').forEach(el=>{
     renderCalendar();
   });
 });
-document.querySelectorAll('#calendar-worker-filter .chip-filter').forEach(el=>{
-  el.addEventListener('click', ()=>{
-    document.querySelectorAll('#calendar-worker-filter .chip-filter').forEach(e=>e.classList.remove('active'));
-    el.classList.add('active');
-    calFiltroWorker = el.dataset.cw;
-    renderCalendar();
+
+function toggleCheckDropdown(id){
+  const dd = document.getElementById(id);
+  const wasOpen = dd.classList.contains('open');
+  document.querySelectorAll('.check-dropdown.open').forEach(e=>e.classList.remove('open'));
+  if(!wasOpen) dd.classList.add('open');
+}
+document.addEventListener('click', (ev)=>{
+  document.querySelectorAll('.check-dropdown.open').forEach(dd=>{
+    if(!dd.contains(ev.target)) dd.classList.remove('open');
   });
 });
+
+function renderFiltrosCalendario(){
+  const trabajadores = ['Rafa','Manolo','Dani', ...new Set(jobs.map(j=>j.worker).filter(w=>w && !['Rafa','Manolo','Dani'].includes(w)))];
+  const wMenu = document.querySelector('#cal-worker-dropdown .check-dropdown-menu');
+  wMenu.innerHTML = `<label><input type="checkbox" ${calFiltroWorkers.size===0?'checked':''} onchange="toggleFiltroTodos('worker')"><b>Todos</b></label><hr>` +
+    trabajadores.map(w=>`<label><input type="checkbox" ${calFiltroWorkers.size===0||calFiltroWorkers.has(w)?'checked':''} onchange="toggleFiltroItem('worker','${w}')">${w}</label>`).join('');
+
+  const maquinas = fleet.map(f=>f.name);
+  const mMenu = document.querySelector('#cal-machine-dropdown .check-dropdown-menu');
+  mMenu.innerHTML = `<label><input type="checkbox" ${calFiltroMachines.size===0?'checked':''} onchange="toggleFiltroTodos('machine')"><b>Todas</b></label><hr>` +
+    maquinas.map(m=>`<label><input type="checkbox" ${calFiltroMachines.size===0||calFiltroMachines.has(m)?'checked':''} onchange="toggleFiltroItem('machine','${m.replace(/'/g,"\\'")}')">${m}</label>`).join('');
+}
+function toggleFiltroTodos(tipo){
+  if(tipo==='worker') calFiltroWorkers = new Set();
+  else calFiltroMachines = new Set();
+  renderFiltrosCalendario();
+  renderCalendar();
+}
+function toggleFiltroItem(tipo, valor){
+  const set = tipo==='worker' ? calFiltroWorkers : calFiltroMachines;
+  const universo = tipo==='worker' ? ['Rafa','Manolo','Dani', ...new Set(jobs.map(j=>j.worker).filter(Boolean))] : fleet.map(f=>f.name);
+  // si estaba en "Todos" (set vacío) y desmarcas uno, pasamos a marcar todos menos ese
+  if(set.size === 0){ universo.forEach(v=>set.add(v)); set.delete(valor); }
+  else if(set.has(valor)){ set.delete(valor); }
+  else { set.add(valor); }
+  if(set.size === universo.length) set.clear(); // si vuelven a estar todos marcados, es lo mismo que "Todos"
+  renderFiltrosCalendario();
+  renderCalendar();
+}
+renderFiltrosCalendario();
 
 function cambiarVistaCalendario(v){
   document.querySelectorAll('#calendar-view-tabs .chip-filter').forEach(e=>e.classList.toggle('active', e.dataset.cv===v));
@@ -5664,27 +5744,44 @@ function renderTarifasTabla(){
       </td>
     </tr>`).join('') : '<tr><td colspan="4" class="empty">Sin tarifas todavía</td></tr>';
 }
-async function abrirNuevaTarifa(){
-  if(!sb){ alert('Supabase no está conectado.'); return; }
-  const concepto = prompt('Concepto (ej. "M³ de excavación en terreno medio"):');
-  if(!concepto || !concepto.trim()) return;
-  const kw = prompt('Palabras clave para que se sugiera solo, separadas por coma (ej. "excava,m3,m³"):') || '';
-  const precioParticular = Number(prompt('Precio para particular/empresa (€):')) || 0;
-  const precioAyuntamiento = Number(prompt('Precio para ayuntamiento (€) — igual que el anterior si no cambia:', precioParticular)) || precioParticular;
-  const {error} = await sb.from('tarifas').insert({concepto: concepto.trim(), palabras_clave: kw.trim(), precio_particular: precioParticular, precio_ayuntamiento: precioAyuntamiento});
-  if(error){ alert('Error al guardar: '+errText(error)); return; }
-  cargarTarifasReales();
+let tarifaEditandoId = null;
+function abrirNuevaTarifa(){
+  tarifaEditandoId = null;
+  document.getElementById('tarifa-modal-title').textContent = 'Nueva tarifa';
+  document.getElementById('tarifa-concepto').value = '';
+  document.getElementById('tarifa-kw').value = '';
+  document.getElementById('tarifa-precio-particular').value = '';
+  document.getElementById('tarifa-precio-ayto').value = '';
+  document.getElementById('tarifa-modal-status').textContent = '';
+  document.getElementById('tarifa-overlay').classList.add('active');
 }
-async function editarTarifa(id){
+function editarTarifa(id){
   const t = TARIFAS_REALES.find(x=>x.id===id);
-  if(!t || !sb) return;
-  const concepto = prompt('Concepto:', t.concepto);
-  if(!concepto || !concepto.trim()) return;
-  const kw = prompt('Palabras clave (separadas por coma):', t.kw.join(',')) || '';
-  const precioParticular = Number(prompt('Precio particular/empresa (€):', t.precioParticular)) || 0;
-  const precioAyuntamiento = Number(prompt('Precio ayuntamiento (€):', t.precioAyuntamiento)) || 0;
-  const {error} = await sb.from('tarifas').update({concepto: concepto.trim(), palabras_clave: kw.trim(), precio_particular: precioParticular, precio_ayuntamiento: precioAyuntamiento}).eq('id', id);
-  if(error){ alert('Error al guardar: '+errText(error)); return; }
+  if(!t) return;
+  tarifaEditandoId = id;
+  document.getElementById('tarifa-modal-title').textContent = 'Editar tarifa';
+  document.getElementById('tarifa-concepto').value = t.concepto;
+  document.getElementById('tarifa-kw').value = t.kw.join(', ');
+  document.getElementById('tarifa-precio-particular').value = t.precioParticular ?? '';
+  document.getElementById('tarifa-precio-ayto').value = t.precioAyuntamiento ?? '';
+  document.getElementById('tarifa-modal-status').textContent = '';
+  document.getElementById('tarifa-overlay').classList.add('active');
+}
+function cerrarTarifaModal(){ document.getElementById('tarifa-overlay').classList.remove('active'); }
+async function guardarTarifaModal(){
+  const statusEl = document.getElementById('tarifa-modal-status');
+  const concepto = document.getElementById('tarifa-concepto').value.trim();
+  const kw = document.getElementById('tarifa-kw').value.trim();
+  const precioParticular = Number(document.getElementById('tarifa-precio-particular').value) || 0;
+  const precioAyuntamiento = Number(document.getElementById('tarifa-precio-ayto').value) || precioParticular;
+  if(!concepto){ statusEl.textContent = 'Falta el concepto.'; statusEl.style.color = 'var(--red)'; return; }
+  if(!sb){ statusEl.textContent = 'Supabase no está conectado.'; statusEl.style.color = 'var(--red)'; return; }
+  const payload = {concepto, palabras_clave: kw, precio_particular: precioParticular, precio_ayuntamiento: precioAyuntamiento};
+  const {error} = tarifaEditandoId
+    ? await sb.from('tarifas').update(payload).eq('id', tarifaEditandoId)
+    : await sb.from('tarifas').insert(payload);
+  if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
+  cerrarTarifaModal();
   cargarTarifasReales();
 }
 async function borrarTarifa(id){
