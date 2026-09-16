@@ -1704,7 +1704,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.67</div>
+        <div class="sub">V0.68</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -3545,6 +3545,44 @@ async function descartarHistorico(){
   renderHistorico();
   cerrarHistoricoModal();
 }
+function calcularKPIsReales(){
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const hoyIso = hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');
+  const mesActual = hoy.getMonth(), anioActual = hoy.getFullYear();
+
+  // --- Trabajos ---
+  const trabajosHoy = jobs.filter(j=>j.scheduledDate===hoyIso).length;
+  const urgentes = jobs.filter(j=>j.urgent && !['terminado','facturado','cobrado'].includes(j.state)).length;
+  const sinPlanificar = jobs.filter(j=>!j.scheduledDate && !['terminado','facturado','cobrado'].includes(j.state)).length;
+
+  // --- Documentos económicos reales ---
+  const docs = Object.values(documentosRealesById);
+  const esDelMes = d => { if(!d.dateRaw) return false; const dt = new Date(d.dateRaw); return dt.getFullYear()===anioActual && dt.getMonth()===mesActual; };
+
+  const facturasEmitidasMes = docs.filter(d=>d.type==='factura' && d.status!=='Borrador' && esDelMes(d));
+  const facturadoMes = facturasEmitidasMes.reduce((s,d)=>s+(d.total||0),0);
+
+  const gastosMes = docs.filter(d=>d.type==='gasto' && esDelMes(d)).reduce((s,d)=>s+(d.total||0),0);
+  const margenMes = facturadoMes - gastosMes;
+
+  const pendienteCobro = docs.filter(d=>d.type==='factura' && d.status==='Pendiente').reduce((s,d)=>s+(d.total||0),0);
+
+  const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+
+  setTxt('kpi-trabajos-hoy', trabajosHoy);
+  setTxt('kpi-urgentes', urgentes);
+  setTxt('kpi-sin-planificar', sinPlanificar);
+  setTxt('kpi-pendiente-cobro', euro(pendienteCobro));
+  setTxt('kpi-facturado-mes', euro(facturadoMes));
+  setTxt('kpi-margen-mes', euro(margenMes));
+
+  setTxt('dash-facturado', euro(facturadoMes));
+  setTxt('dash-cobrado', '— (sin seguimiento aún)');
+  setTxt('dash-gastos', euro(gastosMes));
+  setTxt('dash-margen', euro(margenMes));
+}
+
 function copiarPromptInicio(){
   const texto = document.getElementById('prompt-inicio-texto').textContent;
   navigator.clipboard.writeText(texto).then(()=>{
@@ -5212,6 +5250,7 @@ async function cargarDatosReales(){
     }
     renderFiltrosCalendario();
     renderCalendar();
+    calcularKPIsReales();
   }catch(err){ console.error('No se pudieron cargar los datos reales de Supabase', err); }
 }
 cargarDatosReales();
@@ -7231,6 +7270,7 @@ async function cargarDocumentosEconomicosReales(){
     actualizarContadorPresupuestosStandalone();
     renderFacturasKPIs();
     renderAlbaranesAbiertos();
+    calcularKPIsReales();
   }catch(err){ console.error('No se pudieron cargar los documentos reales', err); }
 }
 cargarDocumentosEconomicosReales();
