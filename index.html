@@ -76,6 +76,14 @@ table{border-collapse:collapse;width:100%;}
 .brand-text{overflow:hidden;white-space:nowrap;}
 .brand .name{color:#fff;font-size:19px;font-weight:800;letter-spacing:0.01em;}
 .brand .sub{font-size:11px;color:#8B929C;font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+.user-badge{
+  display:flex;align-items:center;gap:8px;margin:-6px 18px 16px 18px;padding:8px 10px;
+  background:rgba(216,86,15,0.15);border:1px solid var(--orange);border-radius:8px;cursor:pointer;
+}
+.user-badge-dot{width:8px;height:8px;border-radius:50%;background:var(--green,#3CA55C);flex-shrink:0;}
+.user-badge-name{color:#fff;font-weight:700;font-size:13px;flex:1;}
+.user-badge-switch{color:#8B929C;font-size:10.5px;white-space:nowrap;}
+.user-badge:hover .user-badge-switch{color:var(--orange);}
 .sidebar-toggle{
   flex-shrink:0;width:22px;height:22px;border-radius:50%;
   background:var(--asphalt-2);color:#C9CCD1;font-size:11px;
@@ -83,7 +91,7 @@ table{border-collapse:collapse;width:100%;}
   border:1px solid var(--line-dark);transition:transform 0.18s ease;
 }
 .sidebar-toggle:hover{background:var(--orange);color:#fff;border-color:var(--orange);}
-.nav{flex:1;display:flex;flex-direction:column;gap:1px;padding:0 10px;}
+.nav{flex:1;display:flex;flex-direction:column;gap:1px;padding:0 10px;overflow-y:auto;min-height:0;}
 .nav button{
   text-align:left;padding:9px 12px;border-radius:var(--radius);
   color:#C9CCD1;font-size:13.5px;font-weight:500;
@@ -111,7 +119,7 @@ table{border-collapse:collapse;width:100%;}
 .app.sidebar-collapsed .sidebar-foot{display:none;}
 
 .main{padding:22px 28px 60px 28px;max-width:1400px;}
-.topbar{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.topbar{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:20px;}
 .topbar h1{font-size:22px;}
 .topbar .desc{color:var(--ink-soft);font-size:13px;margin-top:2px;}
 .quickactions{display:flex;gap:8px;flex-wrap:wrap;}
@@ -162,6 +170,8 @@ table{border-collapse:collapse;width:100%;}
   color:var(--ink-soft);padding:8px 10px;border-bottom:1px solid var(--line);font-weight:600;
 }
 .tbl td{padding:9px 10px;border-bottom:1px solid var(--concrete-2);font-size:13px;vertical-align:middle;}
+.tbl th.ord{cursor:pointer;user-select:none;}
+.tbl th.ord:hover{color:var(--orange);}
 .tbl tr:hover td{background:var(--concrete);cursor:pointer;}
 .tbl tr:last-child td{border-bottom:none;}
 .num{font-family:'IBM Plex Mono',monospace;text-align:right;}
@@ -283,6 +293,8 @@ table{border-collapse:collapse;width:100%;}
 
 /* fleet cards */
 .machine-card{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);padding:14px;}
+.machine-card.expanded{border-color:var(--orange);box-shadow:0 2px 10px rgba(0,0,0,0.08);}
+.machine-card-expand{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-dark);}
 .machine-card .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
 .machine-card .mname{font-weight:700;font-size:14.5px;}
 .machine-card .mtype{font-size:11.5px;color:var(--ink-soft);}
@@ -408,7 +420,8 @@ table{border-collapse:collapse;width:100%;}
 .combo-item:hover, .combo-item.hl{background:var(--concrete);}
 .combo-item .sub{font-size:11px;color:var(--ink-soft);}
 
-.ie-dictado{margin-top:16px;padding:14px;border:1px dashed var(--line);border-radius:var(--radius);background:var(--concrete);}
+.ie-dictado{margin:0 24px 16px 24px;padding:14px;border:1px dashed var(--line);border-radius:var(--radius);background:var(--concrete);display:none;}
+.ie-dictado.open{display:block;}
 .ie-dictado h4{font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);margin-bottom:8px;}
 
 .mini-modal-body .field{margin-bottom:12px;}
@@ -444,11 +457,14 @@ table{border-collapse:collapse;width:100%;}
 @keyframes pulse-rec{0%,100%{opacity:1;}50%{opacity:0.5;}}
 body.editor-mode-on{padding-top:30px;}
 body.editor-mode-on::before{
-  content:'MODO EDITOR ACTIVO — arrastra los bloques para moverlos, tira de la esquina para cambiar su tamaño, ✕ para borrarlos';
+  content:'MODO EDITOR ACTIVO — arrastra los bloques (o las secciones del menú) para moverlos, tira de la esquina para cambiar su tamaño, ✕ para borrarlos';
   position:fixed;top:0;left:0;right:0;z-index:4001;
   background:var(--orange);color:#fff;text-align:center;
   font-size:12px;font-weight:700;padding:6px;letter-spacing:0.02em;
 }
+.nav-editable button[data-view], .nav-editable .grp-label[data-view]{cursor:grab;}
+.nav-editable button[data-view].dragging, .nav-editable .grp-label[data-view].dragging{opacity:0.4;}
+.nav-editable button[data-view]:hover, .nav-editable .grp-label[data-view]:hover{outline:1px dashed var(--orange);outline-offset:2px;}
 body.editor-mode-on .layout-block{
   position:relative;outline:1px dashed var(--orange);outline-offset:3px;
   resize:both;overflow:auto;min-width:180px;min-height:80px;
@@ -457,7 +473,7 @@ body.editor-mode-on .layout-block:hover{outline:2px solid var(--orange);}
 body.editor-mode-on .layout-block.dragging{opacity:0.4;}
 body.editor-mode-on .layout-block.drag-over{outline:3px dashed var(--red);}
 .layout-toolbar{
-  display:none;position:absolute;top:-14px;right:6px;z-index:10;gap:4px;
+  display:none;position:absolute;top:4px;right:4px;z-index:10;gap:4px;
 }
 body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .layout-toolbar span{
@@ -560,6 +576,13 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
   padding:10px;cursor:pointer;position:relative;text-align:center;
 }
 .explorer-item:hover{border-color:var(--orange);}
+.exp-sel-wrap{
+  position:absolute;top:6px;left:6px;z-index:5;
+  width:22px;height:22px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 4px rgba(0,0,0,0.35);
+  display:flex;align-items:center;justify-content:center;
+}
+.exp-sel-wrap input[type="checkbox"]{width:15px;height:15px;cursor:pointer;margin:0;}
 .explorer-item.drag-over{border-color:var(--orange);background:var(--orange-soft,#FCE8DA);outline:2px dashed var(--orange);outline-offset:-2px;}
 .explorer-item .exp-icon{font-size:30px;margin-bottom:6px;}
 .explorer-item .exp-thumb{width:100%;height:70px;object-fit:cover;border-radius:3px;margin-bottom:6px;}
@@ -1696,9 +1719,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.62</div>
+        <div class="sub">V0.88</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
+    </div>
+    <div class="user-badge" onclick="doLogout()" title="Clic para cambiar de usuario (cierra sesión)">
+      <div class="user-badge-dot"></div>
+      <div class="user-badge-name" id="user-badge-name">Cargando...</div>
+      <div class="user-badge-switch">Cambiar ↻</div>
     </div>
     <div class="nav" id="nav">
       <button class="active" data-view="control"><span class="ico">◆</span><span class="label"> Centro de control</span></button>
@@ -1715,12 +1743,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="tarifas"><span class="ico">💶</span><span class="label"> Tarifas</span></button>
       <button data-view="economia"><span class="ico">€</span><span class="label"> Economía</span></button>
       <button data-view="correo"><span class="ico">✉</span><span class="label"> Correo</span></button>
-      <div class="grp-label">Cuenta</div>
+      <div class="grp-label" data-view="__label_cuenta">Cuenta</div>
       <button data-view="sistema" class="admin-only"><span class="ico">◉</span><span class="label"> Sistema</span></button>
       <button data-view="reportes" class="admin-only"><span class="ico">🐞</span><span class="label"> Reportes</span></button>
+      <button data-view="historico" class="admin-only"><span class="ico">📜</span><span class="label"> Histórico</span></button>
       <button data-view="config" class="admin-only"><span class="ico">⚙</span><span class="label"> Configuración</span></button>
     </div>
-    <div class="sidebar-foot"><span id="sidebar-username">Sesión iniciada</span><br><span style="cursor:pointer;text-decoration:underline;" onclick="doLogout()">Cerrar sesión</span></div>
+    <div class="sidebar-foot"><span style="cursor:pointer;text-decoration:underline;" onclick="doLogout()">Cerrar sesión</span></div>
   </div>
 
   <!-- MAIN -->
@@ -1973,15 +2002,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="topbar">
         <div><h1>Archivos</h1><div class="desc">Explorador de todos los documentos archivados — Supabase Storage</div></div>
       </div>
-      <div class="panel admin-only">
-        <div class="panel-head"><h3>Reorganizar archivo histórico</h3></div>
-        <div class="panel-body">
-          <p class="two-col-note" style="margin-bottom:12px;">Mueve el histórico viejo (2005-2019, albaranes, fotos, documentos de máquinas...) a la estructura oficial de Sistema. Usa el método real que mueve el archivo de verdad, no solo el nombre — seguro para volver a ejecutar si se corta a medias.</p>
-          <button class="btn primary" onclick="reorganizarArchivo()">🗂 Reorganizar ahora</button>
-          <button class="btn" onclick="mayusculizarArchivo()" style="margin-left:8px;">🔠 Poner todo en MAYÚSCULAS</button>
-          <div id="reorganizar-status" class="sub-t" style="margin-top:10px;"></div>
-        </div>
-      </div>
       <div class="panel">
         <div class="panel-head">
           <div style="display:flex;align-items:center;gap:8px;">
@@ -1995,7 +2015,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <button class="btn" onclick="explorerNewFolder()">+ Carpeta</button>
           </div>
         </div>
-        <div class="panel-body" style="padding-bottom:0;display:flex;gap:8px;flex-wrap:wrap;">
+        <div class="panel-body" style="padding-bottom:0;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <input type="text" id="explorer-search" class="search-box" style="flex:1;min-width:180px;" placeholder="Buscar por nombre..." oninput="renderExplorerGrid()">
           <select id="explorer-type-filter" class="search-box" onchange="renderExplorerGrid()">
             <option value="">Todos los tipos</option>
@@ -2005,6 +2025,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <option value="img">Fotos</option>
             <option value="doc">Word</option>
           </select>
+          <button class="btn" style="display:none;" id="explorer-mover-sel-btn" onclick="moverSeleccionExplorer()">↦ Mover seleccionados (<span id="explorer-sel-count">0</span>)</button>
         </div>
         <div class="panel-body">
           <div class="explorer-grid" id="explorer-grid" ondragover="explorerDragOver(event)" ondragleave="explorerDragLeave(event)" ondrop="explorerDrop(event)"></div>
@@ -2101,12 +2122,22 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="view" id="view-clientes">
       <div class="topbar">
         <div><h1>Clientes</h1><div class="desc">Ayuntamientos, particulares y empresas</div></div>
-        <div class="quickactions"><button class="btn primary" onclick="openNewClientModal(null)">+ Nuevo cliente</button></div>
+        <div class="quickactions">
+          <button class="btn" style="color:var(--red);display:none;" id="clientes-borrar-sel-btn" onclick="borrarClientesSeleccionados()">🗑 Borrar seleccionados (<span id="clientes-sel-count">0</span>)</button>
+          <button class="btn primary" onclick="openNewClientModal(null)">+ Nuevo cliente</button>
+        </div>
       </div>
       <div class="panel">
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
-            <tr><th>Cliente</th><th>Tipo</th><th>Zona</th><th>Tarifa</th><th class="num">Facturado (año)</th><th class="num">Pendiente</th><th>Prioridad</th></tr>
+            <tr><th style="width:30px;"><input type="checkbox" id="clientes-sel-todo" onchange="toggleSeleccionarTodoClientes(this)"></th>
+              <th class="ord" onclick="ordenarTabla('clientes-tbl',1,'text')">Cliente ⇅</th>
+              <th class="ord" onclick="ordenarTabla('clientes-tbl',2,'text')">Tipo ⇅</th>
+              <th class="ord" onclick="ordenarTabla('clientes-tbl',3,'text')">Zona ⇅</th>
+              <th>Tarifa</th>
+              <th class="num ord" onclick="ordenarTabla('clientes-tbl',5,'num')">Facturado (año) ⇅</th>
+              <th class="num ord" onclick="ordenarTabla('clientes-tbl',6,'num')">Pendiente ⇅</th>
+              <th>Prioridad</th></tr>
             <tbody id="clientes-tbl"></tbody>
           </table>
         </div>
@@ -2123,10 +2154,34 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="kpi-strip" id="facturas-kpi-strip" style="margin-bottom:16px;"></div>
 
       <div class="panel">
-        <div class="panel-head"><h3>Facturas</h3><span class="count">0 vencidas</span></div>
+        <div class="panel-head">
+          <h3>Facturas</h3>
+          <span style="display:flex;align-items:center;gap:10px;">
+            <select class="search-box" id="fact-filtro-anio" onchange="filtrarTablaOrdenable('econ-facturas-tbody')" style="padding:5px 8px;font-size:12px;">
+              <option value="">Todos los años</option>
+            </select>
+            <select class="search-box" id="fact-filtro-trim" onchange="filtrarTablaOrdenable('econ-facturas-tbody')" style="padding:5px 8px;font-size:12px;">
+              <option value="">Todos los trimestres</option>
+              <option value="1">1º trimestre</option>
+              <option value="2">2º trimestre</option>
+              <option value="3">3º trimestre</option>
+              <option value="4">4º trimestre</option>
+            </select>
+            <span class="count">0 vencidas</span>
+          </span>
+        </div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl" id="econ-facturas-table">
-            <tr><th>Nº</th><th>Cliente</th><th>Trabajo</th><th>Fecha</th><th>Vencimiento</th><th class="num">Total</th><th class="num">Cobrado</th><th>Estado</th></tr>
+            <tr>
+              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',0,'text')">Nº ⇅</th>
+              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',1,'text')">Cliente ⇅</th>
+              <th>Trabajo</th>
+              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',3,'text')">Fecha ⇅</th>
+              <th>Vencimiento</th>
+              <th class="num ord" onclick="ordenarTabla('econ-facturas-tbody',5,'num')">Total ⇅</th>
+              <th class="num">Cobrado</th>
+              <th>Estado</th>
+            </tr>
             <tbody id="econ-facturas-tbody">
             </tbody>
           </table>
@@ -2145,7 +2200,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="panel-head"><h3>Presupuestos</h3><span class="count" id="presupuestos-standalone-count">0</span></div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
-            <tr><th>Nº</th><th>Cliente</th><th>Trabajo</th><th>Fecha</th><th class="num">Total</th><th>Estado</th></tr>
+            <tr>
+              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',0,'text')">Nº ⇅</th>
+              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',1,'text')">Cliente ⇅</th>
+              <th>Trabajo</th>
+              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',3,'text')">Fecha ⇅</th>
+              <th class="num ord" onclick="ordenarTabla('presupuestos-tbody-standalone',4,'num')">Total ⇅</th>
+              <th>Estado</th>
+            </tr>
             <tbody id="presupuestos-tbody-standalone"></tbody>
           </table>
         </div>
@@ -2162,7 +2224,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="panel">
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
-            <tr><th>Concepto</th><th>Unidad</th><th class="num">Precio particular</th><th class="num">Precio ayuntamiento</th><th></th></tr>
+            <tr>
+              <th class="ord" onclick="ordenarTabla('tarifas-tbl',0,'text')">Concepto ⇅</th>
+              <th class="ord" onclick="ordenarTabla('tarifas-tbl',1,'text')">Unidad ⇅</th>
+              <th class="num ord" onclick="ordenarTabla('tarifas-tbl',2,'num')">Precio particular ⇅</th>
+              <th class="num ord" onclick="ordenarTabla('tarifas-tbl',3,'num')">Precio ayuntamiento ⇅</th>
+              <th></th>
+            </tr>
             <tbody id="tarifas-tbl"></tbody>
           </table>
         </div>
@@ -2376,7 +2444,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="client-tab" data-sub="criterios">Criterios</div>
         <div class="client-tab" data-sub="estandares">Estándares</div>
         <div class="client-tab" data-sub="historial">Historial de decisiones</div>
-        <div class="client-tab" data-sub="oninicio">Prompt de inicio de chat</div>
+        <div class="client-tab" data-sub="oninicio">Prompt</div>
       </div>
 
       <div class="sub-view" id="sis-principios">
@@ -2468,6 +2536,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <li><b>Acceso</b> — Sistema y Configuración solo los ve el usuario administrador (dg). El resto del equipo (rg, mg) ve el día a día, no la lógica de fondo de la empresa.</li>
             <li><b>Móvil y escritorio por igual</b> — cualquier sección nueva tiene que funcionar bien tanto en iPhone/móvil como en ordenador, no solo en uno de los dos.</li>
             <li><b>Un solo tipo de selector para elegir de una lista</b> — siempre el mismo componente desplegable/lista de siempre, nunca un invento distinto (ventanas emergentes de texto, formatos ad-hoc) para resolver lo mismo dos veces. Detectado al pedirle consistencia en cómo se elige la maquinaria en el Mapa.</li>
+            <li><b>Tablas siempre ordenables por columna</b> — cualquier tabla de la web, la que ya existe y la que se haga a partir de ahora, tiene que poder ordenarse haciendo clic en la cabecera de cada columna.</li>
           </ul>
         </div></div>
       </div>
@@ -2561,6 +2630,37 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </div>
     </div>
 
+        <!-- ================= HISTÓRICO ================= -->
+        <div class="view" id="view-historico">
+          <div class="topbar">
+            <div><h1>Histórico</h1><div class="desc">Documentos antiguos extraídos automáticamente de Archivos — revisa y aprueba antes de que cuenten como reales</div></div>
+            <div class="quickactions">
+              <div class="filters" id="historico-filter" style="margin:0;">
+                <div class="chip-filter active" data-hf="pendiente_revisar">Pendientes de revisar</div>
+                <div class="chip-filter" data-hf="aprobado">Aprobados</div>
+                <div class="chip-filter" data-hf="">Todos</div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-strip" id="historico-kpis" style="margin-bottom:16px;"></div>
+          <div class="panel">
+            <div class="panel-body" style="padding:0;">
+              <table class="tbl">
+                <tr>
+                  <th class="ord" onclick="ordenarTabla('historico-tbl',0,'text')">Archivo ⇅</th>
+                  <th class="ord" onclick="ordenarTabla('historico-tbl',1,'text')">Tipo ⇅</th>
+                  <th class="ord" onclick="ordenarTabla('historico-tbl',2,'text')">Nº ⇅</th>
+                  <th class="ord" onclick="ordenarTabla('historico-tbl',3,'text')">Fecha ⇅</th>
+                  <th class="ord" onclick="ordenarTabla('historico-tbl',4,'text')">Cliente ⇅</th>
+                  <th class="num ord" onclick="ordenarTabla('historico-tbl',5,'num')">Importe ⇅</th>
+                  <th class="ord" onclick="ordenarTabla('historico-tbl',6,'text')">Estado ⇅</th>
+                </tr>
+                <tbody id="historico-tbl"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <!-- ================= REPORTES ================= -->
     <div class="view" id="view-reportes">
       <div class="topbar">
@@ -2575,10 +2675,17 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
             <div class="chip-filter" data-mf="revisado">Revisados</div>
             <div class="chip-filter" data-mf="">Todos</div>
           </div>
+          <input type="text" id="mejora-search" class="search-box" style="width:220px;" placeholder="Buscar..." oninput="renderMejora()">
         </div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
-            <tr><th>Reporte</th><th>Sección</th><th>Fecha</th><th>Estado</th><th></th></tr>
+            <tr>
+              <th>Reporte</th>
+              <th class="ord" onclick="ordenarTabla('mejora-list',1,'text')">Sección ⇅</th>
+              <th class="ord" onclick="ordenarTabla('mejora-list',2,'text')">Fecha ⇅</th>
+              <th class="ord" onclick="ordenarTabla('mejora-list',3,'text')">Estado ⇅</th>
+              <th></th>
+            </tr>
             <tbody id="mejora-list"></tbody>
           </table>
         </div>
@@ -2586,23 +2693,16 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     </div>
 
     <div class="view" id="view-config">
-      <div class="topbar"><div><h1>Configuración</h1><div class="desc">Tarifas, usuarios y ajustes generales</div></div></div>
+      <div class="topbar"><div><h1>Configuración</h1><div class="desc">Qué secciones puede ver cada usuario</div></div></div>
       <div class="panel">
-        <div class="panel-head"><h3>Tarifas</h3><span class="count">derivadas de 67 facturas reales 2023-2026</span></div>
+        <div class="panel-head"><h3>Permisos por usuario</h3><span class="count">Dani G ve siempre todo</span></div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
-            <tr><th>Concepto</th><th>Unidad</th><th class="num">Precio observado</th><th>Rango real</th></tr>
-            <tr><td>Excavación de tierra</td><td>m³</td><td class="num">30,06 €</td><td class="tag">estable</td></tr>
-            <tr><td>Explanación y nivelación (motoniveladora)</td><td>m²</td><td class="num">25,05 €</td><td class="tag">estable</td></tr>
-            <tr><td>Relleno y compactado</td><td>m³</td><td class="num">29,63 €</td><td class="tag">estable</td></tr>
-            <tr><td>Desbroce y limpieza mecánica</td><td>m²</td><td class="num">2,50 €</td><td class="tag" style="border-color:var(--orange);color:var(--orange);">varía 2,50 – 2.200 €</td></tr>
-            <tr><td>Aporte de zahorra</td><td>m³ / lote</td><td class="num">30,00 €</td><td class="tag" style="border-color:var(--orange);color:var(--orange);">varía 15 – 1.600 €</td></tr>
-            <tr><td>Cuba de agua (riego/suministro)</td><td>servicio</td><td class="num">60,00 €</td><td class="tag" style="border-color:var(--orange);color:var(--orange);">varía 1,16 – 90 €</td></tr>
-            <tr><td>Alquiler de máquina</td><td>hora</td><td class="num">40,00 €</td><td class="tag">1 sola muestra</td></tr>
-            <tr><td>Reparación de camino (obra completa)</td><td>obra</td><td class="num">4.888 €</td><td class="tag" style="border-color:var(--orange);color:var(--orange);">varía 1.950 – 4.888 €</td></tr>
+            <tr><th>Sección</th><th style="text-align:center;">Rafa</th><th style="text-align:center;">Manolo</th></tr>
+            <tbody id="permisos-tbl"></tbody>
           </table>
         </div>
-        <div class="two-col-note">Precios extraídos automáticamente de las 782 líneas de concepto de las facturas reales de 2023-2026. Las que tienen "varía" mezclan trabajos muy distintos bajo el mismo nombre (ej. "zahorra" a veces es por m³ y a veces una obra cerrada) — antes de usar estas tarifas para calcular presupuestos automáticos, conviene que las revises y separes bien por tipo de trabajo.</div>
+        <div class="two-col-note" style="margin-top:10px;">Sistema, Reportes, Histórico y Configuración son siempre solo para Dani G, no aparecen aquí porque no se pueden ceder.</div>
       </div>
     </div>
 
@@ -2930,25 +3030,37 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
   </div>
 </div>
 
-<!-- ================= MODAL: FICHA DE MÁQUINA ================= -->
-<div class="overlay" id="maquina-overlay" onclick="if(event.target===this) cerrarMaquinaModal()">
-  <div class="drawer" style="max-width:480px;">
+<!-- ================= MODAL: REVISAR DOCUMENTO HISTÓRICO ================= -->
+<div class="overlay" id="historico-overlay" onclick="if(event.target===this) cerrarHistoricoModal()">
+  <div class="drawer" style="max-width:520px;">
     <div class="drawer-head">
-      <div><h2 id="maquina-modal-nombre">—</h2><div class="sub-t" id="maquina-modal-tipo">—</div></div>
-      <button class="close-x" onclick="cerrarMaquinaModal()">✕</button>
+      <div><h2 id="hist-modal-archivo">—</h2></div>
+      <button class="close-x" onclick="cerrarHistoricoModal()">✕</button>
     </div>
     <div class="drawer-body">
-      <div class="field" style="margin-bottom:12px;"><div class="l">Matrícula</div>
-        <input class="search-box mono" style="width:100%;" id="maquina-matricula">
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div class="field" style="flex:1;"><div class="l">Tipo</div>
+          <select class="search-box" style="width:100%;" id="hist-tipo">
+            <option value="factura">Factura</option>
+            <option value="albaran">Albarán</option>
+            <option value="presupuesto">Presupuesto</option>
+          </select>
+        </div>
+        <div class="field" style="flex:1;"><div class="l">Nº documento</div><input class="search-box" style="width:100%;" id="hist-numero"></div>
       </div>
-      <div class="field" style="margin-bottom:12px;"><div class="l">Ficha técnica (año, potencia, peso, nº de serie, neumáticos... lo que quieras poder copiar rápido)</div>
-        <textarea class="search-box" style="width:100%;height:160px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;" id="maquina-ficha"></textarea>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div class="field" style="flex:1;"><div class="l">Fecha</div><input class="search-box" style="width:100%;" id="hist-fecha" placeholder="tal cual salió, revísala"></div>
+        <div class="field" style="flex:1;"><div class="l">Cliente</div><input class="search-box" style="width:100%;" id="hist-cliente"></div>
       </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Líneas detectadas</div>
+        <div id="hist-conceptos" style="border:1px solid var(--line-dark);border-radius:8px;padding:8px;font-size:12.5px;"></div>
+      </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Importe total</div><input class="search-box" style="width:100%;" id="hist-importe" type="number" step="0.01"></div>
       <div class="state-row" style="gap:8px;">
-        <button class="btn" style="flex:1;" onclick="copiarFichaMaquina()">📋 Copiar todo</button>
-        <button class="btn primary" style="flex:1;" onclick="guardarFichaMaquina()">Guardar</button>
+        <button class="btn" style="flex:1;" onclick="descartarHistorico()">Descartar</button>
+        <button class="btn primary" style="flex:1;" onclick="aprobarHistorico()">✓ Aprobar → pasa a Economía real</button>
       </div>
-      <div id="maquina-modal-status" class="sub-t" style="margin-top:8px;"></div>
+      <div id="hist-modal-status" class="sub-t" style="margin-top:8px;"></div>
     </div>
   </div>
 </div>
@@ -3056,6 +3168,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     </div>
     <div class="drawer-body">
       <button class="btn" style="width:100%;margin-bottom:10px;" onclick="elegirTipoDoc('presupuesto')">Presupuesto</button>
+      <button class="btn" style="width:100%;margin-bottom:10px;" onclick="elegirTipoDoc('proforma')">Proforma</button>
       <button class="btn" style="width:100%;margin-bottom:10px;" onclick="elegirTipoDoc('albaran')">Albarán</button>
       <button class="btn primary" style="width:100%;" onclick="elegirTipoDoc('factura')">Factura</button>
     </div>
@@ -3102,7 +3215,18 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <option value="albaran">Albarán</option>
       </select>
       <span class="ie-doc-explain" id="ni-explain"></span>
+      <button type="button" class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="document.getElementById('ie-dictado').classList.toggle('open')">📝 Rellenar desde texto o foto</button>
       <button class="close-x" onclick="closeNewInvoiceModal()">✕</button>
+    </div>
+
+    <div class="ie-dictado" id="ie-dictado">
+      <h4>Rellenar desde texto o imagen</h4>
+      <textarea id="ie-dictado-text" class="search-box" style="width:100%;min-height:60px;resize:vertical;" placeholder="Pega o escribe, por ejemplo:&#10;3 m³ de excavación a 30&#10;490 m² de desbroce a 2,50"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+        <button type="button" class="btn" onclick="parseDictado()">Generar líneas desde el texto</button>
+        <label class="btn" style="cursor:pointer;">📷 Adjuntar foto de nota/albarán<input type="file" accept="image/*" style="display:none;" onchange="onImageAttach(this)"></label>
+      </div>
+      <div class="two-col-note" id="ie-dictado-note">La lectura automática de fotos (OCR) todavía no está conectada — de momento solo guarda la imagen adjunta como referencia. Cuando conectemos IA con visión, esto rellenará las líneas solo.</div>
     </div>
 
     <form id="newinvoice-form" onsubmit="return submitNewInvoice(event)">
@@ -3152,16 +3276,6 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <button type="button" class="btn" onclick="addItemRow()">+ Añadir línea</button>
         <div class="two-col-note">La columna "Maquinaria" es para tu control interno — no sale impresa en la factura, pero ayuda a que el precio salga bien (una retro con martillo no cuesta igual que sola).</div>
 
-        <div class="ie-dictado">
-          <h4>Rellenar desde texto o imagen</h4>
-          <textarea id="ie-dictado-text" class="search-box" style="width:100%;min-height:60px;resize:vertical;" placeholder="Pega o escribe, por ejemplo:&#10;3 m³ de excavación a 30&#10;490 m² de desbroce a 2,50"></textarea>
-          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
-            <button type="button" class="btn" onclick="parseDictado()">Generar líneas desde el texto</button>
-            <label class="btn" style="cursor:pointer;">📷 Adjuntar foto de nota/albarán<input type="file" accept="image/*" style="display:none;" onchange="onImageAttach(this)"></label>
-          </div>
-          <div class="two-col-note" id="ie-dictado-note">La lectura automática de fotos (OCR) todavía no está conectada — de momento solo guarda la imagen adjunta como referencia. Cuando conectemos IA con visión, esto rellenará las líneas solo.</div>
-        </div>
-
         <div class="ie-footer" id="ie-payment-block">
           <div class="ie-payment" id="ie-payment-fields">
             <div class="field" style="margin-bottom:10px;"><div class="l">Forma de pago</div>
@@ -3195,6 +3309,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <button type="button" class="btn dark" id="ni-preview-btn" onclick="togglePreview()">Vista previa de impresión</button>
         <button type="button" class="btn dark" onclick="descargarPDF()">⬇ Descargar PDF</button>
         <button type="button" class="btn primary" id="ni-convert-btn" style="display:none;" onclick="convertirDocumento()">Convertir en albarán</button>
+        <button type="button" class="btn" id="ni-deshacer-btn" style="display:none;color:var(--red);" onclick="deshacerConversion()">↺ Deshacer — volver a albarán</button>
         <button type="submit" class="btn primary ie-submit" id="ni-submit">Crear factura</button>
       </div>
     </form>
@@ -3226,30 +3341,119 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 let editorModeOn = false;
 let dragSrcBlock = null;
 
+let UI_CONFIG_ID = null;
+let UI_CONFIG = {orden_menu: null, bloques_ocultos: []};
+
+async function cargarUIConfig(){
+  if(!sb) return;
+  const {data} = await sb.from('sistema').select('*').eq('tipo','ui_config').limit(1).maybeSingle();
+  if(data){
+    UI_CONFIG_ID = data.id;
+    UI_CONFIG = {orden_menu: data.data.orden_menu || null, bloques_ocultos: data.data.bloques_ocultos || []};
+  }
+  aplicarUIConfig();
+}
+function computeBlockId(el){
+  const view = el.closest('.view')?.id || 'view';
+  const etiqueta = el.querySelector('.lbl')?.textContent || el.querySelector('h3')?.textContent || 'sin-etiqueta';
+  return view + '-' + etiqueta.trim().toLowerCase().replace(/\s+/g,'-');
+}
+function aplicarUIConfig(){
+  // orden del menú lateral
+  if(UI_CONFIG.orden_menu && UI_CONFIG.orden_menu.length){
+    const nav = document.getElementById('nav');
+    UI_CONFIG.orden_menu.forEach(viewKey=>{
+      const btn = nav.querySelector(`[data-view="${viewKey}"]`);
+      if(btn) nav.appendChild(btn);
+    });
+  }
+  // bloques borrados de forma permanente — se calcula el id igual haya entrado o no en modo editor
+  if(UI_CONFIG.bloques_ocultos.length){
+    document.querySelectorAll('.view .panel, .view .kpi-strip .kpi, .view .weather-strip, .view #real-map').forEach(el=>{
+      if(UI_CONFIG.bloques_ocultos.includes(computeBlockId(el))) el.remove();
+    });
+  }
+}
+async function guardarUIConfig(){
+  if(!sb) return;
+  const payload = {orden_menu: UI_CONFIG.orden_menu, bloques_ocultos: UI_CONFIG.bloques_ocultos};
+  if(UI_CONFIG_ID){
+    const {error} = await sb.from('sistema').update({data: payload}).eq('id', UI_CONFIG_ID);
+    if(error) console.error('Error al guardar UI config (update):', error);
+  } else {
+    const {data, error} = await sb.from('sistema').insert({tipo:'ui_config', data: payload}).select().single();
+    if(error) console.error('Error al guardar UI config (insert):', error);
+    if(data) UI_CONFIG_ID = data.id;
+  }
+}
+
 function toggleEditorMode(){
   editorModeOn = !editorModeOn;
   document.body.classList.toggle('editor-mode-on', editorModeOn);
   const btn = document.getElementById('editor-mode-btn');
   btn.textContent = editorModeOn ? '✅ Salir del modo editor' : '✏️ Modo editor';
   btn.classList.toggle('active', editorModeOn);
-  if(editorModeOn) prepareEditableBlocks();
+  if(editorModeOn){ prepareEditableBlocks(); prepareEditableNav(); }
+  document.getElementById('nav').classList.toggle('nav-editable', editorModeOn);
+}
+
+let dragSrcNavBtn = null;
+function prepareEditableNav(){
+  document.querySelectorAll('#nav button[data-view], #nav .grp-label[data-view]').forEach(btn=>{
+    if(btn.dataset.navReady) return;
+    btn.dataset.navReady = '1';
+    btn.setAttribute('draggable','true');
+    btn.addEventListener('dragstart',(ev)=>{
+      if(!editorModeOn) return;
+      dragSrcNavBtn = btn;
+      btn.classList.add('dragging');
+    });
+    btn.addEventListener('dragend', async ()=>{
+      btn.classList.remove('dragging');
+      dragSrcNavBtn = null;
+      // guarda el nuevo orden completo, botones y separadores incluidos
+      UI_CONFIG.orden_menu = Array.from(document.querySelectorAll('#nav [data-view]')).map(b=>b.dataset.view);
+      await guardarUIConfig();
+    });
+    btn.addEventListener('dragover',(ev)=>{
+      if(!editorModeOn || !dragSrcNavBtn || dragSrcNavBtn===btn) return;
+      ev.preventDefault();
+    });
+    btn.addEventListener('drop',(ev)=>{
+      if(!editorModeOn || !dragSrcNavBtn || dragSrcNavBtn===btn) return;
+      ev.preventDefault();
+      const nav = document.getElementById('nav');
+      const rect = btn.getBoundingClientRect();
+      const before = (ev.clientY - rect.top) < rect.height/2;
+      nav.insertBefore(dragSrcNavBtn, before ? btn : btn.nextSibling);
+    });
+  });
 }
 
 function prepareEditableBlocks(){
-  // marca como "bloque editable" cada .panel y cada tarjeta suelta dentro de las vistas, una sola vez
-  document.querySelectorAll('.view .panel, .view .kpi-strip, .view .weather-strip, .view #real-map').forEach(el=>{
+  // marca como "bloque editable" cada .panel, cada tarjeta KPI suelta, y cada tarjeta suelta dentro de las vistas, una sola vez
+  document.querySelectorAll('.view .panel, .view .kpi-strip .kpi, .view .weather-strip, .view #real-map').forEach((el,i)=>{
     if(el.classList.contains('layout-block')) return; // ya preparado
     el.classList.add('layout-block');
     el.setAttribute('draggable','true');
+    if(!el.dataset.blockId){
+      el.dataset.blockId = computeBlockId(el);
+    }
 
     const toolbar = document.createElement('div');
     toolbar.className = 'layout-toolbar';
     toolbar.innerHTML = `<span class="drag-handle" title="Arrastrar para mover">⠿</span><span class="del-handle" title="Borrar este bloque">✕</span>`;
     el.prepend(toolbar);
 
-    toolbar.querySelector('.del-handle').addEventListener('click', (ev)=>{
+    toolbar.querySelector('.del-handle').addEventListener('click', async (ev)=>{
       ev.stopPropagation();
-      if(confirm('¿Quitar este bloque de la pantalla?')) el.remove();
+      const opcion = await elegirDeLista('¿Solo por ahora o del todo?', ['Solo por ahora', 'Del todo']);
+      if(!opcion) return;
+      el.remove(); // quitar de la pantalla siempre, pase lo que pase con el guardado
+      if(opcion.startsWith('Del todo')){
+        UI_CONFIG.bloques_ocultos.push(el.dataset.blockId);
+        try{ await guardarUIConfig(); }catch(e){ console.error('No se pudo guardar el borrado permanente', e); }
+      }
     });
 
     el.addEventListener('dragstart', (ev)=>{
@@ -3345,6 +3549,219 @@ setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimient
 setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',cobros:'econ-cobros',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad',cierre:'econ-cierre'});
 setupSubtabs('entradas-subtabs','entradas',{bandeja:'sub-bandeja',whatsapp:'sub-whatsapp'});
 setupSubtabs('sistema-subtabs','sis',{principios:'sis-principios',organizacion:'sis-organizacion',protocolos:'sis-protocolos',criterios:'sis-criterios',estandares:'sis-estandares',historial:'sis-historial',oninicio:'sis-oninicio'});
+/* ---------------- TABLAS ORDENABLES Y FILTRABLES POR AÑO/TRIMESTRE — reutilizable en cualquier tabla ---------------- */
+function poblarFiltroAnios(tbodyId, selectId){
+  const tbody = document.getElementById(tbodyId);
+  const select = document.getElementById(selectId);
+  if(!tbody || !select) return;
+  const anioActivo = select.value;
+  const anios = [...new Set(Array.from(tbody.querySelectorAll('tr')).map(tr=>tr.dataset.anio).filter(Boolean))].sort().reverse();
+  select.innerHTML = '<option value="">Todos los años</option>' + anios.map(a=>`<option value="${a}">${a}</option>`).join('');
+  select.value = anioActivo;
+}
+function filtrarTablaOrdenable(tbodyId){
+  const tbody = document.getElementById(tbodyId);
+  if(!tbody) return;
+  const prefijo = tbodyId.startsWith('fact') || tbodyId==='econ-facturas-tbody' ? 'fact' : tbodyId;
+  const anioSel = document.getElementById('fact-filtro-anio')?.value || '';
+  const trimSel = document.getElementById('fact-filtro-trim')?.value || '';
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    const okAnio = !anioSel || tr.dataset.anio === anioSel;
+    const okTrim = !trimSel || tr.dataset.trimestre === trimSel;
+    tr.style.display = (okAnio && okTrim) ? '' : 'none';
+  });
+}
+function ordenarTabla(tbodyId, colIndex, tipo){
+  const tbody = document.getElementById(tbodyId);
+  if(!tbody) return;
+  const filas = Array.from(tbody.querySelectorAll('tr'));
+  const dir = tbody.dataset.ordCol == colIndex && tbody.dataset.ordDir === 'asc' ? 'desc' : 'asc';
+  tbody.dataset.ordCol = colIndex;
+  tbody.dataset.ordDir = dir;
+  filas.sort((a,b)=>{
+    let va, vb;
+    if(tipo==='num'){
+      va = Number(a.dataset.total || a.children[colIndex]?.textContent.replace(/[^\d,.-]/g,'').replace(',','.')) || 0;
+      vb = Number(b.dataset.total || b.children[colIndex]?.textContent.replace(/[^\d,.-]/g,'').replace(',','.')) || 0;
+    } else if(colIndex===3 && a.dataset.fechaIso){ // columna Fecha: usar la fecha ISO real, no el texto "7 jun"
+      va = a.dataset.fechaIso; vb = b.dataset.fechaIso;
+    } else {
+      va = a.children[colIndex]?.textContent.trim().toLowerCase() || '';
+      vb = b.children[colIndex]?.textContent.trim().toLowerCase() || '';
+    }
+    if(va < vb) return dir==='asc' ? -1 : 1;
+    if(va > vb) return dir==='asc' ? 1 : -1;
+    return 0;
+  });
+  filas.forEach(f=>tbody.appendChild(f));
+}
+
+/* ---------------- HISTÓRICO — revisión de documentos antiguos extraídos automáticamente ---------------- */
+let HISTORICO_CACHE = [];
+let historicoFiltro = 'pendiente_revisar';
+let historicoEditandoId = null;
+
+async function cargarHistorico(){
+  if(!sb) return;
+  const {data, error} = await sb.from('historico_revision').select('*').order('fecha', {ascending:true});
+  if(error || !data) return;
+  HISTORICO_CACHE = data;
+  renderHistorico();
+}
+document.getElementById('historico-filter')?.addEventListener('click', (ev)=>{
+  const chip = ev.target.closest('.chip-filter');
+  if(!chip) return;
+  document.querySelectorAll('#historico-filter .chip-filter').forEach(e=>e.classList.remove('active'));
+  chip.classList.add('active');
+  historicoFiltro = chip.dataset.hf;
+  renderHistorico();
+});
+function renderHistorico(){
+  const tbody = document.getElementById('historico-tbl');
+  if(!tbody) return;
+  const lista = HISTORICO_CACHE.filter(h => !historicoFiltro || h.estado === historicoFiltro);
+  tbody.innerHTML = lista.length ? lista.map(h=>{
+    const nombreArchivo = h.archivo_path.split('/').pop();
+    const estadoPill = h.estado==='aprobado' ? '<span class="pill terminado">Aprobado</span>'
+      : h.estado==='descartado' ? '<span class="pill">Descartado</span>'
+      : h.estado==='pendiente_revisar' ? '<span class="pill mantenimiento">Pendiente de revisar</span>'
+      : h.error ? '<span class="pill urgente">Error de lectura</span>'
+      : '<span class="pill pendiente">Sin validar todavía</span>';
+    return `<tr onclick="abrirHistoricoModal('${h.id}')" style="cursor:pointer;">
+      <td style="font-size:11.5px;">${nombreArchivo}</td>
+      <td>${h.tipo_detectado || '—'}</td>
+      <td class="mono">${h.numero || '—'}</td>
+      <td>${h.fecha || '—'}</td>
+      <td>${h.cliente_nombre || '—'}</td>
+      <td class="num">${h.importe ? Number(h.importe).toLocaleString('es-ES',{minimumFractionDigits:2})+' €' : '—'}</td>
+      <td>${estadoPill}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">Nada en este filtro</td></tr>';
+  const kpis = document.getElementById('historico-kpis');
+  if(kpis){
+    const total = HISTORICO_CACHE.length;
+    const pendientes = HISTORICO_CACHE.filter(h=>h.estado==='pendiente_revisar').length;
+    const aprobados = HISTORICO_CACHE.filter(h=>h.estado==='aprobado').length;
+    const conError = HISTORICO_CACHE.filter(h=>h.error).length;
+    kpis.innerHTML = `
+      <div class="kpi"><div class="lbl">Total extraídos</div><div class="val">${total}</div></div>
+      <div class="kpi"><div class="lbl">Aprobados solos (cuadraba todo)</div><div class="val green">${aprobados}</div></div>
+      <div class="kpi"><div class="lbl">Pendientes de que los mires tú</div><div class="val orange">${pendientes}</div></div>
+      <div class="kpi"><div class="lbl">Con error de lectura</div><div class="val red">${conError}</div></div>`;
+  }
+}
+function abrirHistoricoModal(id){
+  const h = HISTORICO_CACHE.find(x=>x.id===id);
+  if(!h) return;
+  historicoEditandoId = id;
+  document.getElementById('hist-modal-archivo').textContent = h.archivo_path.split('/').pop();
+  document.getElementById('hist-tipo').value = h.tipo_detectado || 'factura';
+  document.getElementById('hist-numero').value = h.numero || '';
+  document.getElementById('hist-fecha').value = h.fecha || '';
+  document.getElementById('hist-cliente').value = h.cliente_nombre || '';
+  document.getElementById('hist-importe').value = h.importe || '';
+  const conceptos = h.conceptos || [];
+  document.getElementById('hist-conceptos').innerHTML = h.error
+    ? `<span style="color:var(--red);">Error al leer este archivo: ${h.error}</span>`
+    : (conceptos.length ? conceptos.map(c=>`<div class="task-row"><span style="flex:1;">${c.descripcion} (${c.cantidad} × ${Number(c.precio_unitario||0).toLocaleString('es-ES',{minimumFractionDigits:2})}€)</span><b>${Number(c.importe||0).toLocaleString('es-ES',{minimumFractionDigits:2})} €</b></div>`).join('') : '<span class="sub-t">Sin líneas detectadas</span>');
+  document.getElementById('hist-modal-status').textContent = '';
+  document.getElementById('historico-overlay').classList.add('active');
+}
+function cerrarHistoricoModal(){ document.getElementById('historico-overlay').classList.remove('active'); historicoEditandoId = null; }
+
+function fechaHistoricoAIso(txt){
+  // intenta varios formatos que aparecen en las plantillas viejas (m/d/aa, d/m/aaaa, dd/mm//aaaa...)
+  if(!txt) return null;
+  const limpio = txt.trim().replace(/\/\//g,'/');
+  const m = limpio.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(!m) return null;
+  let [, a, b, y] = m;
+  if(y.length===2) y = (Number(y) < 50 ? '20' : '19') + y;
+  // en las plantillas viejas suele ser MM/DD/AA (formato Excel US) — lo tratamos así
+  const mes = String(a).padStart(2,'0'), dia = String(b).padStart(2,'0');
+  return `${y}-${mes}-${dia}`;
+}
+
+async function aprobarHistorico(){
+  const statusEl = document.getElementById('hist-modal-status');
+  const h = HISTORICO_CACHE.find(x=>x.id===historicoEditandoId);
+  if(!h || !sb) return;
+  const tipo = document.getElementById('hist-tipo').value;
+  const numero = document.getElementById('hist-numero').value.trim();
+  const fechaTxt = document.getElementById('hist-fecha').value.trim();
+  const clienteNombre = document.getElementById('hist-cliente').value.trim();
+  const importe = Number(document.getElementById('hist-importe').value) || 0;
+  const fechaIso = fechaHistoricoAIso(fechaTxt);
+
+  let entidad = clientes.find(c=>c.name.toLowerCase()===clienteNombre.toLowerCase());
+  if(!entidad && clienteNombre){
+    const {data, error} = await sb.from('entidades').insert({nombre: clienteNombre, tipo:'cliente'}).select().single();
+    if(!error && data){ entidad = {id:data.id, name:clienteNombre}; clientes.push({id:data.id, name:clienteNombre, type:'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'}); }
+  }
+
+  const payload = {
+    tipo, estado:'emitido', numero: numero || null,
+    fecha_devengo: fechaIso,
+    entidad_id: entidad ? entidad.id : null,
+    importe, concepto: (h.conceptos||[]).map(c=>c.descripcion).filter(Boolean).join('; ').slice(0,500),
+    conceptos: h.conceptos || null,
+  };
+  const {error: insError} = await sb.from('documentos_economicos').insert(payload);
+  if(insError){ statusEl.textContent = 'Error al guardar en Economía: '+errText(insError); statusEl.style.color = 'var(--red)'; return; }
+
+  const {error: updError} = await sb.from('historico_revision').update({estado:'aprobado'}).eq('id', h.id);
+  if(updError){ statusEl.textContent = 'Se guardó en Economía pero no se pudo marcar aquí: '+errText(updError); statusEl.style.color = 'var(--orange)'; }
+  h.estado = 'aprobado';
+  renderHistorico();
+  cerrarHistoricoModal();
+}
+async function descartarHistorico(){
+  const h = HISTORICO_CACHE.find(x=>x.id===historicoEditandoId);
+  if(!h || !sb) return;
+  const {error} = await sb.from('historico_revision').update({estado:'descartado'}).eq('id', h.id);
+  if(error){ alert('Error: '+errText(error)); return; }
+  h.estado = 'descartado';
+  renderHistorico();
+  cerrarHistoricoModal();
+}
+function calcularKPIsReales(){
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const hoyIso = hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');
+  const mesActual = hoy.getMonth(), anioActual = hoy.getFullYear();
+
+  // --- Trabajos ---
+  const trabajosHoy = jobs.filter(j=>j.scheduledDate===hoyIso).length;
+  const urgentes = jobs.filter(j=>j.urgent && !['terminado','facturado','cobrado'].includes(j.state)).length;
+  const sinPlanificar = jobs.filter(j=>!j.scheduledDate && !['terminado','facturado','cobrado'].includes(j.state)).length;
+
+  // --- Documentos económicos reales ---
+  const docs = Object.values(documentosRealesById);
+  const esDelMes = d => { if(!d.dateRaw) return false; const dt = new Date(d.dateRaw); return dt.getFullYear()===anioActual && dt.getMonth()===mesActual; };
+
+  const facturasEmitidasMes = docs.filter(d=>d.type==='factura' && d.status!=='Borrador' && esDelMes(d));
+  const facturadoMes = facturasEmitidasMes.reduce((s,d)=>s+(d.total||0),0);
+
+  const gastosMes = docs.filter(d=>d.type==='gasto' && esDelMes(d)).reduce((s,d)=>s+(d.total||0),0);
+  const margenMes = facturadoMes - gastosMes;
+
+  const pendienteCobro = docs.filter(d=>d.type==='factura' && d.status==='Pendiente').reduce((s,d)=>s+(d.total||0),0);
+
+  const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+
+  setTxt('kpi-trabajos-hoy', trabajosHoy);
+  setTxt('kpi-urgentes', urgentes);
+  setTxt('kpi-sin-planificar', sinPlanificar);
+  setTxt('kpi-pendiente-cobro', euro(pendienteCobro));
+  setTxt('kpi-facturado-mes', euro(facturadoMes));
+  setTxt('kpi-margen-mes', euro(margenMes));
+
+  setTxt('dash-facturado', euro(facturadoMes));
+  setTxt('dash-cobrado', '— (sin seguimiento aún)');
+  setTxt('dash-gastos', euro(gastosMes));
+  setTxt('dash-margen', euro(margenMes));
+}
+
 function copiarPromptInicio(){
   const texto = document.getElementById('prompt-inicio-texto').textContent;
   navigator.clipboard.writeText(texto).then(()=>{
@@ -3637,12 +4054,66 @@ async function checkSession(){
       }
       const NOMBRES_USUARIO = {'dg':'Dani G','rg':'Rafa','mg':'Manolo'};
       const userLocal = (data.session.user.email||'').split('@')[0];
-      const nombreEl = document.getElementById('sidebar-username');
+      const nombreEl = document.getElementById('user-badge-name');
       if(nombreEl) nombreEl.textContent = NOMBRES_USUARIO[userLocal] || data.session.user.email || 'Sesión iniciada';
+
+      if(!esAdmin && (userLocal==='rg' || userLocal==='mg')){
+        const {data: cfgRow} = await sb.from('sistema').select('*').eq('tipo','ui_config').limit(1).maybeSingle();
+        const permisos = cfgRow?.data?.permisos || {};
+        const permitidas = permisos[userLocal] || SECCIONES_CEDIBLES.map(s=>s.key); // por defecto, todo permitido salvo admin-only
+        SECCIONES_CEDIBLES.forEach(s=>{
+          if(!permitidas.includes(s.key)){
+            document.querySelectorAll(`[data-view="${s.key}"]`).forEach(el=>el.style.display='none');
+          }
+        });
+      }
     }
   }catch(e){ console.error(e); }
 }
 checkSession();
+
+const SECCIONES_CEDIBLES = [
+  {key:'control', label:'Centro de control'},
+  {key:'planificacion', label:'Planificación'},
+  {key:'mapa', label:'Mapa'},
+  {key:'trabajos', label:'Trabajos'},
+  {key:'entradas', label:'Entradas'},
+  {key:'archivos', label:'Archivos'},
+  {key:'flota', label:'Flota'},
+  {key:'clientes', label:'Clientes'},
+  {key:'ayuntamiento', label:'Ayuntamiento'},
+  {key:'facturas', label:'Facturas'},
+  {key:'presupuestos', label:'Presupuestos'},
+  {key:'tarifas', label:'Tarifas'},
+  {key:'economia', label:'Economía'},
+  {key:'correo', label:'Correo'},
+];
+async function cargarPermisos(){
+  if(!sb) return;
+  const {data} = await sb.from('sistema').select('*').eq('tipo','ui_config').limit(1).maybeSingle();
+  const permisos = data?.data?.permisos || {};
+  const rg = permisos.rg || SECCIONES_CEDIBLES.map(s=>s.key);
+  const mg = permisos.mg || SECCIONES_CEDIBLES.map(s=>s.key);
+  document.getElementById('permisos-tbl').innerHTML = SECCIONES_CEDIBLES.map(s=>`
+    <tr><td>${s.label}</td>
+      <td style="text-align:center;"><input type="checkbox" data-key="${s.key}" data-user="rg" ${rg.includes(s.key)?'checked':''} onchange="guardarPermisos()"></td>
+      <td style="text-align:center;"><input type="checkbox" data-key="${s.key}" data-user="mg" ${mg.includes(s.key)?'checked':''} onchange="guardarPermisos()"></td>
+    </tr>`).join('');
+}
+async function guardarPermisos(){
+  if(!sb) return;
+  const rg = Array.from(document.querySelectorAll('#permisos-tbl input[data-user="rg"]:checked')).map(c=>c.dataset.key);
+  const mg = Array.from(document.querySelectorAll('#permisos-tbl input[data-user="mg"]:checked')).map(c=>c.dataset.key);
+  const {data: cfgRow} = await sb.from('sistema').select('*').eq('tipo','ui_config').limit(1).maybeSingle();
+  const nuevaData = {...(cfgRow?.data||{}), permisos: {rg, mg}};
+  if(cfgRow){
+    await sb.from('sistema').update({data: nuevaData}).eq('id', cfgRow.id);
+  } else {
+    await sb.from('sistema').insert({tipo:'ui_config', data: nuevaData});
+  }
+}
+cargarPermisos();
+cargarUIConfig();
 
 async function doLogin(){
   let user = document.getElementById('login-email').value.trim().toLowerCase();
@@ -3751,7 +4222,12 @@ function parsearReporte(m){
   return match ? {seccion: match[1], cuerpo: match[2]} : {seccion: '—', cuerpo: m.texto||''};
 }
 function renderMejora(){
-  const list = SISTEMA_CACHE.mejora.filter(m => !mejoraFiltro || (m.estado||'pendiente')===mejoraFiltro);
+  const busqueda = (document.getElementById('mejora-search')?.value || '').trim().toLowerCase();
+  const list = SISTEMA_CACHE.mejora.filter(m => {
+    if(mejoraFiltro && (m.estado||'pendiente')!==mejoraFiltro) return false;
+    if(busqueda && !(m.texto||'').toLowerCase().includes(busqueda)) return false;
+    return true;
+  });
   document.getElementById('mejora-list').innerHTML = list.length ? list.map(m=>{
     const {seccion, cuerpo} = parsearReporte(m);
     const estado = m.estado || 'pendiente';
@@ -4637,6 +5113,7 @@ function explorerMatchesTypeFilter(name, isFolder, tipo){
 }
 
 function renderExplorerGrid(){
+  document.getElementById('explorer-mover-sel-btn').style.display = 'none';
   const grid = document.getElementById('explorer-grid');
   const busqueda = (document.getElementById('explorer-search').value || '').trim().toLowerCase();
   const tipo = document.getElementById('explorer-type-filter').value;
@@ -4669,6 +5146,9 @@ function renderExplorerGrid(){
     return `<div class="explorer-item" draggable="true"
       ondragstart="explorerDragStart(event,'${fullPath}',false)"
       onclick="window.open('${publicUrl}','_blank')">
+      <span class="exp-sel-wrap" onclick="event.stopPropagation();">
+        <input type="checkbox" class="explorer-sel-chk" data-path="${fullPath}" onchange="actualizarSeleccionExplorer()">
+      </span>
       <div class="exp-actions">
         <button title="Renombrar" onclick="event.stopPropagation();explorerRename('${fullPath}','${item.name}')">✎</button>
         <button title="Mover" onclick="event.stopPropagation();explorerMove('${fullPath}','${item.name}')">↦</button>
@@ -4902,6 +5382,28 @@ async function explorerRename(fullPath, oldName){
   loadExplorer(explorerPath);
 }
 
+function actualizarSeleccionExplorer(){
+  const marcados = document.querySelectorAll('.explorer-sel-chk:checked');
+  const btn = document.getElementById('explorer-mover-sel-btn');
+  document.getElementById('explorer-sel-count').textContent = marcados.length;
+  btn.style.display = marcados.length ? '' : 'none';
+}
+async function moverSeleccionExplorer(){
+  const marcados = Array.from(document.querySelectorAll('.explorer-sel-chk:checked'));
+  if(!marcados.length) return;
+  const r = await pedirCampos('Mover '+marcados.length+' archivo(s) a qué carpeta', [{id:'dest', label:'Ruta destino', valor:explorerPath, placeholder:'ej. gastos/2026/2026-09', requerido:true}]);
+  if(!r) return;
+  let ok = 0, fallos = 0;
+  for(const chk of marcados){
+    const fullPath = chk.dataset.path;
+    const nombre = fullPath.split('/').pop();
+    const newPath = (r.dest ? r.dest+'/' : '') + nombre;
+    const {error} = await sb.storage.from(DOC_BUCKET).move(fullPath, newPath);
+    if(error) fallos++; else ok++;
+  }
+  alert(`Movidos ${ok}${fallos ? `, ${fallos} con error` : ''}.`);
+  loadExplorer(explorerPath);
+}
 async function explorerMove(fullPath, name){
   const r = await pedirCampos('Mover a qué carpeta', [{id:'dest', label:'Ruta destino', valor:explorerPath, placeholder:'ej. gastos/2026/2026-09'}]);
   if(!r) return;
@@ -4926,46 +5428,86 @@ document.getElementById('fleet-grid').innerHTML = fleet.map(m=>`
     <div class="metrics"><div>Uso<b>${m.hours}</b></div><div>Ubicación<b style="font-size:12px;">${m.loc}</b></div></div>
     <div class="foot">${m.next}</div>
   </div>`).join('');
+let maquinaExpandidaId = null;
 function renderFleetGrid(){
-  document.getElementById('fleet-grid').innerHTML = fleet.map(m=>`
-    <div class="machine-card" onclick="abrirMaquinaModal('${m.id||''}')" style="cursor:pointer;">
+  document.getElementById('fleet-grid').innerHTML = fleet.map(m=>{
+    const expandida = m.id && m.id === maquinaExpandidaId;
+    return `<div class="machine-card ${expandida?'expanded':''}" onclick="toggleMaquinaExpandida('${m.id||''}')" style="cursor:pointer;">
       <div class="top"><div><div class="mname">${m.name}</div><div class="mtype">${m.type}</div></div>${pill(m.state)}</div>
       <div class="metrics"><div>Uso<b>${m.hours}</b></div><div>Ubicación<b style="font-size:12px;">${m.loc}</b></div></div>
       <div class="foot">${m.next}</div>
-    </div>`).join('');
+      ${expandida ? `
+      <div class="machine-card-expand" onclick="event.stopPropagation();">
+        <div class="field" style="margin-bottom:10px;"><div class="l">Matrícula</div>
+          <input class="search-box mono" style="width:100%;" id="mq-matricula-${m.id}" value="${m.matricula||''}">
+        </div>
+        <div class="field" style="margin-bottom:10px;"><div class="l">Ficha técnica</div>
+          <textarea class="search-box" style="width:100%;height:120px;font-family:'IBM Plex Mono',monospace;font-size:12px;" id="mq-ficha-${m.id}">${m.fichaTecnica||''}</textarea>
+        </div>
+        <div class="field" style="margin-bottom:10px;"><div class="l">Documentos (ficha técnica, permiso de circulación, seguro...)</div>
+          <div id="mq-docs-${m.id}">${(m.documentos||[]).map(d=>`<div class="task-row"><a href="${d.url}" target="_blank" style="flex:1;">${d.nombre}</a><span style="cursor:pointer;color:var(--red);font-weight:800;" onclick="borrarDocMaquina('${m.id}','${d.path}')">✕</span></div>`).join('') || '<span class="sub-t">Sin documentos todavía</span>'}</div>
+          <label class="btn" style="cursor:pointer;margin-top:6px;display:inline-block;">📎 Adjuntar documento<input type="file" accept="image/*,application/pdf" style="display:none;" onchange="subirDocMaquina('${m.id}',this)"></label>
+        </div>
+        <div class="state-row" style="gap:8px;">
+          <button class="btn" style="flex:1;" onclick="copiarFichaMaquinaInline('${m.id}')">📋 Copiar todo</button>
+          <button class="btn primary" style="flex:1;" onclick="guardarFichaMaquinaInline('${m.id}')">Guardar</button>
+        </div>
+        <div class="sub-t" id="mq-status-${m.id}" style="margin-top:6px;"></div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
 }
-function abrirMaquinaModal(id){
+async function subirDocMaquina(id, input){
+  const file = input.files[0];
+  if(!file || !sb) return;
   const m = fleet.find(f=>f.id===id);
-  if(!m){ alert('Esta máquina todavía no tiene id real — espera a que cargue o recarga la página.'); return; }
-  document.getElementById('maquina-modal-nombre').textContent = m.name;
-  document.getElementById('maquina-modal-tipo').textContent = m.type || '—';
-  document.getElementById('maquina-matricula').value = m.matricula || '';
-  document.getElementById('maquina-ficha').value = m.fichaTecnica || '';
-  document.getElementById('maquina-modal-status').textContent = '';
-  document.getElementById('maquina-overlay').dataset.id = id;
-  document.getElementById('maquina-overlay').classList.add('active');
+  if(!m) return;
+  const statusEl = document.getElementById('mq-status-'+id);
+  statusEl.textContent = 'Subiendo...'; statusEl.style.color = 'var(--ink-soft)';
+  const path = `flota-docs/${id}/${Date.now()}-${sanitizeFileName(file.name)}`;
+  const {error} = await sb.storage.from(DOC_BUCKET).upload(path, file);
+  if(error){ statusEl.textContent = 'Error al subir: '+error.message; statusEl.style.color = 'var(--red)'; return; }
+  const url = sb.storage.from(DOC_BUCKET).getPublicUrl(path).data.publicUrl;
+  m.documentos = m.documentos || [];
+  m.documentos.push({nombre: file.name, path, url});
+  const {error: dbErr} = await sb.from('flota').update({documentos: m.documentos}).eq('id', id);
+  if(dbErr){ statusEl.textContent = 'Se subió, pero no se pudo guardar el enlace: '+dbErr.message; statusEl.style.color = 'var(--orange)'; }
+  else { statusEl.textContent = 'Adjuntado ✓'; statusEl.style.color = 'var(--green)'; }
+  renderFleetGrid();
 }
-function cerrarMaquinaModal(){ document.getElementById('maquina-overlay').classList.remove('active'); }
-async function guardarFichaMaquina(){
-  const id = document.getElementById('maquina-overlay').dataset.id;
+async function borrarDocMaquina(id, path){
   const m = fleet.find(f=>f.id===id);
-  const statusEl = document.getElementById('maquina-modal-status');
+  if(!m || !sb) return;
+  if(!confirm('¿Borrar este documento?')) return;
+  await sb.storage.from(DOC_BUCKET).remove([path]);
+  m.documentos = (m.documentos||[]).filter(d=>d.path!==path);
+  await sb.from('flota').update({documentos: m.documentos}).eq('id', id);
+  renderFleetGrid();
+}
+function toggleMaquinaExpandida(id){
+  if(!id){ alert('Esta máquina todavía no tiene id real — espera a que cargue o recarga la página.'); return; }
+  maquinaExpandidaId = maquinaExpandidaId === id ? null : id;
+  renderFleetGrid();
+}
+async function guardarFichaMaquinaInline(id){
+  const m = fleet.find(f=>f.id===id);
+  const statusEl = document.getElementById('mq-status-'+id);
   if(!m || !sb){ statusEl.textContent = 'Supabase no está conectado.'; statusEl.style.color = 'var(--red)'; return; }
-  const matricula = document.getElementById('maquina-matricula').value.trim();
-  const ficha = document.getElementById('maquina-ficha').value.trim();
+  const matricula = document.getElementById('mq-matricula-'+id).value.trim();
+  const ficha = document.getElementById('mq-ficha-'+id).value.trim();
   const {error} = await sb.from('flota').update({matricula, ficha_tecnica: ficha}).eq('id', id);
   if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
   m.matricula = matricula; m.fichaTecnica = ficha;
   statusEl.textContent = 'Guardado ✓'; statusEl.style.color = 'var(--green)';
 }
-function copiarFichaMaquina(){
-  const nombre = document.getElementById('maquina-modal-nombre').textContent;
-  const tipo = document.getElementById('maquina-modal-tipo').textContent;
-  const matricula = document.getElementById('maquina-matricula').value.trim();
-  const ficha = document.getElementById('maquina-ficha').value.trim();
-  const texto = `${nombre} — ${tipo}${matricula ? '\nMatrícula: '+matricula : ''}${ficha ? '\n'+ficha : ''}`;
+function copiarFichaMaquinaInline(id){
+  const m = fleet.find(f=>f.id===id);
+  if(!m) return;
+  const matricula = document.getElementById('mq-matricula-'+id).value.trim();
+  const ficha = document.getElementById('mq-ficha-'+id).value.trim();
+  const texto = `${m.name} — ${m.type}${matricula ? '\nMatrícula: '+matricula : ''}${ficha ? '\n'+ficha : ''}`;
   navigator.clipboard.writeText(texto).then(()=>{
-    const statusEl = document.getElementById('maquina-modal-status');
+    const statusEl = document.getElementById('mq-status-'+id);
     statusEl.textContent = 'Copiado ✓'; statusEl.style.color = 'var(--green)';
   }).catch(()=>{ alert('No se pudo copiar — selecciona el texto a mano.'); });
 }
@@ -5009,12 +5551,13 @@ async function cargarDatosReales(){
     if(flotaReal && flotaReal.length){
       flotaReal.forEach(m=>{
         if(fleet.some(f=>f.name===m.nombre)) return;
-        fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', state: m.estado==='activo' ? 'disponible' : m.estado, hours:'—', loc:'Nave Calle Industria', next:'Sin asignar', matricula: m.matricula||'', fichaTecnica: m.ficha_tecnica||''});
+        fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', state: m.estado==='activo' ? 'disponible' : m.estado, hours:'—', loc:'Nave Calle Industria', next:'Sin asignar', matricula: m.matricula||'', fichaTecnica: m.ficha_tecnica||'', documentos: m.documentos||[]});
       });
       renderFleetGrid();
     }
     renderFiltrosCalendario();
     renderCalendar();
+    calcularKPIsReales();
   }catch(err){ console.error('No se pudieron cargar los datos reales de Supabase', err); }
 }
 cargarDatosReales();
@@ -5638,9 +6181,32 @@ async function registrarRetraso(code){
 
 /* Clientes — se cargan de verdad desde Supabase (tabla entidades) */
 const clientes = [];
+function toggleSeleccionarTodoClientes(master){
+  document.querySelectorAll('.clientes-sel-chk').forEach(chk=>chk.checked = master.checked);
+  actualizarSeleccionClientes();
+}
+function actualizarSeleccionClientes(){
+  const marcados = document.querySelectorAll('.clientes-sel-chk:checked');
+  const btn = document.getElementById('clientes-borrar-sel-btn');
+  document.getElementById('clientes-sel-count').textContent = marcados.length;
+  btn.style.display = marcados.length ? '' : 'none';
+}
+async function borrarClientesSeleccionados(){
+  const marcados = Array.from(document.querySelectorAll('.clientes-sel-chk:checked'));
+  if(!marcados.length) return;
+  if(!confirm(`¿Borrar ${marcados.length} cliente(s)? No se puede deshacer.`)) return;
+  if(!sb){ alert('Supabase no está conectado.'); return; }
+  const ids = marcados.map(c=>c.dataset.id).filter(Boolean);
+  const {error} = await sb.from('entidades').delete().in('id', ids);
+  if(error){ alert('Error al borrar: '+errText(error)); return; }
+  ids.forEach(id=>{ const i = clientes.findIndex(c=>c.id===id); if(i>=0) clientes.splice(i,1); });
+  renderClientesTable();
+  actualizarSeleccionClientes();
+}
+
 function renderClientesTable(){
   document.getElementById('clientes-tbl').innerHTML = clientes.map(c=>`
-    <tr onclick="openClientDrawer('${c.name}')"><td><b>${c.name}</b></td><td><span class="zone-badge">${c.type}</span></td><td>${c.zone}</td><td>${c.tarifa}</td>
+    <tr onclick="openClientDrawer('${c.name}')"><td onclick="event.stopPropagation();"><input type="checkbox" class="clientes-sel-chk" data-id="${c.id||''}" onchange="actualizarSeleccionClientes()"></td><td><b>${c.name}</b></td><td><span class="zone-badge">${c.type}</span></td><td>${c.zone}</td><td>${c.tarifa}</td>
     <td class="num">${c.fact}</td><td class="num">${c.pend}</td>
     <td><span class="tag">${c.prio}</span></td></tr>`).join('');
 }
@@ -5779,10 +6345,7 @@ function submitNewClient(){
       nuevoCliente.id = data.id;
     });
   }
-  document.getElementById('clientes-tbl').innerHTML = clientes.map(c=>`
-    <tr onclick="openClientDrawer('${c.name}')"><td><b>${c.name}</b></td><td><span class="zone-badge">${c.type}</span></td><td>${c.zone}</td><td>${c.tarifa}</td>
-    <td class="num">${c.fact}</td><td class="num">${c.pend}</td>
-    <td><span class="tag">${c.prio}</span></td></tr>`).join('');
+  renderClientesTable();
   fillClientSelects();
   if(clientTargetSelect){
     document.getElementById(clientTargetSelect).value = name;
@@ -5958,24 +6521,29 @@ function submitNewJob(ev){
 }
 
 /* ---------------- EDITOR DE FACTURA / PROFORMA / PRESUPUESTO / ALBARÁN ---------------- */
-let invSeq = 46, proSeq = 6, presSeq = 19, albSeq = 3;
 let itemSeq = 0;
+
+function proximoNumero(tipoDoc){
+  // cuenta de verdad los documentos de este tipo que ya existen, y devuelve el siguiente número con ceros a la izquierda
+  const existentes = Object.values(documentosRealesById).filter(d=>d.type===tipoDoc).length;
+  return String(existentes + 1).padStart(3,'0');
+}
 
 const DOC_TYPES = {
   factura: {
-    title:'FACTURA', button:'Crear factura', prefix:'F-2026-0', seqRef:()=>invSeq, hasIva:true,
+    title:'FACTURA', button:'Crear factura', prefix:'F', seqRef:()=>proximoNumero('factura'), hasIva:true,
     explain:'Documento fiscal definitivo. Genera obligación de cobro y de declarar IVA.',
   },
   proforma: {
-    title:'PROFORMA', button:'Crear proforma', prefix:'PF-2026-0', seqRef:()=>proSeq, hasIva:true,
+    title:'PROFORMA', button:'Crear proforma', prefix:'PF', seqRef:()=>proximoNumero('proforma'), hasIva:true,
     explain:'Anticipo informativo sin validez fiscal, antes de que el cliente se comprometa.',
   },
   presupuesto: {
-    title:'PRESUPUESTO', button:'Crear presupuesto', prefix:'P-2026-0', seqRef:()=>presSeq, hasIva:true,
+    title:'PRESUPUESTO', button:'Crear presupuesto', prefix:'P', seqRef:()=>proximoNumero('presupuesto'), hasIva:true,
     explain:'Propuesta de precio. No obliga a nada — si se acepta, se convierte en trabajo.',
   },
   albaran: {
-    title:'ALBARÁN', button:'Crear albarán', prefix:'ALB-2026-0', seqRef:()=>albSeq, hasIva:false,
+    title:'ALBARÁN', button:'Crear albarán', prefix:'ALB', seqRef:()=>proximoNumero('albaran'), hasIva:false,
     explain:'Justificante de entrega/trabajo realizado. No es un documento fiscal, así que no lleva IVA ni desglose.',
   },
 };
@@ -6071,6 +6639,7 @@ async function borrarTarifa(id){
   cargarTarifasReales();
 }
 cargarTarifasReales();
+cargarHistorico();
 
 function suggestFromConcept(input){
   const q = input.value.toLowerCase();
@@ -6120,7 +6689,8 @@ function onDocTypeChange(){
     document.getElementById('ni-suggest').textContent = '(los albaranes no se numeran — son borradores de trabajo)';
   } else {
     document.getElementById('ni-docnum').value = cfg.prefix + cfg.seqRef();
-    document.getElementById('ni-suggest').textContent = '(último usado: '+cfg.prefix+(cfg.seqRef()-1)+')';
+    const existentes = Object.values(documentosRealesById).filter(d=>d.type===t).length;
+    document.getElementById('ni-suggest').textContent = existentes ? ('(último usado: '+cfg.prefix+String(existentes).padStart(3,'0')+')') : '';
   }
   document.getElementById('ie-iva-row').style.display = cfg.hasIva ? 'flex' : 'none';
   document.getElementById('ie-payment-fields').style.display = (t==='albaran') ? 'none' : '';
@@ -6514,8 +7084,23 @@ function elegirDeLista(titulo, opciones, permitirNuevo){
     pickerResolve = resolve;
     document.getElementById('picker-titulo').textContent = titulo;
     const lista = document.getElementById('picker-lista');
-    lista.innerHTML = opciones.map(o=>`<div class="explorer-item" style="height:auto;padding:12px 14px;margin-bottom:6px;" onclick="cerrarPicker(${JSON.stringify(o)})">${o}</div>`).join('')
-      + (permitirNuevo ? `<button class="btn" style="width:100%;margin-top:6px;" onclick="pickerNuevo()">+ Nuevo</button>` : '');
+    lista.innerHTML = '';
+    opciones.forEach(o=>{
+      const item = document.createElement('div');
+      item.className = 'explorer-item';
+      item.style.cssText = 'height:auto;padding:12px 14px;margin-bottom:6px;';
+      item.textContent = o;
+      item.addEventListener('click', ()=>cerrarPicker(o));
+      lista.appendChild(item);
+    });
+    if(permitirNuevo){
+      const btnNuevo = document.createElement('button');
+      btnNuevo.className = 'btn';
+      btnNuevo.style.cssText = 'width:100%;margin-top:6px;';
+      btnNuevo.textContent = '+ Nuevo';
+      btnNuevo.addEventListener('click', pickerNuevo);
+      lista.appendChild(btnNuevo);
+    }
     document.getElementById('picker-overlay').classList.add('active');
   });
 }
@@ -6604,7 +7189,7 @@ async function guardarGasto(){
     cerrarRegistrarGasto();
   }catch(err){ statusEl.textContent = 'Error de red: '+errText(err); statusEl.style.color = 'var(--red)'; }
 }
-function closeNewInvoiceModal(){ document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); }
+function closeNewInvoiceModal(){ document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); document.getElementById('ie-dictado').classList.remove('open'); }
 
 /* ---------------- ASISTENTE MÓVIL — mismo motor, mismo guardado real, solo cambia cómo se pide ---------------- */
 let wiz = null; // estado del asistente actual
@@ -6848,6 +7433,7 @@ function openDocumentViewer(id){
   document.getElementById('ni-suggest').textContent = doc.status==='Borrador' ? '(borrador sin numerar en firme)' : '';
   document.getElementById('ni-concepto-transf').value = doc.concepto;
   document.getElementById('ie-iva-row').style.display = DOC_TYPES[doc.type].hasIva ? 'flex' : 'none';
+  document.getElementById('ie-payment-fields').style.display = (doc.type==='albaran') ? 'none' : '';
   document.getElementById('ni-title').textContent = DOC_TYPES[doc.type].title;
   document.getElementById('ni-explain').textContent = DOC_TYPES[doc.type].explain;
   document.getElementById('ni-submit').textContent = doc.status==='Borrador' ? 'Guardar y numerar en firme' : 'Guardar cambios';
@@ -6856,15 +7442,31 @@ function openDocumentViewer(id){
   document.getElementById('ie-paper-edit').style.display = 'block';
   document.getElementById('ni-preview-btn').textContent = 'Vista previa de impresión';
   const convBtn = document.getElementById('ni-convert-btn');
+  const deshacerBtn = document.getElementById('ni-deshacer-btn');
+  deshacerBtn.style.display = 'none';
   if(doc.type==='presupuesto' || doc.type==='proforma'){
     convBtn.style.display = ''; convBtn.textContent = 'Convertir en albarán';
   } else if(doc.type==='albaran'){
     convBtn.style.display = ''; convBtn.textContent = 'Convertir en factura';
+  } else if(doc.type==='factura' && doc.origen_albaran_ids && doc.origen_albaran_ids.length){
+    convBtn.style.display = 'none';
+    deshacerBtn.style.display = '';
   } else {
     convBtn.style.display = 'none';
   }
   recalcTotals();
   document.getElementById('newinvoice-overlay').classList.add('active');
+}
+async function deshacerConversion(){
+  const doc = documentosRealesById[editingDocId];
+  if(!doc || !sb) return;
+  if(!confirm(`¿Deshacer esta factura y volver a dejarla como el albarán original? La factura "${doc.num}" se borrará.`)) return;
+  const {error} = await sb.from('documentos_economicos').delete().eq('id', editingDocId);
+  if(error){ alert('Error al deshacer: '+errText(error)); return; }
+  delete documentosRealesById[editingDocId];
+  document.getElementById('docrow-'+editingDocId)?.remove();
+  renderAlbaranesAbiertos();
+  closeNewInvoiceModal();
 }
 
 async function submitNewInvoice(ev, isDraft){
@@ -6943,10 +7545,15 @@ async function submitNewInvoice(ev, isDraft){
     const row = document.createElement('tr');
     row.id = 'docrow-'+savedId;
     row.onclick = () => openDocumentViewer(savedId);
+    row.dataset.fechaIso = dateRaw || '';
+    row.dataset.anio = dateRaw ? dateRaw.slice(0,4) : '';
+    row.dataset.trimestre = dateRaw ? String(Math.floor((Number(dateRaw.slice(5,7))-1)/3)+1) : '';
+    row.dataset.total = total;
     row.innerHTML = `<td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td>${dateLabel}</td><td>—</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td>`;
     document.getElementById('econ-facturas-tbody').prepend(row);
     documentosRealesById[savedId].origen_albaran_ids = payload.origen_albaran_ids || [];
     renderAlbaranesAbiertos();
+    poblarFiltroAnios('econ-facturas-tbody','fact-filtro-anio');
     document.querySelector('[data-view="facturas"]').click();
 
   } else if(type==='proforma' || type==='presupuesto'){
@@ -7020,6 +7627,10 @@ async function cargarDocumentosEconomicosReales(){
         const row = document.createElement('tr');
         row.id = 'docrow-'+doc.id;
         row.onclick = () => openDocumentViewer(doc.id);
+        row.dataset.fechaIso = doc.fecha_devengo || '';
+        row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : '';
+        row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : '';
+        row.dataset.total = totalNum;
         row.innerHTML = `<td class="mono">${doc.numero||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="mono">${trabajo?trabajo.code:'—'}</td><td>${dateLabel}</td><td>—</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td>`;
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
@@ -7033,6 +7644,8 @@ async function cargarDocumentosEconomicosReales(){
     actualizarContadorPresupuestosStandalone();
     renderFacturasKPIs();
     renderAlbaranesAbiertos();
+    calcularKPIsReales();
+    poblarFiltroAnios('econ-facturas-tbody','fact-filtro-anio');
   }catch(err){ console.error('No se pudieron cargar los documentos reales', err); }
 }
 cargarDocumentosEconomicosReales();
