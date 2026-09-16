@@ -1695,7 +1695,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.56</div>
+        <div class="sub">V0.57</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1945,6 +1945,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="chip-filter" data-i="validado">Validado</div>
           </div>
           <div id="inbox-select-bar" style="display:flex;gap:8px;align-items:center;">
+            <label id="inbox-select-all-wrap" style="display:none;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);">
+              <input type="checkbox" id="inbox-select-all" onchange="toggleInboxSelectAll(this.checked)"> Todo
+            </label>
             <button class="btn" id="inbox-select-toggle" onclick="toggleInboxSelectMode()">Seleccionar</button>
             <button class="btn" id="inbox-select-delete" style="display:none;color:var(--red);border-color:var(--red);" onclick="borrarSeleccionInbox()">🗑 Eliminar (<span id="inbox-select-count">0</span>)</button>
           </div>
@@ -4318,10 +4321,21 @@ function toggleInboxSelectMode(){
   inboxSelectMode = !inboxSelectMode;
   inboxSelected.clear();
   document.getElementById('inbox-select-toggle').textContent = inboxSelectMode ? 'Cancelar' : 'Seleccionar';
+  document.getElementById('inbox-select-all-wrap').style.display = inboxSelectMode ? 'flex' : 'none';
+  document.getElementById('inbox-select-all').checked = false;
   updateInboxSelectBar();
   const activeFilter = document.querySelector('#sub-bandeja .chip-filter.active')?.dataset.i || 'todas';
   renderInbox(activeFilter);
 }
+
+function toggleInboxSelectAll(checked){
+  const activeFilter = document.querySelector('#sub-bandeja .chip-filter.active')?.dataset.i || 'todas';
+  const rows = activeFilter==='todas' ? documentosCache : documentosCache.filter(d=>d.status===activeFilter);
+  rows.forEach(d => { if(checked) inboxSelected.add(d.id); else inboxSelected.delete(d.id); });
+  updateInboxSelectBar();
+  renderInbox(activeFilter);
+}
+window.toggleInboxSelectAll = toggleInboxSelectAll;
 
 function toggleInboxItemSelected(id, checked){
   if(checked) inboxSelected.add(id); else inboxSelected.delete(id);
@@ -4411,6 +4425,9 @@ const TRIAGE_ACTIONS = {
     {id:'ref', label:'Trabajo', type:'select', options:()=>jobs.map(j=>j.code+' — '+j.client)},
     {id:'estado', label:'Nuevo estado', type:'select', options:()=>jobStates.map(s=>stateLabels[s])}
   ]},
+  otra_categoria:    {label:'Es otra cosa (crear categoría)', fields:[
+    {id:'categoria', label:'¿Qué tipo de documento es?', type:'text'}
+  ]},
   descartar:         {label:'Descartar — sin acción', fields:[]},
 };
 
@@ -4444,6 +4461,7 @@ function showTriageMenu(){
 
 function selectTriageAction(key){
   const cfg = TRIAGE_ACTIONS[key];
+  const d = documentosCache.find(x=>x.id===triageCurrentId);
   document.getElementById('e-menu-block').style.display = 'none';
   const formBlock = document.getElementById('e-form-block');
   formBlock.style.display = 'block';
@@ -4453,7 +4471,11 @@ function selectTriageAction(key){
       const opts = f.options();
       return `<div class="field"><div class="l">${f.label}</div><select class="search-box" style="width:100%;" id="ef-${f.id}">${opts.map(o=>`<option>${o}</option>`).join('')}</select></div>`;
     }
-    return `<div class="field"><div class="l">${f.label}</div><input class="search-box" style="width:100%;" type="${f.type}" id="ef-${f.id}"></div>`;
+    let sugerido = '';
+    if(f.id==='categoria' && d && d.analisis_ia && !d.analisis_ia.error){
+      sugerido = d.analisis_ia.concepto || d.analisis_ia.tipo_sugerido || '';
+    }
+    return `<div class="field"><div class="l">${f.label}</div><input class="search-box" style="width:100%;" type="${f.type}" id="ef-${f.id}" value="${(sugerido||'').replace(/"/g,'&quot;')}" placeholder="${sugerido?'':'Ej: certificado, seguro, ITV...'}">${sugerido?`<div class="sub-t" style="margin-top:4px;">Sugerido por la IA — puedes cambiarlo</div>`:''}</div>`;
   }).join('') || '<div class="sub-t">Sin datos adicionales — confirma para aplicar.</div>';
   document.getElementById('e-form-confirm').onclick = ()=>confirmTriageAction(key, cfg);
 }
@@ -4473,10 +4495,11 @@ async function confirmTriageAction(key, cfg){
     case 'pendiente_cobro': linked_label = 'Pendiente de cobro — '+(values.ref||'sin cliente')+(values.amount?' · '+values.amount+' €':''); break;
     case 'gasto': linked_label = 'Gasto — '+(values.ref||'Otros')+(values.amount?' · '+values.amount+' €':''); break;
     case 'editar_estado': linked_label = values.ref+' → '+values.estado; break;
+    case 'otra_categoria': linked_label = 'Categoría: '+(values.categoria||'Sin especificar'); break;
     case 'descartar': status = 'descartado'; linked_label = 'Descartado'; break;
   }
 
-  const payload = {status, action_type:key, linked_label, amount: values.amount ? Number(values.amount) : null};
+  const payload = {status, action_type:key, linked_label, amount: values.amount ? Number(values.amount) : null, categoria_libre: key==='otra_categoria' ? (values.categoria||null) : null};
   if(!sb){ alert('Conecta Supabase (SUPABASE_URL / SUPABASE_ANON_KEY) para guardar este cambio.'); return; }
   const {error} = await sb.from('documentos').update(payload).eq('id', triageCurrentId);
   if(error){ alert('Error al guardar: '+error.message); return; }
