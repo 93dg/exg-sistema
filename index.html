@@ -1738,7 +1738,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.98</div>
+        <div class="sub">V0.99</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5249,7 +5249,8 @@ function renderExplorerGrid(){
   const busqueda = (document.getElementById('explorer-search').value || '').trim().toLowerCase();
   const tipo = document.getElementById('explorer-type-filter').value;
   const visibleData = explorerCurrentData.filter(item=>{
-    const isFolder = item.id === null && !item.metadata;
+    const tieneExtension = /\.[a-zA-Z0-9]{2,5}$/.test(item.name);
+    const isFolder = item.id === null && !item.metadata && !tieneExtension; // una carpeta real nunca tiene extensión de archivo en el nombre — esto manda por encima de lo que diga la API si va lenta
     if(busqueda && !item.name.toLowerCase().includes(busqueda)) return false;
     if(!explorerMatchesTypeFilter(item.name, isFolder, tipo)) return false;
     return true;
@@ -5269,7 +5270,8 @@ function renderExplorerGrid(){
   });
 
   grid.innerHTML = visibleData.map(item=>{
-    const isFolder = item.id === null && !item.metadata; // Supabase Storage devuelve las "carpetas" como entradas sin metadata (y sin id, aunque el id a veces tarda un poco tras mover muchos archivos seguidos)
+    const tieneExtension2 = /\.[a-zA-Z0-9]{2,5}$/.test(item.name);
+    const isFolder = item.id === null && !item.metadata && !tieneExtension2; // igual que arriba: si tiene extensión de archivo, nunca es carpeta, mande lo que mande la API
     const fullPath = explorerPath ? explorerPath+'/'+item.name : item.name;
     if(isFolder){
       const displayName = item.name.charAt(0).toUpperCase() + item.name.slice(1);
@@ -5450,7 +5452,8 @@ async function explorerListRecursive(folderPath){
   for(const item of data){
     if(item.name.startsWith('.')) continue;
     const itemPath = folderPath + '/' + item.name;
-    if(item.id === null && !item.metadata){
+    const tieneExtensionRec = /\.[a-zA-Z0-9]{2,5}$/.test(item.name);
+    if(item.id === null && !item.metadata && !tieneExtensionRec){
       const nested = await explorerListRecursive(itemPath);
       results.push(...nested);
     } else {
