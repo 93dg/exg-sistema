@@ -483,6 +483,8 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .calendar-day{border:1px solid var(--line-dark);border-radius:8px;min-height:120px;padding:8px;background:var(--paper);}
 .calendar-day.today{border-color:var(--orange);border-width:2px;}
 .calendar-day-head{font-weight:700;font-size:12.5px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line-dark);display:flex;justify-content:space-between;align-items:center;}
+.cal-weather{font-size:11px;font-weight:600;color:var(--ink-soft);white-space:nowrap;}
+.cal-weather.risky{color:var(--red);}
 .calendar-day-head .n{color:var(--ink-soft);font-weight:500;}
 .calendar-job{background:var(--concrete-2);border-radius:6px;padding:6px 8px;margin-bottom:6px;font-size:11.5px;cursor:pointer;border-left:3px solid var(--orange);}
 .calendar-job:hover{background:var(--concrete-3,#e8e5e0);}
@@ -1680,7 +1682,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.37</div>
+        <div class="sub">V0.38</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1799,20 +1801,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
       </div>
 
-      <div class="panel" id="weather-panel">
-        <div class="panel-head">
-          <h3>Previsión de la semana</h3>
-          <span style="display:flex;align-items:center;gap:10px;">
-            <span class="count" id="weather-source">Cargando previsión real…</span>
-            <button class="btn" style="padding:4px 10px;font-size:11.5px;" onclick="initWeather()">↻ Actualizar</button>
-          </span>
-        </div>
-        <div class="panel-body">
-          <div class="weather-strip" id="weather-strip"></div>
-          <div id="weather-alerts" style="margin-top:10px;"></div>
-        </div>
-      </div>
-
       <div class="panel">
         <div class="panel-head">
           <h3>Calendario de trabajos</h3>
@@ -1826,7 +1814,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </span>
         </div>
         <div class="panel-body">
+          <div id="weather-alerts"></div>
           <div id="calendar-container"></div>
+          <div class="sub-t" id="weather-source" style="margin-top:8px;">Cargando previsión real…</div>
         </div>
       </div>
 
@@ -4629,12 +4619,10 @@ function cambiarSemanaPlan(delta){
   else if(calVista==='dia') calFecha.setDate(calFecha.getDate()+delta);
   else calFecha.setDate(calFecha.getDate()+delta*7);
   renderCalendar();
-  if(calVista!=='dia' || isoDeFecha(calFecha)===isoDeFecha(new Date())) initWeather();
 }
 function resetSemanaPlan(){
   calFecha = new Date(); calFecha.setHours(0,0,0,0);
   renderCalendar();
-  initWeather();
 }
 
 function jobCardHtml(j){
@@ -4685,6 +4673,12 @@ function renderCalendar(){
   else renderCalendarDia(cont, desc);
 }
 
+function weatherChipHtml(iso){
+  const w = weatherByDate[iso];
+  if(!w) return '';
+  return `<span class="cal-weather ${w.rain>=50?'risky':''}" title="${w.rain}% de lluvia">${w.icon} ${w.temp}</span>`;
+}
+
 function renderCalendarSemana(cont, desc){
   const dias = getSemanaDe(calFecha);
   const hoyIso = isoDeFecha(new Date());
@@ -4695,7 +4689,7 @@ function renderCalendarSemana(cont, desc){
     const trabajosDia = jobs.filter(j=>j.scheduledDate===iso);
     total += trabajosDia.length;
     return `<div class="calendar-day ${iso===hoyIso?'today':''}" onclick="irADia('${iso}')" style="cursor:pointer;" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnDia(event,'${iso}')">
-      <div class="calendar-day-head"><span>${DIAS_SEMANA_CORTOS[(d.getDay()+6)%7]}</span><span class="n">${d.getDate()} ${MESES_CORTOS[d.getMonth()]}</span></div>
+      <div class="calendar-day-head"><span>${DIAS_SEMANA_CORTOS[(d.getDay()+6)%7]} ${d.getDate()} ${MESES_CORTOS[d.getMonth()]}</span>${weatherChipHtml(iso)}</div>
       ${trabajosDia.length ? trabajosDia.map(jobCardHtml).join('') : '<div class="calendar-day-empty">Sin trabajos</div>'}
     </div>`;
   }).join('') + `</div>`;
@@ -4717,7 +4711,7 @@ function renderCalendarMes(cont, desc){
     const trabajosDia = jobs.filter(j=>j.scheduledDate===iso);
     total += (!fueraDeMes ? trabajosDia.length : 0);
     celdas += `<div class="calendar-day calendar-day-mes ${iso===hoyIso?'today':''} ${fueraDeMes?'fuera-mes':''}" onclick="irADia('${iso}')" style="cursor:pointer;" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnDia(event,'${iso}')">
-      <div class="calendar-day-head"><span class="n">${d.getDate()}</span></div>
+      <div class="calendar-day-head"><span class="n">${d.getDate()}</span>${weatherChipHtml(iso)}</div>
       ${trabajosDia.slice(0,3).map(jobCardHtml).join('')}
       ${trabajosDia.length>3 ? `<div class="calendar-day-mas">+${trabajosDia.length-3} más</div>` : ''}
     </div>`;
@@ -4734,6 +4728,8 @@ function renderCalendarDia(cont, desc){
   const iso = isoDeFecha(calFecha);
   const hoyIso = isoDeFecha(new Date());
   desc.textContent = `${DIAS_SEMANA_CORTOS[(calFecha.getDay()+6)%7]} ${calFecha.getDate()} de ${MESES_LARGOS[calFecha.getMonth()]}` + (iso===hoyIso ? ' (hoy)' : '');
+  const chipDia = weatherChipHtml(iso);
+  if(chipDia) desc.innerHTML += ' &nbsp;' + chipDia;
   const trabajosDia = jobs.filter(j=>j.scheduledDate===iso);
   const conHora = trabajosDia.filter(j=>j.horaInicio).sort((a,b)=>a.horaInicio.localeCompare(b.horaInicio));
   const sinHora = trabajosDia.filter(j=>!j.horaInicio);
@@ -4803,16 +4799,11 @@ function formatFechaAPI(iso){
   return DIAS_SEMANA_CORTOS[(d.getDay()+6)%7] + ' ' + d.getDate();
 }
 
+let weatherByDate = {}; // 'AAAA-MM-DD' -> {icon, temp, rain}
+
 function renderWeather(){
-  document.getElementById('weather-strip').innerHTML = WEATHER_DATA.map((w)=>{
-    const risky = w.rain>=50;
-    return `<div class="weather-day ${risky?'risky':''}">
-      <div class="wd-label">${formatFechaAPI(w.date)}</div>
-      <div class="wd-icon">${w.icon}</div>
-      <div class="wd-temp">${w.temp}</div>
-      <div class="wd-rain">${w.rain}% lluvia</div>
-    </div>`;
-  }).join('');
+  weatherByDate = {};
+  WEATHER_DATA.forEach(w=>{ weatherByDate[w.date] = w; });
 
   weatherAlerts = [];
   const alertsHtml = [];
@@ -4823,34 +4814,22 @@ function renderWeather(){
       const entry = {
         sev:'red', t:`Lluvia probable el ${formatFechaAPI(w.date)} (${w.rain}%)`,
         s:`Trabajos programados en riesgo: ${trabajosDia.map(j=>j.client).join(', ')} — valora adelantarlos o moverlos`,
-        action:()=>document.querySelector('[data-view="planificacion"]').click()
       };
       weatherAlerts.push(entry);
       alertsHtml.push(`<div class="attention-row"><div class="sev red"></div><div><div class="t">${entry.t}</div><div class="s">${entry.s}</div></div></div>`);
     }
   });
-  document.getElementById('weather-alerts').innerHTML = alertsHtml.join('') ||
-    '<div class="two-col-note">Sin riesgo de lluvia relevante esta semana para los trabajos programados.</div>';
+  document.getElementById('weather-alerts').innerHTML = alertsHtml.join('');
 
   const sourceNote = document.getElementById('weather-source');
   if(sourceNote){
     sourceNote.textContent = weatherIsLive
-      ? 'Datos en vivo — Open-Meteo, Fuente Obejuna (Córdoba)'
+      ? '☀️ Tiempo en vivo — Open-Meteo, Fuente Obejuna (Córdoba). Solo cubre los próximos días.'
       : 'No se ha podido obtener el tiempo real ahora mismo';
   }
+  renderCalendar();
 }
 async function initWeather(){
-  if(planWeekOffset !== 0){
-    // Open-Meteo solo da previsión real de días próximos — para otras semanas no inventamos datos
-    WEATHER_DATA = [];
-    weatherIsLive = false;
-    renderWeather();
-    const sourceNote = document.getElementById('weather-source');
-    if(sourceNote) sourceNote.textContent = 'La previsión del tiempo solo está disponible para la semana actual';
-    document.getElementById('weather-strip').innerHTML = '<div class="empty">Sin previsión para esta semana — vuelve a "Hoy" para verla.</div>';
-    return;
-  }
-  document.getElementById('weather-strip').innerHTML = '<div class="empty">Cargando el tiempo real...</div>';
   try{
     const real = await fetchWeatherReal();
     WEATHER_DATA = real;
@@ -4858,9 +4837,7 @@ async function initWeather(){
   }catch(e){
     WEATHER_DATA = [];
     weatherIsLive = false;
-    document.getElementById('weather-strip').innerHTML = '<div class="empty" style="color:var(--red);">No se ha podido obtener el tiempo real ahora mismo — inténtalo de nuevo en un momento.</div>';
-    document.getElementById('weather-source').textContent = 'Sin conexión con Open-Meteo';
-    return;
+    document.getElementById('weather-source').textContent = 'Sin conexión con Open-Meteo ahora mismo';
   }
   renderWeather();
   renderAtencion();
