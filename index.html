@@ -1684,7 +1684,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.45</div>
+        <div class="sub">V0.46</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -3613,17 +3613,15 @@ function renderMejora(){
     const {seccion, cuerpo} = parsearReporte(m);
     const estado = m.estado || 'pendiente';
     const fecha = m.created_at ? new Date(m.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'}) : '—';
-    const notas = (m.notas||[]).map(n=>`<div class="sub-t" style="margin-top:4px;padding-left:8px;border-left:2px solid var(--line-dark);">↳ ${n}</div>`).join('');
     return `<tr>
-      <td>${cuerpo}${m.captura_url ? ` — <a href="${m.captura_url}" target="_blank">📷 captura</a>` : ''}${notas}</td>
+      <td>${cuerpo}${m.captura_url ? ` — <a href="${m.captura_url}" target="_blank">📷 captura</a>` : ''}</td>
       <td>${seccion}</td>
       <td>${fecha}</td>
       <td><span class="pill ${estado==='revisado'?'terminado':'pendiente'}">${estado==='revisado'?'Revisado':'Pendiente'}</span></td>
       <td style="white-space:nowrap;">
         ${estado==='revisado'
           ? `<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="reabrirReporte('${m.id}')">Reabrir</button>`
-          : `<button class="btn primary" style="padding:3px 8px;font-size:11px;" onclick="marcarRevisado('${m.id}')">Marcar revisado</button>`}
-        <button class="btn" style="padding:3px 8px;font-size:11px;" onclick="anadirNotaReporte('${m.id}')">+ Nota</button>
+          : `<button class="btn primary" style="padding:3px 8px;font-size:11px;" onclick="marcarRevisado('${m.id}')">Revisado ✓</button>`}
         <span style="cursor:pointer;color:var(--red);font-weight:800;margin-left:6px;" onclick="borrarSistemaItem('${m.id}')">✕</span>
       </td>
     </tr>`;
@@ -3645,18 +3643,6 @@ async function reabrirReporte(id){
   const {error} = await sb.from('sistema').update({data: nuevaData}).eq('id', id);
   if(error){ alert('Error al guardar: '+errText(error)); return; }
   m.estado = 'pendiente';
-  renderMejora();
-}
-async function anadirNotaReporte(id){
-  const m = SISTEMA_CACHE.mejora.find(x=>x.id===id);
-  if(!m || !sb) return;
-  const nota = prompt('¿Qué falta o qué hay que repasar de nuevo?');
-  if(!nota || !nota.trim()) return;
-  const notas = [...(m.notas||[]), nota.trim()];
-  const nuevaData = {...m, notas, estado:'pendiente'}; delete nuevaData.id; delete nuevaData.created_at;
-  const {error} = await sb.from('sistema').update({data: nuevaData}).eq('id', id);
-  if(error){ alert('Error al guardar: '+errText(error)); return; }
-  m.notas = notas; m.estado = 'pendiente';
   renderMejora();
 }
 async function addMejora(){
