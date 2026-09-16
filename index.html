@@ -1712,7 +1712,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.78</div>
+        <div class="sub">V0.79</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -3330,6 +3330,11 @@ async function cargarUIConfig(){
   }
   aplicarUIConfig();
 }
+function computeBlockId(el){
+  const view = el.closest('.view')?.id || 'view';
+  const etiqueta = el.querySelector('.lbl')?.textContent || el.querySelector('h3')?.textContent || 'sin-etiqueta';
+  return view + '-' + etiqueta.trim().toLowerCase().replace(/\s+/g,'-');
+}
 function aplicarUIConfig(){
   // orden del menú lateral
   if(UI_CONFIG.orden_menu && UI_CONFIG.orden_menu.length){
@@ -3339,10 +3344,12 @@ function aplicarUIConfig(){
       if(btn) nav.appendChild(btn);
     });
   }
-  // bloques borrados de forma permanente
-  UI_CONFIG.bloques_ocultos.forEach(blockId=>{
-    document.querySelectorAll(`[data-block-id="${blockId}"]`).forEach(el=>el.remove());
-  });
+  // bloques borrados de forma permanente — se calcula el id igual haya entrado o no en modo editor
+  if(UI_CONFIG.bloques_ocultos.length){
+    document.querySelectorAll('.view .panel, .view .kpi-strip .kpi, .view .weather-strip, .view #real-map').forEach(el=>{
+      if(UI_CONFIG.bloques_ocultos.includes(computeBlockId(el))) el.remove();
+    });
+  }
 }
 async function guardarUIConfig(){
   if(!sb) return;
@@ -3354,7 +3361,6 @@ async function guardarUIConfig(){
     if(data) UI_CONFIG_ID = data.id;
   }
 }
-cargarUIConfig();
 
 function toggleEditorMode(){
   editorModeOn = !editorModeOn;
@@ -3406,9 +3412,7 @@ function prepareEditableBlocks(){
     el.classList.add('layout-block');
     el.setAttribute('draggable','true');
     if(!el.dataset.blockId){
-      const view = el.closest('.view')?.id || 'view';
-      const etiqueta = el.querySelector('.lbl')?.textContent || el.querySelector('h3')?.textContent || ('block-'+i);
-      el.dataset.blockId = view + '-' + etiqueta.trim().toLowerCase().replace(/\s+/g,'-');
+      el.dataset.blockId = computeBlockId(el);
     }
 
     const toolbar = document.createElement('div');
@@ -4084,6 +4088,7 @@ async function guardarPermisos(){
   }
 }
 cargarPermisos();
+cargarUIConfig();
 
 async function doLogin(){
   let user = document.getElementById('login-email').value.trim().toLowerCase();
