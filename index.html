@@ -293,6 +293,8 @@ table{border-collapse:collapse;width:100%;}
 
 /* fleet cards */
 .machine-card{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);padding:14px;}
+.machine-card.expanded{grid-column:1/-1;border-color:var(--orange);box-shadow:0 2px 10px rgba(0,0,0,0.08);}
+.machine-card-expand{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-dark);}
 .machine-card .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
 .machine-card .mname{font-weight:700;font-size:14.5px;}
 .machine-card .mtype{font-size:11.5px;color:var(--ink-soft);}
@@ -1706,7 +1708,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.69</div>
+        <div class="sub">V0.70</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2117,12 +2119,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="view" id="view-clientes">
       <div class="topbar">
         <div><h1>Clientes</h1><div class="desc">Ayuntamientos, particulares y empresas</div></div>
-        <div class="quickactions"><button class="btn primary" onclick="openNewClientModal(null)">+ Nuevo cliente</button></div>
+        <div class="quickactions">
+          <button class="btn" style="color:var(--red);display:none;" id="clientes-borrar-sel-btn" onclick="borrarClientesSeleccionados()">🗑 Borrar seleccionados (<span id="clientes-sel-count">0</span>)</button>
+          <button class="btn primary" onclick="openNewClientModal(null)">+ Nuevo cliente</button>
+        </div>
       </div>
       <div class="panel">
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
-            <tr><th>Cliente</th><th>Tipo</th><th>Zona</th><th>Tarifa</th><th class="num">Facturado (año)</th><th class="num">Pendiente</th><th>Prioridad</th></tr>
+            <tr><th style="width:30px;"><input type="checkbox" id="clientes-sel-todo" onchange="toggleSeleccionarTodoClientes(this)"></th><th>Cliente</th><th>Tipo</th><th>Zona</th><th>Tarifa</th><th class="num">Facturado (año)</th><th class="num">Pendiente</th><th>Prioridad</th></tr>
             <tbody id="clientes-tbl"></tbody>
           </table>
         </div>
@@ -2416,7 +2421,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="client-tab" data-sub="criterios">Criterios</div>
         <div class="client-tab" data-sub="estandares">Estándares</div>
         <div class="client-tab" data-sub="historial">Historial de decisiones</div>
-        <div class="client-tab" data-sub="oninicio">Prompt de inicio de chat</div>
+        <div class="client-tab" data-sub="oninicio">Prompt</div>
       </div>
 
       <div class="sub-view" id="sis-principios">
@@ -3028,29 +3033,6 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
   </div>
 </div>
 
-<!-- ================= MODAL: FICHA DE MÁQUINA ================= -->
-<div class="overlay" id="maquina-overlay" onclick="if(event.target===this) cerrarMaquinaModal()">
-  <div class="drawer" style="max-width:480px;">
-    <div class="drawer-head">
-      <div><h2 id="maquina-modal-nombre">—</h2><div class="sub-t" id="maquina-modal-tipo">—</div></div>
-      <button class="close-x" onclick="cerrarMaquinaModal()">✕</button>
-    </div>
-    <div class="drawer-body">
-      <div class="field" style="margin-bottom:12px;"><div class="l">Matrícula</div>
-        <input class="search-box mono" style="width:100%;" id="maquina-matricula">
-      </div>
-      <div class="field" style="margin-bottom:12px;"><div class="l">Ficha técnica (año, potencia, peso, nº de serie, neumáticos... lo que quieras poder copiar rápido)</div>
-        <textarea class="search-box" style="width:100%;height:160px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;" id="maquina-ficha"></textarea>
-      </div>
-      <div class="state-row" style="gap:8px;">
-        <button class="btn" style="flex:1;" onclick="copiarFichaMaquina()">📋 Copiar todo</button>
-        <button class="btn primary" style="flex:1;" onclick="guardarFichaMaquina()">Guardar</button>
-      </div>
-      <div id="maquina-modal-status" class="sub-t" style="margin-top:8px;"></div>
-    </div>
-  </div>
-</div>
-
 <!-- ================= MODAL: TARIFA ================= -->
 <div class="overlay" id="tarifa-overlay" onclick="if(event.target===this) cerrarTarifaModal()">
   <div class="drawer" style="max-width:420px;">
@@ -3154,6 +3136,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     </div>
     <div class="drawer-body">
       <button class="btn" style="width:100%;margin-bottom:10px;" onclick="elegirTipoDoc('presupuesto')">Presupuesto</button>
+      <button class="btn" style="width:100%;margin-bottom:10px;" onclick="elegirTipoDoc('proforma')">Proforma</button>
       <button class="btn" style="width:100%;margin-bottom:10px;" onclick="elegirTipoDoc('albaran')">Albarán</button>
       <button class="btn primary" style="width:100%;" onclick="elegirTipoDoc('factura')">Factura</button>
     </div>
@@ -5234,46 +5217,55 @@ document.getElementById('fleet-grid').innerHTML = fleet.map(m=>`
     <div class="metrics"><div>Uso<b>${m.hours}</b></div><div>Ubicación<b style="font-size:12px;">${m.loc}</b></div></div>
     <div class="foot">${m.next}</div>
   </div>`).join('');
+let maquinaExpandidaId = null;
 function renderFleetGrid(){
-  document.getElementById('fleet-grid').innerHTML = fleet.map(m=>`
-    <div class="machine-card" onclick="abrirMaquinaModal('${m.id||''}')" style="cursor:pointer;">
+  document.getElementById('fleet-grid').innerHTML = fleet.map(m=>{
+    const expandida = m.id && m.id === maquinaExpandidaId;
+    return `<div class="machine-card ${expandida?'expanded':''}" onclick="toggleMaquinaExpandida('${m.id||''}')" style="cursor:pointer;">
       <div class="top"><div><div class="mname">${m.name}</div><div class="mtype">${m.type}</div></div>${pill(m.state)}</div>
       <div class="metrics"><div>Uso<b>${m.hours}</b></div><div>Ubicación<b style="font-size:12px;">${m.loc}</b></div></div>
       <div class="foot">${m.next}</div>
-    </div>`).join('');
+      ${expandida ? `
+      <div class="machine-card-expand" onclick="event.stopPropagation();">
+        <div class="field" style="margin-bottom:10px;"><div class="l">Matrícula</div>
+          <input class="search-box mono" style="width:100%;" id="mq-matricula-${m.id}" value="${m.matricula||''}">
+        </div>
+        <div class="field" style="margin-bottom:10px;"><div class="l">Ficha técnica</div>
+          <textarea class="search-box" style="width:100%;height:120px;font-family:'IBM Plex Mono',monospace;font-size:12px;" id="mq-ficha-${m.id}">${m.fichaTecnica||''}</textarea>
+        </div>
+        <div class="state-row" style="gap:8px;">
+          <button class="btn" style="flex:1;" onclick="copiarFichaMaquinaInline('${m.id}')">📋 Copiar todo</button>
+          <button class="btn primary" style="flex:1;" onclick="guardarFichaMaquinaInline('${m.id}')">Guardar</button>
+        </div>
+        <div class="sub-t" id="mq-status-${m.id}" style="margin-top:6px;"></div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
 }
-function abrirMaquinaModal(id){
-  const m = fleet.find(f=>f.id===id);
-  if(!m){ alert('Esta máquina todavía no tiene id real — espera a que cargue o recarga la página.'); return; }
-  document.getElementById('maquina-modal-nombre').textContent = m.name;
-  document.getElementById('maquina-modal-tipo').textContent = m.type || '—';
-  document.getElementById('maquina-matricula').value = m.matricula || '';
-  document.getElementById('maquina-ficha').value = m.fichaTecnica || '';
-  document.getElementById('maquina-modal-status').textContent = '';
-  document.getElementById('maquina-overlay').dataset.id = id;
-  document.getElementById('maquina-overlay').classList.add('active');
+function toggleMaquinaExpandida(id){
+  if(!id){ alert('Esta máquina todavía no tiene id real — espera a que cargue o recarga la página.'); return; }
+  maquinaExpandidaId = maquinaExpandidaId === id ? null : id;
+  renderFleetGrid();
 }
-function cerrarMaquinaModal(){ document.getElementById('maquina-overlay').classList.remove('active'); }
-async function guardarFichaMaquina(){
-  const id = document.getElementById('maquina-overlay').dataset.id;
+async function guardarFichaMaquinaInline(id){
   const m = fleet.find(f=>f.id===id);
-  const statusEl = document.getElementById('maquina-modal-status');
+  const statusEl = document.getElementById('mq-status-'+id);
   if(!m || !sb){ statusEl.textContent = 'Supabase no está conectado.'; statusEl.style.color = 'var(--red)'; return; }
-  const matricula = document.getElementById('maquina-matricula').value.trim();
-  const ficha = document.getElementById('maquina-ficha').value.trim();
+  const matricula = document.getElementById('mq-matricula-'+id).value.trim();
+  const ficha = document.getElementById('mq-ficha-'+id).value.trim();
   const {error} = await sb.from('flota').update({matricula, ficha_tecnica: ficha}).eq('id', id);
   if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
   m.matricula = matricula; m.fichaTecnica = ficha;
   statusEl.textContent = 'Guardado ✓'; statusEl.style.color = 'var(--green)';
 }
-function copiarFichaMaquina(){
-  const nombre = document.getElementById('maquina-modal-nombre').textContent;
-  const tipo = document.getElementById('maquina-modal-tipo').textContent;
-  const matricula = document.getElementById('maquina-matricula').value.trim();
-  const ficha = document.getElementById('maquina-ficha').value.trim();
-  const texto = `${nombre} — ${tipo}${matricula ? '\nMatrícula: '+matricula : ''}${ficha ? '\n'+ficha : ''}`;
+function copiarFichaMaquinaInline(id){
+  const m = fleet.find(f=>f.id===id);
+  if(!m) return;
+  const matricula = document.getElementById('mq-matricula-'+id).value.trim();
+  const ficha = document.getElementById('mq-ficha-'+id).value.trim();
+  const texto = `${m.name} — ${m.type}${matricula ? '\nMatrícula: '+matricula : ''}${ficha ? '\n'+ficha : ''}`;
   navigator.clipboard.writeText(texto).then(()=>{
-    const statusEl = document.getElementById('maquina-modal-status');
+    const statusEl = document.getElementById('mq-status-'+id);
     statusEl.textContent = 'Copiado ✓'; statusEl.style.color = 'var(--green)';
   }).catch(()=>{ alert('No se pudo copiar — selecciona el texto a mano.'); });
 }
@@ -5947,9 +5939,32 @@ async function registrarRetraso(code){
 
 /* Clientes — se cargan de verdad desde Supabase (tabla entidades) */
 const clientes = [];
+function toggleSeleccionarTodoClientes(master){
+  document.querySelectorAll('.clientes-sel-chk').forEach(chk=>chk.checked = master.checked);
+  actualizarSeleccionClientes();
+}
+function actualizarSeleccionClientes(){
+  const marcados = document.querySelectorAll('.clientes-sel-chk:checked');
+  const btn = document.getElementById('clientes-borrar-sel-btn');
+  document.getElementById('clientes-sel-count').textContent = marcados.length;
+  btn.style.display = marcados.length ? '' : 'none';
+}
+async function borrarClientesSeleccionados(){
+  const marcados = Array.from(document.querySelectorAll('.clientes-sel-chk:checked'));
+  if(!marcados.length) return;
+  if(!confirm(`¿Borrar ${marcados.length} cliente(s)? No se puede deshacer.`)) return;
+  if(!sb){ alert('Supabase no está conectado.'); return; }
+  const ids = marcados.map(c=>c.dataset.id).filter(Boolean);
+  const {error} = await sb.from('entidades').delete().in('id', ids);
+  if(error){ alert('Error al borrar: '+errText(error)); return; }
+  ids.forEach(id=>{ const i = clientes.findIndex(c=>c.id===id); if(i>=0) clientes.splice(i,1); });
+  renderClientesTable();
+  actualizarSeleccionClientes();
+}
+
 function renderClientesTable(){
   document.getElementById('clientes-tbl').innerHTML = clientes.map(c=>`
-    <tr onclick="openClientDrawer('${c.name}')"><td><b>${c.name}</b></td><td><span class="zone-badge">${c.type}</span></td><td>${c.zone}</td><td>${c.tarifa}</td>
+    <tr onclick="openClientDrawer('${c.name}')"><td onclick="event.stopPropagation();"><input type="checkbox" class="clientes-sel-chk" data-id="${c.id||''}" onchange="actualizarSeleccionClientes()"></td><td><b>${c.name}</b></td><td><span class="zone-badge">${c.type}</span></td><td>${c.zone}</td><td>${c.tarifa}</td>
     <td class="num">${c.fact}</td><td class="num">${c.pend}</td>
     <td><span class="tag">${c.prio}</span></td></tr>`).join('');
 }
@@ -6088,10 +6103,7 @@ function submitNewClient(){
       nuevoCliente.id = data.id;
     });
   }
-  document.getElementById('clientes-tbl').innerHTML = clientes.map(c=>`
-    <tr onclick="openClientDrawer('${c.name}')"><td><b>${c.name}</b></td><td><span class="zone-badge">${c.type}</span></td><td>${c.zone}</td><td>${c.tarifa}</td>
-    <td class="num">${c.fact}</td><td class="num">${c.pend}</td>
-    <td><span class="tag">${c.prio}</span></td></tr>`).join('');
+  renderClientesTable();
   fillClientSelects();
   if(clientTargetSelect){
     document.getElementById(clientTargetSelect).value = name;
