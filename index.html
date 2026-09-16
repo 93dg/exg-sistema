@@ -490,6 +490,22 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .calendar-job .cj-cl{font-weight:700;}
 .calendar-job .cj-zn{color:var(--ink-soft);}
 .calendar-day-empty{color:var(--ink-soft);font-size:11.5px;text-align:center;padding-top:20px;}
+.calendar-day.drag-over{border-color:var(--orange);border-width:2px;background:var(--orange-soft,#FCE8DA);}
+.calendar-job[draggable="true"]{cursor:grab;}
+.calendar-grid-mes{grid-template-columns:repeat(7,1fr);gap:6px;}
+.calendar-mes-dow{text-align:center;font-size:11px;font-weight:700;color:var(--ink-soft);padding-bottom:4px;}
+.calendar-day-mes{min-height:80px;padding:6px;}
+.calendar-day-mes.fuera-mes{opacity:0.35;}
+.calendar-day-mas{font-size:10.5px;color:var(--ink-soft);text-align:center;}
+.calendar-sinhora-strip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px;margin-bottom:14px;background:var(--concrete-2);border-radius:8px;font-size:12px;}
+.calendar-sinhora-strip .calendar-job{margin-bottom:0;}
+.calendar-day-hours{border-top:1px solid var(--line-dark);}
+.calendar-hour-row{display:flex;border-bottom:1px solid var(--line-dark);min-height:44px;}
+.calendar-hour-row.drag-over{background:var(--orange-soft,#FCE8DA);}
+.calendar-hour-label{width:60px;flex:0 0 60px;font-size:11px;color:var(--ink-soft);padding:6px;}
+.calendar-hour-slot{flex:1;padding:4px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.calendar-hour-slot .calendar-job{margin-bottom:0;}
+@media (max-width:768px){.calendar-grid{grid-template-columns:1fr;}.calendar-grid-mes{grid-template-columns:repeat(7,minmax(0,1fr));}.calendar-mes-dow{font-size:9px;}.calendar-day-mes{min-height:50px;padding:3px;font-size:10px;}}
 @media (max-width:768px){.calendar-grid{grid-template-columns:1fr;}}
 .weather-day{border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px;text-align:center;background:var(--paper);flex:0 0 auto;min-width:0;}
 .weather-day.risky{border-color:var(--red);background:var(--red-soft);}
@@ -1664,7 +1680,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.35</div>
+        <div class="sub">V0.36</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1776,9 +1792,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="topbar">
         <div><h1>Planificación</h1><div class="desc" id="planif-week-desc">Cuadrante semanal</div></div>
         <div class="quickactions">
-          <button class="btn" onclick="cambiarSemanaPlan(-1)">◀ Semana anterior</button>
+          <button class="btn" onclick="cambiarSemanaPlan(-1)">◀ Anterior</button>
           <button class="btn" onclick="resetSemanaPlan()">Hoy</button>
-          <button class="btn" onclick="cambiarSemanaPlan(1)">Semana siguiente ▶</button>
+          <button class="btn" onclick="cambiarSemanaPlan(1)">Siguiente ▶</button>
           <button class="btn dark" onclick="document.querySelector('[data-view=\"mapa\"]').click()">Ver mapa</button>
         </div>
       </div>
@@ -1798,19 +1814,19 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
 
       <div class="panel">
-        <div class="panel-head"><h3>Calendario semanal</h3><span class="count" id="calendar-count"></span></div>
-        <div class="panel-body">
-          <div class="calendar-grid" id="calendar-grid"></div>
+        <div class="panel-head">
+          <h3>Calendario de trabajos</h3>
+          <span style="display:flex;align-items:center;gap:10px;">
+            <span class="count" id="calendar-count"></span>
+            <div class="filters" id="calendar-view-tabs" style="margin:0;">
+              <div class="chip-filter active" data-cv="semana">Semana</div>
+              <div class="chip-filter" data-cv="mes">Mes</div>
+              <div class="chip-filter" data-cv="dia">Día</div>
+            </div>
+          </span>
         </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head"><h3>Cuadrante máquina × día</h3><span class="count">Rafa y Manolo</span></div>
-        <div class="panel-body planner">
-          <table>
-            <tr><th style="text-align:left;padding:8px;">Maquinaria</th><th>Lun 8</th><th>Mar 9</th><th>Mié 10</th><th>Jue 11</th><th>Vie 12</th></tr>
-            <tbody id="planner-body"></tbody>
-          </table>
+        <div class="panel-body">
+          <div id="calendar-container"></div>
         </div>
       </div>
 
@@ -4559,7 +4575,7 @@ async function cargarDatosReales(){
         const dateLabel = dRaw && !isNaN(dRaw) ? dRaw.getDate()+' '+MESES_CORTOS[dRaw.getMonth()] : 'sin fecha';
         jobs.push({
           id: t.id, code: t.codigo || ('T-'+t.id.slice(0,4)), client: t.nombre || 'Sin nombre', type:'Particular',
-          zone: t.zona || '—', machine: '— sin especificar —', machines: [], date: dateLabel, scheduledDate: t.fecha_inicio || '',
+          zone: t.zona || '—', machine: '— sin especificar —', machines: [], date: dateLabel, scheduledDate: t.fecha_inicio || '', horaInicio: t.hora_inicio ? t.hora_inicio.slice(0,5) : null,
           state: t.estado || 'pendiente', price: t.presupuesto ? Number(t.presupuesto).toLocaleString('es-ES',{minimumFractionDigits:2})+' €' : '— est.',
           urgent: t.prioridad === 'Alta'
         });
@@ -4567,7 +4583,7 @@ async function cargarDatosReales(){
       renderJobFilters();
       renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
       renderCalendar();
-      renderPlanner();
+      
     }
     const {data: flotaReal} = await sb.from('flota').select('*').order('created_at',{ascending:false});
     if(flotaReal && flotaReal.length){
@@ -4581,83 +4597,164 @@ async function cargarDatosReales(){
 }
 cargarDatosReales();
 
-/* ---------------- CUADRANTE DE PLANIFICACIÓN (flota real) ---------------- */
-let planWeekOffset = 0; // 0 = semana actual, +1 = siguiente, -1 = anterior...
+/* ---------------- CALENDARIO DE TRABAJOS (uno solo, con vista mes/semana/día, arrastrar para mover) ---------------- */
 const DIAS_SEMANA_CORTOS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'];
+const MESES_LARGOS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
-function getSemanaLaboral(offset){
-  const hoy = new Date();
-  const diaSemana = (hoy.getDay() + 6) % 7; // 0=lunes ... 6=domingo
-  const lunes = new Date(hoy);
-  lunes.setDate(hoy.getDate() - diaSemana + offset*7);
-  return [0,1,2,3,4].map(i=>{
-    const d = new Date(lunes);
-    d.setDate(lunes.getDate() + i);
-    return d;
-  });
-}
-function formatDiaCorto(d){ return DIAS_SEMANA_CORTOS[(d.getDay()+6)%7] + ' ' + d.getDate(); }
-
-function cambiarSemanaPlan(delta){
-  planWeekOffset += delta;
-  renderPlanner();
-  renderCalendar();
-  initWeather();
-}
-function resetSemanaPlan(){
-  planWeekOffset = 0;
-  renderPlanner();
-  renderCalendar();
-  initWeather();
-}
+let calVista = 'semana'; // 'semana' | 'mes' | 'dia'
+let calFecha = new Date(); calFecha.setHours(0,0,0,0); // fecha de referencia (día concreto en vista día, cualquier día de la semana/mes en las otras)
 
 function isoDeFecha(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+function getSemanaDe(d){
+  const diaSemana = (d.getDay()+6)%7;
+  const lunes = new Date(d); lunes.setDate(d.getDate()-diaSemana);
+  return [0,1,2,3,4].map(i=>{ const x = new Date(lunes); x.setDate(lunes.getDate()+i); return x; });
+}
+function formatDiaCorto(d){ return DIAS_SEMANA_CORTOS[(d.getDay()+6)%7] + ' ' + d.getDate(); }
+
+document.querySelectorAll('#calendar-view-tabs .chip-filter').forEach(el=>{
+  el.addEventListener('click', ()=>{
+    document.querySelectorAll('#calendar-view-tabs .chip-filter').forEach(e=>e.classList.remove('active'));
+    el.classList.add('active');
+    calVista = el.dataset.cv;
+    renderCalendar();
+  });
+});
+
+function cambiarSemanaPlan(delta){
+  if(calVista==='mes') calFecha.setMonth(calFecha.getMonth()+delta);
+  else if(calVista==='dia') calFecha.setDate(calFecha.getDate()+delta);
+  else calFecha.setDate(calFecha.getDate()+delta*7);
+  renderCalendar();
+  if(calVista!=='dia' || isoDeFecha(calFecha)===isoDeFecha(new Date())) initWeather();
+}
+function resetSemanaPlan(){
+  calFecha = new Date(); calFecha.setHours(0,0,0,0);
+  renderCalendar();
+  initWeather();
+}
+
+function jobCardHtml(j){
+  return `<div class="calendar-job ${j.urgent?'urgent':''}" draggable="true"
+    ondragstart="calDragStart(event,'${j.code}')"
+    onclick="openJobDrawer('${j.code}')">
+    <div class="cj-cl">${j.client}</div><div class="cj-zn">${j.zone||''}${j.machine && j.machine!=='— sin especificar —' ? ' · '+j.machine : ''}</div>
+  </div>`;
+}
+
+let calDragCode = null;
+function calDragStart(e, code){ calDragCode = code; e.dataTransfer.effectAllowed = 'move'; }
+async function calDropEnDia(e, iso){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if(!calDragCode) return;
+  await moverTrabajoAFecha(calDragCode, iso);
+}
+async function moverTrabajoAFecha(code, iso, hora){
+  const j = jobs.find(x=>x.code===code);
+  if(!j) return;
+  j.scheduledDate = iso;
+  const d = new Date(iso+'T00:00:00');
+  j.date = d.getDate()+' '+MESES_CORTOS[d.getMonth()];
+  if(sb && j.id){
+    const payload = {fecha_inicio: iso};
+    if(hora!==undefined) payload.hora_inicio = hora;
+    const {error} = await sb.from('trabajos').update(payload).eq('id', j.id);
+    if(error) console.error('No se pudo guardar la nueva fecha en Supabase', error);
+  }
+  renderCalendar();
+  renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
+}
 
 function renderCalendar(){
-  const grid = document.getElementById('calendar-grid');
-  if(!grid) return;
-  const dias = getSemanaLaboral(planWeekOffset);
-  const hoyIso = isoDeFecha(new Date());
-  let totalTrabajos = 0;
-  grid.innerHTML = dias.map(d=>{
-    const iso = isoDeFecha(d);
-    const esHoy = iso===hoyIso;
-    const trabajosDia = jobs.filter(j=>j.scheduledDate===iso);
-    totalTrabajos += trabajosDia.length;
-    const cards = trabajosDia.length
-      ? trabajosDia.map(j=>`<div class="calendar-job ${j.urgent?'urgent':''}" onclick="openJobDrawer('${j.code}')"><div class="cj-cl">${j.client}</div><div class="cj-zn">${j.zone||''} · ${j.machine||'sin máquina'}</div></div>`).join('')
-      : '<div class="calendar-day-empty">Sin trabajos</div>';
-    return `<div class="calendar-day ${esHoy?'today':''}">
-      <div class="calendar-day-head"><span>${DIAS_SEMANA_CORTOS[(d.getDay()+6)%7]}</span><span class="n">${d.getDate()} ${MESES_CORTOS[d.getMonth()]}</span></div>
-      ${cards}
-    </div>`;
-  }).join('');
-  document.getElementById('calendar-count').textContent = totalTrabajos + (totalTrabajos===1 ? ' trabajo esta semana' : ' trabajos esta semana');
+  const cont = document.getElementById('calendar-container');
+  if(!cont) return;
+  const desc = document.getElementById('planif-week-desc');
+  if(calVista==='semana') renderCalendarSemana(cont, desc);
+  else if(calVista==='mes') renderCalendarMes(cont, desc);
+  else renderCalendarDia(cont, desc);
 }
 
-const PLANNER_MACHINES = fleet.filter(m=>!m.name.startsWith('Coche')).map(m=>m.name);
-function renderPlanner(){
-  const dias = getSemanaLaboral(planWeekOffset);
-  document.getElementById('planner-body').closest('table').querySelector('tr').innerHTML =
-    '<th style="text-align:left;padding:8px;">Maquinaria</th>' + dias.map(d=>`<th>${formatDiaCorto(d)}</th>`).join('');
-  const desc = document.getElementById('planif-week-desc');
-  desc.textContent = `Cuadrante semanal · ${dias[0].getDate()}–${dias[4].getDate()} ${MESES_CORTOS[dias[4].getMonth()]}` + (planWeekOffset===0 ? ' (esta semana)' : '');
-  document.getElementById('planner-body').innerHTML = PLANNER_MACHINES.map(machineName=>{
-    const maquinaReal = fleet.find(f=>f.name===machineName);
-    const cells = dias.map(d=>{
-      if(maquinaReal && maquinaReal.state==='averia') return `<td><div class="slot averia">AVERÍA</div></td>`;
-      const iso = isoDeFecha(d);
-      const job = jobs.find(j => j.scheduledDate===iso && (j.machines||[]).includes(machineName));
-      if(!job) return `<td><div class="slot libre">Libre</div></td>`;
-      return `<td><div class="slot" onclick="openJobDrawer('${job.code}')" style="cursor:pointer;"><div class="cl">${job.client}</div><div class="zn">${job.zone||''}</div></div></td>`;
-    }).join('');
-    return `<tr><td class="machine-name">${machineName}</td>${cells}</tr>`;
-  }).join('');
+function renderCalendarSemana(cont, desc){
+  const dias = getSemanaDe(calFecha);
+  const hoyIso = isoDeFecha(new Date());
+  desc.textContent = `Semana del ${dias[0].getDate()} al ${dias[4].getDate()} de ${MESES_LARGOS[dias[4].getMonth()]}`;
+  let total = 0;
+  cont.innerHTML = `<div class="calendar-grid">` + dias.map(d=>{
+    const iso = isoDeFecha(d);
+    const trabajosDia = jobs.filter(j=>j.scheduledDate===iso);
+    total += trabajosDia.length;
+    return `<div class="calendar-day ${iso===hoyIso?'today':''}" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnDia(event,'${iso}')">
+      <div class="calendar-day-head"><span>${DIAS_SEMANA_CORTOS[(d.getDay()+6)%7]}</span><span class="n">${d.getDate()} ${MESES_CORTOS[d.getMonth()]}</span></div>
+      ${trabajosDia.length ? trabajosDia.map(jobCardHtml).join('') : '<div class="calendar-day-empty">Sin trabajos</div>'}
+    </div>`;
+  }).join('') + `</div>`;
+  document.getElementById('calendar-count').textContent = total + (total===1 ? ' trabajo esta semana' : ' trabajos esta semana');
 }
-renderPlanner();
+
+function renderCalendarMes(cont, desc){
+  const year = calFecha.getFullYear(), month = calFecha.getMonth();
+  desc.textContent = MESES_LARGOS[month].charAt(0).toUpperCase()+MESES_LARGOS[month].slice(1)+' de '+year;
+  const primerDia = new Date(year, month, 1);
+  const inicioGrid = new Date(primerDia); inicioGrid.setDate(1 - ((primerDia.getDay()+6)%7));
+  const hoyIso = isoDeFecha(new Date());
+  let total = 0;
+  let celdas = '';
+  for(let i=0;i<42;i++){
+    const d = new Date(inicioGrid); d.setDate(inicioGrid.getDate()+i);
+    const iso = isoDeFecha(d);
+    const fueraDeMes = d.getMonth()!==month;
+    const trabajosDia = jobs.filter(j=>j.scheduledDate===iso);
+    total += (!fueraDeMes ? trabajosDia.length : 0);
+    celdas += `<div class="calendar-day calendar-day-mes ${iso===hoyIso?'today':''} ${fueraDeMes?'fuera-mes':''}" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnDia(event,'${iso}')">
+      <div class="calendar-day-head"><span class="n">${d.getDate()}</span></div>
+      ${trabajosDia.slice(0,3).map(jobCardHtml).join('')}
+      ${trabajosDia.length>3 ? `<div class="calendar-day-mas">+${trabajosDia.length-3} más</div>` : ''}
+    </div>`;
+    if(i%7===6 && i<41) celdas += '';
+  }
+  cont.innerHTML = `<div class="calendar-grid calendar-grid-mes">
+    ${DIAS_SEMANA_CORTOS.map(d=>`<div class="calendar-mes-dow">${d}</div>`).join('')}
+    ${celdas}
+  </div>`;
+  document.getElementById('calendar-count').textContent = total + (total===1 ? ' trabajo este mes' : ' trabajos este mes');
+}
+
+function renderCalendarDia(cont, desc){
+  const iso = isoDeFecha(calFecha);
+  const hoyIso = isoDeFecha(new Date());
+  desc.textContent = `${DIAS_SEMANA_CORTOS[(calFecha.getDay()+6)%7]} ${calFecha.getDate()} de ${MESES_LARGOS[calFecha.getMonth()]}` + (iso===hoyIso ? ' (hoy)' : '');
+  const trabajosDia = jobs.filter(j=>j.scheduledDate===iso);
+  const conHora = trabajosDia.filter(j=>j.horaInicio).sort((a,b)=>a.horaInicio.localeCompare(b.horaInicio));
+  const sinHora = trabajosDia.filter(j=>!j.horaInicio);
+  document.getElementById('calendar-count').textContent = trabajosDia.length + (trabajosDia.length===1 ? ' trabajo' : ' trabajos') + ' ese día';
+
+  const horas = [];
+  for(let h=7; h<=20; h++){
+    const hLabel = String(h).padStart(2,'0')+':00';
+    const jobsHora = conHora.filter(j=>j.horaInicio && j.horaInicio.slice(0,2)===String(h).padStart(2,'0'));
+    horas.push(`<div class="calendar-hour-row" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnHora(event,'${iso}','${hLabel}')">
+      <div class="calendar-hour-label">${hLabel}</div>
+      <div class="calendar-hour-slot">${jobsHora.map(jobCardHtml).join('')}</div>
+    </div>`);
+  }
+  cont.innerHTML = `
+    ${sinHora.length ? `<div class="calendar-sinhora-strip"><b>Sin hora fijada:</b> ${sinHora.map(jobCardHtml).join('')}</div>` : ''}
+    <div class="calendar-day-hours">${horas.join('')}</div>`;
+}
+async function calDropEnHora(e, iso, hLabel){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if(!calDragCode) return;
+  await moverTrabajoAFecha(calDragCode, iso, hLabel+':00');
+  const j = jobs.find(x=>x.code===calDragCode);
+  if(j) j.horaInicio = hLabel;
+  renderCalendar();
+}
+
 renderCalendar();
 
 /* ---------------- PREVISIÓN METEOROLÓGICA — Open-Meteo (Fuente Obejuna, Córdoba) ---------------- */
@@ -5360,7 +5457,7 @@ function submitNewJob(ev){
   renderJobFilters();
   renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
   renderCalendar();
-  renderPlanner();
+  
   fillJobSelect();
   closeNewJobModal();
   document.querySelector('[data-view="trabajos"]').click();
