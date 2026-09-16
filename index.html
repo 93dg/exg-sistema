@@ -1682,7 +1682,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.40</div>
+        <div class="sub">V0.41</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1697,6 +1697,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="clientes"><span class="ico">◈</span><span class="label"> Clientes</span></button>
       <button data-view="ayuntamiento"><span class="ico">⌂</span><span class="label"> Ayuntamiento</span></button>
       <button data-view="facturas"><span class="ico">🧾</span><span class="label"> Facturas</span></button>
+      <button data-view="presupuestos"><span class="ico">📋</span><span class="label"> Presupuestos</span></button>
       <button data-view="economia"><span class="ico">€</span><span class="label"> Economía</span></button>
       <button data-view="correo"><span class="ico">✉</span><span class="label"> Correo</span></button>
       <div class="grp-label">Cuenta</div>
@@ -1730,6 +1731,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="kpi"><div class="lbl">Pendiente cobro</div><div class="val" id="kpi-pendiente-cobro">0,00 €</div></div>
         <div class="kpi"><div class="lbl">Facturado mes</div><div class="val green" id="kpi-facturado-mes">0,00 €</div></div>
         <div class="kpi"><div class="lbl">Margen aprox. mes</div><div class="val green" id="kpi-margen-mes">0,00 €</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>📋 Albaranes abiertos</h3><span class="count" id="control-albaranes-count">0</span></div>
+        <div class="panel-body" style="padding:0;">
+          <table class="tbl">
+            <tr><th>Nº</th><th>Cliente</th><th>Trabajo</th><th>Fecha</th><th class="num">Importe</th><th></th></tr>
+            <tbody id="control-albaranes-tbody"></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="grid-2">
@@ -2105,6 +2116,24 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
       </div>
       <div class="two-col-note">Esta sección es independiente en el menú, pero usa los mismos datos que Economía → Resumen y Rentabilidad — cualquier factura que crees aquí se refleja allí también.</div>
+    </div>
+
+    <!-- ================= PRESUPUESTOS ================= -->
+    <div class="view" id="view-presupuestos">
+      <div class="topbar">
+        <div><h1>Presupuestos</h1><div class="desc">Todos los presupuestos — conectado con Economía</div></div>
+        <div class="quickactions"><button class="btn primary" onclick="openNewInvoiceModal({tipo:'presupuesto'})">+ Nuevo presupuesto</button></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>Presupuestos</h3><span class="count" id="presupuestos-standalone-count">0</span></div>
+        <div class="panel-body" style="padding:0;">
+          <table class="tbl">
+            <tr><th>Nº</th><th>Cliente</th><th>Trabajo</th><th>Fecha</th><th class="num">Total</th><th>Estado</th></tr>
+            <tbody id="presupuestos-tbody-standalone"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="two-col-note">Independiente en el menú, pero mismos datos que Economía → Presupuestos — lo que crees aquí se ve allí también.</div>
     </div>
 
     <!-- ================= AYUNTAMIENTO ================= -->
@@ -6335,16 +6364,18 @@ async function submitNewInvoice(ev, isDraft){
     row.onclick = () => openDocumentViewer(savedId);
     row.innerHTML = `<td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td>${dateLabel}</td><td>—</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td>`;
     document.getElementById('econ-facturas-tbody').prepend(row);
+    documentosRealesById[savedId].origen_albaran_ids = payload.origen_albaran_ids || [];
+    renderAlbaranesAbiertos();
     document.querySelector('[data-view="facturas"]').click();
 
   } else if(type==='proforma' || type==='presupuesto'){
-    const row = document.createElement('tr');
-    row.id = 'docrow-'+savedId;
-    row.onclick = () => openDocumentViewer(savedId);
-    row.innerHTML = `<td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td>${dateLabel}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td>`;
-    document.getElementById('econ-presupuestos-tbody').prepend(row);
-    document.querySelector('[data-view="economia"]').click();
-    document.querySelector('#econ-subtabs [data-sub="presupuestos"]').click();
+    const rowHtml = `<td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td>${dateLabel}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td>`;
+    const row1 = document.createElement('tr'); row1.id = 'docrow-'+savedId; row1.onclick = () => openDocumentViewer(savedId); row1.innerHTML = rowHtml;
+    document.getElementById('econ-presupuestos-tbody').prepend(row1);
+    const row2 = document.createElement('tr'); row2.onclick = () => openDocumentViewer(savedId); row2.innerHTML = rowHtml;
+    document.getElementById('presupuestos-tbody-standalone').prepend(row2);
+    actualizarContadorPresupuestosStandalone();
+    document.querySelector('[data-view="presupuestos"]').click();
 
   } else if(type==='albaran'){
     const row = document.createElement('div');
@@ -6353,14 +6384,34 @@ async function submitNewInvoice(ev, isDraft){
     row.onclick = () => openDocumentViewer(savedId);
     row.innerHTML = `<div class="inbox-src">📋 Albarán</div><div><div class="main-t">${num} — ${client}</div></div><div class="sub-t">${dateLabel} · ${amountLabel}</div><div class="sub-t">${job!=='—'?job:'Sin trabajo asociado'}</div><div>${estadoPill}</div>`;
     document.getElementById('inbox-list').prepend(row);
-    document.querySelector('[data-view="entradas"]').click();
-    document.querySelector('#entradas-subtabs [data-sub="bandeja"]').click();
+    renderAlbaranesAbiertos();
+    document.querySelector('[data-view="control"]').click();
   }
 
   editingDocId = null;
   convirtiendoDesde = null;
   closeNewInvoiceModal();
   return false;
+}
+
+function actualizarContadorPresupuestosStandalone(){
+  const el = document.getElementById('presupuestos-standalone-count');
+  if(el) el.textContent = document.getElementById('presupuestos-tbody-standalone').children.length;
+}
+function renderAlbaranesAbiertos(){
+  const tbody = document.getElementById('control-albaranes-tbody');
+  if(!tbody) return;
+  const todos = Object.values(documentosRealesById);
+  const idsFacturados = new Set();
+  todos.filter(d=>d.type==='factura').forEach(f=>{ (f.origen_albaran_ids||[]).forEach(id=>idsFacturados.add(id)); });
+  const abiertos = todos.filter(d=>d.type==='albaran' && !idsFacturados.has(d.id))
+    .sort((a,b)=> new Date(b.created_at||0) - new Date(a.created_at||0));
+  document.getElementById('control-albaranes-count').textContent = abiertos.length;
+  tbody.innerHTML = abiertos.length ? abiertos.map(a=>`
+    <tr>
+      <td class="mono">${a.num||'—'}</td><td>${a.client}</td><td class="mono">${a.job&&a.job!=='—'?a.job:'—'}</td><td>${a.dateLabel}</td><td class="num">${a.amountLabel}</td>
+      <td><button class="btn" style="padding:3px 10px;font-size:11px;" onclick="openDocumentViewer('${a.id}')">Abrir</button></td>
+    </tr>`).join('') : '<tr><td colspan="6" class="empty">Sin albaranes abiertos — todo facturado</td></tr>';
 }
 
 async function cargarDocumentosEconomicosReales(){
@@ -6392,14 +6443,16 @@ async function cargarDocumentosEconomicosReales(){
         row.innerHTML = `<td class="mono">${doc.numero||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="mono">${trabajo?trabajo.code:'—'}</td><td>${dateLabel}</td><td>—</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td>`;
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
-        const row = document.createElement('tr');
-        row.id = 'docrow-'+doc.id;
-        row.onclick = () => openDocumentViewer(doc.id);
-        row.innerHTML = `<td class="mono">${doc.numero||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="mono">${trabajo?trabajo.code:'—'}</td><td>${dateLabel}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td>`;
+        const rowHtml = `<td class="mono">${doc.numero||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="mono">${trabajo?trabajo.code:'—'}</td><td>${dateLabel}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td>`;
+        const row = document.createElement('tr'); row.id = 'docrow-'+doc.id; row.onclick = () => openDocumentViewer(doc.id); row.innerHTML = rowHtml;
         document.getElementById('econ-presupuestos-tbody')?.appendChild(row);
+        const row2 = document.createElement('tr'); row2.onclick = () => openDocumentViewer(doc.id); row2.innerHTML = rowHtml;
+        document.getElementById('presupuestos-tbody-standalone')?.appendChild(row2);
       }
     });
+    actualizarContadorPresupuestosStandalone();
     renderFacturasKPIs();
+    renderAlbaranesAbiertos();
   }catch(err){ console.error('No se pudieron cargar los documentos reales', err); }
 }
 cargarDocumentosEconomicosReales();
