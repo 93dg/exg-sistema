@@ -1696,7 +1696,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.61</div>
+        <div class="sub">V0.62</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -1718,6 +1718,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="grp-label">Cuenta</div>
       <button data-view="sistema" class="admin-only"><span class="ico">◉</span><span class="label"> Sistema</span></button>
       <button data-view="reportes" class="admin-only"><span class="ico">🐞</span><span class="label"> Reportes</span></button>
+      <button data-view="historico" class="admin-only"><span class="ico">📜</span><span class="label"> Histórico</span></button>
       <button data-view="config" class="admin-only"><span class="ico">⚙</span><span class="label"> Configuración</span></button>
     </div>
     <div class="sidebar-foot"><span id="sidebar-username">Sesión iniciada</span><br><span style="cursor:pointer;text-decoration:underline;" onclick="doLogout()">Cerrar sesión</span></div>
@@ -2561,6 +2562,29 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </div>
     </div>
 
+        <!-- ================= HISTÓRICO ================= -->
+        <div class="view" id="view-historico">
+          <div class="topbar">
+            <div><h1>Histórico</h1><div class="desc">Documentos antiguos extraídos automáticamente de Archivos — revisa y aprueba antes de que cuenten como reales</div></div>
+            <div class="quickactions">
+              <div class="filters" id="historico-filter" style="margin:0;">
+                <div class="chip-filter active" data-hf="sin_revisar">Sin revisar</div>
+                <div class="chip-filter" data-hf="aprobado">Aprobados</div>
+                <div class="chip-filter" data-hf="">Todos</div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-strip" id="historico-kpis" style="margin-bottom:16px;"></div>
+          <div class="panel">
+            <div class="panel-body" style="padding:0;">
+              <table class="tbl">
+                <tr><th>Archivo</th><th>Tipo</th><th>Nº</th><th>Fecha</th><th>Cliente</th><th class="num">Importe</th><th>Estado</th></tr>
+                <tbody id="historico-tbl"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <!-- ================= REPORTES ================= -->
     <div class="view" id="view-reportes">
       <div class="topbar">
@@ -2926,6 +2950,41 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         </div>
         <button type="submit" class="btn primary" style="width:100%;">Crear trabajo</button>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: REVISAR DOCUMENTO HISTÓRICO ================= -->
+<div class="overlay" id="historico-overlay" onclick="if(event.target===this) cerrarHistoricoModal()">
+  <div class="drawer" style="max-width:520px;">
+    <div class="drawer-head">
+      <div><h2 id="hist-modal-archivo">—</h2></div>
+      <button class="close-x" onclick="cerrarHistoricoModal()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div class="field" style="flex:1;"><div class="l">Tipo</div>
+          <select class="search-box" style="width:100%;" id="hist-tipo">
+            <option value="factura">Factura</option>
+            <option value="albaran">Albarán</option>
+            <option value="presupuesto">Presupuesto</option>
+          </select>
+        </div>
+        <div class="field" style="flex:1;"><div class="l">Nº documento</div><input class="search-box" style="width:100%;" id="hist-numero"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div class="field" style="flex:1;"><div class="l">Fecha</div><input class="search-box" style="width:100%;" id="hist-fecha" placeholder="tal cual salió, revísala"></div>
+        <div class="field" style="flex:1;"><div class="l">Cliente</div><input class="search-box" style="width:100%;" id="hist-cliente"></div>
+      </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Líneas detectadas</div>
+        <div id="hist-conceptos" style="border:1px solid var(--line-dark);border-radius:8px;padding:8px;font-size:12.5px;"></div>
+      </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Importe total</div><input class="search-box" style="width:100%;" id="hist-importe" type="number" step="0.01"></div>
+      <div class="state-row" style="gap:8px;">
+        <button class="btn" style="flex:1;" onclick="descartarHistorico()">Descartar</button>
+        <button class="btn primary" style="flex:1;" onclick="aprobarHistorico()">✓ Aprobar → pasa a Economía real</button>
+      </div>
+      <div id="hist-modal-status" class="sub-t" style="margin-top:8px;"></div>
     </div>
   </div>
 </div>
@@ -3345,6 +3404,135 @@ setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimient
 setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',cobros:'econ-cobros',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad',cierre:'econ-cierre'});
 setupSubtabs('entradas-subtabs','entradas',{bandeja:'sub-bandeja',whatsapp:'sub-whatsapp'});
 setupSubtabs('sistema-subtabs','sis',{principios:'sis-principios',organizacion:'sis-organizacion',protocolos:'sis-protocolos',criterios:'sis-criterios',estandares:'sis-estandares',historial:'sis-historial',oninicio:'sis-oninicio'});
+/* ---------------- HISTÓRICO — revisión de documentos antiguos extraídos automáticamente ---------------- */
+let HISTORICO_CACHE = [];
+let historicoFiltro = 'sin_revisar';
+let historicoEditandoId = null;
+
+async function cargarHistorico(){
+  if(!sb) return;
+  const {data, error} = await sb.from('historico_revision').select('*').order('fecha', {ascending:true});
+  if(error || !data) return;
+  HISTORICO_CACHE = data;
+  renderHistorico();
+}
+document.getElementById('historico-filter')?.addEventListener('click', (ev)=>{
+  const chip = ev.target.closest('.chip-filter');
+  if(!chip) return;
+  document.querySelectorAll('#historico-filter .chip-filter').forEach(e=>e.classList.remove('active'));
+  chip.classList.add('active');
+  historicoFiltro = chip.dataset.hf;
+  renderHistorico();
+});
+function renderHistorico(){
+  const tbody = document.getElementById('historico-tbl');
+  if(!tbody) return;
+  const lista = HISTORICO_CACHE.filter(h => !historicoFiltro || h.estado === historicoFiltro);
+  tbody.innerHTML = lista.length ? lista.map(h=>{
+    const nombreArchivo = h.archivo_path.split('/').pop();
+    const estadoPill = h.estado==='aprobado' ? '<span class="pill terminado">Aprobado</span>'
+      : h.estado==='descartado' ? '<span class="pill">Descartado</span>'
+      : h.error ? '<span class="pill urgente">Error de lectura</span>'
+      : '<span class="pill pendiente">Sin revisar</span>';
+    return `<tr onclick="abrirHistoricoModal('${h.id}')" style="cursor:pointer;">
+      <td style="font-size:11.5px;">${nombreArchivo}</td>
+      <td>${h.tipo_detectado || '—'}</td>
+      <td class="mono">${h.numero || '—'}</td>
+      <td>${h.fecha || '—'}</td>
+      <td>${h.cliente_nombre || '—'}</td>
+      <td class="num">${h.importe ? Number(h.importe).toLocaleString('es-ES',{minimumFractionDigits:2})+' €' : '—'}</td>
+      <td>${estadoPill}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">Nada en este filtro</td></tr>';
+  const kpis = document.getElementById('historico-kpis');
+  if(kpis){
+    const total = HISTORICO_CACHE.length;
+    const sinRevisar = HISTORICO_CACHE.filter(h=>h.estado==='sin_revisar' && !h.error).length;
+    const aprobados = HISTORICO_CACHE.filter(h=>h.estado==='aprobado').length;
+    const conError = HISTORICO_CACHE.filter(h=>h.error).length;
+    kpis.innerHTML = `
+      <div class="kpi"><div class="lbl">Total extraídos</div><div class="val">${total}</div></div>
+      <div class="kpi"><div class="lbl">Sin revisar</div><div class="val orange">${sinRevisar}</div></div>
+      <div class="kpi"><div class="lbl">Aprobados</div><div class="val green">${aprobados}</div></div>
+      <div class="kpi"><div class="lbl">Con error de lectura</div><div class="val red">${conError}</div></div>`;
+  }
+}
+function abrirHistoricoModal(id){
+  const h = HISTORICO_CACHE.find(x=>x.id===id);
+  if(!h) return;
+  historicoEditandoId = id;
+  document.getElementById('hist-modal-archivo').textContent = h.archivo_path.split('/').pop();
+  document.getElementById('hist-tipo').value = h.tipo_detectado || 'factura';
+  document.getElementById('hist-numero').value = h.numero || '';
+  document.getElementById('hist-fecha').value = h.fecha || '';
+  document.getElementById('hist-cliente').value = h.cliente_nombre || '';
+  document.getElementById('hist-importe').value = h.importe || '';
+  const conceptos = h.conceptos || [];
+  document.getElementById('hist-conceptos').innerHTML = h.error
+    ? `<span style="color:var(--red);">Error al leer este archivo: ${h.error}</span>`
+    : (conceptos.length ? conceptos.map(c=>`<div class="task-row"><span style="flex:1;">${c.descripcion} (${c.cantidad} × ${Number(c.precio_unitario||0).toLocaleString('es-ES',{minimumFractionDigits:2})}€)</span><b>${Number(c.importe||0).toLocaleString('es-ES',{minimumFractionDigits:2})} €</b></div>`).join('') : '<span class="sub-t">Sin líneas detectadas</span>');
+  document.getElementById('hist-modal-status').textContent = '';
+  document.getElementById('historico-overlay').classList.add('active');
+}
+function cerrarHistoricoModal(){ document.getElementById('historico-overlay').classList.remove('active'); historicoEditandoId = null; }
+
+function fechaHistoricoAIso(txt){
+  // intenta varios formatos que aparecen en las plantillas viejas (m/d/aa, d/m/aaaa, dd/mm//aaaa...)
+  if(!txt) return null;
+  const limpio = txt.trim().replace(/\/\//g,'/');
+  const m = limpio.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(!m) return null;
+  let [, a, b, y] = m;
+  if(y.length===2) y = (Number(y) < 50 ? '20' : '19') + y;
+  // en las plantillas viejas suele ser MM/DD/AA (formato Excel US) — lo tratamos así
+  const mes = String(a).padStart(2,'0'), dia = String(b).padStart(2,'0');
+  return `${y}-${mes}-${dia}`;
+}
+
+async function aprobarHistorico(){
+  const statusEl = document.getElementById('hist-modal-status');
+  const h = HISTORICO_CACHE.find(x=>x.id===historicoEditandoId);
+  if(!h || !sb) return;
+  const tipo = document.getElementById('hist-tipo').value;
+  const numero = document.getElementById('hist-numero').value.trim();
+  const fechaTxt = document.getElementById('hist-fecha').value.trim();
+  const clienteNombre = document.getElementById('hist-cliente').value.trim();
+  const importe = Number(document.getElementById('hist-importe').value) || 0;
+  const fechaIso = fechaHistoricoAIso(fechaTxt);
+
+  let entidad = clientes.find(c=>c.name.toLowerCase()===clienteNombre.toLowerCase());
+  if(!entidad && clienteNombre){
+    const {data, error} = await sb.from('entidades').insert({nombre: clienteNombre, tipo:'cliente'}).select().single();
+    if(!error && data){ entidad = {id:data.id, name:clienteNombre}; clientes.push({id:data.id, name:clienteNombre, type:'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'}); }
+  }
+
+  const payload = {
+    tipo, estado:'emitido', numero: numero || null,
+    fecha_devengo: fechaIso,
+    entidad_id: entidad ? entidad.id : null,
+    importe, concepto: (h.conceptos||[]).map(c=>c.descripcion).filter(Boolean).join('; ').slice(0,500),
+    conceptos: h.conceptos || null,
+  };
+  const {error: insError} = await sb.from('documentos_economicos').insert(payload);
+  if(insError){ statusEl.textContent = 'Error al guardar en Economía: '+errText(insError); statusEl.style.color = 'var(--red)'; return; }
+
+  const {error: updError} = await sb.from('historico_revision').update({estado:'aprobado'}).eq('id', h.id);
+  if(updError){ statusEl.textContent = 'Se guardó en Economía pero no se pudo marcar aquí: '+errText(updError); statusEl.style.color = 'var(--orange)'; }
+  h.estado = 'aprobado';
+  renderHistorico();
+  cerrarHistoricoModal();
+}
+async function descartarHistorico(){
+  const h = HISTORICO_CACHE.find(x=>x.id===historicoEditandoId);
+  if(!h || !sb) return;
+  const {error} = await sb.from('historico_revision').update({estado:'descartado'}).eq('id', h.id);
+  if(error){ alert('Error: '+errText(error)); return; }
+  h.estado = 'descartado';
+  renderHistorico();
+  cerrarHistoricoModal();
+}
+cargarHistorico();
+
 function copiarPromptInicio(){
   const texto = document.getElementById('prompt-inicio-texto').textContent;
   navigator.clipboard.writeText(texto).then(()=>{
