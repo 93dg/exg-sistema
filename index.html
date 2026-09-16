@@ -1694,7 +1694,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.49</div>
+        <div class="sub">V0.50</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2957,6 +2957,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   </div>
 </div>
 
+<!-- ================= SELECTOR GENÉRICO (sustituye a los prompt() de listas) ================= -->
+<div class="overlay" id="picker-overlay" onclick="if(event.target===this) cerrarPicker(null)">
+  <div class="drawer" style="max-width:360px;">
+    <div class="drawer-head">
+      <div><h2 id="picker-titulo">Elegir</h2></div>
+      <button class="close-x" onclick="cerrarPicker(null)">✕</button>
+    </div>
+    <div class="drawer-body" id="picker-lista" style="max-height:60vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
 <!-- ================= MENÚ: QUÉ TIPO DE DOCUMENTO CREAR ================= -->
 <div class="overlay" id="tipo-doc-menu-overlay" onclick="if(event.target===this) document.getElementById('tipo-doc-menu-overlay').classList.remove('active')">
   <div class="drawer" style="max-width:320px;">
@@ -3296,12 +3307,10 @@ async function abrirAveria(){
   if(!sb){ alert('Supabase no está conectado.'); return; }
   const disponibles = fleet.filter(f=>f.state!=='averia');
   if(!disponibles.length){ alert('No hay máquinas disponibles para marcar.'); return; }
-  const opciones = disponibles.map((m,i)=>`${i+1}. ${m.name}`).join('\n');
-  const resp = prompt(`¿Qué máquina tiene la avería? Escribe el número:\n\n${opciones}`);
-  if(!resp) return;
-  const num = parseInt(resp.trim(),10);
-  const maquina = disponibles[num-1];
-  if(!maquina){ alert('No he entendido cuál — vuelve a intentarlo.'); return; }
+  const nombreMaquina = await elegirDeLista('¿Qué máquina tiene la avería?', disponibles.map(m=>m.name));
+  if(!nombreMaquina) return;
+  const maquina = disponibles.find(m=>m.name===nombreMaquina);
+  if(!maquina) return;
   const sintoma = prompt('¿Qué le pasa? (síntoma)');
   if(!sintoma || !sintoma.trim()) return;
 
@@ -3354,15 +3363,14 @@ async function marcarReparada(id){
   closeBreakdownDrawer();
 }
 
-function reasignarMaquina(jobCode, maquinaVieja){
+async function reasignarMaquina(jobCode, maquinaVieja){
   const j = jobs.find(x=>x.code===jobCode);
   if(!j) return;
   const disponibles = fleet.filter(f=>f.state!=='averia' && f.name!==maquinaVieja);
   if(!disponibles.length){ alert('No hay otra máquina disponible ahora mismo.'); return; }
-  const opciones = disponibles.map((m,i)=>`${i+1}. ${m.name}`).join('\n');
-  const resp = prompt(`Reasignar "${j.code}" a qué máquina:\n\n${opciones}`);
-  if(!resp) return;
-  const maquina = disponibles[parseInt(resp.trim(),10)-1];
+  const nombreMaquina = await elegirDeLista(`Reasignar "${j.code}" a qué máquina`, disponibles.map(m=>m.name));
+  if(!nombreMaquina) return;
+  const maquina = disponibles.find(m=>m.name===nombreMaquina);
   if(!maquina) return;
   j.machines = (j.machines||[]).filter(m=>m!==maquinaVieja).concat([maquina.name]);
   j.machine = j.machines.join(', ');
@@ -5182,7 +5190,7 @@ function cancelPlacingSite(){
   document.querySelectorAll('#site-btn-sitio,#site-btn-maquinaria,#site-btn-rafa,#site-btn-manolo').forEach(b=>b.classList.remove('primary'));
 }
 
-function onMapClick(e){
+async function onMapClick(e){
   const pt = {lat: e.latlng.lat, lon: e.latlng.lng};
   if(placingSiteType){
     const type = placingSiteType;
@@ -5193,11 +5201,8 @@ function onMapClick(e){
       const i = FINCAS_GUARDADAS.findIndex(f=>f.type===type);
       if(i>=0) FINCAS_GUARDADAS.splice(i,1);
     } else if(type==='maquinaria'){
-      const opciones = fleet.map((m,i)=>`${i+1}. ${m.name}`).join('\n');
-      const resp = prompt(`¿Qué máquina es? Escribe el número:\n\n${opciones}\n\n(o escribe un nombre nuevo si no está en la lista)`);
-      if(!resp || !resp.trim()) { cancelPlacingSite(); return; }
-      const num = parseInt(resp.trim(), 10);
-      nombre = (num >= 1 && num <= fleet.length) ? fleet[num-1].name : resp.trim();
+      nombre = await elegirDeLista('¿Qué máquina es?', fleet.map(m=>m.name), true);
+      if(!nombre) { cancelPlacingSite(); return; }
     } else {
       nombre = prompt('Nombre de este sitio (ej. "Finca los Álamos"):');
       if(!nombre || !nombre.trim()) { cancelPlacingSite(); return; }
@@ -6186,6 +6191,29 @@ document.querySelectorAll('#cierre-filters .chip-filter').forEach(el=>{
 });
 calcularCierre(4);
 
+
+/* ---------------- SELECTOR GENÉRICO — para elegir de una lista, en vez de prompt() con números a mano ---------------- */
+let pickerResolve = null;
+function elegirDeLista(titulo, opciones, permitirNuevo){
+  // opciones: array de strings. Devuelve una Promise con el texto elegido, o null si cancela.
+  return new Promise(resolve=>{
+    pickerResolve = resolve;
+    document.getElementById('picker-titulo').textContent = titulo;
+    const lista = document.getElementById('picker-lista');
+    lista.innerHTML = opciones.map(o=>`<div class="explorer-item" style="height:auto;padding:12px 14px;margin-bottom:6px;" onclick="cerrarPicker(${JSON.stringify(o)})">${o}</div>`).join('')
+      + (permitirNuevo ? `<button class="btn" style="width:100%;margin-top:6px;" onclick="pickerNuevo()">+ Nuevo</button>` : '');
+    document.getElementById('picker-overlay').classList.add('active');
+  });
+}
+function cerrarPicker(valor){
+  document.getElementById('picker-overlay').classList.remove('active');
+  if(pickerResolve) pickerResolve(valor);
+  pickerResolve = null;
+}
+function pickerNuevo(){
+  const nombre = prompt('Nombre:');
+  cerrarPicker(nombre && nombre.trim() ? nombre.trim() : null);
+}
 
 function abrirMenuTipoDoc(){
   document.getElementById('tipo-doc-menu-overlay').classList.add('active');
