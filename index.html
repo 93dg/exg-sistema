@@ -1738,7 +1738,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.03</div>
+        <div class="sub">V1.04</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2288,6 +2288,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="topbar">
         <div><h1>Economía</h1><div class="desc">Presupuestos, facturas, cobros, gastos y rentabilidad</div></div>
         <div class="quickactions">
+          <div class="filters" id="econ-contabilidad-filter" style="margin:0;">
+            <div class="chip-filter" data-cf="oficial">Legal</div>
+            <div class="chip-filter" data-cf="en_b">En B</div>
+            <div class="chip-filter active" data-cf="">Todo</div>
+          </div>
           <button class="btn" onclick="abrirRegistrarGasto()">+ Registrar gasto</button>
           <button class="btn primary" onclick="abrirMenuTipoDoc()">+ Crear documento</button>
         </div>
@@ -3174,6 +3179,12 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <div class="field" style="flex:1;"><div class="l">Importe (€)</div><input class="search-box" style="width:100%;" id="gasto-importe" type="number" step="0.01"></div>
         <div class="field" style="flex:1;"><div class="l">Fecha</div><input class="search-box" style="width:100%;" id="gasto-fecha" type="date"></div>
       </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Contabilidad</div>
+        <select class="search-box" style="width:100%;" id="gasto-contabilidad">
+          <option value="oficial">Oficial (declarado a Hacienda)</option>
+          <option value="en_b">En B (no pasa por Hacienda)</option>
+        </select>
+      </div>
       <div class="state-row">
         <button class="btn primary" style="width:100%;" onclick="guardarGasto()">Guardar gasto</button>
       </div>
@@ -3342,6 +3353,13 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         </table>
         <button type="button" class="btn" onclick="addItemRow()">+ Añadir línea</button>
         <div class="two-col-note">La columna "Maquinaria" es para tu control interno — no sale impresa en la factura, pero ayuda a que el precio salga bien (una retro con martillo no cuesta igual que sola).</div>
+
+        <div class="field" style="margin:14px 0;"><div class="l">Contabilidad</div>
+          <select class="search-box" style="width:100%;" id="ni-contabilidad">
+            <option value="oficial">Oficial (declarada a Hacienda)</option>
+            <option value="en_b">En B (no pasa por Hacienda)</option>
+          </select>
+        </div>
 
         <div class="ie-footer" id="ie-payment-block">
           <div class="ie-payment" id="ie-payment-fields">
@@ -4365,7 +4383,7 @@ function renderMejora(){
       <td>${cuerpo}${m.captura_url ? ` — <a href="${m.captura_url}" target="_blank" onclick="event.stopPropagation();">📷 captura</a>` : ''}</td>
       <td>${seccion}</td>
       <td>${fecha}</td>
-      <td><span class="pill ${estado==='revisado'?'terminado':'pendiente'}">${estado==='revisado'?'Revisado':'Pendiente'}</span></td>
+      <td><span class="pill ${estado==='revisado'?'terminado':'pendiente'}">${estado==='revisado'?'Revisado':'Pendiente'}</span> <button class="btn" style="padding:2px 6px;font-size:11px;" onclick="event.stopPropagation();anadirAReporte('${m.id}')" title="Añadir/dictar algo más a este reporte">+</button></td>
       <td style="white-space:nowrap;" onclick="event.stopPropagation();">
         ${estado==='revisado'
           ? `<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="reabrirReporte('${m.id}')">Reabrir</button>`
@@ -4413,8 +4431,20 @@ function seccionActualNombre(){
   return btn ? btn.textContent.trim() : 'Sistema';
 }
 
+let reportBugAnadirId = null;
 function openReportBug(){
+  reportBugAnadirId = null;
   document.getElementById('report-bug-seccion').textContent = seccionActualNombre();
+  document.getElementById('report-bug-text').value = '';
+  document.getElementById('report-bug-status').textContent = '';
+  document.getElementById('report-bug-bar').classList.add('active');
+  document.getElementById('report-bug-text').focus();
+}
+function anadirAReporte(id){
+  const m = SISTEMA_CACHE.mejora.find(x=>x.id===id);
+  if(!m) return;
+  reportBugAnadirId = id;
+  document.getElementById('report-bug-seccion').textContent = 'Añadiendo a un reporte ya existente';
   document.getElementById('report-bug-text').value = '';
   document.getElementById('report-bug-status').textContent = '';
   document.getElementById('report-bug-bar').classList.add('active');
@@ -4483,6 +4513,19 @@ async function guardarReporteBug(){
 
   statusEl.textContent = 'Guardando...';
   try{
+    if(reportBugAnadirId){
+      const m = SISTEMA_CACHE.mejora.find(x=>x.id===reportBugAnadirId);
+      if(!m){ statusEl.textContent = 'No se encuentra el reporte original.'; statusEl.style.color = 'var(--red)'; return; }
+      const nuevoTexto = m.texto + '\n↳ ' + texto;
+      const nuevaData = {...m, texto: nuevoTexto, estado:'pendiente', captura_url: capturaUrl || m.captura_url}; delete nuevaData.id; delete nuevaData.created_at;
+      const {error} = await sb.from('sistema').update({data: nuevaData}).eq('id', reportBugAnadirId);
+      if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
+      m.texto = nuevoTexto; m.estado = 'pendiente'; if(capturaUrl) m.captura_url = capturaUrl;
+      statusEl.textContent = 'Añadido ✓'; statusEl.style.color = 'var(--green)';
+      renderMejora();
+      setTimeout(closeReportBug, 800);
+      return;
+    }
     const {error} = await sb.from('sistema').insert({tipo:'mejora', data:{texto: `[${seccion}] ${texto}`, captura_url: capturaUrl, estado:'pendiente'}});
     if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
     statusEl.textContent = 'Guardado ✓'; statusEl.style.color = 'var(--green)';
@@ -7351,6 +7394,7 @@ function openNewInvoiceModal(contexto){
   document.getElementById('ni-iban').value = 'ES40 3187 0588 5420 6788 5612';
   document.getElementById('ni-titular').value = 'RAFAEL GÓMEZ MARTÍNEZ';
   document.getElementById('ni-payment').value = 'Transferencia';
+  document.getElementById('ni-contabilidad').value = 'oficial';
   document.getElementById('ie-dictado-text').value = '';
   document.getElementById('ie-dictado-note').textContent = 'La lectura automática de fotos (OCR) todavía no está conectada — de momento solo guarda la imagen adjunta como referencia. Cuando conectemos IA con visión, esto rellenará las líneas solo.';
   document.getElementById('ie-preview-pane').style.display = 'none';
@@ -7369,6 +7413,7 @@ function abrirRegistrarGasto(){
   document.getElementById('gasto-importe').value = '';
   document.getElementById('gasto-fecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('gasto-status').textContent = '';
+  document.getElementById('gasto-contabilidad').value = 'oficial';
   document.getElementById('gasto-proveedores-list').innerHTML = clientes.map(c=>`<option value="${c.name}">`).join('');
   document.getElementById('gasto-overlay').classList.add('active');
 }
@@ -7380,6 +7425,7 @@ async function guardarGasto(){
   const importe = Number(document.getElementById('gasto-importe').value);
   const fecha = document.getElementById('gasto-fecha').value;
   const proveedorNombre = document.getElementById('gasto-proveedor').value.trim();
+  const contabilidad = document.getElementById('gasto-contabilidad').value;
   if(!concepto){ statusEl.textContent = 'Falta el concepto.'; statusEl.style.color = 'var(--red)'; return; }
   if(!importe || importe<=0){ statusEl.textContent = 'Pon un importe válido.'; statusEl.style.color = 'var(--red)'; return; }
   if(!sb){ statusEl.textContent = 'Supabase no está conectado.'; statusEl.style.color = 'var(--red)'; return; }
@@ -7387,7 +7433,7 @@ async function guardarGasto(){
   const payload = {
     tipo: 'gasto', estado: 'emitido', concepto,
     fecha_devengo: fecha || null,
-    entidad_id: entidad ? entidad.id : null, importe,
+    entidad_id: entidad ? entidad.id : null, importe, contabilidad,
   };
   try{
     const {data, error} = await sb.from('documentos_economicos').insert(payload).select().single();
@@ -7396,6 +7442,7 @@ async function guardarGasto(){
     const dateLabel = isNaN(dRaw) ? fecha : dRaw.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][dRaw.getMonth()];
     documentosRealesById[data.id] = {...payload, id:data.id, type:'gasto', client: proveedorNombre||'—', dateRaw:fecha, dateLabel, amountLabel: importe.toLocaleString('es-ES',{minimumFractionDigits:2})+' €', total: importe, status:'Pagado', num:'—'};
     const row = document.createElement('tr');
+    row.dataset.contabilidad = contabilidad;
     row.innerHTML = `<td>${dateLabel}</td><td>${concepto}</td><td>${proveedorNombre||'—'}</td><td class="num">${importe.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>`;
     document.getElementById('econ-gastos-tbody')?.prepend(row);
     cerrarRegistrarGasto();
@@ -7637,6 +7684,7 @@ function openDocumentViewer(id){
   document.getElementById('ni-job').value = doc.job==='—' ? '' : doc.job;
   document.getElementById('ni-date').value = doc.dateRaw;
   document.getElementById('ni-payment').value = doc.payment;
+  document.getElementById('ni-contabilidad').value = doc.contabilidad || 'oficial';
   document.getElementById('ni-iban').value = doc.iban;
   document.getElementById('ni-titular').value = doc.titular;
   onClientChange();
@@ -7726,6 +7774,7 @@ async function submitNewInvoice(ev, isDraft){
     entidad_id: entidad ? entidad.id : null,
     trabajo_id: trabajo ? trabajo.id : null,
     importe: total, concepto: conceptoResumen, conceptos,
+    contabilidad: document.getElementById('ni-contabilidad')?.value || 'oficial',
   };
   if(convirtiendoDesde){
     if(convirtiendoDesde.origenTipo==='albaran') payload.origen_albaran_ids = [convirtiendoDesde.origenId];
@@ -7813,6 +7862,17 @@ function renderAlbaranesAbiertos(){
     </tr>`).join('') : '<tr><td colspan="5" class="empty">Sin albaranes abiertos — todo facturado</td></tr>';
 }
 
+document.getElementById('econ-contabilidad-filter')?.addEventListener('click', (ev)=>{
+  const chip = ev.target.closest('.chip-filter');
+  if(!chip) return;
+  document.querySelectorAll('#econ-contabilidad-filter .chip-filter').forEach(e=>e.classList.remove('active'));
+  chip.classList.add('active');
+  const filtro = chip.dataset.cf;
+  document.querySelectorAll('#econ-facturas-tbody tr, #econ-presupuestos-tbody tr, #presupuestos-tbody-standalone tr, #econ-gastos-tbody tr').forEach(tr=>{
+    tr.style.display = (!filtro || tr.dataset.contabilidad === filtro) ? '' : 'none';
+  });
+});
+
 async function marcarEnviadoGestor(id){
   if(!sb) return;
   const hoy = new Date().toISOString().slice(0,10);
@@ -7873,6 +7933,7 @@ async function cargarDocumentosEconomicosReales(){
         row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : '';
         row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : '';
         row.dataset.total = totalNum;
+        row.dataset.contabilidad = doc.contabilidad || 'oficial';
         const gestorPill = doc.enviado_gestor
           ? `<span class="pill terminado" title="Enviada el ${doc.enviado_gestor_fecha||''}">Enviada ✓</span>`
           : `<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();marcarEnviadoGestor('${doc.id}')">Marcar enviada</button>`;
@@ -7880,10 +7941,15 @@ async function cargarDocumentosEconomicosReales(){
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
         const rowHtml = `<td class="mono">${doc.numero||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="mono">${trabajo?trabajo.code:'—'}</td><td>${dateLabel}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td>`;
-        const row = document.createElement('tr'); row.id = 'docrow-'+doc.id; row.onclick = () => openDocumentViewer(doc.id); row.innerHTML = rowHtml;
+        const row = document.createElement('tr'); row.id = 'docrow-'+doc.id; row.onclick = () => openDocumentViewer(doc.id); row.innerHTML = rowHtml; row.dataset.contabilidad = doc.contabilidad || 'oficial';
         document.getElementById('econ-presupuestos-tbody')?.appendChild(row);
-        const row2 = document.createElement('tr'); row2.onclick = () => openDocumentViewer(doc.id); row2.innerHTML = rowHtml;
+        const row2 = document.createElement('tr'); row2.onclick = () => openDocumentViewer(doc.id); row2.innerHTML = rowHtml; row2.dataset.contabilidad = doc.contabilidad || 'oficial';
         document.getElementById('presupuestos-tbody-standalone')?.appendChild(row2);
+      } else if(doc.tipo==='gasto'){
+        const row = document.createElement('tr');
+        row.dataset.contabilidad = doc.contabilidad || 'oficial';
+        row.innerHTML = `<td>${dateLabel}</td><td>${doc.concepto||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="num">${amountLabel}</td>`;
+        document.getElementById('econ-gastos-tbody')?.appendChild(row);
       }
     });
     actualizarContadorPresupuestosStandalone();
