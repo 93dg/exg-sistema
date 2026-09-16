@@ -1694,7 +1694,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.50</div>
+        <div class="sub">V0.51</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2957,6 +2957,23 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   </div>
 </div>
 
+<!-- ================= FORMULARIO GENÉRICO (sustituye a los prompt() de campos sueltos) ================= -->
+<div class="overlay" id="form-picker-overlay" onclick="if(event.target===this) cerrarFormPicker(null)">
+  <div class="drawer" style="max-width:420px;">
+    <div class="drawer-head">
+      <div><h2 id="form-picker-titulo">—</h2></div>
+      <button class="close-x" onclick="cerrarFormPicker(null)">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div id="form-picker-campos"></div>
+      <div class="state-row" style="margin-top:14px;">
+        <button class="btn primary" style="width:100%;" onclick="confirmarFormPicker()">Guardar</button>
+      </div>
+      <div id="form-picker-status" class="sub-t" style="margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ================= SELECTOR GENÉRICO (sustituye a los prompt() de listas) ================= -->
 <div class="overlay" id="picker-overlay" onclick="if(event.target===this) cerrarPicker(null)">
   <div class="drawer" style="max-width:360px;">
@@ -3311,8 +3328,8 @@ async function abrirAveria(){
   if(!nombreMaquina) return;
   const maquina = disponibles.find(m=>m.name===nombreMaquina);
   if(!maquina) return;
-  const sintoma = prompt('¿Qué le pasa? (síntoma)');
-  if(!sintoma || !sintoma.trim()) return;
+  const sintoma = (await pedirCampos('¿Qué le pasa?', [{id:'sintoma', label:'Síntoma', tipo:'textarea', requerido:true}])) ?.sintoma;
+  if(!sintoma) return;
 
   const {data, error} = await sb.from('averias').insert({flota_id: maquina.id, sintoma: sintoma.trim()}).select().single();
   if(error){ alert('Error al guardar: '+errText(error)); return; }
@@ -3624,13 +3641,15 @@ function renderProtocolos(){
     </div>`).join('') : '<div class="empty">Ningún protocolo todavía</div>';
 }
 async function addProtocolo(){
-  const title = prompt('Nombre del protocolo (ej. "Entrega de trabajo"):');
-  if(!title || !title.trim()) return;
-  const stepsRaw = prompt('Pasos, separados por punto y coma ( ; ):');
-  const steps = (stepsRaw||'').split(';').map(s=>s.trim()).filter(Boolean);
+  const r = await pedirCampos('Nuevo protocolo', [
+    {id:'title', label:'Nombre del protocolo', placeholder:'Ej. "Entrega de trabajo"', requerido:true},
+    {id:'steps', label:'Pasos, separados por punto y coma ( ; )', tipo:'textarea'},
+  ]);
+  if(!r) return;
+  const steps = (r.steps||'').split(';').map(s=>s.trim()).filter(Boolean);
   if(!sb){ alert('Conecta Supabase primero.'); return; }
   try{
-    const {error} = await sb.from('sistema').insert({tipo:'protocolo', data:{title: title.trim(), steps}});
+    const {error} = await sb.from('sistema').insert({tipo:'protocolo', data:{title: r.title, steps}});
     if(error){ alert('Error al guardar: '+errText(error)); return; }
   }catch(err){ alert('Error de red al guardar: '+errText(err)); return; }
   loadSistema();
@@ -3689,11 +3708,11 @@ async function reabrirReporte(id){
   renderMejora();
 }
 async function addMejora(){
-  const texto = prompt('¿Qué genera fricción, sobra, o se podría simplificar?');
-  if(!texto || !texto.trim()) return;
+  const r = await pedirCampos('Añadir reporte', [{id:'texto', label:'¿Qué genera fricción, sobra, o se podría simplificar?', tipo:'textarea', requerido:true}]);
+  if(!r) return;
   if(!sb){ alert('Conecta Supabase primero.'); return; }
   try{
-    const {error} = await sb.from('sistema').insert({tipo:'mejora', data:{texto: texto.trim(), estado:'pendiente'}});
+    const {error} = await sb.from('sistema').insert({tipo:'mejora', data:{texto: r.texto, estado:'pendiente'}});
     if(error){ alert('Error al guardar: '+errText(error)); return; }
   }catch(err){ alert('Error de red al guardar: '+errText(err)); return; }
   loadSistema();
@@ -3796,14 +3815,16 @@ function renderHistorial(){
     </div>`).join('') : '<div class="empty">Ninguna decisión registrada todavía</div>';
 }
 async function addDecision(){
-  const que = prompt('¿Qué se decidió?');
-  if(!que || !que.trim()) return;
-  const porque = prompt('¿Por qué se decidió?') || '';
-  const descartado = prompt('¿Qué se descartó? (opcional, deja en blanco si nada)') || '';
+  const r = await pedirCampos('Nueva decisión', [
+    {id:'que', label:'¿Qué se decidió?', tipo:'textarea', requerido:true},
+    {id:'porque', label:'¿Por qué se decidió?', tipo:'textarea'},
+    {id:'descartado', label:'¿Qué se descartó? (opcional)', tipo:'textarea'},
+  ]);
+  if(!r) return;
   const fecha = new Date().toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
   if(!sb){ alert('Conecta Supabase primero.'); return; }
   try{
-    const {error} = await sb.from('sistema').insert({tipo:'decision', data:{que: que.trim(), porque: porque.trim(), descartado: descartado.trim(), fecha}});
+    const {error} = await sb.from('sistema').insert({tipo:'decision', data:{que: r.que, porque: r.porque, descartado: r.descartado, fecha}});
     if(error){ alert('Error al guardar: '+errText(error)); return; }
   }catch(err){ alert('Error de red al guardar: '+errText(err)); return; }
   loadSistema();
@@ -4047,9 +4068,9 @@ async function marcarCorreo(messageId, categoria){
 async function vincularCorreo(messageId){
   const msg = correoMessagesCache.find(r=>r.id===messageId);
   if(!msg) return;
-  const nombreExistente = correoEntidadesCache.map(e=>e.nombre).join(', ');
-  const nombre = prompt(`¿A qué cliente/proveedor pertenece ${msg.email}?\n\nYa tienes guardados: ${nombreExistente || '(ninguno todavía)'}\n\nEscribe el nombre exacto de uno ya existente, o uno nuevo para crearlo:`);
-  if(!nombre || !nombre.trim()) return;
+  const nombresExistentes = correoEntidadesCache.map(e=>e.nombre);
+  const nombre = await elegirDeLista(`¿A qué cliente/proveedor pertenece ${msg.email}?`, nombresExistentes, true);
+  if(!nombre) return;
   let entidad = correoEntidadesCache.find(e=>e.nombre.toLowerCase()===nombre.trim().toLowerCase());
   if(!entidad){
     const tipo = confirm('¿Es un proveedor? (Aceptar = proveedor, Cancelar = cliente)') ? 'proveedor' : 'cliente';
@@ -4659,12 +4680,12 @@ function explorerDrop(e){
   if(files && files.length) explorerUploadFiles(files);
 }
 
-function explorerNewFolder(){
-  const name = prompt('Nombre de la nueva carpeta:');
-  if(!name) return;
+async function explorerNewFolder(){
+  const r = await pedirCampos('Nueva carpeta', [{id:'name', label:'Nombre de la carpeta', requerido:true}]);
+  if(!r) return;
   // Supabase Storage no tiene "carpetas" reales — se crean subiendo un archivo marcador dentro
   if(!sb){ alert('Conecta Supabase primero.'); return; }
-  const dest = (explorerPath ? explorerPath+'/' : '') + name + '/.keep';
+  const dest = (explorerPath ? explorerPath+'/' : '') + r.name + '/.keep';
   sb.storage.from(DOC_BUCKET).upload(dest, new Blob(['']), {upsert:true}).then(({error})=>{
     if(error){ alert('Error al crear carpeta: '+error.message); return; }
     loadExplorer(explorerPath);
@@ -4672,18 +4693,18 @@ function explorerNewFolder(){
 }
 
 async function explorerRename(fullPath, oldName){
-  const newName = prompt('Nuevo nombre:', oldName);
-  if(!newName || newName===oldName) return;
+  const r = await pedirCampos('Renombrar', [{id:'newName', label:'Nuevo nombre', valor:oldName, requerido:true}]);
+  if(!r || r.newName===oldName) return;
   const dir = fullPath.substring(0, fullPath.length - oldName.length);
-  const {error} = await sb.storage.from(DOC_BUCKET).move(fullPath, dir+newName);
+  const {error} = await sb.storage.from(DOC_BUCKET).move(fullPath, dir+r.newName);
   if(error){ alert('Error al renombrar: '+error.message); return; }
   loadExplorer(explorerPath);
 }
 
 async function explorerMove(fullPath, name){
-  const dest = prompt('Mover a qué carpeta (ej. gastos/2026/2026-09):', explorerPath);
-  if(dest===null) return;
-  const newPath = (dest ? dest+'/' : '') + name;
+  const r = await pedirCampos('Mover a qué carpeta', [{id:'dest', label:'Ruta destino', valor:explorerPath, placeholder:'ej. gastos/2026/2026-09'}]);
+  if(!r) return;
+  const newPath = (r.dest ? r.dest+'/' : '') + name;
   const {error} = await sb.storage.from(DOC_BUCKET).move(fullPath, newPath);
   if(error){ alert('Error al mover: '+error.message); return; }
   loadExplorer(explorerPath);
@@ -4713,14 +4734,16 @@ function renderFleetGrid(){
     </div>`).join('');
 }
 async function addMaquina(){
-  const name = prompt('Nombre de la máquina (ej. "Excavadora 3"):');
-  if(!name || !name.trim()) return;
-  const type = prompt('Tipo/modelo (ej. "CASE 580 Super LE"):') || '';
-  const nuevaMaquina = {name: name.trim(), type, state:'disponible', hours:'—', loc:'Nave Calle Industria', next:'Sin asignar'};
+  const r = await pedirCampos('Añadir máquina', [
+    {id:'name', label:'Nombre', placeholder:'Ej. "Excavadora 3"', requerido:true},
+    {id:'type', label:'Tipo/modelo', placeholder:'Ej. "CASE 580 Super LE"'},
+  ]);
+  if(!r) return;
+  const nuevaMaquina = {name: r.name, type: r.type, state:'disponible', hours:'—', loc:'Nave Calle Industria', next:'Sin asignar'};
   fleet.push(nuevaMaquina);
   renderFleetGrid();
   if(sb){
-    const {data, error} = await sb.from('flota').insert({nombre: name.trim(), tipo: type, estado:'activo'}).select().single();
+    const {data, error} = await sb.from('flota').insert({nombre: r.name, tipo: r.type, estado:'activo'}).select().single();
     if(error){ alert('Se añadió aquí, pero no se pudo guardar en Supabase: '+error.message); }
     else nuevaMaquina.id = data.id;
   } else {
@@ -5204,9 +5227,9 @@ async function onMapClick(e){
       nombre = await elegirDeLista('¿Qué máquina es?', fleet.map(m=>m.name), true);
       if(!nombre) { cancelPlacingSite(); return; }
     } else {
-      nombre = prompt('Nombre de este sitio (ej. "Finca los Álamos"):');
-      if(!nombre || !nombre.trim()) { cancelPlacingSite(); return; }
-      nombre = nombre.trim();
+      const r = await pedirCampos('Nombre de este sitio', [{id:'nombre', label:'Nombre', placeholder:'Ej. "Finca los Álamos"', requerido:true}]);
+      if(!r) { cancelPlacingSite(); return; }
+      nombre = r.nombre;
     }
     FINCAS_GUARDADAS.push({name: nombre, lat: pt.lat, lon: pt.lon, type});
     cancelPlacingSite();
@@ -5234,12 +5257,12 @@ function moveJobPin(code, dir){
   [jobPinOrder[i], jobPinOrder[j2]] = [jobPinOrder[j2], jobPinOrder[i]];
   renderJobPins();
 }
-function editJobPinNumber(code){
+async function editJobPinNumber(code){
   const i = jobPinOrder.indexOf(code);
   if(i<0) return;
-  const input = prompt('¿En qué posición de la ruta va este trabajo? (1 a '+jobPinOrder.length+')', i+1);
-  if(input===null) return;
-  let pos = parseInt(input,10);
+  const r = await pedirCampos('Posición en la ruta', [{id:'pos', label:`¿En qué posición? (1 a ${jobPinOrder.length})`, tipo:'number', valor:i+1, requerido:true}]);
+  if(!r) return;
+  let pos = parseInt(r.pos,10);
   if(isNaN(pos)) return;
   pos = Math.max(1, Math.min(jobPinOrder.length, pos)) - 1;
   jobPinOrder.splice(i,1);
@@ -5348,12 +5371,12 @@ initRealMap();
 
 
 /* ---------------- RETRASOS EN CADENA ---------------- */
-function registrarRetraso(code){
+async function registrarRetraso(code){
   const j = jobs.find(x=>x.code===code);
   if(!j) return;
-  const input = prompt('¿Cuántos días de retraso? (ej. 1 para un día, 5 para una semana)', j.delayDays || 1);
-  if(input===null) return;
-  const days = parseInt(input,10);
+  const r = await pedirCampos('Registrar retraso', [{id:'days', label:'¿Cuántos días de retraso?', tipo:'number', valor:j.delayDays||1, requerido:true}]);
+  if(!r) return;
+  const days = parseInt(r.days,10);
   if(isNaN(days) || days<0) return;
   j.delayDays = days;
   if(days===0){
@@ -5440,11 +5463,13 @@ cargarExpedientesReales();
 
 async function abrirNuevoExpediente(){
   if(!sb){ alert('Supabase no está conectado.'); return; }
-  const titulo = prompt('Título del expediente (ej. "Mantenimiento caminos rurales 2026"):');
-  if(!titulo || !titulo.trim()) return;
-  const descripcion = prompt('Descripción breve (opcional):') || '';
-  const fecha = prompt('Fecha límite (AAAA-MM-DD, opcional):') || null;
-  const {data, error} = await sb.from('expedientes').insert({titulo: titulo.trim(), descripcion: descripcion.trim(), fecha}).select().single();
+  const r = await pedirCampos('Nuevo expediente', [
+    {id:'titulo', label:'Título', placeholder:'Ej. "Mantenimiento caminos rurales 2026"', requerido:true},
+    {id:'descripcion', label:'Descripción (opcional)', tipo:'textarea'},
+    {id:'fecha', label:'Fecha límite (opcional)', tipo:'date'},
+  ]);
+  if(!r) return;
+  const {data, error} = await sb.from('expedientes').insert({titulo: r.titulo, descripcion: r.descripcion, fecha: r.fecha || null}).select().single();
   if(error){ alert('Error al guardar: '+errText(error)); return; }
   expedientesById[data.id] = data;
   renderExpedientesTabla();
@@ -6192,6 +6217,42 @@ document.querySelectorAll('#cierre-filters .chip-filter').forEach(el=>{
 calcularCierre(4);
 
 
+/* ---------------- FORMULARIO GENÉRICO — para pedir uno o varios campos, en vez de prompt() ---------------- */
+let formPickerResolve = null;
+let formPickerCampos = [];
+function pedirCampos(titulo, campos){
+  // campos: [{id, label, tipo:'text'|'number'|'date'|'textarea', valor, placeholder, requerido}]
+  return new Promise(resolve=>{
+    formPickerResolve = resolve;
+    formPickerCampos = campos;
+    document.getElementById('form-picker-titulo').textContent = titulo;
+    document.getElementById('form-picker-status').textContent = '';
+    document.getElementById('form-picker-campos').innerHTML = campos.map(c=>`
+      <div class="field" style="margin-bottom:12px;"><div class="l">${c.label}</div>
+        ${c.tipo==='textarea'
+          ? `<textarea class="search-box" style="width:100%;height:70px;" id="fp-${c.id}" placeholder="${c.placeholder||''}">${c.valor??''}</textarea>`
+          : `<input class="search-box" style="width:100%;" id="fp-${c.id}" type="${c.tipo||'text'}" value="${c.valor??''}" placeholder="${c.placeholder||''}">`}
+      </div>`).join('');
+    document.getElementById('form-picker-overlay').classList.add('active');
+    const first = document.getElementById('fp-'+campos[0].id);
+    if(first) setTimeout(()=>first.focus(), 50);
+  });
+}
+function confirmarFormPicker(){
+  const valores = {};
+  for(const c of formPickerCampos){
+    const v = document.getElementById('fp-'+c.id).value.trim();
+    if(c.requerido && !v){ document.getElementById('form-picker-status').textContent = 'Falta '+c.label.toLowerCase()+'.'; document.getElementById('form-picker-status').style.color = 'var(--red)'; return; }
+    valores[c.id] = v;
+  }
+  cerrarFormPicker(valores);
+}
+function cerrarFormPicker(valor){
+  document.getElementById('form-picker-overlay').classList.remove('active');
+  if(formPickerResolve) formPickerResolve(valor);
+  formPickerResolve = null;
+}
+
 /* ---------------- SELECTOR GENÉRICO — para elegir de una lista, en vez de prompt() con números a mano ---------------- */
 let pickerResolve = null;
 function elegirDeLista(titulo, opciones, permitirNuevo){
@@ -6210,9 +6271,9 @@ function cerrarPicker(valor){
   if(pickerResolve) pickerResolve(valor);
   pickerResolve = null;
 }
-function pickerNuevo(){
-  const nombre = prompt('Nombre:');
-  cerrarPicker(nombre && nombre.trim() ? nombre.trim() : null);
+async function pickerNuevo(){
+  const r = await pedirCampos('Nuevo', [{id:'nombre', label:'Nombre', requerido:true}]);
+  cerrarPicker(r ? r.nombre : null);
 }
 
 function abrirMenuTipoDoc(){
@@ -6403,16 +6464,16 @@ function wizRenderClienteCombo(){
   const matches = clientes.filter(c => q && c.name.toLowerCase().includes(q.toLowerCase())).slice(0,6);
   box.innerHTML = matches.map(c=>`<div class="combo-item" onmousedown="wiz.clientName='${c.name.replace(/'/g,"\\'")}';wizNext();">${c.name}</div>`).join('');
 }
-function wizNuevoCliente(){
-  const nombre = prompt('Nombre del cliente nuevo:');
-  if(!nombre || !nombre.trim()) return;
-  const nuevoCliente = {name: nombre.trim(), type:'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'};
+async function wizNuevoCliente(){
+  const r = await pedirCampos('Cliente nuevo', [{id:'nombre', label:'Nombre', requerido:true}]);
+  if(!r) return;
+  const nuevoCliente = {name: r.nombre, type:'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'};
   clientes.push(nuevoCliente);
-  if(sb) sb.from('entidades').insert({nombre: nombre.trim(), tipo:'cliente'}).select().single().then(({data,error})=>{
+  if(sb) sb.from('entidades').insert({nombre: r.nombre, tipo:'cliente'}).select().single().then(({data,error})=>{
     if(error){ console.error('No se pudo guardar el cliente en Supabase', error); return; }
     nuevoCliente.id = data.id;
   });
-  wiz.clientName = nombre.trim();
+  wiz.clientName = r.nombre;
   wizNext();
 }
 function wizRenderJobCombo(){
