@@ -1680,7 +1680,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.36</div>
+        <div class="sub">V0.37</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -4640,9 +4640,16 @@ function resetSemanaPlan(){
 function jobCardHtml(j){
   return `<div class="calendar-job ${j.urgent?'urgent':''}" draggable="true"
     ondragstart="calDragStart(event,'${j.code}')"
-    onclick="openJobDrawer('${j.code}')">
+    onclick="event.stopPropagation();openJobDrawer('${j.code}')">
     <div class="cj-cl">${j.client}</div><div class="cj-zn">${j.zone||''}${j.machine && j.machine!=='— sin especificar —' ? ' · '+j.machine : ''}</div>
   </div>`;
+}
+function irADia(iso){
+  calFecha = new Date(iso+'T00:00:00');
+  document.querySelectorAll('#calendar-view-tabs .chip-filter').forEach(e=>e.classList.remove('active'));
+  document.querySelector('#calendar-view-tabs [data-cv="dia"]').classList.add('active');
+  calVista = 'dia';
+  renderCalendar();
 }
 
 let calDragCode = null;
@@ -4687,7 +4694,7 @@ function renderCalendarSemana(cont, desc){
     const iso = isoDeFecha(d);
     const trabajosDia = jobs.filter(j=>j.scheduledDate===iso);
     total += trabajosDia.length;
-    return `<div class="calendar-day ${iso===hoyIso?'today':''}" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnDia(event,'${iso}')">
+    return `<div class="calendar-day ${iso===hoyIso?'today':''}" onclick="irADia('${iso}')" style="cursor:pointer;" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnDia(event,'${iso}')">
       <div class="calendar-day-head"><span>${DIAS_SEMANA_CORTOS[(d.getDay()+6)%7]}</span><span class="n">${d.getDate()} ${MESES_CORTOS[d.getMonth()]}</span></div>
       ${trabajosDia.length ? trabajosDia.map(jobCardHtml).join('') : '<div class="calendar-day-empty">Sin trabajos</div>'}
     </div>`;
@@ -4709,7 +4716,7 @@ function renderCalendarMes(cont, desc){
     const fueraDeMes = d.getMonth()!==month;
     const trabajosDia = jobs.filter(j=>j.scheduledDate===iso);
     total += (!fueraDeMes ? trabajosDia.length : 0);
-    celdas += `<div class="calendar-day calendar-day-mes ${iso===hoyIso?'today':''} ${fueraDeMes?'fuera-mes':''}" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnDia(event,'${iso}')">
+    celdas += `<div class="calendar-day calendar-day-mes ${iso===hoyIso?'today':''} ${fueraDeMes?'fuera-mes':''}" onclick="irADia('${iso}')" style="cursor:pointer;" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="calDropEnDia(event,'${iso}')">
       <div class="calendar-day-head"><span class="n">${d.getDate()}</span></div>
       ${trabajosDia.slice(0,3).map(jobCardHtml).join('')}
       ${trabajosDia.length>3 ? `<div class="calendar-day-mas">+${trabajosDia.length-3} más</div>` : ''}
