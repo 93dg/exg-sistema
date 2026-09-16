@@ -1704,7 +1704,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.66</div>
+        <div class="sub">V0.67</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2581,8 +2581,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
             <div><h1>Histórico</h1><div class="desc">Documentos antiguos extraídos automáticamente de Archivos — revisa y aprueba antes de que cuenten como reales</div></div>
             <div class="quickactions">
               <div class="filters" id="historico-filter" style="margin:0;">
-                <div class="chip-filter active" data-hf="sin_revisar">Sin revisar</div>
-                <div class="chip-filter" data-hf="revisar_a_fondo">Revisar a fondo</div>
+                <div class="chip-filter active" data-hf="pendiente_revisar">Pendientes de revisar</div>
                 <div class="chip-filter" data-hf="aprobado">Aprobados</div>
                 <div class="chip-filter" data-hf="">Todos</div>
               </div>
@@ -3420,7 +3419,7 @@ setupSubtabs('entradas-subtabs','entradas',{bandeja:'sub-bandeja',whatsapp:'sub-
 setupSubtabs('sistema-subtabs','sis',{principios:'sis-principios',organizacion:'sis-organizacion',protocolos:'sis-protocolos',criterios:'sis-criterios',estandares:'sis-estandares',historial:'sis-historial',oninicio:'sis-oninicio'});
 /* ---------------- HISTÓRICO — revisión de documentos antiguos extraídos automáticamente ---------------- */
 let HISTORICO_CACHE = [];
-let historicoFiltro = 'sin_revisar';
+let historicoFiltro = 'pendiente_revisar';
 let historicoEditandoId = null;
 
 async function cargarHistorico(){
@@ -3446,9 +3445,9 @@ function renderHistorico(){
     const nombreArchivo = h.archivo_path.split('/').pop();
     const estadoPill = h.estado==='aprobado' ? '<span class="pill terminado">Aprobado</span>'
       : h.estado==='descartado' ? '<span class="pill">Descartado</span>'
-      : h.estado==='revisar_a_fondo' ? '<span class="pill mantenimiento">Revisar a fondo</span>'
+      : h.estado==='pendiente_revisar' ? '<span class="pill mantenimiento">Pendiente de revisar</span>'
       : h.error ? '<span class="pill urgente">Error de lectura</span>'
-      : '<span class="pill pendiente">Sin revisar</span>';
+      : '<span class="pill pendiente">Sin validar todavía</span>';
     return `<tr onclick="abrirHistoricoModal('${h.id}')" style="cursor:pointer;">
       <td style="font-size:11.5px;">${nombreArchivo}</td>
       <td>${h.tipo_detectado || '—'}</td>
@@ -3462,15 +3461,13 @@ function renderHistorico(){
   const kpis = document.getElementById('historico-kpis');
   if(kpis){
     const total = HISTORICO_CACHE.length;
-    const sinRevisar = HISTORICO_CACHE.filter(h=>h.estado==='sin_revisar' && !h.error).length;
-    const aFondo = HISTORICO_CACHE.filter(h=>h.estado==='revisar_a_fondo').length;
+    const pendientes = HISTORICO_CACHE.filter(h=>h.estado==='pendiente_revisar').length;
     const aprobados = HISTORICO_CACHE.filter(h=>h.estado==='aprobado').length;
     const conError = HISTORICO_CACHE.filter(h=>h.error).length;
     kpis.innerHTML = `
       <div class="kpi"><div class="lbl">Total extraídos</div><div class="val">${total}</div></div>
-      <div class="kpi"><div class="lbl">Sin revisar</div><div class="val orange">${sinRevisar}</div></div>
-      <div class="kpi"><div class="lbl">Revisar a fondo</div><div class="val orange">${aFondo}</div></div>
-      <div class="kpi"><div class="lbl">Aprobados</div><div class="val green">${aprobados}</div></div>
+      <div class="kpi"><div class="lbl">Aprobados solos (cuadraba todo)</div><div class="val green">${aprobados}</div></div>
+      <div class="kpi"><div class="lbl">Pendientes de que los mires tú</div><div class="val orange">${pendientes}</div></div>
       <div class="kpi"><div class="lbl">Con error de lectura</div><div class="val red">${conError}</div></div>`;
   }
 }
