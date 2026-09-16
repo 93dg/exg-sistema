@@ -1712,7 +1712,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V0.84</div>
+        <div class="sub">V0.85</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
     </div>
@@ -2008,7 +2008,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <button class="btn" onclick="explorerNewFolder()">+ Carpeta</button>
           </div>
         </div>
-        <div class="panel-body" style="padding-bottom:0;display:flex;gap:8px;flex-wrap:wrap;">
+        <div class="panel-body" style="padding-bottom:0;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <input type="text" id="explorer-search" class="search-box" style="flex:1;min-width:180px;" placeholder="Buscar por nombre..." oninput="renderExplorerGrid()">
           <select id="explorer-type-filter" class="search-box" onchange="renderExplorerGrid()">
             <option value="">Todos los tipos</option>
@@ -2018,6 +2018,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <option value="img">Fotos</option>
             <option value="doc">Word</option>
           </select>
+          <button class="btn" style="display:none;" id="explorer-mover-sel-btn" onclick="moverSeleccionExplorer()">↦ Mover seleccionados (<span id="explorer-sel-count">0</span>)</button>
         </div>
         <div class="panel-body">
           <div class="explorer-grid" id="explorer-grid" ondragover="explorerDragOver(event)" ondragleave="explorerDragLeave(event)" ondrop="explorerDrop(event)"></div>
@@ -5102,6 +5103,7 @@ function explorerMatchesTypeFilter(name, isFolder, tipo){
 }
 
 function renderExplorerGrid(){
+  document.getElementById('explorer-mover-sel-btn').style.display = 'none';
   const grid = document.getElementById('explorer-grid');
   const busqueda = (document.getElementById('explorer-search').value || '').trim().toLowerCase();
   const tipo = document.getElementById('explorer-type-filter').value;
@@ -5134,6 +5136,7 @@ function renderExplorerGrid(){
     return `<div class="explorer-item" draggable="true"
       ondragstart="explorerDragStart(event,'${fullPath}',false)"
       onclick="window.open('${publicUrl}','_blank')">
+      <input type="checkbox" class="explorer-sel-chk" data-path="${fullPath}" onclick="event.stopPropagation();" onchange="actualizarSeleccionExplorer()" style="position:absolute;top:4px;left:4px;z-index:5;">
       <div class="exp-actions">
         <button title="Renombrar" onclick="event.stopPropagation();explorerRename('${fullPath}','${item.name}')">✎</button>
         <button title="Mover" onclick="event.stopPropagation();explorerMove('${fullPath}','${item.name}')">↦</button>
@@ -5367,6 +5370,28 @@ async function explorerRename(fullPath, oldName){
   loadExplorer(explorerPath);
 }
 
+function actualizarSeleccionExplorer(){
+  const marcados = document.querySelectorAll('.explorer-sel-chk:checked');
+  const btn = document.getElementById('explorer-mover-sel-btn');
+  document.getElementById('explorer-sel-count').textContent = marcados.length;
+  btn.style.display = marcados.length ? '' : 'none';
+}
+async function moverSeleccionExplorer(){
+  const marcados = Array.from(document.querySelectorAll('.explorer-sel-chk:checked'));
+  if(!marcados.length) return;
+  const r = await pedirCampos('Mover '+marcados.length+' archivo(s) a qué carpeta', [{id:'dest', label:'Ruta destino', valor:explorerPath, placeholder:'ej. gastos/2026/2026-09', requerido:true}]);
+  if(!r) return;
+  let ok = 0, fallos = 0;
+  for(const chk of marcados){
+    const fullPath = chk.dataset.path;
+    const nombre = fullPath.split('/').pop();
+    const newPath = (r.dest ? r.dest+'/' : '') + nombre;
+    const {error} = await sb.storage.from(DOC_BUCKET).move(fullPath, newPath);
+    if(error) fallos++; else ok++;
+  }
+  alert(`Movidos ${ok}${fallos ? `, ${fallos} con error` : ''}.`);
+  loadExplorer(explorerPath);
+}
 async function explorerMove(fullPath, name){
   const r = await pedirCampos('Mover a qué carpeta', [{id:'dest', label:'Ruta destino', valor:explorerPath, placeholder:'ej. gastos/2026/2026-09'}]);
   if(!r) return;
