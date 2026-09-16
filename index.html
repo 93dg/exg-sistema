@@ -228,16 +228,17 @@ table{border-collapse:collapse;width:100%;}
 /* ---------- FICHA / MODAL ---------- */
 .overlay{
   display:none;position:fixed;inset:0;background:rgba(27,31,36,0.5);
-  align-items:flex-start;justify-content:flex-end;z-index:3000;
+  align-items:center;justify-content:center;z-index:3000;padding:20px;
 }
 .overlay.active{display:flex;}
 .drawer{
-  background:var(--paper);width:600px;max-width:92vw;height:100vh;overflow-y:auto;
-  box-shadow:-6px 0 24px rgba(0,0,0,0.15);
+  background:var(--paper);width:600px;max-width:92vw;max-height:90vh;overflow-y:auto;
+  border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.35);
 }
 .drawer-head{
   padding:18px 22px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper);
   display:flex;justify-content:space-between;align-items:flex-start;z-index:2;
+  border-radius:14px 14px 0 0;
 }
 .drawer-head h2{font-size:19px;}
 .drawer-head .code{color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;font-size:12px;}
@@ -1752,7 +1753,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="panel-head"><h3>📋 Albaranes abiertos</h3><span class="count" id="control-albaranes-count">0</span></div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
-            <tr><th>Nº</th><th>Cliente</th><th>Trabajo</th><th>Fecha</th><th class="num">Importe</th><th></th></tr>
+            <tr><th>Nº</th><th>Cliente</th><th>Trabajo</th><th>Fecha</th><th class="num">Importe</th></tr>
             <tbody id="control-albaranes-tbody"></tbody>
           </table>
         </div>
@@ -1977,6 +1978,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="panel-body">
           <p class="two-col-note" style="margin-bottom:12px;">Mueve el histórico viejo (2005-2019, albaranes, fotos, documentos de máquinas...) a la estructura oficial de Sistema. Usa el método real que mueve el archivo de verdad, no solo el nombre — seguro para volver a ejecutar si se corta a medias.</p>
           <button class="btn primary" onclick="reorganizarArchivo()">🗂 Reorganizar ahora</button>
+          <button class="btn" onclick="mayusculizarArchivo()" style="margin-left:8px;">🔠 Poner todo en MAYÚSCULAS</button>
           <div id="reorganizar-status" class="sub-t" style="margin-top:10px;"></div>
         </div>
       </div>
@@ -2928,6 +2930,29 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
   </div>
 </div>
 
+<!-- ================= MODAL: FICHA DE MÁQUINA ================= -->
+<div class="overlay" id="maquina-overlay" onclick="if(event.target===this) cerrarMaquinaModal()">
+  <div class="drawer" style="max-width:480px;">
+    <div class="drawer-head">
+      <div><h2 id="maquina-modal-nombre">—</h2><div class="sub-t" id="maquina-modal-tipo">—</div></div>
+      <button class="close-x" onclick="cerrarMaquinaModal()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field" style="margin-bottom:12px;"><div class="l">Matrícula</div>
+        <input class="search-box mono" style="width:100%;" id="maquina-matricula">
+      </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Ficha técnica (año, potencia, peso, nº de serie, neumáticos... lo que quieras poder copiar rápido)</div>
+        <textarea class="search-box" style="width:100%;height:160px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;" id="maquina-ficha"></textarea>
+      </div>
+      <div class="state-row" style="gap:8px;">
+        <button class="btn" style="flex:1;" onclick="copiarFichaMaquina()">📋 Copiar todo</button>
+        <button class="btn primary" style="flex:1;" onclick="guardarFichaMaquina()">Guardar</button>
+      </div>
+      <div id="maquina-modal-status" class="sub-t" style="margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ================= MODAL: TARIFA ================= -->
 <div class="overlay" id="tarifa-overlay" onclick="if(event.target===this) cerrarTarifaModal()">
   <div class="drawer" style="max-width:420px;">
@@ -3124,8 +3149,8 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <div class="two-col-note" id="ie-dictado-note">La lectura automática de fotos (OCR) todavía no está conectada — de momento solo guarda la imagen adjunta como referencia. Cuando conectemos IA con visión, esto rellenará las líneas solo.</div>
         </div>
 
-        <div class="ie-footer">
-          <div class="ie-payment">
+        <div class="ie-footer" id="ie-payment-block">
+          <div class="ie-payment" id="ie-payment-fields">
             <div class="field" style="margin-bottom:10px;"><div class="l">Forma de pago</div>
               <select class="search-box" style="width:100%;" id="ni-payment">
                 <option>Transferencia</option>
@@ -4668,6 +4693,40 @@ function categorizarRuta(oldPath){
   return null; // ya está bien organizado (economia/, trabajos/, flota/, empresa/, plantillas/, sin-clasificar/...)
 }
 
+function mayusculizarRuta(path){
+  const dot = path.lastIndexOf('.');
+  const slash = path.lastIndexOf('/');
+  const ext = (dot > slash) ? path.slice(dot).toLowerCase() : '';
+  const sinExt = (dot > slash) ? path.slice(0, dot) : path;
+  const mayus = sinExt.toUpperCase();
+  return mayus + ext;
+}
+async function mayusculizarArchivo(){
+  const statusEl = document.getElementById('reorganizar-status');
+  if(!sb){ statusEl.textContent = 'Supabase no conectado.'; statusEl.style.color = 'var(--red)'; return; }
+  if(!confirm('Esto renombra TODO el archivo a mayúsculas, con el método real (no rompe nada). Puede tardar unos minutos. ¿Seguimos?')) return;
+  statusEl.style.color = 'var(--ink-soft)';
+  statusEl.textContent = 'Listando archivos...';
+  const todos = await explorerListRecursive('excavaciones-gomez');
+  const movimientos = todos.map(p=>{
+    const nueva = mayusculizarRuta(p);
+    return nueva !== p ? {origen: p, destino: nueva} : null;
+  }).filter(Boolean);
+  if(!movimientos.length){ statusEl.textContent = 'Ya está todo en mayúsculas.'; statusEl.style.color = 'var(--green)'; return; }
+  let ok = 0, fallos = 0;
+  for(let i=0; i<movimientos.length; i++){
+    const {origen, destino} = movimientos[i];
+    statusEl.textContent = `Poniendo en mayúsculas ${i+1} de ${movimientos.length}...`;
+    try{
+      const {error} = await sb.storage.from(DOC_BUCKET).move(origen, destino);
+      if(error) fallos++; else ok++;
+    }catch(e){ fallos++; }
+  }
+  statusEl.textContent = `Listo: ${ok} renombrados${fallos ? `, ${fallos} con error (puedes volver a pulsar, es seguro repetir)` : ''}.`;
+  statusEl.style.color = fallos ? 'var(--orange)' : 'var(--green)';
+  loadExplorer(explorerPath);
+}
+
 async function reorganizarArchivo(){
   const statusEl = document.getElementById('reorganizar-status');
   if(!sb){ statusEl.textContent = 'Supabase no conectado.'; statusEl.style.color = 'var(--red)'; return; }
@@ -4851,11 +4910,46 @@ document.getElementById('fleet-grid').innerHTML = fleet.map(m=>`
   </div>`).join('');
 function renderFleetGrid(){
   document.getElementById('fleet-grid').innerHTML = fleet.map(m=>`
-    <div class="machine-card">
+    <div class="machine-card" onclick="abrirMaquinaModal('${m.id||''}')" style="cursor:pointer;">
       <div class="top"><div><div class="mname">${m.name}</div><div class="mtype">${m.type}</div></div>${pill(m.state)}</div>
       <div class="metrics"><div>Uso<b>${m.hours}</b></div><div>Ubicación<b style="font-size:12px;">${m.loc}</b></div></div>
       <div class="foot">${m.next}</div>
     </div>`).join('');
+}
+function abrirMaquinaModal(id){
+  const m = fleet.find(f=>f.id===id);
+  if(!m){ alert('Esta máquina todavía no tiene id real — espera a que cargue o recarga la página.'); return; }
+  document.getElementById('maquina-modal-nombre').textContent = m.name;
+  document.getElementById('maquina-modal-tipo').textContent = m.type || '—';
+  document.getElementById('maquina-matricula').value = m.matricula || '';
+  document.getElementById('maquina-ficha').value = m.fichaTecnica || '';
+  document.getElementById('maquina-modal-status').textContent = '';
+  document.getElementById('maquina-overlay').dataset.id = id;
+  document.getElementById('maquina-overlay').classList.add('active');
+}
+function cerrarMaquinaModal(){ document.getElementById('maquina-overlay').classList.remove('active'); }
+async function guardarFichaMaquina(){
+  const id = document.getElementById('maquina-overlay').dataset.id;
+  const m = fleet.find(f=>f.id===id);
+  const statusEl = document.getElementById('maquina-modal-status');
+  if(!m || !sb){ statusEl.textContent = 'Supabase no está conectado.'; statusEl.style.color = 'var(--red)'; return; }
+  const matricula = document.getElementById('maquina-matricula').value.trim();
+  const ficha = document.getElementById('maquina-ficha').value.trim();
+  const {error} = await sb.from('flota').update({matricula, ficha_tecnica: ficha}).eq('id', id);
+  if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
+  m.matricula = matricula; m.fichaTecnica = ficha;
+  statusEl.textContent = 'Guardado ✓'; statusEl.style.color = 'var(--green)';
+}
+function copiarFichaMaquina(){
+  const nombre = document.getElementById('maquina-modal-nombre').textContent;
+  const tipo = document.getElementById('maquina-modal-tipo').textContent;
+  const matricula = document.getElementById('maquina-matricula').value.trim();
+  const ficha = document.getElementById('maquina-ficha').value.trim();
+  const texto = `${nombre} — ${tipo}${matricula ? '\nMatrícula: '+matricula : ''}${ficha ? '\n'+ficha : ''}`;
+  navigator.clipboard.writeText(texto).then(()=>{
+    const statusEl = document.getElementById('maquina-modal-status');
+    statusEl.textContent = 'Copiado ✓'; statusEl.style.color = 'var(--green)';
+  }).catch(()=>{ alert('No se pudo copiar — selecciona el texto a mano.'); });
 }
 async function addMaquina(){
   const r = await pedirCampos('Añadir máquina', [
@@ -4897,7 +4991,7 @@ async function cargarDatosReales(){
     if(flotaReal && flotaReal.length){
       flotaReal.forEach(m=>{
         if(fleet.some(f=>f.name===m.nombre)) return;
-        fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', state: m.estado==='activo' ? 'disponible' : m.estado, hours:'—', loc:'Nave Calle Industria', next:'Sin asignar'});
+        fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', state: m.estado==='activo' ? 'disponible' : m.estado, hours:'—', loc:'Nave Calle Industria', next:'Sin asignar', matricula: m.matricula||'', fichaTecnica: m.ficha_tecnica||''});
       });
       renderFleetGrid();
     }
@@ -5324,8 +5418,16 @@ let placingSiteType = null;
 const SITE_TYPE_LABEL = {sitio:'sitio', maquinaria:'maquinaria', rafa:'Rafa', manolo:'Manolo'};
 const SITE_TYPE_ICON = {sitio:'📌', maquinaria:'🚜', rafa:'👷', manolo:'👷'};
 
-function startPlacingSite(type){
+let placingSiteExtra = null; // nombre ya elegido de antemano (ej. qué máquina), para no preguntarlo tras el clic en el mapa
+async function startPlacingSite(type){
   if(placingSiteType===type){ cancelPlacingSite(); return; }
+  if(type==='maquinaria'){
+    const nombre = await elegirDeLista('¿Qué máquina vas a marcar?', fleet.map(m=>m.name), true);
+    if(!nombre) return;
+    placingSiteExtra = nombre;
+  } else {
+    placingSiteExtra = null;
+  }
   placingSiteType = type;
   document.getElementById('site-hint').style.display = 'inline';
   document.querySelectorAll('#site-btn-sitio,#site-btn-maquinaria,#site-btn-rafa,#site-btn-manolo').forEach(b=>b.classList.remove('primary'));
@@ -5333,6 +5435,7 @@ function startPlacingSite(type){
 }
 function cancelPlacingSite(){
   placingSiteType = null;
+  placingSiteExtra = null;
   document.getElementById('site-hint').style.display = 'none';
   document.querySelectorAll('#site-btn-sitio,#site-btn-maquinaria,#site-btn-rafa,#site-btn-manolo').forEach(b=>b.classList.remove('primary'));
 }
@@ -5348,7 +5451,7 @@ async function onMapClick(e){
       const i = FINCAS_GUARDADAS.findIndex(f=>f.type===type);
       if(i>=0) FINCAS_GUARDADAS.splice(i,1);
     } else if(type==='maquinaria'){
-      nombre = await elegirDeLista('¿Qué máquina es?', fleet.map(m=>m.name), true);
+      nombre = placingSiteExtra;
       if(!nombre) { cancelPlacingSite(); return; }
     } else {
       const r = await pedirCampos('Nombre de este sitio', [{id:'nombre', label:'Nombre', placeholder:'Ej. "Finca los Álamos"', requerido:true}]);
@@ -5534,6 +5637,7 @@ async function cargarEntidadesReales(){
       clientes.push({id: e.id, name: e.nombre, type: tipoMap[(e.tipo||'').toLowerCase()] || 'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'});
     });
     renderClientesTable();
+    fillClientSelects();
   }catch(err){ console.error('No se pudieron cargar las entidades reales', err); }
 }
 cargarEntidadesReales();
@@ -5995,6 +6099,7 @@ function onDocTypeChange(){
     document.getElementById('ni-suggest').textContent = '(último usado: '+cfg.prefix+(cfg.seqRef()-1)+')';
   }
   document.getElementById('ie-iva-row').style.display = cfg.hasIva ? 'flex' : 'none';
+  document.getElementById('ie-payment-fields').style.display = (t==='albaran') ? 'none' : '';
   updateConceptoTransferencia();
   recalcTotals();
 }
@@ -6860,10 +6965,9 @@ function renderAlbaranesAbiertos(){
     .sort((a,b)=> new Date(b.created_at||0) - new Date(a.created_at||0));
   document.getElementById('control-albaranes-count').textContent = abiertos.length;
   tbody.innerHTML = abiertos.length ? abiertos.map(a=>`
-    <tr>
+    <tr onclick="openDocumentViewer('${a.id}')" style="cursor:pointer;">
       <td class="mono">${a.num||'—'}</td><td>${a.client}</td><td class="mono">${a.job&&a.job!=='—'?a.job:'—'}</td><td>${a.dateLabel}</td><td class="num">${a.amountLabel}</td>
-      <td><button class="btn" style="padding:3px 10px;font-size:11px;" onclick="openDocumentViewer('${a.id}')">Abrir</button></td>
-    </tr>`).join('') : '<tr><td colspan="6" class="empty">Sin albaranes abiertos — todo facturado</td></tr>';
+    </tr>`).join('') : '<tr><td colspan="5" class="empty">Sin albaranes abiertos — todo facturado</td></tr>';
 }
 
 async function cargarDocumentosEconomicosReales(){
