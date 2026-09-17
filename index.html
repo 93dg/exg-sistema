@@ -1741,7 +1741,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.13</div>
+        <div class="sub">V1.14</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2216,6 +2216,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <th class="num">Cobrado</th>
               <th>Estado</th>
               <th>Gestor</th>
+              <th>Falta</th>
+              <th>Archivo</th>
             </tr>
             <tbody id="econ-facturas-tbody">
             </tbody>
@@ -8294,7 +8296,11 @@ async function cargarDocumentosEconomicosReales(){
         const gestorPill = doc.enviado_gestor
           ? `<span class="pill terminado" title="Enviada el ${doc.enviado_gestor_fecha||''}">Enviada ✓</span>`
           : `<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();marcarEnviadoGestor('${doc.id}')">Marcar enviada</button>`;
-        row.innerHTML = `<td class="mono">${doc.numero||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="mono">${trabajo?trabajo.code:'—'}</td><td>${dateLabel}</td><td>—</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td><td>${gestorPill}</td>`;
+        const archivoUrlReal = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
+        const faltaTexto = (doc.info_faltante && doc.info_faltante.startsWith('Falta:')) ? doc.info_faltante.split('.')[0].replace('Falta: ','') : '';
+        const faltaHtml = faltaTexto ? `<span class="pill mantenimiento" title="${doc.info_faltante}">${faltaTexto}</span>` : '<span class="pill terminado">Completo</span>';
+        const archivoHtml = archivoUrlReal ? `<a href="${archivoUrlReal}" target="_blank" onclick="event.stopPropagation();">📎 Ver</a>` : '—';
+        row.innerHTML = `<td class="mono">${doc.numero||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="mono">${trabajo?trabajo.code:'—'}</td><td>${dateLabel}</td><td>—</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td><td>${gestorPill}</td><td>${faltaHtml}</td><td>${archivoHtml}</td>`;
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
         const rowHtml = `<td class="mono">${doc.numero||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="mono">${trabajo?trabajo.code:'—'}</td><td>${dateLabel}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td>`;
