@@ -1738,7 +1738,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.07</div>
+        <div class="sub">V1.08</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4333,7 +4333,10 @@ function renderDocsEmpresa(){
         <div class="l" style="margin-bottom:4px;">Lo importante del documento</div>
         ${d.info_clave
           ? `<pre style="white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:13px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin:0;">${d.info_clave}</pre>`
-          : `<div class="two-col-note">Todavía no he leído este documento para sacar sus datos reales. Pídemelo en el chat y lo leo (como hice con los DNI).</div>`}
+          : `<div style="display:flex;align-items:center;gap:10px;">
+              <div class="two-col-note" style="margin:0;">Todavía no he leído este documento para sacar sus datos reales.</div>
+              <button class="btn" id="btn-leer-${d.id}" onclick="pedirLeerDocEmpresa('${d.id}')">📖 Leer</button>
+            </div>`}
       </div>
       <details>
         <summary style="cursor:pointer;color:var(--ink-soft);font-size:12.5px;">Editar ficha (categoría, nombre, caducidad, archivo)</summary>
@@ -4357,6 +4360,17 @@ function renderDocsEmpresa(){
 function toggleExpandirDocEmpresa(id){
   empresaDocExpandidoId = empresaDocExpandidoId === id ? null : id;
   renderDocsEmpresa();
+}
+async function pedirLeerDocEmpresa(id){
+  const d = EMPRESA_DOCS.find(x=>x.id===id);
+  if(!d || !sb) return;
+  const btn = document.getElementById('btn-leer-'+id);
+  if(btn){ btn.disabled = true; btn.textContent = 'Pidiendo...'; }
+  const texto = `[Empresa] Leer el documento "${d.nombre}" (categoría ${d.categoria}${d.archivo_path ? ', archivo: '+d.archivo_path : ', sin archivo adjuntado todavía'}) y sacar sus datos reales (número, titular, fechas...) para rellenar la ficha, igual que se hizo con los DNI.`;
+  const {error} = await sb.from('sistema').insert({tipo:'mejora', data:{texto, estado:'pendiente'}});
+  if(error){ mostrarToast('Error: '+errText(error), 'err'); if(btn){ btn.disabled=false; btn.textContent='📖 Leer'; } return; }
+  mostrarToast('Pedido — lo verás la próxima vez que revises los reportes.', 'ok');
+  if(btn) btn.textContent = '✓ Pedido';
 }
 async function guardarDocEmpresaInline(id){
   const statusEl = document.getElementById('ed-status-'+id);
