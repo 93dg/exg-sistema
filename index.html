@@ -1738,7 +1738,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.04</div>
+        <div class="sub">V1.05</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -1758,6 +1758,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="flota"><span class="ico">⛭</span><span class="label"> Flota</span></button>
       <button data-view="clientes"><span class="ico">◈</span><span class="label"> Clientes</span></button>
       <button data-view="ayuntamiento"><span class="ico">⌂</span><span class="label"> Ayuntamiento</span></button>
+      <button data-view="empresa" class="admin-only"><span class="ico">🏢</span><span class="label"> Empresa</span></button>
       <button data-view="facturas"><span class="ico">🧾</span><span class="label"> Facturas</span></button>
       <button data-view="presupuestos"><span class="ico">📋</span><span class="label"> Presupuestos</span></button>
       <button data-view="tarifas"><span class="ico">💶</span><span class="label"> Tarifas</span></button>
@@ -2666,6 +2667,28 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </div>
     </div>
 
+        <!-- ================= EMPRESA ================= -->
+        <div class="view" id="view-empresa">
+          <div class="topbar">
+            <div><h1>Empresa</h1><div class="desc">Documentación de empresa — seguros, certificados, DNI... con fecha de caducidad</div></div>
+            <div class="quickactions"><button class="btn primary" onclick="abrirNuevoDocEmpresa()">+ Nuevo documento</button></div>
+          </div>
+          <div class="panel">
+            <div class="panel-body" style="padding:0;">
+              <table class="tbl">
+                <tr>
+                  <th class="ord" onclick="ordenarTabla('empresa-docs-tbl',0,'text')">Categoría ⇅</th>
+                  <th class="ord" onclick="ordenarTabla('empresa-docs-tbl',1,'text')">Documento ⇅</th>
+                  <th>Archivo</th>
+                  <th class="ord" onclick="ordenarTabla('empresa-docs-tbl',3,'text')">Caducidad ⇅</th>
+                  <th></th>
+                </tr>
+                <tbody id="empresa-docs-tbl"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <!-- ================= HISTÓRICO ================= -->
         <div class="view" id="view-historico">
           <div class="topbar">
@@ -3062,6 +3085,36 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         </div>
         <button type="submit" class="btn primary" style="width:100%;">Crear trabajo</button>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: DOCUMENTO DE EMPRESA ================= -->
+<div class="overlay" id="empresa-doc-overlay" onclick="if(event.target===this) cerrarDocEmpresa()">
+  <div class="drawer" style="max-width:420px;">
+    <div class="drawer-head">
+      <div><h2 id="empresa-doc-titulo">Nuevo documento</h2></div>
+      <button class="close-x" onclick="cerrarDocEmpresa()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field" style="margin-bottom:12px;"><div class="l">Categoría</div>
+        <input class="search-box" style="width:100%;" id="empresa-doc-categoria" list="empresa-doc-categorias-list" placeholder="Ej. Seguros">
+        <datalist id="empresa-doc-categorias-list"></datalist>
+      </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Nombre del documento</div>
+        <input class="search-box" style="width:100%;" id="empresa-doc-nombre" placeholder="Ej. Póliza responsabilidad civil">
+      </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Fecha de caducidad (opcional)</div>
+        <input class="search-box" style="width:100%;" id="empresa-doc-caducidad" type="date">
+      </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Archivo</div>
+        <div id="empresa-doc-archivo-actual" class="sub-t" style="margin-bottom:6px;"></div>
+        <input type="file" id="empresa-doc-archivo-input" class="search-box" style="width:100%;">
+      </div>
+      <div class="state-row" style="gap:8px;">
+        <button class="btn primary" style="flex:1;" onclick="guardarDocEmpresa()">Guardar</button>
+      </div>
+      <div class="sub-t" id="empresa-doc-status" style="margin-top:8px;"></div>
     </div>
   </div>
 </div>
@@ -4233,6 +4286,122 @@ async function guardarPermisos(){
   }
 }
 cargarPermisos();
+
+/* ---------------- EMPRESA — documentación con fecha de caducidad ---------------- */
+let EMPRESA_DOCS = [];
+let empresaDocEditandoId = null;
+async function cargarDocsEmpresa(){
+  if(!sb) return;
+  const {data} = await sb.from('documentos_empresa').select('*').order('categoria');
+  EMPRESA_DOCS = data || [];
+  renderDocsEmpresa();
+}
+function diasHastaCaducidad(fecha){
+  if(!fecha) return null;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const cad = new Date(fecha+'T00:00:00');
+  return Math.round((cad - hoy) / 86400000);
+}
+function renderDocsEmpresa(){
+  const tbody = document.getElementById('empresa-docs-tbl');
+  if(!tbody) return;
+  tbody.innerHTML = EMPRESA_DOCS.length ? EMPRESA_DOCS.map(d=>{
+    const dias = diasHastaCaducidad(d.fecha_caducidad);
+    let caducidadHtml = '—';
+    if(d.fecha_caducidad){
+      const fechaFmt = new Date(d.fecha_caducidad+'T00:00:00').toLocaleDateString('es-ES');
+      if(dias < 0) caducidadHtml = `<span class="pill urgente">Caducado — ${fechaFmt}</span>`;
+      else if(dias <= 30) caducidadHtml = `<span class="pill mantenimiento">Caduca en ${dias} días — ${fechaFmt}</span>`;
+      else caducidadHtml = fechaFmt;
+    }
+    return `<tr onclick="abrirEditarDocEmpresa('${d.id}')" style="cursor:pointer;">
+      <td>${d.categoria}</td>
+      <td>${d.nombre}</td>
+      <td onclick="event.stopPropagation();">${d.archivo_url ? `<a href="${d.archivo_url}" target="_blank">📎 Ver archivo</a>` : '<span class="sub-t">Sin adjuntar</span>'}</td>
+      <td>${caducidadHtml}</td>
+      <td onclick="event.stopPropagation();"><span style="cursor:pointer;color:var(--red);font-weight:800;" onclick="borrarDocEmpresa('${d.id}')">✕</span></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="5" class="empty">Sin documentos todavía</td></tr>';
+  renderAtencionDocsEmpresa();
+}
+function renderAtencionDocsEmpresa(){
+  document.querySelectorAll('.atencion-empresa-doc').forEach(el=>el.remove()); // quita avisos viejos antes de volver a añadir
+  const urgentes = EMPRESA_DOCS.filter(d=>{
+    const dias = diasHastaCaducidad(d.fecha_caducidad);
+    return dias !== null && dias <= 30;
+  });
+  const cont = document.getElementById('atencion-list');
+  if(cont && urgentes.length){
+    urgentes.forEach(d=>{
+      const dias = diasHastaCaducidad(d.fecha_caducidad);
+      cont.insertAdjacentHTML('beforeend', `<div class="task-row atencion-empresa-doc" onclick="document.querySelector('[data-view=\\'empresa\\']').click()" style="cursor:pointer;">
+        <span style="flex:1;">📄 ${d.nombre} (Empresa)</span>
+        <span class="sub-t" style="color:${dias<0?'var(--red)':'var(--orange)'};">${dias<0?'Caducado':'Caduca en '+dias+' días'}</span>
+      </div>`);
+    });
+  }
+}
+function abrirNuevoDocEmpresa(){
+  empresaDocEditandoId = null;
+  document.getElementById('empresa-doc-titulo').textContent = 'Nuevo documento';
+  document.getElementById('empresa-doc-categoria').value = '';
+  document.getElementById('empresa-doc-nombre').value = '';
+  document.getElementById('empresa-doc-caducidad').value = '';
+  document.getElementById('empresa-doc-archivo-actual').textContent = '';
+  document.getElementById('empresa-doc-archivo-input').value = '';
+  document.getElementById('empresa-doc-status').textContent = '';
+  document.getElementById('empresa-doc-categorias-list').innerHTML = [...new Set(EMPRESA_DOCS.map(d=>d.categoria))].map(c=>`<option value="${c}">`).join('');
+  document.getElementById('empresa-doc-overlay').classList.add('active');
+}
+function abrirEditarDocEmpresa(id){
+  const d = EMPRESA_DOCS.find(x=>x.id===id);
+  if(!d) return;
+  empresaDocEditandoId = id;
+  document.getElementById('empresa-doc-titulo').textContent = 'Editar documento';
+  document.getElementById('empresa-doc-categoria').value = d.categoria;
+  document.getElementById('empresa-doc-nombre').value = d.nombre;
+  document.getElementById('empresa-doc-caducidad').value = d.fecha_caducidad || '';
+  document.getElementById('empresa-doc-archivo-actual').innerHTML = d.archivo_url ? `<a href="${d.archivo_url}" target="_blank">📎 Ver archivo actual</a> — sube otro para reemplazarlo` : 'Sin archivo adjuntado todavía';
+  document.getElementById('empresa-doc-archivo-input').value = '';
+  document.getElementById('empresa-doc-status').textContent = '';
+  document.getElementById('empresa-doc-categorias-list').innerHTML = [...new Set(EMPRESA_DOCS.map(d=>d.categoria))].map(c=>`<option value="${c}">`).join('');
+  document.getElementById('empresa-doc-overlay').classList.add('active');
+}
+function cerrarDocEmpresa(){ document.getElementById('empresa-doc-overlay').classList.remove('active'); }
+async function guardarDocEmpresa(){
+  const statusEl = document.getElementById('empresa-doc-status');
+  const categoria = document.getElementById('empresa-doc-categoria').value.trim();
+  const nombre = document.getElementById('empresa-doc-nombre').value.trim();
+  const caducidad = document.getElementById('empresa-doc-caducidad').value || null;
+  if(!categoria || !nombre){ statusEl.textContent = 'Falta la categoría o el nombre.'; statusEl.style.color = 'var(--red)'; return; }
+  if(!sb){ statusEl.textContent = 'Supabase no está conectado.'; statusEl.style.color = 'var(--red)'; return; }
+
+  const payload = {categoria, nombre, fecha_caducidad: caducidad};
+  const archivo = document.getElementById('empresa-doc-archivo-input').files[0];
+  if(archivo){
+    statusEl.textContent = 'Subiendo archivo...'; statusEl.style.color = 'var(--ink-soft)';
+    const path = `EXCAVACIONES-GOMEZ/EMPRESA/${sanitizeFileName(categoria)}/${sanitizeFileName(archivo.name)}`;
+    const {error: upErr} = await sb.storage.from(DOC_BUCKET).upload(path, archivo, {upsert:true});
+    if(upErr){ statusEl.textContent = 'Error al subir: '+upErr.message; statusEl.style.color = 'var(--red)'; return; }
+    payload.archivo_path = path;
+    payload.archivo_url = sb.storage.from(DOC_BUCKET).getPublicUrl(path).data.publicUrl;
+  }
+
+  const {error} = empresaDocEditandoId
+    ? await sb.from('documentos_empresa').update(payload).eq('id', empresaDocEditandoId)
+    : await sb.from('documentos_empresa').insert(payload);
+  if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
+  cerrarDocEmpresa();
+  cargarDocsEmpresa();
+}
+async function borrarDocEmpresa(id){
+  const ok = await confirmarAccion('¿Borrar este documento de la lista? (el archivo en Storage no se borra, solo la ficha)');
+  if(!ok || !sb) return;
+  const {error} = await sb.from('documentos_empresa').delete().eq('id', id);
+  if(error){ mostrarToast('Error: '+errText(error), 'err'); return; }
+  cargarDocsEmpresa();
+}
+cargarDocsEmpresa();
 cargarUIConfig();
 
 async function doLogin(){
