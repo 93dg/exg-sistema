@@ -1742,7 +1742,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.25</div>
+        <div class="sub">V1.26</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2188,22 +2188,22 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="kpi-strip" id="facturas-kpi-strip" style="margin-bottom:16px;"></div>
 
       <div class="panel">
-        <div class="panel-head">
-          <h3>Facturas</h3>
-          <span style="display:flex;align-items:center;gap:10px;">
-            <select class="search-box" id="fact-filtro-anio" onchange="filtrarTablaOrdenable('econ-facturas-tbody')" style="padding:5px 8px;font-size:12px;">
-              <option value="">Todos los años</option>
-            </select>
-            <select class="search-box" id="fact-filtro-trim" onchange="filtrarTablaOrdenable('econ-facturas-tbody')" style="padding:5px 8px;font-size:12px;">
-              <option value="">Todos los trimestres</option>
-              <option value="1">1º trimestre</option>
-              <option value="2">2º trimestre</option>
-              <option value="3">3º trimestre</option>
-              <option value="4">4º trimestre</option>
-            </select>
-            <button class="btn" onclick="marcarTrimestreEnviado()" title="Marca como enviadas al gestor todas las facturas del año/trimestre que tengas seleccionado en los filtros de arriba">📤 Marcar trimestre como enviado</button>
-            <span class="count">0 vencidas</span>
-          </span>
+        <div class="panel-head" style="flex-direction:column;align-items:stretch;gap:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <h3>Facturas</h3>
+            <span style="display:flex;align-items:center;gap:10px;">
+              <button class="btn" onclick="marcarTrimestreEnviado()" title="Marca como enviadas al gestor todas las facturas del año/trimestre que tengas seleccionado en los filtros de arriba">📤 Marcar trimestre como enviado</button>
+              <span class="count">0 vencidas</span>
+            </span>
+          </div>
+          <div class="filters" id="fact-filtro-anio-chips" style="margin:0;"></div>
+          <div class="filters" id="fact-filtro-trim-chips" style="margin:0;">
+            <div class="chip-filter active" data-trim="">Todos los trimestres</div>
+            <div class="chip-filter" data-trim="1">1º trimestre</div>
+            <div class="chip-filter" data-trim="2">2º trimestre</div>
+            <div class="chip-filter" data-trim="3">3º trimestre</div>
+            <div class="chip-filter" data-trim="4">4º trimestre</div>
+          </div>
         </div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl" id="econ-facturas-table">
@@ -3709,12 +3709,21 @@ function renderFacturasKPIs(){
     if(tds[7].textContent.toLowerCase().includes('vencid')) vencidas++;
   });
   const pendiente = facturado - cobrado;
+  const activoKpi = strip.querySelector('.kpi.active')?.dataset.kpi || '';
   strip.innerHTML = `
-    <div class="kpi"><div class="lbl">Total facturado</div><div class="val">${facturado.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
-    <div class="kpi"><div class="lbl">Total cobrado</div><div class="val green">${cobrado.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
-    <div class="kpi"><div class="lbl">Pendiente de cobro</div><div class="val orange">${pendiente.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
-    <div class="kpi"><div class="lbl">Facturas vencidas</div><div class="val red">${vencidas}</div></div>
+    <div class="kpi ${activoKpi==='todo'?'active':''}" data-kpi="todo" style="cursor:pointer;"><div class="lbl">Total facturado</div><div class="val">${facturado.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+    <div class="kpi ${activoKpi==='cobrado'?'active':''}" data-kpi="cobrado" style="cursor:pointer;"><div class="lbl">Total cobrado</div><div class="val green">${cobrado.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+    <div class="kpi ${activoKpi==='pendiente'?'active':''}" data-kpi="pendiente" style="cursor:pointer;"><div class="lbl">Pendiente de cobro</div><div class="val orange">${pendiente.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+    <div class="kpi ${activoKpi==='vencida'?'active':''}" data-kpi="vencida" style="cursor:pointer;"><div class="lbl">Facturas vencidas</div><div class="val red">${vencidas}</div></div>
   `;
+  strip.querySelectorAll('.kpi').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      const yaActiva = card.classList.contains('active');
+      strip.querySelectorAll('.kpi').forEach(c=>c.classList.remove('active'));
+      if(!yaActiva) card.classList.add('active');
+      filtrarTablaOrdenable('econ-facturas-tbody');
+    });
+  });
 }
 
 function setupSubtabs(navId, prefix, mapping){
@@ -3734,6 +3743,29 @@ setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-pr
 setupSubtabs('entradas-subtabs','entradas',{bandeja:'sub-bandeja',whatsapp:'sub-whatsapp'});
 setupSubtabs('sistema-subtabs','sis',{principios:'sis-principios',organizacion:'sis-organizacion',protocolos:'sis-protocolos',criterios:'sis-criterios',estandares:'sis-estandares',historial:'sis-historial',oninicio:'sis-oninicio'});
 /* ---------------- TABLAS ORDENABLES Y FILTRABLES POR AÑO/TRIMESTRE — reutilizable en cualquier tabla ---------------- */
+function poblarFiltroAniosChips(tbodyId, contenedorId){
+  const tbody = document.getElementById(tbodyId);
+  const contenedor = document.getElementById(contenedorId);
+  if(!tbody || !contenedor) return;
+  const activo = contenedor.querySelector('.chip-filter.active')?.dataset.anio || '';
+  const anios = [...new Set(Array.from(tbody.querySelectorAll('tr')).map(tr=>tr.dataset.anio).filter(Boolean))].sort().reverse();
+  contenedor.innerHTML = `<div class="chip-filter ${activo===''?'active':''}" data-anio="">Todos los años</div>` +
+    anios.map(a=>`<div class="chip-filter ${activo===a?'active':''}" data-anio="${a}">${a}</div>`).join('');
+  contenedor.querySelectorAll('.chip-filter').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      contenedor.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+      filtrarTablaOrdenable(tbodyId);
+    });
+  });
+}
+document.querySelectorAll('#fact-filtro-trim-chips .chip-filter').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#fact-filtro-trim-chips .chip-filter').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    filtrarTablaOrdenable('econ-facturas-tbody');
+  });
+});
 function poblarFiltroAnios(tbodyId, selectId){
   const tbody = document.getElementById(tbodyId);
   const select = document.getElementById(selectId);
@@ -3747,12 +3779,22 @@ function filtrarTablaOrdenable(tbodyId){
   const tbody = document.getElementById(tbodyId);
   if(!tbody) return;
   const prefijo = tbodyId.startsWith('fact') || tbodyId==='econ-facturas-tbody' ? 'fact' : tbodyId;
-  const anioSel = document.getElementById('fact-filtro-anio')?.value || '';
-  const trimSel = document.getElementById('fact-filtro-trim')?.value || '';
+  const anioSel = document.getElementById('fact-filtro-anio-chips')?.querySelector('.chip-filter.active')?.dataset.anio
+    ?? document.getElementById('fact-filtro-anio')?.value ?? '';
+  const trimSel = document.getElementById('fact-filtro-trim-chips')?.querySelector('.chip-filter.active')?.dataset.trim
+    ?? document.getElementById('fact-filtro-trim')?.value ?? '';
+  const kpiSel = tbodyId==='econ-facturas-tbody' ? (document.querySelector('#facturas-kpi-strip .kpi.active')?.dataset.kpi || '') : '';
   tbody.querySelectorAll('tr').forEach(tr=>{
     const okAnio = !anioSel || tr.dataset.anio === anioSel;
     const okTrim = !trimSel || tr.dataset.trimestre === trimSel;
-    tr.style.display = (okAnio && okTrim) ? '' : 'none';
+    let okKpi = true;
+    if(kpiSel && kpiSel!=='todo'){
+      const estadoTexto = tr.children[8]?.textContent.toLowerCase() || '';
+      if(kpiSel==='cobrado') okKpi = estadoTexto.includes('cobrad');
+      else if(kpiSel==='pendiente') okKpi = estadoTexto.includes('pendiente');
+      else if(kpiSel==='vencida') okKpi = estadoTexto.includes('vencid');
+    }
+    tr.style.display = (okAnio && okTrim && okKpi) ? '' : 'none';
   });
 }
 function formatFechaCorta(dateRaw){
@@ -8214,7 +8256,7 @@ async function submitNewInvoice(ev, isDraft){
     document.getElementById('econ-facturas-tbody').prepend(row);
     documentosRealesById[savedId].origen_albaran_ids = payload.origen_albaran_ids || [];
     renderAlbaranesAbiertos();
-    poblarFiltroAnios('econ-facturas-tbody','fact-filtro-anio');
+    poblarFiltroAniosChips('econ-facturas-tbody','fact-filtro-anio-chips');
     document.querySelector('[data-view="facturas"]').click();
 
   } else if(type==='proforma' || type==='presupuesto'){
@@ -8332,8 +8374,8 @@ async function marcarEnviadoGestor(id){
   if(fila) fila.lastElementChild.innerHTML = `<span class="pill terminado">Enviada ✓</span>`;
 }
 async function marcarTrimestreEnviado(){
-  const anio = document.getElementById('fact-filtro-anio').value;
-  const trim = document.getElementById('fact-filtro-trim').value;
+  const anio = document.getElementById('fact-filtro-anio-chips')?.querySelector('.chip-filter.active')?.dataset.anio || '';
+  const trim = document.getElementById('fact-filtro-trim-chips')?.querySelector('.chip-filter.active')?.dataset.trim || '';
   if(!anio || !trim){ mostrarToast('Elige primero un año y un trimestre en los filtros de arriba.'); return; }
   const ok = await confirmarAccion(`¿Marcar como enviadas al gestor TODAS las facturas del ${trim}º trimestre de ${anio}?`);
   if(!ok) return;
@@ -8423,7 +8465,7 @@ async function cargarDocumentosEconomicosReales(){
     renderAlbaranesAbiertos();
     calcularKPIsReales();
     recalcularResumenEconomia();
-    poblarFiltroAnios('econ-facturas-tbody','fact-filtro-anio');
+    poblarFiltroAniosChips('econ-facturas-tbody','fact-filtro-anio-chips');
   }catch(err){ console.error('No se pudieron cargar los documentos reales', err); }
 }
 cargarDocumentosEconomicosReales();
