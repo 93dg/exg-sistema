@@ -1742,7 +1742,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.19</div>
+        <div class="sub">V1.20</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5135,9 +5135,33 @@ function b64urlEncode(str){
 async function mostrarArchivoEnVisor(url){
   const iframe = document.getElementById('visor-original-iframe');
   const contenedor = document.getElementById('visor-original-tabla');
-  contenedor.style.display = 'none';
-  iframe.style.display = '';
-  iframe.src = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+  iframe.style.display = 'none';
+  contenedor.style.display = '';
+  contenedor.innerHTML = '<div class="sub-t" style="padding:20px;">Cargando...</div>';
+  try{
+    const resp = await fetch(url);
+    const buf = await resp.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellStyles:true});
+    const nombreHoja = wb.SheetNames.includes('Factura') ? 'Factura' : wb.SheetNames.find(n=>{
+      const s = wb.Sheets[n];
+      return s['!ref'] && XLSX.utils.decode_range(s['!ref']).e.r > 0;
+    }) || wb.SheetNames[0];
+    const hoja = wb.Sheets[nombreHoja];
+    let logoHtml = '';
+    const imagenes = hoja['!images'];
+    if(imagenes && imagenes.length){
+      const img = imagenes[0];
+      const b64 = img.imageData || img['!datalink'];
+      if(b64) logoHtml = `<img src="data:image/png;base64,${b64}" style="max-height:80px;margin-bottom:10px;">`;
+    }
+    const html = XLSX.utils.sheet_to_html(hoja, {editable:false});
+    contenedor.innerHTML = `<div style="padding:16px;background:#fff;">${logoHtml}${html}</div>`;
+    contenedor.querySelectorAll('table').forEach(t=>{ t.style.borderCollapse='collapse'; t.style.width='auto'; t.style.color='#111'; t.style.fontFamily='Arial,sans-serif'; });
+    contenedor.querySelectorAll('td').forEach(td=>{ td.style.border='1px solid #ccc'; td.style.padding='4px 8px'; td.style.fontSize='13px'; });
+    contenedor.querySelectorAll('td[data-t]').forEach(td=>{ if(/N\.?I\.?F|Fecha|Cliente|Nombre|Direcci|Poblaci|C\.I\.F|Concepto|Horas|Precio|TOTAL/i.test(td.textContent)) td.style.fontWeight='700'; });
+  }catch(e){
+    contenedor.innerHTML = '<div class="sub-t" style="padding:20px;">No se pudo leer el archivo aquí. Usa "Descargar" para verlo entero.</div>';
+  }
 }
 function abrirVisorDesdeUrl(url){
   document.getElementById('visor-original-descargar').href = url;
