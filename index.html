@@ -1741,7 +1741,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.16</div>
+        <div class="sub">V1.17</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2677,6 +2677,21 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </div>
     </div>
 
+    <div class="overlay" id="visor-original-overlay" onclick="if(event.target===this) cerrarVisorArchivoOriginal()">
+      <div class="drawer" style="width:min(900px,92vw);height:88vh;display:flex;flex-direction:column;">
+        <div class="drawer-head">
+          <div><h2>Archivo original</h2></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <a id="visor-original-descargar" href="#" target="_blank" class="btn" style="padding:5px 10px;font-size:11.5px;">⬇ Descargar</a>
+            <button class="close-x" onclick="cerrarVisorArchivoOriginal()">✕</button>
+          </div>
+        </div>
+        <div style="flex:1;min-height:0;">
+          <iframe id="visor-original-iframe" style="width:100%;height:100%;border:0;background:#fff;"></iframe>
+        </div>
+      </div>
+    </div>
+
     <div class="overlay" id="compose-overlay" onclick="if(event.target===this) closeComposeDrawer()">
       <div class="drawer">
         <div class="drawer-head">
@@ -3382,7 +3397,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </select>
       <span class="ie-doc-explain" id="ni-explain"></span>
       <button type="button" class="btn" style="padding:5px 10px;font-size:11.5px;" onclick="document.getElementById('ie-dictado').classList.toggle('open')">📝 Rellenar desde texto o foto</button>
-      <a id="ni-ver-original" href="#" target="_blank" class="btn" style="padding:5px 10px;font-size:11.5px;display:none;">📎 Ver archivo original</a>
+      <button type="button" id="ni-ver-original" onclick="abrirVisorArchivoOriginal()" class="btn" style="padding:5px 10px;font-size:11.5px;display:none;">📎 Ver archivo original</button>
       <button class="close-x" onclick="closeNewInvoiceModal()">✕</button>
     </div>
 
@@ -5114,6 +5129,27 @@ async function vincularCorreo(messageId){
 
 function b64urlEncode(str){
   return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function abrirVisorDesdeUrl(url){
+  document.getElementById('visor-original-descargar').href = url;
+  const esOffice = /\.(xls|xlsx|doc|docx)$/i.test(url);
+  const src = esOffice ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}` : url;
+  document.getElementById('visor-original-iframe').src = src;
+  document.getElementById('visor-original-overlay').classList.add('active');
+}
+function abrirVisorArchivoOriginal(){
+  const btn = document.getElementById('ni-ver-original');
+  const url = btn.dataset.url;
+  if(!url) return;
+  document.getElementById('visor-original-descargar').href = url;
+  const esOffice = /\.(xls|xlsx|doc|docx)$/i.test(url);
+  const src = esOffice ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}` : url;
+  document.getElementById('visor-original-iframe').src = src;
+  document.getElementById('visor-original-overlay').classList.add('active');
+}
+function cerrarVisorArchivoOriginal(){
+  document.getElementById('visor-original-overlay').classList.remove('active');
+  document.getElementById('visor-original-iframe').src = 'about:blank';
 }
 function openComposeDrawer(){ document.getElementById('compose-overlay').classList.add('active'); }
 function closeComposeDrawer(){
@@ -8002,7 +8038,7 @@ function openDocumentViewer(id){
   document.getElementById('ni-titular').value = doc.titular;
   const btnOriginal = document.getElementById('ni-ver-original');
   const urlOriginal = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
-  if(urlOriginal){ btnOriginal.href = urlOriginal; btnOriginal.style.display = ''; }
+  if(urlOriginal){ btnOriginal.dataset.url = urlOriginal; btnOriginal.style.display = ''; }
   else { btnOriginal.style.display = 'none'; }
   onClientChange();
   doc.items.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine));
@@ -8305,7 +8341,7 @@ async function cargarDocumentosEconomicosReales(){
         const archivoUrlReal = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
         const faltaTexto = (doc.info_faltante && doc.info_faltante.startsWith('Falta:')) ? doc.info_faltante.split('.')[0].replace('Falta: ','') : '';
         const faltaHtml = faltaTexto ? `<span class="pill mantenimiento" title="${doc.info_faltante}">${faltaTexto}</span>` : '<span class="pill terminado">Completo</span>';
-        const archivoHtml = archivoUrlReal ? `<a href="${archivoUrlReal}" target="_blank" onclick="event.stopPropagation();">📎 Ver</a>` : '—';
+        const archivoHtml = archivoUrlReal ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${archivoUrlReal}')">📎 Ver</a>` : '—';
         row.innerHTML = `<td class="mono">${doc.numero||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="mono">${trabajo?trabajo.code:'—'}</td><td>${dateLabel}</td><td>—</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td><td>${gestorPill}</td><td>${faltaHtml}</td><td>${archivoHtml}</td>`;
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
