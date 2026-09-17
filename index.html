@@ -1742,7 +1742,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.27</div>
+        <div class="sub">V1.28</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3819,12 +3819,18 @@ function toggleExpandirFacturaFila(id){
   detalle.id = 'docrow-detalle-'+id;
   detalle.onclick = (ev)=>ev.stopPropagation();
   const lineasHtml = conceptos.length
-    ? conceptos.map(c=>`<div class="task-row"><span style="flex:1;">${c.descripcion||'—'}</span>${c.importe!=null?`<span class="mono">${Number(c.importe).toLocaleString('es-ES',{minimumFractionDigits:2})} €</span>`:''}</div>`).join('')
+    ? conceptos.map(c=>{
+        const partes = (c.descripcion||'').split(/(?<=00\d)\s+(?=[A-ZÁÉÍÓÚÑ])/).filter(Boolean);
+        const lineasTexto = partes.length > 1 ? partes : [c.descripcion||'—'];
+        return lineasTexto.map((linea,i)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;font-size:12px;color:var(--ink-soft);">
+          <span>${linea.trim()}</span>
+          ${i===lineasTexto.length-1 && c.importe!=null ? `<span class="mono" style="flex:0 0 auto;">${Number(c.importe).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</span>` : ''}
+        </div>`).join('');
+      }).join('')
     : '<span class="sub-t">Sin líneas de concepto guardadas</span>';
-  detalle.innerHTML = `<td colspan="12" style="background:var(--concrete);padding:12px 20px;">
-    <div class="l" style="margin-bottom:6px;">Conceptos</div>
+  detalle.innerHTML = `<td colspan="12" style="background:var(--concrete);padding:10px 20px;">
     ${lineasHtml}
-    <div style="margin-top:10px;"><button class="btn" onclick="openDocumentViewer('${id}')">✏️ Editar factura completa</button></div>
+    <div style="margin-top:8px;"><button class="btn" onclick="openDocumentViewer('${id}')">✏️ Editar factura completa</button></div>
   </td>`;
   fila.after(detalle);
 }
@@ -3890,7 +3896,7 @@ function renderHistorico(){
       <td class="mono">${h.numero || '—'}</td>
       <td>${h.fecha || '—'}</td>
       <td>${h.cliente_nombre || '—'}</td>
-      <td class="num">${h.importe ? Number(h.importe).toLocaleString('es-ES',{minimumFractionDigits:2})+' €' : '—'}</td>
+      <td class="num">${h.importe ? Number(h.importe).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €' : '—'}</td>
       <td>${estadoPill}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="7" class="empty">Nada en este filtro</td></tr>';
@@ -4004,7 +4010,7 @@ function calcularKPIsReales(){
   const pendienteCobro = docs.filter(d=>d.type==='factura' && d.status==='Pendiente').reduce((s,d)=>s+(d.total||0),0);
 
   const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-  const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+  const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
 
   setTxt('kpi-trabajos-hoy', trabajosHoy);
   setTxt('kpi-urgentes', urgentes);
@@ -6242,7 +6248,7 @@ async function cargarDatosReales(){
         jobs.push({
           id: t.id, code: t.codigo || ('T-'+t.id.slice(0,4)), client: t.nombre || 'Sin nombre', type:'Particular',
           zone: t.zona || '—', machine: '— sin especificar —', machines: [], date: dateLabel, scheduledDate: t.fecha_inicio || '', horaInicio: t.hora_inicio ? t.hora_inicio.slice(0,5) : null, worker: t.operario || '',
-          state: t.estado || 'pendiente', price: t.presupuesto ? Number(t.presupuesto).toLocaleString('es-ES',{minimumFractionDigits:2})+' €' : '— est.',
+          state: t.estado || 'pendiente', price: t.presupuesto ? Number(t.presupuesto).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €' : '— est.',
           urgent: t.prioridad === 'Alta'
         });
       });
@@ -6953,8 +6959,8 @@ function openClientDrawer(name){
   const facturasEsteAnio = cDocs.filter(d=>d.type==='factura' && d.status!=='Borrador' && new Date().getFullYear()===Number((d.dateRaw||'').slice(0,4)));
   const totalFacturado = facturasEsteAnio.reduce((s,d)=>s+(d.total||0),0);
   const totalPendiente = cDocs.filter(d=>d.type==='factura' && d.status==='Pendiente').reduce((s,d)=>s+(d.total||0),0);
-  document.getElementById('c-fact').textContent = totalFacturado.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
-  document.getElementById('c-pend').textContent = totalPendiente.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+  document.getElementById('c-fact').textContent = totalFacturado.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  document.getElementById('c-pend').textContent = totalPendiente.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   const cJobs = jobs.filter(j=>j.client===name);
   document.getElementById('c-jobs-tbl').innerHTML = '<tr><th>Código</th><th>Fecha</th><th>Estado</th><th class="num">Precio</th></tr>' +
     (cJobs.length ? cJobs.map(j=>`<tr onclick="closeClientDrawer();openJobDrawer('${j.code}')"><td class="mono">${j.code}</td><td>${j.date}</td><td>${pill(j.state)}</td><td class="num">${j.price}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">Sin trabajos registrados</td></tr>');
@@ -7207,7 +7213,7 @@ function submitNewJob(ev){
     scheduledDate, dateTentative,
     machine: machines.join(', ') || '— sin especificar —',
     date: dateLabel, state:initialState,
-    price: price ? Number(price).toLocaleString('es-ES',{minimumFractionDigits:2})+' €' : '— est.',
+    price: price ? Number(price).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €' : '— est.',
     urgent: priority==='Alta'
   };
   jobs.push(nuevoJob);
@@ -7458,15 +7464,15 @@ function recalcTotals(){
     const qty = Number(tr.querySelector('.ie-qty').value) || 0;
     const price = Number(tr.querySelector('.ie-price').value) || 0;
     const lineTotal = qty * price;
-    tr.querySelector('.line-total').textContent = lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+    tr.querySelector('.line-total').textContent = lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
     base += lineTotal;
   });
   const ivaPct = hasIva ? (Number(document.getElementById('ie-iva-pct').value) || 0) : 0;
   const iva = base * ivaPct / 100;
   const total = base + iva;
-  document.getElementById('ie-base').textContent = base.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
-  document.getElementById('ie-iva').textContent = iva.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
-  document.getElementById('ie-total').textContent = total.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+  document.getElementById('ie-base').textContent = base.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  document.getElementById('ie-iva').textContent = iva.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  document.getElementById('ie-total').textContent = total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   return {base, iva, total};
 }
 
@@ -7527,19 +7533,19 @@ function descargarPDF(){
     const lineTotal = (Number(it.qty)||0)*it.price;
     doc.text(String(it.qty), 15, y);
     doc.text(doc.splitTextToSize(it.concept||'—', 110)[0], 30, y);
-    doc.text(it.price.toLocaleString('es-ES',{minimumFractionDigits:2})+' €', 150, y, {align:'right'});
-    doc.text(lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2})+' €', 195, y, {align:'right'});
+    doc.text(it.price.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 150, y, {align:'right'});
+    doc.text(lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
     y += 6;
   });
 
   y += 4; doc.line(120,y,195,y); y += 6;
-  doc.text('Base imponible:', 150, y, {align:'right'}); doc.text(base.toLocaleString('es-ES',{minimumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
+  doc.text('Base imponible:', 150, y, {align:'right'}); doc.text(base.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
   if(cfg.hasIva){
     const ivaPct = document.getElementById('ie-iva-pct').value;
-    doc.text(`IVA (${ivaPct}%):`, 150, y, {align:'right'}); doc.text(iva.toLocaleString('es-ES',{minimumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
+    doc.text(`IVA (${ivaPct}%):`, 150, y, {align:'right'}); doc.text(iva.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
   }
   doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('TOTAL:', 150, y, {align:'right'}); doc.text(total.toLocaleString('es-ES',{minimumFractionDigits:2})+' €', 195, y, {align:'right'});
+  doc.text('TOTAL:', 150, y, {align:'right'}); doc.text(total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
 
   y += 14;
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
@@ -7699,13 +7705,13 @@ function calcularCierre(q){
   const neto130 = baseIngresos - baseGastos;
   const pago130 = Math.max(0, neto130 * 0.20);
 
-  document.getElementById('c303-repercutido').textContent = ivaRepercutido.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
-  document.getElementById('c303-soportado').textContent = ivaSoportado.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
-  document.getElementById('c303-resultado').textContent = resultado303.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
-  document.getElementById('c130-ingresos').textContent = baseIngresos.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
-  document.getElementById('c130-gastos').textContent = baseGastos.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
-  document.getElementById('c130-neto').textContent = neto130.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
-  document.getElementById('c130-pago').textContent = pago130.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+  document.getElementById('c303-repercutido').textContent = ivaRepercutido.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  document.getElementById('c303-soportado').textContent = ivaSoportado.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  document.getElementById('c303-resultado').textContent = resultado303.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  document.getElementById('c130-ingresos').textContent = baseIngresos.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  document.getElementById('c130-gastos').textContent = baseGastos.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  document.getElementById('c130-neto').textContent = neto130.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  document.getElementById('c130-pago').textContent = pago130.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
 
   document.getElementById('cierre-fact-count').textContent = facturas.length;
   document.getElementById('cierre-facturas-tbody').innerHTML = facturas.length
@@ -7895,7 +7901,7 @@ async function guardarGasto(){
     if(error){ statusEl.textContent = 'Error al guardar: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
     const dRaw = new Date(fecha);
     const dateLabel = isNaN(dRaw) ? fecha : dRaw.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][dRaw.getMonth()];
-    documentosRealesById[data.id] = {...payload, id:data.id, type:'gasto', client: proveedorNombre||'—', dateRaw:fecha, dateLabel, amountLabel: importe.toLocaleString('es-ES',{minimumFractionDigits:2})+' €', total: importe, status:'Pagado', num:'—'};
+    documentosRealesById[data.id] = {...payload, id:data.id, type:'gasto', client: proveedorNombre||'—', dateRaw:fecha, dateLabel, amountLabel: importe.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', total: importe, status:'Pagado', num:'—'};
     const row = document.createElement('tr');
     row.dataset.contabilidad = contabilidad;
     row.innerHTML = `<td>${dateLabel}</td><td>${concepto}</td><td>${proveedorNombre||'—'}</td><td class="num">${importe.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>`;
@@ -8198,7 +8204,7 @@ async function submitNewInvoice(ev, isDraft){
   const {base, iva, total} = recalcTotals();
   const d = new Date(dateRaw);
   const dateLabel = isNaN(d) ? (dateRaw||'sin fecha') : d.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][d.getMonth()];
-  const amountLabel = total.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+  const amountLabel = total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   const items = Array.from(document.querySelectorAll('#ie-items-body tr')).map(tr=>({
     qty: tr.querySelector('.ie-qty').value,
     unidad: tr.querySelector('.ie-unidad')?.value || 'ud',
@@ -8272,8 +8278,8 @@ async function submitNewInvoice(ev, isDraft){
     const fechaCorta = formatFechaCorta(dateRaw);
     const baseCreada = ivaPct ? total / (1 + ivaPct/100) : total;
     const ivaCreada = total - baseCreada;
-    const baseLabelCreada = baseCreada.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
-    const ivaLabelCreada = ivaCreada.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+    const baseLabelCreada = baseCreada.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+    const ivaLabelCreada = ivaCreada.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
     row.innerHTML = `<td class="mono">${fechaCorta}</td><td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td class="num">${baseLabelCreada}</td><td class="num">${ivaLabelCreada}</td><td class="num">${ivaPct}%</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td><td><button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();marcarEnviadoGestor('${savedId}')">Marcar enviada</button></td><td>—</td>`;
     document.getElementById('econ-facturas-tbody').prepend(row);
     documentosRealesById[savedId].origen_albaran_ids = payload.origen_albaran_ids || [];
@@ -8345,7 +8351,7 @@ function recalcularResumenEconomia(){
   const hoy = new Date(); const mes = hoy.getMonth(), anio = hoy.getFullYear();
   const docs = Object.values(documentosRealesById);
   const esDelMes = d => { if(!d.dateRaw) return false; const dt = new Date(d.dateRaw); return dt.getFullYear()===anio && dt.getMonth()===mes; };
-  const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+  const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
 
   // Legal: facturas reales (siempre oficiales, una factura nunca es "en B"). En B: albaranes cobrados en efectivo, sin factura.
   const facturasMes = docs.filter(d=>d.type==='factura' && d.status!=='Borrador' && esDelMes(d));
@@ -8427,7 +8433,7 @@ async function cargarDocumentosEconomicosReales(){
       const items = (doc.conceptos||[]).map(c=>({qty:c.cantidad, concept:c.descripcion, price:c.precio_unitario, machine:c.maquina}));
       const dRaw = doc.fecha_devengo ? new Date(doc.fecha_devengo) : null;
       const dateLabel = (dRaw && !isNaN(dRaw)) ? dRaw.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][dRaw.getMonth()] : 'sin fecha';
-      const amountLabel = Number(doc.importe||0).toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+      const amountLabel = Number(doc.importe||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
       const totalNum = Number(doc.importe||0);
       const baseNum = totalNum / 1.21;
       const ivaNum = totalNum - baseNum;
@@ -8457,8 +8463,8 @@ async function cargarDocumentosEconomicosReales(){
         const ivaPctDoc = doc.iva_pct != null ? Number(doc.iva_pct) : 21;
         const baseNum2 = totalNum / (1 + ivaPctDoc/100);
         const ivaNum2 = totalNum - baseNum2;
-        const baseLabel = baseNum2.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
-        const ivaLabel = ivaNum2.toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+        const baseLabel = baseNum2.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+        const ivaLabel = ivaNum2.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
         row.innerHTML = `<td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num">${baseLabel}</td><td class="num">${ivaLabel}</td><td class="num">${ivaPctDoc}%</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td><td>${gestorPill}</td><td>${archivoHtml}</td>`;
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
