@@ -1742,7 +1742,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.29</div>
+        <div class="sub">V1.30</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2931,6 +2931,19 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       <button class="close-x" onclick="closeClientDrawer()">✕</button>
     </div>
     <div class="drawer-body">
+      <div class="block" style="margin-bottom:20px;">
+        <h4>Datos de contacto</h4>
+        <div class="field-grid">
+          <div class="field"><div class="l">NIF/CIF</div><input class="search-box" style="width:100%;" id="c-nif"></div>
+          <div class="field"><div class="l">Email</div><input class="search-box" style="width:100%;" id="c-email"></div>
+          <div class="field"><div class="l">Teléfono</div><input class="search-box" style="width:100%;" id="c-telefono"></div>
+          <div class="field"><div class="l">Dirección</div><input class="search-box" style="width:100%;" id="c-direccion"></div>
+          <div class="field"><div class="l">Población</div><input class="search-box" style="width:100%;" id="c-poblacion"></div>
+          <div class="field"><div class="l">Provincia</div><input class="search-box" style="width:100%;" id="c-provincia"></div>
+        </div>
+        <button class="btn primary" style="margin-top:10px;" onclick="guardarContactoCliente()">Guardar datos de contacto</button>
+        <div class="sub-t" id="c-contacto-status" style="margin-top:6px;"></div>
+      </div>
       <div class="field-grid" style="margin-bottom:20px;">
         <div class="field"><div class="l">Zona</div><div class="v" id="c-zone">Zona Norte</div></div>
         <div class="field"><div class="l">Tarifa asignada</div><div class="v" id="c-tarifa">Especial</div></div>
@@ -6932,7 +6945,7 @@ async function cargarEntidadesReales(){
     (data||[]).forEach(e=>{
       if(clientes.some(c=>c.name===e.nombre)) return;
       const tipoMap = {proveedor:'Proveedor', ayuntamiento:'Ayuntamiento', empresa:'Empresa', particular:'Particular', cliente:'Particular'};
-      clientes.push({id: e.id, name: e.nombre, type: tipoMap[(e.tipo||'').toLowerCase()] || 'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'});
+      clientes.push({id: e.id, name: e.nombre, type: tipoMap[(e.tipo||'').toLowerCase()] || 'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media', nif: e.nif||'', email: e.email||'', telefono: e.telefono||'', direccion: e.direccion||'', poblacion: e.poblacion||'', provincia: e.provincia||''});
     });
     renderClientesTable();
     fillClientSelects();
@@ -6943,6 +6956,24 @@ cargarEntidadesReales();
 /* Facturas reales — se cargan desde Supabase (tabla documentos_economicos) */
 const facturasReales = [];
 
+let clientDrawerAbiertoId = null;
+async function guardarContactoCliente(){
+  const statusEl = document.getElementById('c-contacto-status');
+  if(!sb || !clientDrawerAbiertoId){ statusEl.textContent = 'No se pudo guardar.'; return; }
+  const payload = {
+    nif: document.getElementById('c-nif').value.trim() || null,
+    email: document.getElementById('c-email').value.trim() || null,
+    telefono: document.getElementById('c-telefono').value.trim() || null,
+    direccion: document.getElementById('c-direccion').value.trim() || null,
+    poblacion: document.getElementById('c-poblacion').value.trim() || null,
+    provincia: document.getElementById('c-provincia').value.trim() || null,
+  };
+  const {error} = await sb.from('entidades').update(payload).eq('id', clientDrawerAbiertoId);
+  if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color='var(--red)'; return; }
+  const c = clientes.find(x=>x.id===clientDrawerAbiertoId);
+  if(c) Object.assign(c, payload);
+  statusEl.textContent = 'Guardado ✓'; statusEl.style.color='var(--green)';
+}
 function openClientDrawer(name){
   const c = clientes.find(x=>x.name===name) || clientes[0];
   document.getElementById('c-type').textContent = c.type;
@@ -6951,6 +6982,14 @@ function openClientDrawer(name){
   document.getElementById('c-tarifa').textContent = c.tarifa;
   document.getElementById('c-prio').textContent = c.prio;
   document.getElementById('c-pago').textContent = '—';
+  document.getElementById('c-nif').value = c.nif || '';
+  document.getElementById('c-email').value = c.email || '';
+  document.getElementById('c-telefono').value = c.telefono || '';
+  document.getElementById('c-direccion').value = c.direccion || '';
+  document.getElementById('c-poblacion').value = c.poblacion || '';
+  document.getElementById('c-provincia').value = c.provincia || '';
+  document.getElementById('c-contacto-status').textContent = '';
+  clientDrawerAbiertoId = c.id;
   const cDocs = Object.values(documentosRealesById).filter(d=>d.entidad_id === c.id && d.type!=='albaran');
   const facturasEsteAnio = cDocs.filter(d=>d.type==='factura' && d.status!=='Borrador' && new Date().getFullYear()===Number((d.dateRaw||'').slice(0,4)));
   const totalFacturado = facturasEsteAnio.reduce((s,d)=>s+(d.total||0),0);
