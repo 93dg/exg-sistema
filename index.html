@@ -294,8 +294,11 @@ table{border-collapse:collapse;width:100%;}
 .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
 .chip-filter{
   padding:6px 12px;border:1px solid var(--line);border-radius:20px;font-size:12px;font-weight:600;color:var(--ink-soft);
+  cursor:pointer;
 }
 .chip-filter.active{background:var(--asphalt);color:#fff;border-color:var(--asphalt);}
+[onclick]{cursor:pointer;}
+.client-tab{cursor:pointer;}
 .search-box{
   padding:7px 12px;border:1px solid var(--line);border-radius:var(--radius);font-size:13px;
   background:var(--paper);min-width:200px;color:var(--ink);
@@ -1738,7 +1741,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.11</div>
+        <div class="sub">V1.12</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2336,12 +2339,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <!-- RESUMEN -->
       <div class="sub-view" id="econ-resumen">
         <div class="kpi-strip">
-          <div class="kpi"><div class="lbl">Facturado mes</div><div class="val">0,00 €</div></div>
-          <div class="kpi"><div class="lbl">Cobrado mes</div><div class="val green">0,00 €</div></div>
-          <div class="kpi"><div class="lbl">Pendiente cobro</div><div class="val orange">0,00 €</div></div>
-          <div class="kpi"><div class="lbl">Gastos mes</div><div class="val red">0,00 €</div></div>
-          <div class="kpi"><div class="lbl">IVA repercutido est.</div><div class="val">0,00 €</div></div>
-          <div class="kpi"><div class="lbl">Margen operativo</div><div class="val green">0,00 €</div></div>
+          <div class="kpi"><div class="lbl">Facturado mes</div><div class="val" id="resumen-facturado">0,00 €</div></div>
+          <div class="kpi"><div class="lbl">Cobrado mes</div><div class="val green" id="resumen-cobrado">0,00 €</div></div>
+          <div class="kpi"><div class="lbl">Pendiente cobro</div><div class="val orange" id="resumen-pendiente">0,00 €</div></div>
+          <div class="kpi"><div class="lbl">Gastos mes</div><div class="val red" id="resumen-gastos">0,00 €</div></div>
+          <div class="kpi"><div class="lbl">IVA repercutido est.</div><div class="val" id="resumen-iva">0,00 €</div></div>
+          <div class="kpi"><div class="lbl">Margen operativo</div><div class="val green" id="resumen-margen">0,00 €</div></div>
         </div>
 
         <div class="panel">
@@ -8191,14 +8194,37 @@ async function cambiarEstadoAlbaran(id, valor){
   mostrarToast('Estado actualizado ✓', 'ok');
 }
 
+function recalcularResumenEconomia(){
+  const filtro = document.querySelector('#econ-contabilidad-filter .chip-filter.active')?.dataset.cf || '';
+  const hoy = new Date(); const mes = hoy.getMonth(), anio = hoy.getFullYear();
+  const docs = Object.values(documentosRealesById).filter(d=>!filtro || (d.contabilidad||'oficial')===filtro);
+  const esDelMes = d => { if(!d.dateRaw) return false; const dt = new Date(d.dateRaw); return dt.getFullYear()===anio && dt.getMonth()===mes; };
+  const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+
+  const facturasMes = docs.filter(d=>d.type==='factura' && d.status!=='Borrador' && esDelMes(d));
+  const facturado = facturasMes.reduce((s,d)=>s+(d.total||0),0);
+  const gastosMes = docs.filter(d=>d.type==='gasto' && esDelMes(d)).reduce((s,d)=>s+(d.total||0),0);
+  const pendiente = docs.filter(d=>d.type==='factura' && d.status==='Pendiente').reduce((s,d)=>s+(d.total||0),0);
+  const iva = facturasMes.reduce((s,d)=>s+(d.iva||0),0);
+
+  const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  setTxt('resumen-facturado', euro(facturado));
+  setTxt('resumen-cobrado', '— (sin seguimiento de cobro aún)');
+  setTxt('resumen-pendiente', euro(pendiente));
+  setTxt('resumen-gastos', euro(gastosMes));
+  setTxt('resumen-iva', euro(iva));
+  setTxt('resumen-margen', euro(facturado - gastosMes));
+}
+
 document.querySelectorAll('#econ-contabilidad-filter .chip-filter').forEach(el=>{
   el.addEventListener('click', ()=>{
     document.querySelectorAll('#econ-contabilidad-filter .chip-filter').forEach(e=>e.classList.remove('active'));
     el.classList.add('active');
     const filtro = el.dataset.cf;
-    document.querySelectorAll('#econ-facturas-tbody tr, #econ-presupuestos-tbody tr, #presupuestos-tbody-standalone tr, #econ-gastos-tbody tr').forEach(tr=>{
+    document.querySelectorAll('#econ-presupuestos-tbody tr, #presupuestos-tbody-standalone tr, #econ-gastos-tbody tr').forEach(tr=>{
       tr.style.display = (!filtro || tr.dataset.contabilidad === filtro) ? '' : 'none';
     });
+    recalcularResumenEconomia();
   });
 });
 
@@ -8293,6 +8319,7 @@ async function cargarDocumentosEconomicosReales(){
     renderFacturasKPIs();
     renderAlbaranesAbiertos();
     calcularKPIsReales();
+    recalcularResumenEconomia();
     poblarFiltroAnios('econ-facturas-tbody','fact-filtro-anio');
   }catch(err){ console.error('No se pudieron cargar los documentos reales', err); }
 }
