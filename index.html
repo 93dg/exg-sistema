@@ -1742,7 +1742,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.18</div>
+        <div class="sub">V1.19</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5135,33 +5135,9 @@ function b64urlEncode(str){
 async function mostrarArchivoEnVisor(url){
   const iframe = document.getElementById('visor-original-iframe');
   const contenedor = document.getElementById('visor-original-tabla');
-  const esOffice = /\.(xls|xlsx)$/i.test(url);
-  if(!esOffice){
-    contenedor.style.display = 'none';
-    iframe.style.display = '';
-    iframe.src = url;
-    return;
-  }
-  iframe.style.display = 'none';
-  contenedor.style.display = '';
-  contenedor.innerHTML = '<div class="sub-t" style="padding:20px;">Cargando...</div>';
-  try{
-    const resp = await fetch(url);
-    const buf = await resp.arrayBuffer();
-    const wb = XLSX.read(buf, {type:'array'});
-    // preferimos la hoja "Factura" si existe (es la plantilla real), si no la primera hoja con contenido
-    const nombreHoja = wb.SheetNames.includes('Factura') ? 'Factura' : wb.SheetNames.find(n=>{
-      const s = wb.Sheets[n];
-      return s['!ref'] && XLSX.utils.decode_range(s['!ref']).e.r > 0;
-    }) || wb.SheetNames[0];
-    const hoja = wb.Sheets[nombreHoja];
-    const html = XLSX.utils.sheet_to_html(hoja, {editable:false});
-    contenedor.innerHTML = html;
-    contenedor.querySelectorAll('table').forEach(t=>{ t.style.borderCollapse='collapse'; t.style.width='auto'; t.style.color='#111'; });
-    contenedor.querySelectorAll('td').forEach(td=>{ td.style.border='1px solid #ccc'; td.style.padding='3px 6px'; td.style.fontSize='13px'; });
-  }catch(e){
-    contenedor.innerHTML = '<div class="sub-t" style="padding:20px;">No se pudo leer el archivo aquí. Usa "Descargar" para verlo entero.</div>';
-  }
+  contenedor.style.display = 'none';
+  iframe.style.display = '';
+  iframe.src = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
 }
 function abrirVisorDesdeUrl(url){
   document.getElementById('visor-original-descargar').href = url;
