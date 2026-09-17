@@ -213,6 +213,21 @@ table{border-collapse:collapse;width:100%;}
 .pill.presentado{background:var(--blue-soft);color:var(--blue);}
 .pill.adjudicado{background:var(--green-soft);color:var(--green);}
 .pill.noadjudicado{background:var(--red-soft);color:var(--red);}
+.pill.pendiente_enviar{background:var(--concrete-2);color:var(--ink-soft);}
+.pill.pendiente_cobrar{background:var(--yellow-soft);color:#8A6100;}
+.pill.parcial{background:var(--blue-soft);color:var(--blue);}
+
+.estado-cobro-dd{position:relative;display:inline-block;}
+.estado-cobro-dd .pill{cursor:pointer;border:1px solid transparent;}
+.estado-cobro-dd .pill:hover{border-color:currentColor;}
+.estado-cobro-menu{
+  display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:500;
+  background:var(--paper);border:1px solid var(--line-dark);border-radius:8px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.15);padding:6px;min-width:150px;flex-direction:column;gap:4px;
+}
+.estado-cobro-dd.open .estado-cobro-menu{display:flex;}
+.estado-cobro-menu .pill{cursor:pointer;text-align:center;}
+.estado-cobro-menu .pill:hover{opacity:0.75;}
 
 .tag{font-size:11px;padding:2px 7px;border:1px solid var(--line);border-radius:20px;color:var(--ink-soft);}
 
@@ -1742,7 +1757,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.32</div>
+        <div class="sub">V1.33</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8485,15 +8500,31 @@ function renderAlbaranesAbiertos(){
       <td onclick="event.stopPropagation();">${estadoAlbaranSelect(a.id, a.estado_albaran)}</td>
     </tr>`).join('') : '<tr><td colspan="6" class="empty">Sin albaranes abiertos — todo facturado</td></tr>';
 }
+const ESTADO_COBRO_OPCIONES = [['pendiente_enviar','Pendiente de enviar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Parcial'],['cobrado','Cobrado']];
 function estadoCobroSelect(id, actual){
-  const opciones = [['pendiente_enviar','Pendiente de enviar','#94a3b8'],['pendiente_cobrar','Pendiente de cobrar','#f59e0b'],['parcial','Parcial','#3b82f6'],['cobrado','Cobrado','#22c55e']];
   const act = actual || 'pendiente_enviar';
-  const color = opciones.find(o=>o[0]===act)?.[2] || '#94a3b8';
-  return `<select class="search-box" style="padding:3px 6px;font-size:11.5px;border-color:${color};color:${color};font-weight:700;" onchange="cambiarEstadoCobro('${id}',this.value,this)">
-    ${opciones.map(([v,l])=>`<option value="${v}" ${act===v?'selected':''}>${l}</option>`).join('')}
-  </select>`;
+  const label = ESTADO_COBRO_OPCIONES.find(o=>o[0]===act)?.[1] || act;
+  const ddId = 'estado-cobro-dd-'+id;
+  return `<div class="estado-cobro-dd" id="${ddId}">
+    <span class="pill ${act}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${ddId}')">${label}</span>
+    <div class="estado-cobro-menu">
+      ${ESTADO_COBRO_OPCIONES.map(([v,l])=>`<span class="pill ${v}" onclick="event.stopPropagation();cambiarEstadoCobro('${id}','${v}','${ddId}')">${l}</span>`).join('')}
+    </div>
+  </div>`;
 }
-async function cambiarEstadoCobro(id, valor, selectEl){
+function toggleEstadoCobroDropdown(ddId){
+  const dd = document.getElementById(ddId);
+  if(!dd) return;
+  const wasOpen = dd.classList.contains('open');
+  document.querySelectorAll('.estado-cobro-dd.open').forEach(e=>e.classList.remove('open'));
+  if(!wasOpen) dd.classList.add('open');
+}
+document.addEventListener('click', (ev)=>{
+  document.querySelectorAll('.estado-cobro-dd.open').forEach(dd=>{
+    if(!dd.contains(ev.target)) dd.classList.remove('open');
+  });
+});
+async function cambiarEstadoCobro(id, valor, ddId){
   if(!sb) return;
   const payload = {estado_cobro: valor};
   if(valor==='cobrado'){
@@ -8507,9 +8538,13 @@ async function cambiarEstadoCobro(id, valor, selectEl){
     const celdaCobrado = document.querySelector('.celda-cobrado-'+id);
     if(celdaCobrado) celdaCobrado.textContent = Number(payload.cobrado_importe).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   }
-  const opciones = [['pendiente_enviar','#94a3b8'],['pendiente_cobrar','#f59e0b'],['parcial','#3b82f6'],['cobrado','#22c55e']];
-  const color = opciones.find(o=>o[0]===valor)?.[1] || '#94a3b8';
-  if(selectEl){ selectEl.style.borderColor = color; selectEl.style.color = color; }
+  const dd = document.getElementById(ddId);
+  if(dd){
+    const label = ESTADO_COBRO_OPCIONES.find(o=>o[0]===valor)?.[1] || valor;
+    dd.querySelector('.pill').className = 'pill '+valor;
+    dd.querySelector('.pill').textContent = label;
+    dd.classList.remove('open');
+  }
   mostrarToast('Estado actualizado ✓', 'ok');
 }
 function editarCobrado(id){
