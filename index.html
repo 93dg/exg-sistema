@@ -1741,7 +1741,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.12</div>
+        <div class="sub">V1.13</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3439,13 +3439,6 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         </table>
         <button type="button" class="btn" onclick="addItemRow()">+ Añadir línea</button>
         <div class="two-col-note">La columna "Maquinaria" es para tu control interno — no sale impresa en la factura, pero ayuda a que el precio salga bien (una retro con martillo no cuesta igual que sola).</div>
-
-        <div class="field" style="margin:14px 0;"><div class="l">Contabilidad</div>
-          <select class="search-box" style="width:100%;" id="ni-contabilidad">
-            <option value="oficial">Oficial (declarada a Hacienda)</option>
-            <option value="en_b">En B (no pasa por Hacienda)</option>
-          </select>
-        </div>
 
         <div class="ie-footer" id="ie-payment-block">
           <div class="ie-payment" id="ie-payment-fields">
@@ -7712,7 +7705,6 @@ function openNewInvoiceModal(contexto){
   document.getElementById('ni-iban').value = 'ES40 3187 0588 5420 6788 5612';
   document.getElementById('ni-titular').value = 'RAFAEL GÓMEZ MARTÍNEZ';
   document.getElementById('ni-payment').value = 'Transferencia';
-  document.getElementById('ni-contabilidad').value = 'oficial';
   document.getElementById('ie-dictado-text').value = '';
   document.getElementById('ie-dictado-note').textContent = 'La lectura automática de fotos (OCR) todavía no está conectada — de momento solo guarda la imagen adjunta como referencia. Cuando conectemos IA con visión, esto rellenará las líneas solo.';
   document.getElementById('ie-preview-pane').style.display = 'none';
@@ -8002,7 +7994,6 @@ function openDocumentViewer(id){
   document.getElementById('ni-job').value = doc.job==='—' ? '' : doc.job;
   document.getElementById('ni-date').value = doc.dateRaw;
   document.getElementById('ni-payment').value = doc.payment;
-  document.getElementById('ni-contabilidad').value = doc.contabilidad || 'oficial';
   document.getElementById('ni-iban').value = doc.iban;
   document.getElementById('ni-titular').value = doc.titular;
   onClientChange();
@@ -8092,7 +8083,7 @@ async function submitNewInvoice(ev, isDraft){
     entidad_id: entidad ? entidad.id : null,
     trabajo_id: trabajo ? trabajo.id : null,
     importe: total, concepto: conceptoResumen, conceptos,
-    contabilidad: document.getElementById('ni-contabilidad')?.value || 'oficial',
+    contabilidad: 'oficial',
   };
   if(convirtiendoDesde){
     if(convirtiendoDesde.origenTipo==='albaran') payload.origen_albaran_ids = [convirtiendoDesde.origenId];
@@ -8197,23 +8188,34 @@ async function cambiarEstadoAlbaran(id, valor){
 function recalcularResumenEconomia(){
   const filtro = document.querySelector('#econ-contabilidad-filter .chip-filter.active')?.dataset.cf || '';
   const hoy = new Date(); const mes = hoy.getMonth(), anio = hoy.getFullYear();
-  const docs = Object.values(documentosRealesById).filter(d=>!filtro || (d.contabilidad||'oficial')===filtro);
+  const docs = Object.values(documentosRealesById);
   const esDelMes = d => { if(!d.dateRaw) return false; const dt = new Date(d.dateRaw); return dt.getFullYear()===anio && dt.getMonth()===mes; };
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
 
+  // Legal: facturas reales (siempre oficiales, una factura nunca es "en B"). En B: albaranes cobrados en efectivo, sin factura.
   const facturasMes = docs.filter(d=>d.type==='factura' && d.status!=='Borrador' && esDelMes(d));
-  const facturado = facturasMes.reduce((s,d)=>s+(d.total||0),0);
-  const gastosMes = docs.filter(d=>d.type==='gasto' && esDelMes(d)).reduce((s,d)=>s+(d.total||0),0);
-  const pendiente = docs.filter(d=>d.type==='factura' && d.status==='Pendiente').reduce((s,d)=>s+(d.total||0),0);
-  const iva = facturasMes.reduce((s,d)=>s+(d.iva||0),0);
+  const facturadoLegal = facturasMes.reduce((s,d)=>s+(d.total||0),0);
+  const albaranesEnB = docs.filter(d=>d.type==='albaran' && d.estado_albaran==='cobrado_efectivo' && esDelMes(d));
+  const ingresoEnB = albaranesEnB.reduce((s,d)=>s+(d.total||0),0);
+
+  let ingresos, etiquetaIngreso;
+  if(filtro==='oficial'){ ingresos = facturadoLegal; etiquetaIngreso = 'Facturado mes'; }
+  else if(filtro==='en_b'){ ingresos = ingresoEnB; etiquetaIngreso = 'Cobrado en B (albaranes)'; }
+  else { ingresos = facturadoLegal + ingresoEnB; etiquetaIngreso = 'Ingresos mes (todo)'; }
+
+  const gastosMes = docs.filter(d=>d.type==='gasto' && esDelMes(d) && (!filtro || (d.contabilidad||'oficial')===filtro)).reduce((s,d)=>s+(d.total||0),0);
+  const pendiente = facturasMes.filter(d=>d.status==='Pendiente').reduce((s,d)=>s+(d.total||0),0);
+  const iva = filtro==='en_b' ? 0 : facturasMes.reduce((s,d)=>s+(d.iva||0),0);
 
   const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-  setTxt('resumen-facturado', euro(facturado));
-  setTxt('resumen-cobrado', '— (sin seguimiento de cobro aún)');
-  setTxt('resumen-pendiente', euro(pendiente));
+  const lblEl = document.querySelector('#resumen-facturado')?.closest('.kpi')?.querySelector('.lbl');
+  if(lblEl) lblEl.textContent = etiquetaIngreso;
+  setTxt('resumen-facturado', euro(ingresos));
+  setTxt('resumen-cobrado', filtro==='en_b' ? '— (el cobro en B es el propio importe)' : '— (sin seguimiento de cobro aún)');
+  setTxt('resumen-pendiente', filtro==='en_b' ? '—' : euro(pendiente));
   setTxt('resumen-gastos', euro(gastosMes));
-  setTxt('resumen-iva', euro(iva));
-  setTxt('resumen-margen', euro(facturado - gastosMes));
+  setTxt('resumen-iva', filtro==='en_b' ? '— (no aplica)' : euro(iva));
+  setTxt('resumen-margen', euro(ingresos - gastosMes));
 }
 
 document.querySelectorAll('#econ-contabilidad-filter .chip-filter').forEach(el=>{
