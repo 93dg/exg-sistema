@@ -1742,7 +1742,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.22</div>
+        <div class="sub">V1.23</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2208,16 +2208,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="panel-body" style="padding:0;">
           <table class="tbl" id="econ-facturas-table">
             <tr>
-              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',0,'num')">Nº ⇅</th>
-              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',1,'text')">Cliente ⇅</th>
+              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',0,'fecha')">Fecha ⇅</th>
+              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',1,'num')">Nº ⇅</th>
+              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',2,'text')">Cliente ⇅</th>
               <th>Trabajo</th>
-              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',3,'text')">Fecha ⇅</th>
-              <th>Vencimiento</th>
-              <th class="num ord" onclick="ordenarTabla('econ-facturas-tbody',5,'num')">Total ⇅</th>
+              <th class="num ord" onclick="ordenarTabla('econ-facturas-tbody',4,'num')">Total ⇅</th>
               <th class="num">Cobrado</th>
               <th>Estado</th>
               <th>Gestor</th>
-              <th>Falta</th>
               <th>Archivo</th>
             </tr>
             <tbody id="econ-facturas-tbody">
@@ -3755,6 +3753,15 @@ function filtrarTablaOrdenable(tbodyId){
     tr.style.display = (okAnio && okTrim) ? '' : 'none';
   });
 }
+function formatFechaCorta(dateRaw){
+  if(!dateRaw) return '—';
+  const d = new Date(dateRaw);
+  if(isNaN(d)) return '—';
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const aa = String(d.getFullYear()).slice(-2);
+  return `${dd}/${mm}/${aa}`;
+}
 function ordenarTabla(tbodyId, colIndex, tipo){
   const tbody = document.getElementById(tbodyId);
   if(!tbody) return;
@@ -3767,7 +3774,7 @@ function ordenarTabla(tbodyId, colIndex, tipo){
     if(tipo==='num'){
       va = Number((a.children[colIndex]?.textContent||'').replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3})/g,'').replace(',','.')) || 0;
       vb = Number((b.children[colIndex]?.textContent||'').replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3})/g,'').replace(',','.')) || 0;
-    } else if(colIndex===3 && a.dataset.fechaIso){ // columna Fecha: usar la fecha ISO real, no el texto "7 jun"
+    } else if(tipo==='fecha' || (colIndex===3 && a.dataset.fechaIso)){ // columna Fecha: usar la fecha ISO real, no el texto "7 jun"
       va = a.dataset.fechaIso; vb = b.dataset.fechaIso;
     } else {
       va = a.children[colIndex]?.textContent.trim().toLowerCase() || '';
@@ -8197,7 +8204,8 @@ async function submitNewInvoice(ev, isDraft){
     row.dataset.anio = dateRaw ? dateRaw.slice(0,4) : '';
     row.dataset.trimestre = dateRaw ? String(Math.floor((Number(dateRaw.slice(5,7))-1)/3)+1) : '';
     row.dataset.total = total;
-    row.innerHTML = `<td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td>${dateLabel}</td><td>—</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td><td><button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();marcarEnviadoGestor('${savedId}')">Marcar enviada</button></td>`;
+    const fechaCorta = formatFechaCorta(dateRaw);
+    row.innerHTML = `<td class="mono">${fechaCorta}</td><td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td><td><button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();marcarEnviadoGestor('${savedId}')">Marcar enviada</button></td><td>—</td>`;
     document.getElementById('econ-facturas-tbody').prepend(row);
     documentosRealesById[savedId].origen_albaran_ids = payload.origen_albaran_ids || [];
     renderAlbaranesAbiertos();
@@ -8373,10 +8381,11 @@ async function cargarDocumentosEconomicosReales(){
           ? `<span class="pill terminado" title="Enviada el ${doc.enviado_gestor_fecha||''}">Enviada ✓</span>`
           : `<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();marcarEnviadoGestor('${doc.id}')">Marcar enviada</button>`;
         const archivoUrlReal = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
-        const faltaTexto = (doc.info_faltante && doc.info_faltante.startsWith('Falta:')) ? doc.info_faltante.split('.')[0].replace('Falta: ','') : '';
-        const faltaHtml = faltaTexto ? `<span class="pill mantenimiento" title="${doc.info_faltante}">${faltaTexto}</span>` : '<span class="pill terminado">Completo</span>';
+        const clienteHtml = entidad ? entidad.name : '<span class="pill mantenimiento">Falta cliente</span>';
+        const trabajoHtml = trabajo ? trabajo.code : '<span class="sub-t">Falta trabajo</span>';
+        const fechaCorta = formatFechaCorta(doc.fecha_devengo);
         const archivoHtml = archivoUrlReal ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${archivoUrlReal}')">📎 Ver</a>` : '—';
-        row.innerHTML = `<td class="mono">${doc.numero||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="mono">${trabajo?trabajo.code:'—'}</td><td>${dateLabel}</td><td>—</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td><td>${gestorPill}</td><td>${faltaHtml}</td><td>${archivoHtml}</td>`;
+        row.innerHTML = `<td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td><td>${gestorPill}</td><td>${archivoHtml}</td>`;
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
         const rowHtml = `<td class="mono">${doc.numero||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="mono">${trabajo?trabajo.code:'—'}</td><td>${dateLabel}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td>`;
