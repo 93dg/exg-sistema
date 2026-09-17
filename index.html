@@ -18,6 +18,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --asphalt:#1B1F24;
@@ -1741,7 +1742,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.17</div>
+        <div class="sub">V1.18</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2686,7 +2687,8 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
             <button class="close-x" onclick="cerrarVisorArchivoOriginal()">✕</button>
           </div>
         </div>
-        <div style="flex:1;min-height:0;">
+        <div style="flex:1;min-height:0;overflow:auto;background:#fff;">
+          <div id="visor-original-tabla" style="display:none;"></div>
           <iframe id="visor-original-iframe" style="width:100%;height:100%;border:0;background:#fff;"></iframe>
         </div>
       </div>
@@ -5130,26 +5132,52 @@ async function vincularCorreo(messageId){
 function b64urlEncode(str){
   return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
+async function mostrarArchivoEnVisor(url){
+  const iframe = document.getElementById('visor-original-iframe');
+  const contenedor = document.getElementById('visor-original-tabla');
+  const esOffice = /\.(xls|xlsx)$/i.test(url);
+  if(!esOffice){
+    contenedor.style.display = 'none';
+    iframe.style.display = '';
+    iframe.src = url;
+    return;
+  }
+  iframe.style.display = 'none';
+  contenedor.style.display = '';
+  contenedor.innerHTML = '<div class="sub-t" style="padding:20px;">Cargando...</div>';
+  try{
+    const resp = await fetch(url);
+    const buf = await resp.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    // preferimos la hoja "Factura" si existe (es la plantilla real), si no la primera hoja con contenido
+    const nombreHoja = wb.SheetNames.includes('Factura') ? 'Factura' : wb.SheetNames.find(n=>{
+      const s = wb.Sheets[n];
+      return s['!ref'] && XLSX.utils.decode_range(s['!ref']).e.r > 0;
+    }) || wb.SheetNames[0];
+    const hoja = wb.Sheets[nombreHoja];
+    const html = XLSX.utils.sheet_to_html(hoja, {editable:false});
+    contenedor.innerHTML = html;
+    contenedor.querySelectorAll('table').forEach(t=>{ t.style.borderCollapse='collapse'; t.style.width='auto'; t.style.color='#111'; });
+    contenedor.querySelectorAll('td').forEach(td=>{ td.style.border='1px solid #ccc'; td.style.padding='3px 6px'; td.style.fontSize='13px'; });
+  }catch(e){
+    contenedor.innerHTML = '<div class="sub-t" style="padding:20px;">No se pudo leer el archivo aquí. Usa "Descargar" para verlo entero.</div>';
+  }
+}
 function abrirVisorDesdeUrl(url){
   document.getElementById('visor-original-descargar').href = url;
-  const esOffice = /\.(xls|xlsx|doc|docx)$/i.test(url);
-  const src = esOffice ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}` : url;
-  document.getElementById('visor-original-iframe').src = src;
   document.getElementById('visor-original-overlay').classList.add('active');
+  mostrarArchivoEnVisor(url);
 }
 function abrirVisorArchivoOriginal(){
   const btn = document.getElementById('ni-ver-original');
   const url = btn.dataset.url;
   if(!url) return;
-  document.getElementById('visor-original-descargar').href = url;
-  const esOffice = /\.(xls|xlsx|doc|docx)$/i.test(url);
-  const src = esOffice ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}` : url;
-  document.getElementById('visor-original-iframe').src = src;
-  document.getElementById('visor-original-overlay').classList.add('active');
+  abrirVisorDesdeUrl(url);
 }
 function cerrarVisorArchivoOriginal(){
   document.getElementById('visor-original-overlay').classList.remove('active');
   document.getElementById('visor-original-iframe').src = 'about:blank';
+  document.getElementById('visor-original-tabla').innerHTML = '';
 }
 function openComposeDrawer(){ document.getElementById('compose-overlay').classList.add('active'); }
 function closeComposeDrawer(){
