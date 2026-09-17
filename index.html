@@ -1738,7 +1738,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.08</div>
+        <div class="sub">V1.09</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -1761,6 +1761,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="empresa" class="admin-only"><span class="ico">🏢</span><span class="label"> Empresa</span></button>
       <button data-view="facturas"><span class="ico">🧾</span><span class="label"> Facturas</span></button>
       <button data-view="presupuestos"><span class="ico">📋</span><span class="label"> Presupuestos</span></button>
+      <button data-view="albaranes"><span class="ico">📄</span><span class="label"> Albaranes</span></button>
       <button data-view="tarifas"><span class="ico">💶</span><span class="label"> Tarifas</span></button>
       <button data-view="economia"><span class="ico">€</span><span class="label"> Economía</span></button>
       <button data-view="correo"><span class="ico">✉</span><span class="label"> Correo</span></button>
@@ -1803,7 +1804,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="panel-head"><h3>📋 Albaranes abiertos</h3><span class="count" id="control-albaranes-count">0</span></div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
-            <tr><th>Nº</th><th>Cliente</th><th>Trabajo</th><th>Fecha</th><th class="num">Importe</th></tr>
+            <tr><th>Nº</th><th>Cliente</th><th>Trabajo</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th></tr>
             <tbody id="control-albaranes-tbody"></tbody>
           </table>
         </div>
@@ -2219,6 +2220,30 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
       </div>
       <div class="two-col-note">Esta sección es independiente en el menú, pero usa los mismos datos que Economía → Resumen y Rentabilidad — cualquier factura que crees aquí se refleja allí también.</div>
+    </div>
+
+    <!-- ================= ALBARANES ================= -->
+    <div class="view" id="view-albaranes">
+      <div class="topbar">
+        <div><h1>Albaranes</h1><div class="desc">Todos los albaranes — conectado con Economía</div></div>
+        <div class="quickactions"><button class="btn primary" onclick="openNewInvoiceModal({tipo:'albaran'})">+ Nuevo albarán</button></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>Albaranes</h3><span class="count" id="albaranes-standalone-count">0</span></div>
+        <div class="panel-body" style="padding:0;">
+          <table class="tbl">
+            <tr>
+              <th class="ord" onclick="ordenarTabla('albaranes-tbody-standalone',0,'text')">Nº ⇅</th>
+              <th class="ord" onclick="ordenarTabla('albaranes-tbody-standalone',1,'text')">Cliente ⇅</th>
+              <th>Trabajo</th>
+              <th class="ord" onclick="ordenarTabla('albaranes-tbody-standalone',3,'text')">Fecha ⇅</th>
+              <th class="num ord" onclick="ordenarTabla('albaranes-tbody-standalone',4,'num')">Total ⇅</th>
+              <th>Estado</th>
+            </tr>
+            <tbody id="albaranes-tbody-standalone"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- ================= PRESUPUESTOS ================= -->
@@ -4262,6 +4287,7 @@ const SECCIONES_CEDIBLES = [
   {key:'ayuntamiento', label:'Ayuntamiento'},
   {key:'facturas', label:'Facturas'},
   {key:'presupuestos', label:'Presupuestos'},
+  {key:'albaranes', label:'Albaranes'},
   {key:'tarifas', label:'Tarifas'},
   {key:'economia', label:'Economía'},
   {key:'correo', label:'Correo'},
@@ -5959,24 +5985,33 @@ function renderFleetGrid(){
     const expandida = m.id && m.id === maquinaExpandidaId;
     return `<div class="machine-card ${expandida?'expanded':''}" onclick="toggleMaquinaExpandida('${m.id||''}')" style="cursor:pointer;">
       <div class="top"><div><div class="mname">${m.name}</div><div class="mtype">${m.type}</div></div>${pill(m.state)}</div>
-      <div class="metrics"><div>Uso<b>${m.hours}</b></div><div>Ubicación<b style="font-size:12px;">${m.loc}</b></div></div>
-      <div class="foot">${m.next}</div>
+      <div class="metrics"><div>Matrícula<b class="mono">${m.matricula||'—'}</b></div><div>Documentos<b>${(m.documentos||[]).length}</b></div></div>
       ${expandida ? `
       <div class="machine-card-expand" onclick="event.stopPropagation();">
-        <div class="field" style="margin-bottom:10px;"><div class="l">Matrícula</div>
-          <input class="search-box mono" style="width:100%;" id="mq-matricula-${m.id}" value="${m.matricula||''}">
+        <div class="state-row" style="gap:8px;margin-bottom:12px;">
+          <button class="btn primary" style="flex:1;" onclick="copiarFichaMaquinaInline('${m.id}')">📋 Copiar todo</button>
         </div>
-        <div class="field" style="margin-bottom:10px;"><div class="l">Ficha técnica</div>
-          <textarea class="search-box" style="width:100%;height:120px;font-family:'IBM Plex Mono',monospace;font-size:12px;" id="mq-ficha-${m.id}">${m.fichaTecnica||''}</textarea>
+        <div style="margin-bottom:12px;">
+          <div class="l" style="margin-bottom:4px;">Ficha técnica</div>
+          ${m.fichaTecnica
+            ? `<pre style="white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:12.5px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin:0;">${m.fichaTecnica}</pre>`
+            : `<div class="two-col-note">Sin ficha técnica todavía.</div>`}
         </div>
-        <div class="field" style="margin-bottom:10px;"><div class="l">Documentos (ficha técnica, permiso de circulación, seguro...)</div>
-          <div id="mq-docs-${m.id}">${(m.documentos||[]).map(d=>`<div class="task-row"><a href="${d.url}" target="_blank" style="flex:1;">${d.nombre}</a><span style="cursor:pointer;color:var(--red);font-weight:800;" onclick="borrarDocMaquina('${m.id}','${d.path}')">✕</span></div>`).join('') || '<span class="sub-t">Sin documentos todavía</span>'}</div>
+        <div style="margin-bottom:12px;">
+          <div class="l" style="margin-bottom:4px;">Documentos (ficha técnica, permiso de circulación, seguro...)</div>
+          <div id="mq-docs-${m.id}">${(m.documentos||[]).map(d=>`<div class="task-row"><a href="${d.url}" target="_blank" style="flex:1;">📎 ${d.nombre}</a><span style="cursor:pointer;color:var(--red);font-weight:800;" onclick="borrarDocMaquina('${m.id}','${d.path}')">✕</span></div>`).join('') || '<span class="sub-t">Sin documentos todavía</span>'}</div>
           <label class="btn" style="cursor:pointer;margin-top:6px;display:inline-block;">📎 Adjuntar documento<input type="file" accept="image/*,application/pdf" style="display:none;" onchange="subirDocMaquina('${m.id}',this)"></label>
         </div>
-        <div class="state-row" style="gap:8px;">
-          <button class="btn" style="flex:1;" onclick="copiarFichaMaquinaInline('${m.id}')">📋 Copiar todo</button>
-          <button class="btn primary" style="flex:1;" onclick="guardarFichaMaquinaInline('${m.id}')">Guardar</button>
-        </div>
+        <details>
+          <summary style="cursor:pointer;color:var(--ink-soft);font-size:12.5px;">Editar (matrícula, ficha técnica)</summary>
+          <div class="field" style="margin:10px 0;"><div class="l">Matrícula</div>
+            <input class="search-box mono" style="width:100%;" id="mq-matricula-${m.id}" value="${m.matricula||''}">
+          </div>
+          <div class="field" style="margin-bottom:10px;"><div class="l">Ficha técnica</div>
+            <textarea class="search-box" style="width:100%;height:120px;font-family:'IBM Plex Mono',monospace;font-size:12px;" id="mq-ficha-${m.id}">${m.fichaTecnica||''}</textarea>
+          </div>
+          <button class="btn primary" style="width:100%;" onclick="guardarFichaMaquinaInline('${m.id}')">Guardar</button>
+        </details>
         <div class="sub-t" id="mq-status-${m.id}" style="margin-top:6px;"></div>
       </div>` : ''}
     </div>`;
@@ -6075,8 +6110,18 @@ async function cargarDatosReales(){
     const {data: flotaReal} = await sb.from('flota').select('*').order('created_at',{ascending:false});
     if(flotaReal && flotaReal.length){
       flotaReal.forEach(m=>{
-        if(fleet.some(f=>f.name===m.nombre)) return;
-        fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', state: m.estado==='activo' ? 'disponible' : m.estado, hours:'—', loc:'Nave Calle Industria', next:'Sin asignar', matricula: m.matricula||'', fichaTecnica: m.ficha_tecnica||'', documentos: m.documentos||[]});
+        const existente = fleet.find(f=>f.name===m.nombre);
+        if(existente){
+          // ya había una entrada con este nombre (de la lista de siempre) — se actualiza con el dato real, no se salta
+          existente.id = m.id;
+          existente.type = m.tipo || existente.type;
+          existente.state = m.estado==='activo' ? 'disponible' : (m.estado || existente.state);
+          existente.matricula = m.matricula || '';
+          existente.fichaTecnica = m.ficha_tecnica || '';
+          existente.documentos = m.documentos || [];
+        } else {
+          fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', state: m.estado==='activo' ? 'disponible' : m.estado, matricula: m.matricula||'', fichaTecnica: m.ficha_tecnica||'', documentos: m.documentos||[]});
+        }
       });
       renderFleetGrid();
     }
@@ -8129,7 +8174,21 @@ function renderAlbaranesAbiertos(){
   tbody.innerHTML = abiertos.length ? abiertos.map(a=>`
     <tr onclick="openDocumentViewer('${a.id}')" style="cursor:pointer;">
       <td class="mono">${a.num||'—'}</td><td>${a.client}</td><td class="mono">${a.job&&a.job!=='—'?a.job:'—'}</td><td>${a.dateLabel}</td><td class="num">${a.amountLabel}</td>
-    </tr>`).join('') : '<tr><td colspan="5" class="empty">Sin albaranes abiertos — todo facturado</td></tr>';
+      <td onclick="event.stopPropagation();">${estadoAlbaranSelect(a.id, a.estado_albaran)}</td>
+    </tr>`).join('') : '<tr><td colspan="6" class="empty">Sin albaranes abiertos — todo facturado</td></tr>';
+}
+function estadoAlbaranSelect(id, actual){
+  const opciones = [['en_proceso','En proceso'],['entregado','Entregado'],['cobrado_efectivo','Cobrado en efectivo']];
+  return `<select class="search-box" style="padding:3px 6px;font-size:11.5px;" onchange="cambiarEstadoAlbaran('${id}',this.value)">
+    ${opciones.map(([v,l])=>`<option value="${v}" ${(actual||'en_proceso')===v?'selected':''}>${l}</option>`).join('')}
+  </select>`;
+}
+async function cambiarEstadoAlbaran(id, valor){
+  if(!sb) return;
+  const {error} = await sb.from('documentos_economicos').update({estado_albaran: valor}).eq('id', id);
+  if(error){ mostrarToast('Error: '+errText(error), 'err'); return; }
+  if(documentosRealesById[id]) documentosRealesById[id].estado_albaran = valor;
+  mostrarToast('Estado actualizado ✓', 'ok');
 }
 
 document.getElementById('econ-contabilidad-filter')?.addEventListener('click', (ev)=>{
@@ -8220,8 +8279,16 @@ async function cargarDocumentosEconomicosReales(){
         row.dataset.contabilidad = doc.contabilidad || 'oficial';
         row.innerHTML = `<td>${dateLabel}</td><td>${doc.concepto||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="num">${amountLabel}</td>`;
         document.getElementById('econ-gastos-tbody')?.appendChild(row);
+      } else if(doc.tipo==='albaran'){
+        const row = document.createElement('tr');
+        row.id = 'albrow-'+doc.id;
+        row.onclick = () => openDocumentViewer(doc.id);
+        row.innerHTML = `<td class="mono">${doc.numero||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="mono">${trabajo?trabajo.code:'—'}</td><td>${dateLabel}</td><td class="num">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoAlbaranSelect(doc.id, doc.estado_albaran)}</td>`;
+        document.getElementById('albaranes-tbody-standalone')?.appendChild(row);
       }
     });
+    const contAlb = document.getElementById('albaranes-standalone-count');
+    if(contAlb) contAlb.textContent = document.querySelectorAll('#albaranes-tbody-standalone tr').length;
     actualizarContadorPresupuestosStandalone();
     renderFacturasKPIs();
     renderAlbaranesAbiertos();
