@@ -1738,7 +1738,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.05</div>
+        <div class="sub">V1.06</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2671,17 +2671,22 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <div class="view" id="view-empresa">
           <div class="topbar">
             <div><h1>Empresa</h1><div class="desc">Documentación de empresa — seguros, certificados, DNI... con fecha de caducidad</div></div>
-            <div class="quickactions"><button class="btn primary" onclick="abrirNuevoDocEmpresa()">+ Nuevo documento</button></div>
+            <div class="quickactions">
+            <button class="btn" onclick="toggleSeleccionarTodoEmpresaDocs()">☑ Seleccionar todo</button>
+            <button class="btn" style="display:none;" id="empresa-descargar-sel-btn" onclick="descargarSeleccionEmpresaDocs()">⬇ Descargar (<span id="empresa-sel-count">0</span>)</button>
+            <button class="btn" style="display:none;" id="empresa-enviar-sel-btn" onclick="enviarSeleccionEmpresaDocs()">✉ Enviar por correo (<span id="empresa-sel-count2">0</span>)</button>
+            <button class="btn primary" onclick="abrirNuevoDocEmpresa()">+ Nuevo documento</button>
+          </div>
           </div>
           <div class="panel">
             <div class="panel-body" style="padding:0;">
               <table class="tbl">
                 <tr>
-                  <th class="ord" onclick="ordenarTabla('empresa-docs-tbl',0,'text')">Categoría ⇅</th>
-                  <th class="ord" onclick="ordenarTabla('empresa-docs-tbl',1,'text')">Documento ⇅</th>
+                  <th style="width:30px;"><input type="checkbox" id="empresa-docs-sel-todo" onchange="toggleSeleccionarTodoEmpresaDocs(this)"></th>
+                  <th class="ord" onclick="ordenarTabla('empresa-docs-tbl',1,'text')">Categoría ⇅</th>
+                  <th class="ord" onclick="ordenarTabla('empresa-docs-tbl',2,'text')">Documento ⇅</th>
                   <th>Archivo</th>
-                  <th class="ord" onclick="ordenarTabla('empresa-docs-tbl',3,'text')">Caducidad ⇅</th>
-                  <th></th>
+                  <th class="ord" onclick="ordenarTabla('empresa-docs-tbl',4,'text')">Caducidad ⇅</th>
                 </tr>
                 <tbody id="empresa-docs-tbl"></tbody>
               </table>
@@ -4302,6 +4307,7 @@ function diasHastaCaducidad(fecha){
   const cad = new Date(fecha+'T00:00:00');
   return Math.round((cad - hoy) / 86400000);
 }
+let empresaDocExpandidoId = null;
 function renderDocsEmpresa(){
   const tbody = document.getElementById('empresa-docs-tbl');
   if(!tbody) return;
@@ -4314,15 +4320,87 @@ function renderDocsEmpresa(){
       else if(dias <= 30) caducidadHtml = `<span class="pill mantenimiento">Caduca en ${dias} días — ${fechaFmt}</span>`;
       else caducidadHtml = fechaFmt;
     }
-    return `<tr onclick="abrirEditarDocEmpresa('${d.id}')" style="cursor:pointer;">
+    const expandido = d.id === empresaDocExpandidoId;
+    const fila = `<tr onclick="toggleExpandirDocEmpresa('${d.id}')" style="cursor:pointer;">
+      <td onclick="event.stopPropagation();"><input type="checkbox" class="empresa-doc-sel-chk" data-id="${d.id}" onchange="actualizarSeleccionEmpresaDocs()"></td>
       <td>${d.categoria}</td>
       <td>${d.nombre}</td>
       <td onclick="event.stopPropagation();">${d.archivo_url ? `<a href="${d.archivo_url}" target="_blank">📎 Ver archivo</a>` : '<span class="sub-t">Sin adjuntar</span>'}</td>
       <td>${caducidadHtml}</td>
-      <td onclick="event.stopPropagation();"><span style="cursor:pointer;color:var(--red);font-weight:800;" onclick="borrarDocEmpresa('${d.id}')">✕</span></td>
     </tr>`;
+    const detalle = expandido ? `<tr><td colspan="5" style="background:var(--concrete);padding:14px 20px;" onclick="event.stopPropagation();">
+      <div class="field-grid">
+        <div class="field"><div class="l">Categoría</div><input class="search-box" style="width:100%;" id="ed-cat-${d.id}" value="${d.categoria}"></div>
+        <div class="field"><div class="l">Nombre</div><input class="search-box" style="width:100%;" id="ed-nom-${d.id}" value="${d.nombre}"></div>
+        <div class="field"><div class="l">Caducidad</div><input class="search-box" type="date" style="width:100%;" id="ed-cad-${d.id}" value="${d.fecha_caducidad||''}"></div>
+        <div class="field"><div class="l">Archivo</div><input type="file" class="search-box" style="width:100%;" id="ed-arch-${d.id}"></div>
+      </div>
+      <div class="state-row" style="gap:8px;margin-top:10px;">
+        <button class="btn primary" onclick="guardarDocEmpresaInline('${d.id}')">Guardar</button>
+        <button class="btn" style="color:var(--red);" onclick="borrarDocEmpresa('${d.id}')">Borrar</button>
+      </div>
+      <div class="sub-t" id="ed-status-${d.id}" style="margin-top:6px;"></div>
+    </td></tr>` : '';
+    return fila + detalle;
   }).join('') : '<tr><td colspan="5" class="empty">Sin documentos todavía</td></tr>';
   renderAtencionDocsEmpresa();
+}
+function toggleExpandirDocEmpresa(id){
+  empresaDocExpandidoId = empresaDocExpandidoId === id ? null : id;
+  renderDocsEmpresa();
+}
+async function guardarDocEmpresaInline(id){
+  const statusEl = document.getElementById('ed-status-'+id);
+  const categoria = document.getElementById('ed-cat-'+id).value.trim();
+  const nombre = document.getElementById('ed-nom-'+id).value.trim();
+  const caducidad = document.getElementById('ed-cad-'+id).value || null;
+  if(!sb){ statusEl.textContent = 'Supabase no está conectado.'; return; }
+  const payload = {categoria, nombre, fecha_caducidad: caducidad};
+  const archivo = document.getElementById('ed-arch-'+id).files[0];
+  if(archivo){
+    statusEl.textContent = 'Subiendo archivo...';
+    const path = `EXCAVACIONES-GOMEZ/EMPRESA/${sanitizeFileName(categoria)}/${sanitizeFileName(archivo.name)}`;
+    const {error: upErr} = await sb.storage.from(DOC_BUCKET).upload(path, archivo, {upsert:true});
+    if(upErr){ statusEl.textContent = 'Error al subir: '+upErr.message; statusEl.style.color = 'var(--red)'; return; }
+    payload.archivo_path = path;
+    payload.archivo_url = sb.storage.from(DOC_BUCKET).getPublicUrl(path).data.publicUrl;
+  }
+  const {error} = await sb.from('documentos_empresa').update(payload).eq('id', id);
+  if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
+  statusEl.textContent = 'Guardado ✓'; statusEl.style.color = 'var(--green)';
+  cargarDocsEmpresa();
+}
+let empresaDocsTodoSeleccionado = false;
+function toggleSeleccionarTodoEmpresaDocs(){
+  empresaDocsTodoSeleccionado = !empresaDocsTodoSeleccionado;
+  document.querySelectorAll('.empresa-doc-sel-chk').forEach(chk=>chk.checked = empresaDocsTodoSeleccionado);
+  document.getElementById('empresa-docs-sel-todo').checked = empresaDocsTodoSeleccionado;
+  actualizarSeleccionEmpresaDocs();
+}
+function actualizarSeleccionEmpresaDocs(){
+  const marcados = document.querySelectorAll('.empresa-doc-sel-chk:checked');
+  document.getElementById('empresa-sel-count').textContent = marcados.length;
+  document.getElementById('empresa-sel-count2').textContent = marcados.length;
+  document.getElementById('empresa-descargar-sel-btn').style.display = marcados.length ? '' : 'none';
+  document.getElementById('empresa-enviar-sel-btn').style.display = marcados.length ? '' : 'none';
+}
+function descargarSeleccionEmpresaDocs(){
+  const marcados = Array.from(document.querySelectorAll('.empresa-doc-sel-chk:checked')).map(c=>c.dataset.id);
+  const docs = EMPRESA_DOCS.filter(d=>marcados.includes(d.id) && d.archivo_url);
+  if(!docs.length){ mostrarToast('Ninguno de los seleccionados tiene archivo adjunto.'); return; }
+  docs.forEach(d=>{
+    const a = document.createElement('a');
+    a.href = d.archivo_url; a.download = ''; a.target = '_blank';
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+}
+function enviarSeleccionEmpresaDocs(){
+  const marcados = Array.from(document.querySelectorAll('.empresa-doc-sel-chk:checked')).map(c=>c.dataset.id);
+  const docs = EMPRESA_DOCS.filter(d=>marcados.includes(d.id));
+  document.getElementById('mail-to').value = '';
+  document.getElementById('mail-subject').value = 'Documentación de empresa';
+  document.getElementById('mail-body').value = 'Adjunto los siguientes documentos:\n\n' + docs.map(d=>`- ${d.nombre}${d.archivo_url ? ': '+d.archivo_url : ' (sin archivo adjuntado)'}`).join('\n');
+  openComposeDrawer();
 }
 function renderAtencionDocsEmpresa(){
   document.querySelectorAll('.atencion-empresa-doc').forEach(el=>el.remove()); // quita avisos viejos antes de volver a añadir
