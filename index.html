@@ -1762,7 +1762,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.44</div>
+        <div class="sub">V1.45</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3959,11 +3959,11 @@ document.querySelectorAll('#fact-filtro-estado-chips .chip-filter, #alb-filtro-e
 function filtrarPorAnioTrim(tbodyId, prefijo){
   const tbody = document.getElementById(tbodyId);
   if(!tbody) return;
-  const anioSel = document.getElementById(prefijo+'-filtro-anio-chips')?.querySelector('.chip-filter.active')?.dataset.anio || '';
+  const aniosSel = new Set(Array.from(document.getElementById(prefijo+'-filtro-anio-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.anio).filter(Boolean));
   const trimSel = document.getElementById(prefijo+'-filtro-trim-chips')?.querySelector('.chip-filter.active')?.dataset.trim || '';
   const estadosSel = new Set(Array.from(document.getElementById(prefijo+'-filtro-estado-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.estado));
   tbody.querySelectorAll('tr').forEach(tr=>{
-    const okAnio = !anioSel || tr.dataset.anio === anioSel;
+    const okAnio = aniosSel.size===0 || aniosSel.has(tr.dataset.anio);
     const okTrim = !trimSel || tr.dataset.trimestre === trimSel;
     let okEstado = true;
     if(estadosSel.size){
@@ -3978,14 +3978,21 @@ function poblarFiltroAniosChipsGenerico(tbodyId, contenedorId, prefijo){
   const tbody = document.getElementById(tbodyId);
   const contenedor = document.getElementById(contenedorId);
   if(!tbody || !contenedor) return;
-  const activo = contenedor.querySelector('.chip-filter.active')?.dataset.anio || '';
+  const activos = new Set(Array.from(contenedor.querySelectorAll('.chip-filter.active')).map(c=>c.dataset.anio).filter(Boolean));
   const anios = [...new Set(Array.from(tbody.querySelectorAll('tr')).map(tr=>tr.dataset.anio).filter(Boolean))].sort().reverse();
-  contenedor.innerHTML = `<div class="chip-filter ${activo===''?'active':''}" data-anio="">Todos los años</div>` +
-    anios.map(a=>`<div class="chip-filter ${activo===a?'active':''}" data-anio="${a}">${a}</div>`).join('');
+  const soloTodos = activos.size===0;
+  contenedor.innerHTML = `<div class="chip-filter ${soloTodos?'active':''}" data-anio="">Todos los años</div>` +
+    anios.map(a=>`<div class="chip-filter ${activos.has(a)?'active':''}" data-anio="${a}">${a}</div>`).join('');
   contenedor.querySelectorAll('.chip-filter').forEach(chip=>{
     chip.addEventListener('click', ()=>{
-      contenedor.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
-      chip.classList.add('active');
+      if(chip.dataset.anio===''){
+        contenedor.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
+        chip.classList.add('active');
+      } else {
+        contenedor.querySelector('.chip-filter[data-anio=""]')?.classList.remove('active');
+        chip.classList.toggle('active');
+        if(!contenedor.querySelector('.chip-filter.active')) contenedor.querySelector('.chip-filter[data-anio=""]')?.classList.add('active');
+      }
       filtrarPorAnioTrim(tbodyId, prefijo);
     });
   });
