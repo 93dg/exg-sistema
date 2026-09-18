@@ -177,10 +177,10 @@ table{border-collapse:collapse;width:100%;}
 
 /* ---------- TABLES ---------- */
 .tbl th{
-  text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;
+  text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;
   color:var(--ink-soft);padding:8px 10px;border-bottom:1px solid var(--line);font-weight:600;
 }
-.tbl td{padding:9px 10px;border-bottom:1px solid var(--concrete-2);font-size:13px;vertical-align:middle;}
+.tbl td{padding:9px 10px;border-bottom:1px solid var(--concrete-2);font-size:13px;vertical-align:middle;text-align:center;}
 .tbl th.ord{cursor:pointer;user-select:none;}
 .tbl th.ord:hover{color:var(--orange);}
 .tbl tr:hover td{background:var(--concrete);cursor:pointer;}
@@ -213,6 +213,7 @@ table{border-collapse:collapse;width:100%;}
 .pill.presentado{background:var(--blue-soft);color:var(--blue);}
 .pill.adjudicado{background:var(--green-soft);color:var(--green);}
 .pill.noadjudicado{background:var(--red-soft);color:var(--red);}
+.pill.enviado{background:var(--blue-soft);color:var(--blue);}
 .pill.pendiente_enviar{background:var(--concrete-2);color:var(--ink-soft);}
 .pill.pendiente_cobrar{background:var(--yellow-soft);color:#8A6100;}
 .pill.parcial{background:var(--blue-soft);color:var(--blue);}
@@ -1757,7 +1758,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.33</div>
+        <div class="sub">V1.34</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -1820,12 +1821,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
 
       <div class="panel">
-        <div class="panel-head"><h3>📋 Albaranes abiertos</h3><span class="count" id="control-albaranes-count">0</span></div>
-        <div class="panel-body" style="padding:0;">
+        <div class="panel-head" style="cursor:pointer;" onclick="document.getElementById('control-albaranes-body').style.display = document.getElementById('control-albaranes-body').style.display==='none' ? '' : 'none'; this.querySelector('.chev').textContent = document.getElementById('control-albaranes-body').style.display==='none' ? '▸' : '▾';">
+          <h3><span class="chev">▾</span> 📋 Albaranes abiertos</h3><span class="count" id="control-albaranes-count">0</span>
+        </div>
+        <div class="panel-body" style="padding:0;" id="control-albaranes-body">
           <table class="tbl">
             <tr><th>Nº</th><th>Cliente</th><th>Trabajo</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th></tr>
             <tbody id="control-albaranes-tbody"></tbody>
           </table>
+          <div style="padding:10px;text-align:center;display:none;" id="control-albaranes-cargar-mas-wrap">
+            <button class="btn" onclick="controlAlbaranesMostrarMas()">Cargar más</button>
+          </div>
         </div>
       </div>
 
@@ -2188,8 +2194,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <th>Provincia</th>
               <th>Email</th>
               <th>Teléfono</th>
-              <th class="num ord" onclick="ordenarTabla('clientes-tbl',9,'num')">Facturado (año) ⇅</th>
-              <th class="num ord" onclick="ordenarTabla('clientes-tbl',10,'num')">Pendiente ⇅</th></tr>
+              <th class="num ord" onclick="ordenarTabla('clientes-tbl',9,'num')">Facturado (año) ⇅</th></tr>
             <tbody id="clientes-tbl"></tbody>
           </table>
         </div>
@@ -2200,20 +2205,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="view" id="view-facturas">
       <div class="topbar">
         <div><h1>Facturas</h1><div class="desc">Todas las facturas — conectado con Economía</div></div>
-        <div class="quickactions"><button class="btn primary" onclick="abrirMenuTipoDoc()">+ Crear documento</button></div>
+        <div class="quickactions">
+          <button class="btn" style="color:var(--red);display:none;" id="fact-borrar-sel-btn" onclick="borrarDocumentosSeleccionados('fact-sel-chk')">🗑 Borrar seleccionadas (<span id="fact-sel-count">0</span>)</button>
+          <button class="btn primary" onclick="abrirMenuTipoDoc()">+ Crear documento</button>
+        </div>
       </div>
 
       <div class="kpi-strip" id="facturas-kpi-strip" style="margin-bottom:16px;"></div>
 
       <div class="panel">
         <div class="panel-head" style="flex-direction:column;align-items:stretch;gap:10px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <h3>Facturas</h3>
-            <span style="display:flex;align-items:center;gap:10px;">
-              <button class="btn" onclick="marcarTrimestreEnviado()" title="Marca como enviadas al gestor todas las facturas del año/trimestre que tengas seleccionado en los filtros de arriba">📤 Marcar trimestre como enviado</button>
-              <span class="count">0 vencidas</span>
-            </span>
-          </div>
           <div class="filters" id="fact-filtro-anio-chips" style="margin:0;"></div>
           <div class="filters" id="fact-filtro-trim-chips" style="margin:0;">
             <div class="chip-filter active" data-trim="">Todos los trimestres</div>
@@ -2226,14 +2227,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="panel-body" style="padding:0;">
           <table class="tbl" id="econ-facturas-table">
             <tr>
-              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',0,'fecha')">Fecha ⇅</th>
-              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',1,'num')">Nº ⇅</th>
-              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',2,'text')">Cliente ⇅</th>
+              <th style="width:30px;"><input type="checkbox" id="fact-sel-todo" onchange="toggleSeleccionarTodoDoc(this,'fact-sel-chk')"></th>
+              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',1,'fecha')">Fecha ⇅</th>
+              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',2,'num')">Nº ⇅</th>
+              <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',3,'text')">Cliente ⇅</th>
               <th>Trabajo</th>
-              <th class="num ord" onclick="ordenarTabla('econ-facturas-tbody',4,'num')">Base ⇅</th>
+              <th class="num ord" onclick="ordenarTabla('econ-facturas-tbody',5,'num')">Base ⇅</th>
               <th class="num">IVA</th>
               <th class="num">% IVA</th>
-              <th class="num ord" onclick="ordenarTabla('econ-facturas-tbody',7,'num')">Total ⇅</th>
+              <th class="num ord" onclick="ordenarTabla('econ-facturas-tbody',8,'num')">Total ⇅</th>
               <th class="num">Cobrado</th>
               <th>Estado</th>
               <th>Gestor</th>
@@ -2251,7 +2253,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="view" id="view-albaranes">
       <div class="topbar">
         <div><h1>Albaranes</h1><div class="desc">Todos los albaranes — conectado con Economía</div></div>
-        <div class="quickactions"><button class="btn primary" onclick="openNewInvoiceModal({tipo:'albaran'})">+ Nuevo albarán</button></div>
+        <div class="quickactions">
+          <button class="btn" style="color:var(--red);display:none;" id="alb-borrar-sel-btn" onclick="borrarDocumentosSeleccionados('alb-sel-chk')">🗑 Borrar seleccionados (<span id="alb-sel-count">0</span>)</button>
+          <button class="btn primary" onclick="openNewInvoiceModal({tipo:'albaran'})">+ Nuevo albarán</button>
+        </div>
       </div>
       <div class="kpi-strip" id="albaranes-kpi-strip" style="margin-bottom:16px;"></div>
       <div class="panel">
@@ -2272,11 +2277,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
             <tr>
-              <th class="ord" onclick="ordenarTabla('albaranes-tbody-standalone',0,'fecha')">Fecha ⇅</th>
-              <th class="ord" onclick="ordenarTabla('albaranes-tbody-standalone',1,'num')">Nº ⇅</th>
-              <th class="ord" onclick="ordenarTabla('albaranes-tbody-standalone',2,'text')">Cliente ⇅</th>
+              <th style="width:30px;"><input type="checkbox" id="alb-sel-todo" onchange="toggleSeleccionarTodoDoc(this,'alb-sel-chk')"></th>
+              <th class="ord" onclick="ordenarTabla('albaranes-tbody-standalone',1,'fecha')">Fecha ⇅</th>
+              <th class="ord" onclick="ordenarTabla('albaranes-tbody-standalone',2,'num')">Nº ⇅</th>
+              <th class="ord" onclick="ordenarTabla('albaranes-tbody-standalone',3,'text')">Cliente ⇅</th>
               <th>Trabajo</th>
-              <th class="num ord" onclick="ordenarTabla('albaranes-tbody-standalone',4,'num')">Total ⇅</th>
+              <th class="num ord" onclick="ordenarTabla('albaranes-tbody-standalone',5,'num')">Total ⇅</th>
               <th>Estado</th>
               <th>Archivo</th>
             </tr>
@@ -2290,7 +2296,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="view" id="view-presupuestos">
       <div class="topbar">
         <div><h1>Presupuestos</h1><div class="desc">Todos los presupuestos — conectado con Economía</div></div>
-        <div class="quickactions"><button class="btn primary" onclick="openNewInvoiceModal({tipo:'presupuesto'})">+ Nuevo presupuesto</button></div>
+        <div class="quickactions">
+          <button class="btn" style="color:var(--red);display:none;" id="pres-borrar-sel-btn" onclick="borrarDocumentosSeleccionados('pres-sel-chk')">🗑 Borrar seleccionados (<span id="pres-sel-count">0</span>)</button>
+          <button class="btn primary" onclick="openNewInvoiceModal({tipo:'presupuesto'})">+ Nuevo presupuesto</button>
+        </div>
       </div>
       <div class="kpi-strip" id="presupuestos-kpi-strip" style="margin-bottom:16px;"></div>
       <div class="panel">
@@ -2311,11 +2320,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
             <tr>
-              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',0,'fecha')">Fecha ⇅</th>
-              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',1,'num')">Nº ⇅</th>
-              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',2,'text')">Cliente ⇅</th>
+              <th style="width:30px;"><input type="checkbox" id="pres-sel-todo" onchange="toggleSeleccionarTodoDoc(this,'pres-sel-chk')"></th>
+              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',1,'fecha')">Fecha ⇅</th>
+              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',2,'num')">Nº ⇅</th>
+              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',3,'text')">Cliente ⇅</th>
               <th>Trabajo</th>
-              <th class="num ord" onclick="ordenarTabla('presupuestos-tbody-standalone',4,'num')">Total ⇅</th>
+              <th class="num ord" onclick="ordenarTabla('presupuestos-tbody-standalone',5,'num')">Total ⇅</th>
               <th>Estado</th>
               <th>Archivo</th>
             </tr>
@@ -2397,6 +2407,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div class="kpi"><div class="lbl">Gastos mes</div><div class="val red" id="resumen-gastos">0,00 €</div></div>
           <div class="kpi"><div class="lbl">IVA repercutido est.</div><div class="val" id="resumen-iva">0,00 €</div></div>
           <div class="kpi"><div class="lbl">Margen operativo</div><div class="val green" id="resumen-margen">0,00 €</div></div>
+        </div>
+        <div class="filters" id="econ-filtro-anio-chips" style="margin-bottom:10px;"></div>
+        <div class="filters" id="econ-filtro-trim-chips" style="margin-bottom:16px;">
+          <div class="chip-filter active" data-trim="">Todos los trimestres</div>
+          <div class="chip-filter" data-trim="1">1º trimestre</div>
+          <div class="chip-filter" data-trim="2">2º trimestre</div>
+          <div class="chip-filter" data-trim="3">3º trimestre</div>
+          <div class="chip-filter" data-trim="4">4º trimestre</div>
         </div>
 
         <div class="panel">
@@ -3113,9 +3131,11 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           </div>
 
           <div class="field" style="margin-bottom:12px;"><div class="l">Cliente</div>
-            <select class="search-box" style="width:100%;" id="nj-client" required>
-              <option value="">Selecciona un cliente…</option>
-            </select>
+            <div style="display:flex;gap:6px;">
+              <input class="search-box" style="width:100%;" id="nj-client" list="nj-client-list" required placeholder="Buscar cliente…" autocomplete="off">
+              <datalist id="nj-client-list"></datalist>
+              <button type="button" class="btn" style="white-space:nowrap;" onclick="openNewClientModal('nj-client')">+ Nuevo</button>
+            </div>
           </div>
           <div class="field" style="margin-bottom:12px;"><div class="l">Zona / ubicación</div>
             <input class="search-box" style="width:100%;" id="nj-zone" placeholder="Ej. Camino de la Peña" required>
@@ -3499,9 +3519,8 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 
         <div class="ie-client-row">
           <div class="field" style="flex:1;"><div class="l">Cliente</div>
-            <select class="search-box" style="width:100%;" id="ni-client" required onchange="onClientChange()">
-              <option value="">Selecciona un cliente…</option>
-            </select>
+            <input class="search-box" style="width:100%;" id="ni-client" list="ni-client-list" required oninput="onClientChange()" onchange="onClientChange()" placeholder="Buscar cliente…" autocomplete="off">
+            <datalist id="ni-client-list"></datalist>
           </div>
           <div class="field" style="flex:1;position:relative;"><div class="l">Trabajo asociado (opcional)</div>
             <input class="search-box" style="width:100%;" id="ni-job" placeholder="Escribe o elige un trabajo…" autocomplete="off"
@@ -3762,13 +3781,14 @@ function renderFacturasKPIs(){
   if(!strip) return;
   let facturado=0, cobrado=0, vencidas=0;
   document.querySelectorAll('#econ-facturas-tbody tr').forEach(tr=>{
+    if(tr.style.display==='none') return;
     const tds = tr.querySelectorAll('td');
-    if(tds.length < 10) return;
-    const total = parseFloat(tds[7].textContent.replace(/[^\d,.-]/g,'').replace(',','.'))||0;
-    const cob = parseFloat(tds[8].textContent.replace(/[^\d,.-]/g,'').replace(',','.'))||0;
+    if(tds.length < 11) return;
+    const total = parseFloat(tds[8].textContent.replace(/[^\d,.-]/g,'').replace(',','.'))||0;
+    const cob = parseFloat(tds[9].textContent.replace(/[^\d,.-]/g,'').replace(',','.'))||0;
     facturado += total;
     cobrado += cob;
-    if(tds[9].textContent.toLowerCase().includes('vencid')) vencidas++;
+    if(tds[10].textContent.toLowerCase().includes('vencid')) vencidas++;
   });
   const pendiente = facturado - cobrado;
   const activoKpi = strip.querySelector('.kpi.active')?.dataset.kpi || '';
@@ -3815,9 +3835,16 @@ function poblarFiltroAniosChips(tbodyId, contenedorId){
     anios.map(a=>`<div class="chip-filter ${activo===a?'active':''}" data-anio="${a}">${a}</div>`).join('');
   contenedor.querySelectorAll('.chip-filter').forEach(chip=>{
     chip.addEventListener('click', ()=>{
-      contenedor.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
-      chip.classList.add('active');
+      if(chip.dataset.anio===''){
+        contenedor.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
+        chip.classList.add('active');
+      } else {
+        contenedor.querySelector('.chip-filter[data-anio=""]')?.classList.remove('active');
+        chip.classList.toggle('active');
+        if(!contenedor.querySelector('.chip-filter.active')) contenedor.querySelector('.chip-filter[data-anio=""]')?.classList.add('active');
+      }
       filtrarTablaOrdenable(tbodyId);
+      if(tbodyId==='econ-facturas-tbody') renderFacturasKPIs();
     });
   });
 }
@@ -3826,6 +3853,7 @@ document.querySelectorAll('#fact-filtro-trim-chips .chip-filter').forEach(chip=>
     document.querySelectorAll('#fact-filtro-trim-chips .chip-filter').forEach(c=>c.classList.remove('active'));
     chip.classList.add('active');
     filtrarTablaOrdenable('econ-facturas-tbody');
+    renderFacturasKPIs();
   });
 });
 function renderAlbaranesKPIs(){
@@ -3913,17 +3941,16 @@ function filtrarTablaOrdenable(tbodyId){
   const tbody = document.getElementById(tbodyId);
   if(!tbody) return;
   const prefijo = tbodyId.startsWith('fact') || tbodyId==='econ-facturas-tbody' ? 'fact' : tbodyId;
-  const anioSel = document.getElementById('fact-filtro-anio-chips')?.querySelector('.chip-filter.active')?.dataset.anio
-    ?? document.getElementById('fact-filtro-anio')?.value ?? '';
+  const aniosSel = new Set(Array.from(document.getElementById('fact-filtro-anio-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.anio).filter(Boolean));
   const trimSel = document.getElementById('fact-filtro-trim-chips')?.querySelector('.chip-filter.active')?.dataset.trim
     ?? document.getElementById('fact-filtro-trim')?.value ?? '';
   const kpiSel = tbodyId==='econ-facturas-tbody' ? (document.querySelector('#facturas-kpi-strip .kpi.active')?.dataset.kpi || '') : '';
   tbody.querySelectorAll('tr').forEach(tr=>{
-    const okAnio = !anioSel || tr.dataset.anio === anioSel;
+    const okAnio = aniosSel.size===0 || aniosSel.has(tr.dataset.anio);
     const okTrim = !trimSel || tr.dataset.trimestre === trimSel;
     let okKpi = true;
     if(kpiSel && kpiSel!=='todo'){
-      const estadoTexto = tr.children[9]?.textContent.toLowerCase() || '';
+      const estadoTexto = tr.children[10]?.textContent.toLowerCase() || '';
       if(kpiSel==='cobrado') okKpi = estadoTexto.includes('cobrad');
       else if(kpiSel==='pendiente') okKpi = estadoTexto.includes('pendiente');
       else if(kpiSel==='vencida') okKpi = estadoTexto.includes('vencid');
@@ -3963,7 +3990,7 @@ function toggleExpandirDocFila(id, colspan){
   </td>`;
   fila.after(detalle);
 }
-function toggleExpandirFacturaFila(id){ toggleExpandirDocFila(id, 12); }
+function toggleExpandirFacturaFila(id){ toggleExpandirDocFila(id, 13); }
 function ordenarTabla(tbodyId, colIndex, tipo){
   const tbody = document.getElementById(tbodyId);
   if(!tbody) return;
@@ -4335,6 +4362,22 @@ function pill(state){ return `<span class="pill ${state}">${stateLabels[state]||
 
 /* Centro de control - bandeja de decision (pendientes sin planificar) */
 const pendientes = jobs.filter(j=>j.state==='pendiente');
+const limitesListas = {};
+function aplicarLimiteLista(contId, limitePorDefecto){
+  const cont = document.getElementById(contId);
+  if(!cont) return;
+  document.getElementById(contId+'-cargar-mas')?.remove();
+  const limite = limitesListas[contId] || limitePorDefecto;
+  const hijos = Array.from(cont.children).filter(el=>el.id !== contId+'-cargar-mas');
+  hijos.forEach((el,i)=>{ el.style.display = i < limite ? '' : 'none'; });
+  if(hijos.length > limite){
+    const btnWrap = document.createElement('div');
+    btnWrap.id = contId+'-cargar-mas';
+    btnWrap.style.cssText = 'padding:8px;text-align:center;';
+    btnWrap.innerHTML = `<button class="btn" onclick="limitesListas['${contId}']=(limitesListas['${contId}']||${limitePorDefecto})+10;aplicarLimiteLista('${contId}',${limitePorDefecto});">Cargar más</button>`;
+    cont.appendChild(btnWrap);
+  }
+}
 
 /* ---------------- REQUIERE ATENCIÓN (centro de control) ---------------- */
 const atencionBase = [];
@@ -4354,6 +4397,7 @@ function renderAtencion(){
     <div class="attention-row" onclick="atencionFns[${i}]()"><div class="sev ${a.sev}"></div><div><div class="t">${a.t}</div><div class="s">${a.s}</div></div></div>
   `).join('');
   window.atencionFns = atencion.map(a=>a.action);
+  aplicarLimiteLista('atencion-list', 10);
 }
 
 document.getElementById('control-tbl').innerHTML = pendientes.map((j,i)=>`
@@ -4692,6 +4736,7 @@ function renderAtencionDocsEmpresa(){
       </div>`);
     });
   }
+  aplicarLimiteLista('atencion-list', 10);
 }
 function abrirNuevoDocEmpresa(){
   empresaDocEditandoId = null;
@@ -7029,6 +7074,36 @@ async function registrarRetraso(code){
 
 /* Clientes — se cargan de verdad desde Supabase (tabla entidades) */
 const clientes = [];
+function toggleSeleccionarTodoDoc(master, claseChk){
+  document.querySelectorAll('.'+claseChk).forEach(chk=>chk.checked = master.checked);
+  actualizarSeleccionDoc(claseChk, claseChk.replace('-chk','-borrar-sel-btn'), claseChk.replace('-chk','-sel-count'));
+}
+function actualizarSeleccionDoc(claseChk, btnId, countId){
+  const marcados = document.querySelectorAll('.'+claseChk+':checked');
+  const btn = document.getElementById(btnId);
+  const countEl = document.getElementById(countId);
+  if(countEl) countEl.textContent = marcados.length;
+  if(btn) btn.style.display = marcados.length ? '' : 'none';
+}
+async function borrarDocumentosSeleccionados(claseChk){
+  const marcados = Array.from(document.querySelectorAll('.'+claseChk+':checked'));
+  if(!marcados.length) return;
+  if(!(await confirmarAccion(`¿Borrar ${marcados.length} documento(s)? No se puede deshacer.`))) return;
+  if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
+  const ids = marcados.map(c=>c.dataset.id).filter(Boolean);
+  const {error} = await sb.from('documentos_economicos').delete().in('id', ids);
+  if(error){ mostrarToast('Error al borrar: '+errText(error)); return; }
+  ids.forEach(id=>{
+    delete documentosRealesById[id];
+    document.getElementById('docrow-detalle-'+id)?.remove();
+    document.getElementById('docrow-'+id)?.remove();
+    document.getElementById('albrow-'+id)?.remove();
+    document.getElementById('presrow-'+id)?.remove();
+  });
+  mostrarToast(`${ids.length} documento(s) borrado(s).`, 'ok');
+  actualizarSeleccionDoc(claseChk, claseChk.replace('-chk','-borrar-sel-btn'), claseChk.replace('-chk','-sel-count'));
+  if(claseChk==='fact-sel-chk') renderFacturasKPIs();
+}
 function toggleSeleccionarTodoClientes(master){
   document.querySelectorAll('.clientes-sel-chk').forEach(chk=>chk.checked = master.checked);
   actualizarSeleccionClientes();
@@ -7057,7 +7132,7 @@ function renderClientesTable(){
   document.getElementById('clientes-tbl').innerHTML = clientes.map(c=>`
     <tr onclick="openClientDrawer('${c.name}')"><td onclick="event.stopPropagation();"><input type="checkbox" class="clientes-sel-chk" data-id="${c.id||''}" onchange="actualizarSeleccionClientes()"></td><td><b>${c.name}</b></td><td><span class="zone-badge">${c.type}</span></td>
     <td>${falta(c.nif)}</td><td>${falta(c.direccion)}</td><td>${falta(c.poblacion)}</td><td>${falta(c.provincia)}</td><td>${falta(c.email)}</td><td>${falta(c.telefono)}</td>
-    <td class="num">${c.fact}</td><td class="num">${c.pend}</td></tr>`).join('');
+    <td class="num">${c.fact}</td></tr>`).join('');
 }
 renderClientesTable();
 async function cargarEntidadesReales(){
@@ -7187,11 +7262,9 @@ const clientFiscalData = {};
 let clientTargetSelect = null; // qué select disparó "crear cliente nuevo"
 
 function fillClientSelects(){
-  const opts = `<option value="__new__">+ Crear cliente nuevo…</option>` +
-    clientes.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
-  document.getElementById('nj-client').innerHTML = '<option value="">Selecciona un cliente…</option>' + opts;
-  document.getElementById('ni-client').innerHTML = '<option value="">Selecciona un cliente…</option>' + opts;
-  document.getElementById('nj-client').onchange = () => { if(document.getElementById('nj-client').value==='__new__') openNewClientModal('nj-client'); };
+  const opts = clientes.map(c=>`<option value="${c.name}">`).join('');
+  document.getElementById('nj-client-list').innerHTML = opts;
+  document.getElementById('ni-client-list').innerHTML = opts;
 }
 function fillJobSelect(){ /* usado por renderJobCombo, no necesita precálculo */ }
 fillClientSelects();
@@ -8485,6 +8558,8 @@ function actualizarContadorPresupuestosStandalone(){
   const el = document.getElementById('presupuestos-standalone-count');
   if(el) el.textContent = document.getElementById('presupuestos-tbody-standalone').children.length;
 }
+let controlAlbaranesLimite = 10;
+function controlAlbaranesMostrarMas(){ controlAlbaranesLimite += 10; renderAlbaranesAbiertos(); }
 function renderAlbaranesAbiertos(){
   const tbody = document.getElementById('control-albaranes-tbody');
   if(!tbody) return;
@@ -8494,11 +8569,14 @@ function renderAlbaranesAbiertos(){
   const abiertos = todos.filter(d=>d.type==='albaran' && !idsFacturados.has(d.id))
     .sort((a,b)=> new Date(b.created_at||0) - new Date(a.created_at||0));
   document.getElementById('control-albaranes-count').textContent = abiertos.length;
-  tbody.innerHTML = abiertos.length ? abiertos.map(a=>`
+  const visibles = abiertos.slice(0, controlAlbaranesLimite);
+  tbody.innerHTML = visibles.length ? visibles.map(a=>`
     <tr onclick="openDocumentViewer('${a.id}')" style="cursor:pointer;">
-      <td class="mono">${a.num||'—'}</td><td>${a.client}</td><td class="mono">${a.job&&a.job!=='—'?a.job:'—'}</td><td>${a.dateLabel}</td><td class="num">${a.amountLabel}</td>
+      <td class="mono">${a.num||'—'}</td><td>${a.client}</td><td class="mono">${a.job&&a.job!=='—'?a.job:'—'}</td><td class="mono">${formatFechaCorta(a.dateRaw)}</td><td class="num">${a.amountLabel}</td>
       <td onclick="event.stopPropagation();">${estadoAlbaranSelect(a.id, a.estado_albaran)}</td>
     </tr>`).join('') : '<tr><td colspan="6" class="empty">Sin albaranes abiertos — todo facturado</td></tr>';
+  const wrap = document.getElementById('control-albaranes-cargar-mas-wrap');
+  if(wrap) wrap.style.display = abiertos.length > controlAlbaranesLimite ? '' : 'none';
 }
 const ESTADO_COBRO_OPCIONES = [['pendiente_enviar','Pendiente de enviar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Parcial'],['cobrado','Cobrado']];
 function estadoCobroSelect(id, actual){
@@ -8581,37 +8659,74 @@ async function cambiarEstadoAlbaran(id, valor){
   mostrarToast('Estado actualizado ✓', 'ok');
 }
 
+function poblarFiltroAniosEconomia(){
+  const contenedor = document.getElementById('econ-filtro-anio-chips');
+  if(!contenedor) return;
+  const activos = new Set(Array.from(contenedor.querySelectorAll('.chip-filter.active')).map(c=>c.dataset.anio).filter(Boolean));
+  const anios = [...new Set(Object.values(documentosRealesById).map(d=>d.dateRaw ? String(new Date(d.dateRaw).getFullYear()) : null).filter(Boolean))].sort().reverse();
+  const soloTodos = activos.size===0;
+  contenedor.innerHTML = `<div class="chip-filter ${soloTodos?'active':''}" data-anio="">Todos los años</div>` +
+    anios.map(a=>`<div class="chip-filter ${activos.has(a)?'active':''}" data-anio="${a}">${a}</div>`).join('');
+  contenedor.querySelectorAll('.chip-filter').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      if(chip.dataset.anio===''){
+        contenedor.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
+        chip.classList.add('active');
+      } else {
+        contenedor.querySelector('.chip-filter[data-anio=""]')?.classList.remove('active');
+        chip.classList.toggle('active');
+        if(!contenedor.querySelector('.chip-filter.active')) contenedor.querySelector('.chip-filter[data-anio=""]')?.classList.add('active');
+      }
+      recalcularResumenEconomia();
+    });
+  });
+}
+document.querySelectorAll('#econ-filtro-trim-chips .chip-filter').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#econ-filtro-trim-chips .chip-filter').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    recalcularResumenEconomia();
+  });
+});
 function recalcularResumenEconomia(){
   const filtro = document.querySelector('#econ-contabilidad-filter .chip-filter.active')?.dataset.cf || '';
-  const hoy = new Date(); const mes = hoy.getMonth(), anio = hoy.getFullYear();
+  const aniosSel = new Set(Array.from(document.getElementById('econ-filtro-anio-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.anio).filter(Boolean));
+  const trimSel = document.getElementById('econ-filtro-trim-chips')?.querySelector('.chip-filter.active')?.dataset.trim || '';
   const docs = Object.values(documentosRealesById);
-  const esDelMes = d => { if(!d.dateRaw) return false; const dt = new Date(d.dateRaw); return dt.getFullYear()===anio && dt.getMonth()===mes; };
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  const enRango = d => {
+    if(!d.dateRaw) return aniosSel.size===0 && !trimSel;
+    const dt = new Date(d.dateRaw);
+    if(isNaN(dt)) return false;
+    if(aniosSel.size && !aniosSel.has(String(dt.getFullYear()))) return false;
+    if(trimSel && String(Math.floor(dt.getMonth()/3)+1)!==trimSel) return false;
+    return true;
+  };
 
-  // Legal: facturas reales (siempre oficiales, una factura nunca es "en B"). En B: albaranes cobrados en efectivo, sin factura.
-  const facturasMes = docs.filter(d=>d.type==='factura' && d.status!=='Borrador' && esDelMes(d));
-  const facturadoLegal = facturasMes.reduce((s,d)=>s+(d.total||0),0);
-  const albaranesEnB = docs.filter(d=>d.type==='albaran' && d.estado_albaran==='cobrado_efectivo' && esDelMes(d));
+  const facturasRango = docs.filter(d=>d.type==='factura' && d.status!=='Borrador' && enRango(d));
+  const facturadoLegal = facturasRango.reduce((s,d)=>s+(d.total||0),0);
+  const albaranesEnB = docs.filter(d=>d.type==='albaran' && d.estado_albaran==='cobrado_efectivo' && enRango(d));
   const ingresoEnB = albaranesEnB.reduce((s,d)=>s+(d.total||0),0);
 
   let ingresos, etiquetaIngreso;
-  if(filtro==='oficial'){ ingresos = facturadoLegal; etiquetaIngreso = 'Facturado mes'; }
+  if(filtro==='oficial'){ ingresos = facturadoLegal; etiquetaIngreso = 'Facturado'; }
   else if(filtro==='en_b'){ ingresos = ingresoEnB; etiquetaIngreso = 'Cobrado en B (albaranes)'; }
-  else { ingresos = facturadoLegal + ingresoEnB; etiquetaIngreso = 'Ingresos mes (todo)'; }
+  else { ingresos = facturadoLegal + ingresoEnB; etiquetaIngreso = 'Ingresos (todo)'; }
 
-  const gastosMes = docs.filter(d=>d.type==='gasto' && esDelMes(d) && (!filtro || (d.contabilidad||'oficial')===filtro)).reduce((s,d)=>s+(d.total||0),0);
-  const pendiente = facturasMes.filter(d=>d.status==='Pendiente').reduce((s,d)=>s+(d.total||0),0);
-  const iva = filtro==='en_b' ? 0 : facturasMes.reduce((s,d)=>s+(d.iva||0),0);
+  const gastosRango = docs.filter(d=>d.type==='gasto' && enRango(d) && (!filtro || (d.contabilidad||'oficial')===filtro)).reduce((s,d)=>s+(d.total||0),0);
+  const cobradoRango = facturasRango.reduce((s,d)=>s+Number(d.cobrado_importe||0),0);
+  const pendiente = Math.max(0, facturadoLegal - cobradoRango);
+  const iva = filtro==='en_b' ? 0 : facturasRango.reduce((s,d)=>s+(d.iva||0),0);
 
   const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
   const lblEl = document.querySelector('#resumen-facturado')?.closest('.kpi')?.querySelector('.lbl');
   if(lblEl) lblEl.textContent = etiquetaIngreso;
   setTxt('resumen-facturado', euro(ingresos));
-  setTxt('resumen-cobrado', filtro==='en_b' ? '— (el cobro en B es el propio importe)' : '— (sin seguimiento de cobro aún)');
+  setTxt('resumen-cobrado', filtro==='en_b' ? euro(ingresoEnB) : euro(cobradoRango));
   setTxt('resumen-pendiente', filtro==='en_b' ? '—' : euro(pendiente));
-  setTxt('resumen-gastos', euro(gastosMes));
+  setTxt('resumen-gastos', euro(gastosRango));
   setTxt('resumen-iva', filtro==='en_b' ? '— (no aplica)' : euro(iva));
-  setTxt('resumen-margen', euro(ingresos - gastosMes));
+  setTxt('resumen-margen', euro(ingresos - gastosRango));
 }
 
 document.querySelectorAll('#econ-contabilidad-filter .chip-filter').forEach(el=>{
@@ -8684,7 +8799,7 @@ async function cargarDocumentosEconomicosReales(){
         ...doc, id: doc.id, type: doc.tipo, num: doc.numero, client: entidad ? entidad.name : '—', job: trabajo ? (trabajo.code+' — '+trabajo.client) : '—',
         dateRaw: doc.fecha_devengo, dateLabel, amountLabel, status, items, ivaPct: 21, total: totalNum, base: baseNum, iva: ivaNum,
       };
-      const estadoPill = `<span class="pill ${status==='Borrador'?'':status==='Pendiente'?'pendiente':status==='Validado'?'validado':''}">${status}</span>`;
+      const estadoPill = `<span class="pill ${status==='Borrador'?'porconfirmar':status==='Pendiente'?'pendiente':status==='Validado'?'validado':'enviado'}">${status}</span>`;
       if(doc.tipo==='factura'){
         const row = document.createElement('tr');
         row.id = 'docrow-'+doc.id;
@@ -8707,7 +8822,7 @@ async function cargarDocumentosEconomicosReales(){
         const ivaLabel = ivaNum2.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
         const cobradoNum = doc.cobrado_importe != null ? Number(doc.cobrado_importe) : 0;
         const cobradoLabel = cobradoNum.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-        row.innerHTML = `<td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num">${baseLabel}</td><td class="num">${ivaLabel}</td><td class="num">${ivaPctDoc}%</td><td class="num">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoCobroSelect(doc.id, doc.estado_cobro)}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td>`;
+        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num">${baseLabel}</td><td class="num">${ivaLabel}</td><td class="num">${ivaPctDoc}%</td><td class="num">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoCobroSelect(doc.id, doc.estado_cobro)}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td>`;
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
         const clienteHtmlP = entidad ? entidad.name : '<span class="pill mantenimiento">Falta cliente</span>';
@@ -8715,11 +8830,12 @@ async function cargarDocumentosEconomicosReales(){
         const fechaCortaP = formatFechaCorta(doc.fecha_devengo);
         const archivoUrlRealP = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
         const archivoHtmlP = archivoUrlRealP ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${archivoUrlRealP}')">📎 Ver</a>` : '—';
-        const rowHtml = `<td class="mono">${fechaCortaP}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlP}</td><td class="mono">${trabajoHtmlP}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td><td>${archivoHtmlP}</td>`;
-        const row = document.createElement('tr'); row.id = 'docrow-'+doc.id; row.onclick = () => toggleExpandirDocFila(doc.id, 7); row.innerHTML = rowHtml;
+        const baseRowHtml = `<td class="mono">${fechaCortaP}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlP}</td><td class="mono">${trabajoHtmlP}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td><td>${archivoHtmlP}</td>`;
+        const row = document.createElement('tr'); row.id = 'docrow-'+doc.id; row.onclick = () => toggleExpandirDocFila(doc.id, 7); row.innerHTML = baseRowHtml;
         row.dataset.contabilidad = doc.contabilidad || 'oficial'; row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum;
         document.getElementById('econ-presupuestos-tbody')?.appendChild(row);
-        const row2 = document.createElement('tr'); row2.id = 'presrow-'+doc.id; row2.onclick = () => toggleExpandirDocFila(doc.id, 7); row2.innerHTML = rowHtml;
+        const rowHtml = `<td onclick="event.stopPropagation();"><input type="checkbox" class="pres-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('pres-sel-chk','pres-borrar-sel-btn','pres-sel-count')"></td>` + baseRowHtml;
+        const row2 = document.createElement('tr'); row2.id = 'presrow-'+doc.id; row2.onclick = () => toggleExpandirDocFila(doc.id, 8); row2.innerHTML = rowHtml;
         row2.dataset.contabilidad = doc.contabilidad || 'oficial'; row2.dataset.fechaIso = doc.fecha_devengo || ''; row2.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row2.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row2.dataset.total = totalNum;
         document.getElementById('presupuestos-tbody-standalone')?.appendChild(row2);
       } else if(doc.tipo==='gasto'){
@@ -8735,9 +8851,9 @@ async function cargarDocumentosEconomicosReales(){
         const archivoHtmlA = archivoUrlRealA ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${archivoUrlRealA}')">📎 Ver</a>` : '—';
         const row = document.createElement('tr');
         row.id = 'albrow-'+doc.id;
-        row.onclick = () => toggleExpandirDocFila(doc.id, 7);
+        row.onclick = () => toggleExpandirDocFila(doc.id, 8);
         row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum;
-        row.innerHTML = `<td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlA}</td><td class="mono">${trabajoHtmlA}</td><td class="num">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoAlbaranSelect(doc.id, doc.estado_albaran)}</td><td>${archivoHtmlA}</td>`;
+        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="alb-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('alb-sel-chk','alb-borrar-sel-btn','alb-sel-count')"></td><td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlA}</td><td class="mono">${trabajoHtmlA}</td><td class="num">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoAlbaranSelect(doc.id, doc.estado_albaran)}</td><td>${archivoHtmlA}</td>`;
         document.getElementById('albaranes-tbody-standalone')?.appendChild(row);
       }
     });
@@ -8749,8 +8865,8 @@ async function cargarDocumentosEconomicosReales(){
     renderPresupuestosKPIs();
     renderAlbaranesAbiertos();
     calcularKPIsReales();
+    poblarFiltroAniosEconomia();
     recalcularResumenEconomia();
-    poblarFiltroAniosChips('econ-facturas-tbody','fact-filtro-anio-chips');
     poblarFiltroAniosChipsGenerico('albaranes-tbody-standalone','alb-filtro-anio-chips','alb');
     poblarFiltroAniosChipsGenerico('presupuestos-tbody-standalone','pres-filtro-anio-chips','pres');
   }catch(err){ console.error('No se pudieron cargar los documentos reales', err); }
