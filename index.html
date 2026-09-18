@@ -1777,7 +1777,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.61</div>
+        <div class="sub">V1.62</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3739,7 +3739,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         </div>
 
         <table class="ie-items">
-          <thead><tr><th style="width:70px;">Cant.</th><th style="width:70px;">Ud.</th><th>Concepto de trabajo</th><th class="machine-col" style="width:150px;">Maquinaria</th><th class="col-precio" style="width:110px;">Precio</th><th class="col-total" style="width:110px;">Total</th><th style="width:30px;"></th></tr></thead>
+          <thead><tr><th style="width:100px;">Fecha</th><th style="width:70px;">Cant.</th><th style="width:70px;">Ud.</th><th>Concepto de trabajo</th><th class="machine-col" style="width:150px;">Maquinaria</th><th class="col-precio" style="width:110px;">Precio</th><th class="col-total" style="width:110px;">Total</th><th style="width:30px;"></th></tr></thead>
           <tbody id="ie-items-body"></tbody>
         </table>
         <button type="button" class="btn" onclick="addItemRow()">+ Añadir línea</button>
@@ -8182,13 +8182,14 @@ function updateConceptoTransferencia(){
 }
 
 const UNIDADES = ['ud','h','m³','m²','ml','km','día','servicio','transporte'];
-function addItemRow(qty, concept, price, machine, unidad){
+function addItemRow(qty, concept, price, machine, unidad, fecha){
   const id = 'item'+(itemSeq++);
   const tbody = document.getElementById('ie-items-body');
   const tr = document.createElement('tr');
   tr.id = id;
   const comboId = 'combo-'+id;
   tr.innerHTML = `
+    <td><input type="date" class="ie-linea-fecha search-box mono" style="width:100%;padding:4px;" value="${fecha ?? ''}"></td>
     <td><input type="number" class="ie-qty" value="${qty ?? 1}" min="0" step="0.01" oninput="recalcTotals()"></td>
     <td><select class="search-box ie-unidad" style="width:100%;min-width:0;padding:4px;">${UNIDADES.map(u=>`<option value="${u}" ${unidad===u?'selected':''}>${u}</option>`).join('')}</select></td>
     <td style="position:relative;"><input type="text" class="ie-concept" name="concepto-${id}" autocomplete="new-password" placeholder="Ej. M³ de excavación en terreno de consistencia media" value="${concept ?? ''}"
@@ -8251,6 +8252,7 @@ function descargarPDF(){
   const dateRaw = document.getElementById('ni-date').value || '';
   const {base, iva, total} = recalcTotals();
   const items = Array.from(document.querySelectorAll('#ie-items-body tr')).map(tr=>({
+    fecha: tr.querySelector('.ie-linea-fecha')?.value || '',
     qty: tr.querySelector('.ie-qty').value,
     unidad: tr.querySelector('.ie-unidad')?.value || 'ud',
     concept: tr.querySelector('.ie-concept').value,
@@ -8296,15 +8298,16 @@ function descargarPDF(){
 
   y += 10;
   doc.setFont('helvetica','bold'); doc.setFontSize(9);
-  doc.text('Cant.', 15, y); doc.text('Concepto', 30, y);
+  doc.text('Fecha', 15, y); doc.text('Cant.', 40, y); doc.text('Concepto', 55, y);
   if(cfg.hasPrecios){ doc.text('Precio', 150, y, {align:'right'}); }
   doc.text('Total', 195, y, {align:'right'});
   y += 2; doc.line(15,y,195,y); y += 5;
   doc.setFont('helvetica','normal');
   items.forEach(it=>{
     const lineTotal = (Number(it.qty)||0)*it.price;
-    doc.text(String(it.qty), 15, y);
-    doc.text(doc.splitTextToSize(it.concept||'—', cfg.hasPrecios ? 110 : 160)[0], 30, y);
+    doc.text(it.fecha || '—', 15, y);
+    doc.text(String(it.qty), 40, y);
+    doc.text(doc.splitTextToSize(it.concept||'—', cfg.hasPrecios ? 95 : 145)[0], 55, y);
     if(cfg.hasPrecios){
       doc.text(it.price.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 150, y, {align:'right'});
     }
@@ -8360,6 +8363,7 @@ function togglePreview(){
   const dateRaw = document.getElementById('ni-date').value;
   const {base, iva, total} = recalcTotals();
   const items = Array.from(document.querySelectorAll('#ie-items-body tr')).map(tr=>({
+    fecha: tr.querySelector('.ie-linea-fecha')?.value || '',
     qty: tr.querySelector('.ie-qty').value,
     unidad: tr.querySelector('.ie-unidad')?.value || 'ud',
     concept: tr.querySelector('.ie-concept').value,
@@ -8390,8 +8394,8 @@ function togglePreview(){
       <b>Cliente:</b> ${client}
     </div>
     <table class="ie-items">
-      <thead><tr><th>Cant.</th><th>Concepto</th>${cfg.hasPrecios ? '<th style="text-align:right;">Precio</th>' : ''}<th style="text-align:right;">Total</th></tr></thead>
-      <tbody>${items.map(i=>`<tr><td>${i.qty}</td><td>${i.concept||'—'}</td>${cfg.hasPrecios ? `<td style="text-align:right;" class="mono">${i.price.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>` : ''}<td style="text-align:right;" class="mono">${i.total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td></tr>`).join('')}</tbody>
+      <thead><tr><th>Fecha</th><th>Cant.</th><th>Concepto</th>${cfg.hasPrecios ? '<th style="text-align:right;">Precio</th>' : ''}<th style="text-align:right;">Total</th></tr></thead>
+      <tbody>${items.map(i=>`<tr><td class="mono">${i.fecha ? formatFechaCorta(i.fecha) : '—'}</td><td>${i.qty}</td><td>${i.concept||'—'}</td>${cfg.hasPrecios ? `<td style="text-align:right;" class="mono">${i.price.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>` : ''}<td style="text-align:right;" class="mono">${i.total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td></tr>`).join('')}</tbody>
     </table>
     <div class="ie-footer">
       <div class="ie-payment" style="font-size:13px;">
@@ -8935,7 +8939,7 @@ function openDocumentViewer(id){
   if(urlOriginal){ btnOriginal.dataset.url = urlOriginal; btnOriginal.style.display = ''; }
   else { btnOriginal.style.display = 'none'; }
   onClientChange();
-  doc.items.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine));
+  doc.items.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, undefined, i.fecha));
   document.getElementById('ni-docnum').value = doc.num;
   document.getElementById('ni-suggest').textContent = doc.status==='Borrador' ? '(borrador sin numerar en firme)' : '';
   document.getElementById('ni-concepto-transf').value = doc.concepto_transferencia || doc.num;
@@ -8994,6 +8998,7 @@ async function submitNewInvoice(ev, isDraft){
   const dateLabel = isNaN(d) ? (dateRaw||'sin fecha') : d.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][d.getMonth()];
   const amountLabel = total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   const items = Array.from(document.querySelectorAll('#ie-items-body tr')).map(tr=>({
+    fecha: tr.querySelector('.ie-linea-fecha')?.value || '',
     qty: tr.querySelector('.ie-qty').value,
     unidad: tr.querySelector('.ie-unidad')?.value || 'ud',
     concept: tr.querySelector('.ie-concept').value,
@@ -9016,7 +9021,7 @@ async function submitNewInvoice(ev, isDraft){
 
   const conceptos = items.map(it=>({
     descripcion: it.concept, cantidad: Number(it.qty)||1, unidad: it.unidad||'ud', precio_unitario: it.price,
-    importe: (Number(it.qty)||1) * it.price, maquina: it.machine||null,
+    importe: (Number(it.qty)||1) * it.price, maquina: it.machine||null, fecha: it.fecha||null,
   }));
   const conceptoResumen = items.map(i=>i.concept).filter(Boolean).join('; ').slice(0,500);
 
@@ -9434,7 +9439,7 @@ async function cargarDocumentosEconomicosReales(){
       if(documentosRealesById[doc.id]) return; // ya está (lo acabamos de guardar nosotros mismos)
       const entidad = clientes.find(c=>c.id===doc.entidad_id);
       const trabajo = jobs.find(j=>j.id===doc.trabajo_id);
-      const items = (doc.conceptos||[]).map(c=>({qty:c.cantidad, concept:c.descripcion, price:c.precio_unitario, machine:c.maquina}));
+      const items = (doc.conceptos||[]).map(c=>({qty:c.cantidad, concept:c.descripcion, price:c.precio_unitario, machine:c.maquina, fecha:c.fecha}));
       const dRaw = doc.fecha_devengo ? new Date(doc.fecha_devengo) : null;
       const dateLabel = (dRaw && !isNaN(dRaw)) ? dRaw.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][dRaw.getMonth()] : 'sin fecha';
       const amountLabel = Number(doc.importe||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
