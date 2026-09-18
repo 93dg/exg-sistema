@@ -1882,7 +1882,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.70</div>
+        <div class="sub">V1.71</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -1950,15 +1950,19 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="panel">
         <div class="panel-head" style="flex-direction:column;align-items:stretch;gap:10px;">
           <div style="display:flex;align-items:center;justify-content:space-between;">
-            <h3>📑 Documentos</h3><span class="count" id="control-docs-count">0</span>
+            <h3>📑 Documentos</h3>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="count" id="control-docs-count">0</span>
+              <button type="button" class="btn sm" id="control-docs-filtros-toggle" onclick="toggleControlDocsFiltros()">🔎 Filtros</button>
+            </div>
           </div>
+          <div id="control-docs-filtros-wrap" style="display:none;">
           <div class="filters" id="control-docs-tipo-chips" style="margin:0;">
             <div class="chip-filter active" data-tipo="factura">Factura</div>
             <div class="chip-filter active" data-tipo="albaran">Albarán</div>
-            <div class="chip-filter active" data-tipo="presupuesto">Presupuesto</div>
-            <div class="chip-filter active" data-tipo="proforma">Proforma</div>
+            <div class="chip-filter active" data-tipo="presupuesto,proforma">Presupuesto</div>
           </div>
-          <div class="filters" id="control-docs-estado-chips" style="margin:0;">
+          <div class="filters" id="control-docs-estado-chips" style="margin:8px 0 0 0;">
             <div class="chip-filter active" data-estado="pendiente_enviar">Pend. enviar</div>
             <div class="chip-filter active" data-estado="pendiente_cobrar">Pend. cobrar</div>
             <div class="chip-filter active" data-estado="parcial">Cobro parcial</div>
@@ -1970,13 +1974,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="chip-filter active" data-estado="Validado">Presup. validado</div>
             <div class="chip-filter" data-estado="Enviado">Presup. enviado</div>
           </div>
-          <div class="filters" id="control-docs-anio-chips" style="margin:0;"></div>
-          <div class="filters" id="control-docs-trim-chips" style="margin:0;">
+          <div class="filters" id="control-docs-anio-chips" style="margin:8px 0 0 0;"></div>
+          <div class="filters" id="control-docs-trim-chips" style="margin:8px 0 0 0;">
             <div class="chip-filter active" data-trim="">Todos los trimestres</div>
             <div class="chip-filter" data-trim="1">1º trimestre</div>
             <div class="chip-filter" data-trim="2">2º trimestre</div>
             <div class="chip-filter" data-trim="3">3º trimestre</div>
             <div class="chip-filter" data-trim="4">4º trimestre</div>
+          </div>
           </div>
         </div>
         <div class="panel-body" style="padding:0;">
@@ -9275,6 +9280,13 @@ function actualizarContadorPresupuestosStandalone(){
   const el = document.getElementById('presupuestos-standalone-count');
   if(el) el.textContent = document.getElementById('presupuestos-tbody-standalone').children.length;
 }
+function toggleControlDocsFiltros(){
+  const wrap = document.getElementById('control-docs-filtros-wrap');
+  const btn = document.getElementById('control-docs-filtros-toggle');
+  const abierto = wrap.style.display !== 'none';
+  wrap.style.display = abierto ? 'none' : '';
+  btn.classList.toggle('primary', !abierto);
+}
 function controlDocsEstadoDe(d){
   if(d.type==='factura') return d.estado_cobro||'pendiente_enviar';
   if(d.type==='albaran') return d.estado_albaran||'en_proceso';
@@ -9307,7 +9319,7 @@ function renderControlDocs(){
       });
     });
   }
-  const tiposSel = new Set(Array.from(document.querySelectorAll('#control-docs-tipo-chips .chip-filter.active')).map(c=>c.dataset.tipo));
+  const tiposSel = new Set(Array.from(document.querySelectorAll('#control-docs-tipo-chips .chip-filter.active')).flatMap(c=>c.dataset.tipo.split(',')));
   const estadosSel = new Set(Array.from(document.querySelectorAll('#control-docs-estado-chips .chip-filter.active')).map(c=>c.dataset.estado));
   const aniosSel = new Set(Array.from(document.querySelectorAll('#control-docs-anio-chips .chip-filter.active')).map(c=>c.dataset.anio).filter(Boolean));
   const trimsSel = new Set(Array.from(document.querySelectorAll('#control-docs-trim-chips .chip-filter.active')).map(c=>c.dataset.trim).filter(Boolean));
