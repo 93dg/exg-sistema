@@ -1773,7 +1773,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.52</div>
+        <div class="sub">V1.53</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8105,18 +8105,22 @@ function proximoNumero(tipoDoc){
 const DOC_TYPES = {
   factura: {
     title:'FACTURA', button:'Crear factura', prefix:'F', seqRef:()=>proximoNumero('factura'), hasIva:true,
+    hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasPayment:true, hasBank:true,
     explain:'Documento fiscal definitivo. Genera obligación de cobro y de declarar IVA.',
   },
   proforma: {
-    title:'PROFORMA', button:'Crear proforma', prefix:'PF', seqRef:()=>proximoNumero('proforma'), hasIva:true,
+    title:'FACTURA PROFORMA', button:'Crear proforma', prefix:'PF', seqRef:()=>proximoNumero('proforma'), hasIva:true,
+    hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasPayment:true, hasBank:true,
     explain:'Anticipo informativo sin validez fiscal, antes de que el cliente se comprometa.',
   },
   presupuesto: {
     title:'PRESUPUESTO', button:'Crear presupuesto', prefix:'P', seqRef:()=>proximoNumero('presupuesto'), hasIva:true,
+    hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasPayment:true, hasBank:false,
     explain:'Propuesta de precio. No obliga a nada — si se acepta, se convierte en trabajo.',
   },
   albaran: {
     title:'ALBARÁN', button:'Crear albarán', prefix:'ALB', seqRef:()=>proximoNumero('albaran'), hasIva:false,
+    hasFiscalHeader:false, hasPrecios:false, hasTotales:false, hasPayment:false, hasBank:false,
     explain:'Justificante de entrega/trabajo realizado. No es un documento fiscal, así que no lleva IVA ni desglose.',
   },
 };
@@ -8367,11 +8371,13 @@ function descargarPDF(){
   const xTexto = logoSrc ? 38 : 15;
   doc.setFont('helvetica','bold'); doc.setFontSize(11);
   doc.text('RAFAEL GÓMEZ MARTÍNEZ', xTexto, y);
-  doc.setFont('helvetica','normal'); doc.setFontSize(9);
-  y += 5; doc.text('NIF 75706590C', xTexto, y);
-  y += 4.5; doc.text('Calle Industria s/n', xTexto, y);
-  y += 4.5; doc.text('14290 Fuente Obejuna (Córdoba)', xTexto, y);
-  y += 4.5; doc.text('exgomez.m@gmail.com', xTexto, y);
+  if(cfg.hasFiscalHeader){
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    y += 5; doc.text('NIF 75706590C', xTexto, y);
+    y += 4.5; doc.text('Calle Industria s/n', xTexto, y);
+    y += 4.5; doc.text('14290 Fuente Obejuna (Córdoba)', xTexto, y);
+    y += 4.5; doc.text('exgomez.m@gmail.com', xTexto, y);
+  }
 
   doc.setFont('helvetica','bold'); doc.setFontSize(18);
   doc.setTextColor(216,86,15);
@@ -8391,34 +8397,41 @@ function descargarPDF(){
 
   y += 10;
   doc.setFont('helvetica','bold'); doc.setFontSize(9);
-  doc.text('Cant.', 15, y); doc.text('Concepto', 30, y); doc.text('Precio', 150, y, {align:'right'}); doc.text('Total', 195, y, {align:'right'});
+  doc.text('Cant.', 15, y); doc.text('Concepto', 30, y);
+  if(cfg.hasPrecios){ doc.text('Precio', 150, y, {align:'right'}); doc.text('Total', 195, y, {align:'right'}); }
   y += 2; doc.line(15,y,195,y); y += 5;
   doc.setFont('helvetica','normal');
   items.forEach(it=>{
     const lineTotal = (Number(it.qty)||0)*it.price;
     doc.text(String(it.qty), 15, y);
-    doc.text(doc.splitTextToSize(it.concept||'—', 110)[0], 30, y);
-    doc.text(it.price.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 150, y, {align:'right'});
-    doc.text(lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
+    doc.text(doc.splitTextToSize(it.concept||'—', cfg.hasPrecios ? 110 : 160)[0], 30, y);
+    if(cfg.hasPrecios){
+      doc.text(it.price.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 150, y, {align:'right'});
+      doc.text(lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
+    }
     y += 6;
   });
 
-  y += 4; doc.line(120,y,195,y); y += 6;
-  doc.text('Base imponible:', 150, y, {align:'right'}); doc.text(base.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
-  if(cfg.hasIva){
-    const ivaPct = document.getElementById('ie-iva-pct').value;
-    doc.text(`IVA (${ivaPct}%):`, 150, y, {align:'right'}); doc.text(iva.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
+  if(cfg.hasTotales){
+    y += 4; doc.line(120,y,195,y); y += 6;
+    doc.text('Base imponible:', 150, y, {align:'right'}); doc.text(base.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
+    if(cfg.hasIva){
+      const ivaPct = document.getElementById('ie-iva-pct').value;
+      doc.text(`IVA (${ivaPct}%):`, 150, y, {align:'right'}); doc.text(iva.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
+    }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11);
+    doc.text('TOTAL:', 150, y, {align:'right'}); doc.text(total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
   }
-  doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('TOTAL:', 150, y, {align:'right'}); doc.text(total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
 
-  y += 14;
-  doc.setFont('helvetica','normal'); doc.setFontSize(9);
-  doc.text('Forma de pago: '+payment, 15, y);
-  if(payment==='Transferencia'){
-    y+=5; doc.text('IBAN: '+iban, 15, y);
-    y+=5; doc.text('Titular: '+titular, 15, y);
-    y+=5; doc.text('Concepto: '+concepto, 15, y);
+  if(cfg.hasPayment){
+    y += 14;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    doc.text('Forma de pago: '+payment, 15, y);
+    if(cfg.hasBank && payment==='Transferencia'){
+      y+=5; doc.text('IBAN: '+iban, 15, y);
+      y+=5; doc.text('Titular: '+titular, 15, y);
+      y+=5; doc.text('Concepto: '+concepto, 15, y);
+    }
   }
 
   doc.save(`${num || 'documento'}.pdf`);
@@ -8462,7 +8475,7 @@ function togglePreview(){
         <img class="ie-logo" src="${document.querySelector('.ie-logo').src}">
         <div class="ie-company-text">
           <div class="ie-company-name">RAFAEL GÓMEZ MARTÍNEZ</div>
-          <div>NIF 75706590C</div><div>Calle Industria s/n</div><div>14290 Fuente Obejuna (Córdoba)</div><div>exgomez.m@gmail.com</div>
+          ${cfg.hasFiscalHeader ? `<div>NIF 75706590C</div><div>Calle Industria s/n</div><div>14290 Fuente Obejuna (Córdoba)</div><div>exgomez.m@gmail.com</div>` : ''}
         </div>
       </div>
       <div class="ie-doc-meta">
@@ -8476,19 +8489,19 @@ function togglePreview(){
       ${job?`<br><b>Trabajo:</b> ${job}`:''}
     </div>
     <table class="ie-items">
-      <thead><tr><th>Cant.</th><th>Concepto</th><th style="text-align:right;">Precio</th><th style="text-align:right;">Total</th></tr></thead>
-      <tbody>${items.map(i=>`<tr><td>${i.qty}</td><td>${i.concept||'—'}</td><td style="text-align:right;" class="mono">${i.price.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td><td style="text-align:right;" class="mono">${i.total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td></tr>`).join('')}</tbody>
+      <thead><tr><th>Cant.</th><th>Concepto</th>${cfg.hasPrecios ? '<th style="text-align:right;">Precio</th><th style="text-align:right;">Total</th>' : ''}</tr></thead>
+      <tbody>${items.map(i=>`<tr><td>${i.qty}</td><td>${i.concept||'—'}</td>${cfg.hasPrecios ? `<td style="text-align:right;" class="mono">${i.price.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td><td style="text-align:right;" class="mono">${i.total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>` : ''}</tr>`).join('')}</tbody>
     </table>
     <div class="ie-footer">
       <div class="ie-payment" style="font-size:13px;">
-        <div><b>Forma de pago:</b> ${payment}</div>
-        ${payment==='Transferencia' ? `<div><b>IBAN:</b> ${iban}</div><div><b>Titular:</b> ${titular}</div><div><b>Concepto:</b> ${concepto}</div>` : ''}
+        ${cfg.hasPayment ? `<div><b>Forma de pago:</b> ${payment}</div>` : ''}
+        ${cfg.hasBank && payment==='Transferencia' ? `<div><b>IBAN:</b> ${iban}</div><div><b>Titular:</b> ${titular}</div><div><b>Concepto:</b> ${concepto}</div>` : ''}
       </div>
-      <div class="ie-totals">
+      ${cfg.hasTotales ? `<div class="ie-totals">
         <div class="econ-line"><span>Base imponible</span><span class="v mono">${base.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>
         ${cfg.hasIva ? `<div class="econ-line"><span>IVA</span><span class="v mono">${iva.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>` : ''}
         <div class="econ-line"><span>TOTAL</span><span class="v mono">${total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>
-      </div>
+      </div>` : ''}
     </div>
   `;
   editPane.style.display = 'none';
