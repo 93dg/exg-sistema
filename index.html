@@ -377,6 +377,17 @@ table{border-collapse:collapse;width:100%;}
 .ie-topbar{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper);z-index:2;}
 .ie-doc-explain{flex:1;font-size:12px;color:var(--ink-soft);}
 .ie-paper{padding:26px 30px;border:1px solid var(--line);margin:20px;background:var(--paper);}
+#ie-preview-pane.ie-paper{
+  background:#ffffff;color:#1a1a1a;max-width:720px;margin:20px auto;
+  box-shadow:0 4px 24px rgba(0,0,0,0.35);border:1px solid #d8d8d8;border-radius:2px;
+  padding:40px 46px;
+}
+#ie-preview-pane.ie-paper .ie-company-text, #ie-preview-pane.ie-paper .ie-items th{color:#555;}
+#ie-preview-pane.ie-paper .ie-company-name, #ie-preview-pane.ie-paper td, #ie-preview-pane.ie-paper .econ-line span:first-child{color:#1a1a1a;}
+#ie-preview-pane.ie-paper .ie-header{border-bottom-color:#1a1a1a;}
+#ie-preview-pane.ie-paper .ie-items td, #ie-preview-pane.ie-paper .ie-items th{border-bottom-color:#e0e0e0;}
+#ie-preview-pane.ie-paper .ie-footer{border-top-color:#e0e0e0;}
+#ie-preview-pane.ie-paper .v.mono{color:#1a1a1a;}
 .ie-header{display:flex;justify-content:space-between;gap:20px;padding-bottom:18px;border-bottom:2px solid var(--asphalt);margin-bottom:18px;}
 .ie-company{display:flex;gap:14px;align-items:flex-start;}
 .ie-logo{width:64px;height:auto;flex-shrink:0;}
@@ -1762,7 +1773,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.48</div>
+        <div class="sub">V1.49</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -1786,6 +1797,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="facturas"><span class="ico">🧾</span><span class="label"> Facturas</span></button>
       <button data-view="presupuestos"><span class="ico">📋</span><span class="label"> Presupuestos</span></button>
       <button data-view="albaranes"><span class="ico">📄</span><span class="label"> Albaranes</span></button>
+      <button data-view="gastos"><span class="ico">💸</span><span class="label"> Gastos</span></button>
       <button data-view="tarifas"><span class="ico">💶</span><span class="label"> Tarifas</span></button>
       <button data-view="economia"><span class="ico">€</span><span class="label"> Economía</span></button>
       <button data-view="correo"><span class="ico">✉</span><span class="label"> Correo</span></button>
@@ -2391,7 +2403,36 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </table>
         </div>
       </div>
-      <div class="two-col-note">Independiente en el menú, pero mismos datos que Economía → Presupuestos — lo que crees aquí se ve allí también.</div>
+      <div class="two-col-note">Independiente en el menú, pero mismos datos que Economía → Gastos — lo que crees aquí se ve allí también.</div>
+    </div>
+
+    <!-- ================= GASTOS ================= -->
+    <div class="view" id="view-gastos">
+      <div class="topbar">
+        <div><h1>Gastos</h1><div class="desc">Todos los gastos — conectado con Economía</div></div>
+        <div class="quickactions">
+          <button class="btn primary" onclick="abrirRegistrarGasto()">+ Registrar gasto</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head" style="flex-direction:column;align-items:stretch;gap:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <h3>Gastos</h3>
+            <span class="count" id="gastos-standalone-count">0</span>
+          </div>
+          <div class="filters" id="gastos-filtro-tipo-chips" style="margin:0;">
+            <div class="chip-filter active" data-tipo="todos">Todos</div>
+            <div class="chip-filter" data-tipo="suscripciones">Suscripciones</div>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0;">
+          <table class="tbl">
+            <tr><th>Fecha</th><th>Concepto</th><th>Proveedor</th><th>Recurrencia</th><th class="num">Importe</th></tr>
+            <tbody id="gastos-tbody-standalone"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="two-col-note">Independiente en el menú, pero mismos datos que Economía → Gastos — lo que crees aquí se ve allí también.</div>
     </div>
 
     <!-- ================= TARIFAS ================= -->
@@ -2538,7 +2579,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div class="panel-head"><h3>Gastos</h3></div>
           <div class="panel-body" style="padding:0;">
             <table class="tbl">
-              <tr><th>Fecha</th><th>Proveedor</th><th>Categoría</th><th>Relacionado con</th><th class="num">Total</th><th>Estado</th></tr>
+              <tr><th>Fecha</th><th>Proveedor</th><th>Categoría</th><th>Relacionado con</th><th>Recurrencia</th><th class="num">Total</th><th>Estado</th></tr>
               <tbody id="econ-gastos-tbody"></tbody>
             </table>
           </div>
@@ -3430,6 +3471,14 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <option value="en_b">En B (no pasa por Hacienda)</option>
         </select>
       </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">¿Es una suscripción / gasto recurrente?</div>
+        <select class="search-box" style="width:100%;" id="gasto-recurrencia">
+          <option value="">No — gasto puntual</option>
+          <option value="mensual">Sí — mensual</option>
+          <option value="trimestral">Sí — trimestral</option>
+          <option value="anual">Sí — anual</option>
+        </select>
+      </div>
       <div class="state-row">
         <button class="btn primary" style="width:100%;" onclick="guardarGasto()">Guardar gasto</button>
       </div>
@@ -3814,6 +3863,16 @@ function toggleMobileNav(){
 }
 
 /* ---------------- NAV ---------------- */
+document.querySelectorAll('#gastos-filtro-tipo-chips .chip-filter').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#gastos-filtro-tipo-chips .chip-filter').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    const soloSuscripciones = chip.dataset.tipo==='suscripciones';
+    document.querySelectorAll('#gastos-tbody-standalone tr').forEach(tr=>{
+      tr.style.display = (!soloSuscripciones || tr.dataset.recurrencia) ? '' : 'none';
+    });
+  });
+});
 document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
   btn.addEventListener('click',()=>{
     document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
@@ -8348,6 +8407,7 @@ function abrirRegistrarGasto(){
   document.getElementById('gasto-fecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('gasto-status').textContent = '';
   document.getElementById('gasto-contabilidad').value = 'oficial';
+  document.getElementById('gasto-recurrencia').value = '';
   document.getElementById('gasto-proveedores-list').innerHTML = clientes.map(c=>`<option value="${c.name}">`).join('');
   document.getElementById('gasto-overlay').classList.add('active');
 }
@@ -8360,6 +8420,7 @@ async function guardarGasto(){
   const fecha = document.getElementById('gasto-fecha').value;
   const proveedorNombre = document.getElementById('gasto-proveedor').value.trim();
   const contabilidad = document.getElementById('gasto-contabilidad').value;
+  const recurrencia = document.getElementById('gasto-recurrencia').value || null;
   if(!concepto){ statusEl.textContent = 'Falta el concepto.'; statusEl.style.color = 'var(--red)'; return; }
   if(!importe || importe<=0){ statusEl.textContent = 'Pon un importe válido.'; statusEl.style.color = 'var(--red)'; return; }
   if(!sb){ statusEl.textContent = 'Supabase no está conectado.'; statusEl.style.color = 'var(--red)'; return; }
@@ -8367,7 +8428,7 @@ async function guardarGasto(){
   const payload = {
     tipo: 'gasto', estado: 'emitido', concepto,
     fecha_devengo: fecha || null,
-    entidad_id: entidad ? entidad.id : null, importe, contabilidad,
+    entidad_id: entidad ? entidad.id : null, importe, contabilidad, recurrencia,
   };
   try{
     const {data, error} = await sb.from('documentos_economicos').insert(payload).select().single();
@@ -8377,8 +8438,10 @@ async function guardarGasto(){
     documentosRealesById[data.id] = {...payload, id:data.id, type:'gasto', client: proveedorNombre||'—', dateRaw:fecha, dateLabel, amountLabel: importe.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', total: importe, status:'Pagado', num:'—'};
     const row = document.createElement('tr');
     row.dataset.contabilidad = contabilidad;
-    row.innerHTML = `<td>${dateLabel}</td><td>${concepto}</td><td>${proveedorNombre||'—'}</td><td class="num">${importe.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>`;
+    row.dataset.recurrencia = recurrencia || '';
+    row.innerHTML = `<td>${dateLabel}</td><td>${concepto}</td><td>${proveedorNombre||'—'}</td><td>${recurrencia ? `<span class="pill planificado">${recurrencia}</span>` : '—'}</td><td class="num">${importe.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>`;
     document.getElementById('econ-gastos-tbody')?.prepend(row);
+    document.getElementById('gastos-tbody-standalone')?.insertAdjacentHTML('afterbegin', `<tr>${row.innerHTML}</tr>`);
     cerrarRegistrarGasto();
   }catch(err){ statusEl.textContent = 'Error de red: '+errText(err); statusEl.style.color = 'var(--red)'; }
 }
@@ -9173,8 +9236,15 @@ async function cargarDocumentosEconomicosReales(){
       } else if(doc.tipo==='gasto'){
         const row = document.createElement('tr');
         row.dataset.contabilidad = doc.contabilidad || 'oficial';
-        row.innerHTML = `<td>${dateLabel}</td><td>${doc.concepto||'—'}</td><td>${entidad?entidad.name:'—'}</td><td class="num">${amountLabel}</td>`;
+        row.dataset.recurrencia = doc.recurrencia || '';
+        const recurrenciaHtml = doc.recurrencia ? `<span class="pill planificado">${doc.recurrencia}</span>` : '—';
+        row.innerHTML = `<td>${dateLabel}</td><td>${doc.concepto||'—'}</td><td>${entidad?entidad.name:'—'}</td><td>${recurrenciaHtml}</td><td class="num">${amountLabel}</td>`;
         document.getElementById('econ-gastos-tbody')?.appendChild(row);
+        const row2 = document.createElement('tr');
+        row2.dataset.contabilidad = doc.contabilidad || 'oficial';
+        row2.dataset.recurrencia = doc.recurrencia || '';
+        row2.innerHTML = row.innerHTML;
+        document.getElementById('gastos-tbody-standalone')?.appendChild(row2);
       } else if(doc.tipo==='albaran'){
         const clienteHtmlA = entidad ? entidad.name : '<span class="pill mantenimiento">Falta cliente</span>';
         const trabajoHtmlA = trabajo ? trabajo.code : '—';
@@ -9208,6 +9278,8 @@ async function cargarDocumentosEconomicosReales(){
     filtrarPorAnioTrim('albaranes-tbody-standalone','alb');
     filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
     calcularTotalesClientes();
+    const contGastos = document.getElementById('gastos-standalone-count');
+    if(contGastos) contGastos.textContent = document.querySelectorAll('#gastos-tbody-standalone tr').length;
   }catch(err){ console.error('No se pudieron cargar los documentos reales', err); }
 }
 cargarDocumentosEconomicosReales();
