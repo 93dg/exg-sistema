@@ -1762,7 +1762,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.37</div>
+        <div class="sub">V1.38</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4297,6 +4297,29 @@ async function abrirAveria(){
   const d = new Date(data.created_at);
   averiasById[data.id] = {...data, machineName: maquina.name, codigoCorto: 'B-'+data.id.slice(0,4),
     fechaLabel: d.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][d.getMonth()], downtimeLabel:'en curso'};
+
+  const afectados = jobs.filter(j => (j.machines||[]).includes(maquina.name) && ['planificado','porconfirmar','confirmado','encurso'].includes(j.state));
+  if(afectados.length){
+    const resp = await pedirCampos(
+      `"${maquina.name}" tiene ${afectados.length} trabajo(s) pendiente(s): ${afectados.map(j=>j.code).join(', ')}. ¿Qué vas a hacer?`,
+      [
+        {id:'accion', label:'¿Vas a usar otra máquina para esos trabajos? (Sí / No)', tipo:'text', placeholder:'Sí o No', requerido:true},
+        {id:'dias', label:'¿Cuántos días estimas de retraso? (0 si no hay retraso)', tipo:'text', requerido:false},
+      ]
+    );
+    if(resp && resp.dias && Number(resp.dias) > 0){
+      const dias = Number(resp.dias);
+      atencionBase.push({
+        sev: dias>=3 ? 'red' : 'yellow',
+        t: `Retraso de ${dias} día${dias>1?'s':''} por avería de ${maquina.name}`,
+        s: `Afecta a: ${afectados.map(j=>j.code).join(', ')} — revisar planificación`,
+        action: () => { document.querySelector('[data-view="planificacion"]').click(); }
+      });
+      renderAtencion();
+      mostrarToast('Alerta añadida a "Requiere atención" en Centro de control.', 'ok');
+    }
+  }
+
   renderBreakdownsTable();
   openBreakdownDrawer(data.id);
 }
