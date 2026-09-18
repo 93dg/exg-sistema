@@ -2,7 +2,10 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1B1F24">
 <title>EXG · Centro de operaciones</title>
 
 <!-- PWA -->
@@ -418,7 +421,7 @@ table{border-collapse:collapse;width:100%;}
 .ie-actions .btn.dark{flex:1;}
 
 /* ---------- MÓVIL / iPhone ---------- */
-#mobile-hamburger, #mobile-nav-backdrop{display:none;}
+#mobile-hamburger, #mobile-nav-backdrop, #mobile-tabbar{display:none;}
 @media (max-width:768px){
   .app{grid-template-columns:1fr !important;}
   .app.sidebar-collapsed{grid-template-columns:1fr !important;}
@@ -438,7 +441,7 @@ table{border-collapse:collapse;width:100%;}
     display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:2500;
   }
   .app.mobile-nav-open #mobile-nav-backdrop{display:block;}
-  .main{padding:64px 14px 40px 14px;}
+  .main{padding:64px 14px 84px 14px;}
   .topbar{flex-direction:column;align-items:flex-start;gap:10px;}
   .kpi-strip{gap:8px;}
   [style*="grid-template-columns:2fr 1fr"], [style*="grid-template-columns:1fr 1fr"]{
@@ -477,6 +480,23 @@ table{border-collapse:collapse;width:100%;}
   .del-row, td[onclick] span{font-size:16px;padding:4px;}
   span[onclick]{font-size:16px !important;padding:6px;display:inline-block;}
   .row-actions .btn, .btn.sm{min-height:40px;}
+
+  #mobile-tabbar{
+    display:flex; position:fixed; left:0; right:0; bottom:0; z-index:3100;
+    background:var(--asphalt); border-top:1px solid var(--line-dark);
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom)) 4px;
+    box-shadow:0 -2px 10px rgba(0,0,0,0.25);
+  }
+  .mobile-tab-btn{
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    background:none; border:none; color:#9CA2AC; padding:6px 2px; border-radius:10px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .mobile-tab-btn .mt-ico{font-size:19px; line-height:1;}
+  .mobile-tab-btn .mt-label{font-size:10.5px; font-weight:600;}
+  .mobile-tab-btn.active{color:var(--orange);}
+  #mobile-hamburger{bottom:auto;}
+  button, .btn, .chip-filter, .nav button, .mobile-tab-btn{-webkit-tap-highlight-color:transparent;}
 }
 
 @media print{
@@ -1797,6 +1817,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <button id="mobile-hamburger" onclick="toggleMobileNav()">☰</button>
 <div id="mobile-nav-backdrop" onclick="toggleMobileNav()"></div>
 
+<div id="mobile-tabbar">
+  <button data-view="control" class="mobile-tab-btn active"><span class="mt-ico">◆</span><span class="mt-label">Control</span></button>
+  <button data-view="trabajos" class="mobile-tab-btn"><span class="mt-ico">▤</span><span class="mt-label">Trabajos</span></button>
+  <button data-view="facturas" class="mobile-tab-btn"><span class="mt-ico">🧾</span><span class="mt-label">Facturas</span></button>
+  <button data-view="clientes" class="mobile-tab-btn"><span class="mt-ico">◈</span><span class="mt-label">Clientes</span></button>
+  <button id="mobile-tab-mas" class="mobile-tab-btn"><span class="mt-ico">☰</span><span class="mt-label">Más</span></button>
+</div>
+
 
 
   <!-- SIDEBAR -->
@@ -1804,7 +1832,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.63</div>
+        <div class="sub">V1.64</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4014,6 +4042,9 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     document.getElementById('view-'+btn.dataset.view).classList.add('active');
     document.getElementById('app').classList.remove('mobile-nav-open');
     localStorage.setItem('vista_activa', btn.dataset.view);
+    document.querySelectorAll('.mobile-tab-btn[data-view]').forEach(b=>b.classList.remove('active'));
+    const tabBtn = document.querySelector(`.mobile-tab-btn[data-view="${btn.dataset.view}"]`);
+    if(tabBtn) tabBtn.classList.add('active');
     if(btn.dataset.view==='mapa' && typeof realMap!=='undefined' && realMap){
       setTimeout(()=>realMap.invalidateSize(), 50);
     }
@@ -4025,6 +4056,12 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     }
   });
 });
+document.querySelectorAll('.mobile-tab-btn[data-view]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelector(`.nav button[data-view="${btn.dataset.view}"]`)?.click();
+  });
+});
+document.getElementById('mobile-tab-mas')?.addEventListener('click', toggleMobileNav);
 function actualizarSeccionActual(){
   mostrarToast('Actualizando…');
   location.reload();
