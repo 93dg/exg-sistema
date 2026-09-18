@@ -217,7 +217,8 @@ table{border-collapse:collapse;width:100%;}
 .pill.en_proceso{background:var(--yellow-soft);color:#8A6100;}
 .pill.entregado{background:var(--green-soft);color:var(--green);}
 .pill.cobrado_efectivo{background:#E4DEF7;color:#5A3FA0;}
-.pill.pendiente_enviar{background:var(--concrete-2);color:var(--ink-soft);}
+.pill.pendiente_enviar{background:transparent;color:var(--ink);border:1px solid var(--ink-soft);}
+.pill.borrador{background:transparent;color:var(--ink-soft);border:1px dashed var(--ink-soft);}
 .pill.pendiente_cobrar{background:var(--yellow-soft);color:#8A6100;}
 .pill.parcial{background:var(--blue-soft);color:var(--blue);}
 
@@ -1761,7 +1762,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.36</div>
+        <div class="sub">V1.37</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2217,7 +2218,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
       <div class="panel">
         <div class="panel-head" style="flex-direction:column;align-items:stretch;gap:10px;">
-          <div style="display:flex;align-items:center;justify-content:flex-end;">
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
+            <button class="btn" id="fact-enviar-sel-btn" style="display:none;" onclick="enviarSeleccionadasAlGestor('fact-sel-chk')">📤 Enviar seleccionadas al gestor</button>
             <button class="btn" style="color:var(--red);display:none;" id="fact-borrar-sel-btn" onclick="borrarDocumentosSeleccionados('fact-sel-chk')">🗑 Borrar seleccionadas (<span id="fact-sel-count">0</span>)</button>
           </div>
           <div class="filters" id="fact-filtro-anio-chips" style="margin:0;"></div>
@@ -5574,6 +5576,7 @@ async function sendGmail(){
     const data = await res.json();
     if(data.error){ statusEl.textContent = 'Error: '+data.error.message; statusEl.style.color = 'var(--red)'; return; }
     statusEl.textContent = 'Enviado ✓'; statusEl.style.color = 'var(--green)';
+    if(composeOnSentCallback){ const cb = composeOnSentCallback; composeOnSentCallback = null; await cb(); }
     setTimeout(closeComposeDrawer, 900);
   }catch(err){
     statusEl.textContent = 'Error de red: '+(err && err.message ? err.message : err);
@@ -7096,6 +7099,8 @@ function actualizarSeleccionDoc(claseChk, btnId, countId){
   const countEl = document.getElementById(countId);
   if(countEl) countEl.textContent = marcados.length;
   if(btn) btn.style.display = marcados.length ? '' : 'none';
+  const btnEnviar = document.getElementById(btnId.replace('-borrar-sel-btn','-enviar-sel-btn'));
+  if(btnEnviar) btnEnviar.style.display = marcados.length ? '' : 'none';
 }
 async function borrarUnDocumento(id){
   if(!(await confirmarAccion('¿Borrar este documento? No se puede deshacer.'))) return;
@@ -8607,7 +8612,7 @@ function renderAlbaranesAbiertos(){
   const wrap = document.getElementById('control-albaranes-cargar-mas-wrap');
   if(wrap) wrap.style.display = abiertos.length > controlAlbaranesLimite ? '' : 'none';
 }
-const ESTADO_COBRO_OPCIONES = [['pendiente_enviar','Pendiente de enviar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Parcial'],['cobrado','Cobrado']];
+const ESTADO_COBRO_OPCIONES = [['borrador','0. Borrador'],['pendiente_enviar','1. Pendiente de enviar'],['pendiente_cobrar','2. Pendiente de cobrar'],['parcial','3. Cobro parcial'],['cobrado','4. Cobrado']];
 function estadoCobroSelect(id, actual){
   const act = actual || 'pendiente_enviar';
   const label = ESTADO_COBRO_OPCIONES.find(o=>o[0]===act)?.[1] || act;
@@ -8797,7 +8802,59 @@ async function toggleEnviadoGestor(id){
 function gestorPillHtml(id, enviado, fecha){
   return enviado
     ? `<span class="pill terminado" style="cursor:pointer;" title="Enviada el ${fecha||''} — clic para desmarcar" onclick="event.stopPropagation();toggleEnviadoGestor('${id}')">Enviada ✓</span>`
-    : `<button class="btn" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();toggleEnviadoGestor('${id}')">Marcar enviada</button>`;
+    : `<span style="display:flex;gap:4px;"><button class="btn" style="padding:3px 6px;font-size:11px;" title="Marcar como enviada sin mandar correo" onclick="event.stopPropagation();toggleEnviadoGestor('${id}')">Marcar</button><button class="btn primary" style="padding:3px 6px;font-size:11px;" title="Enviar por correo al gestor" onclick="event.stopPropagation();enviarAlGestorDoc('${id}')">Enviar</button></span>`;
+}
+function getGestorEmail(){
+  let email = localStorage.getItem('gestor_email') || '';
+  if(!email){
+    email = prompt('¿Cuál es el email del gestor? (se guarda para la próxima vez)') || '';
+    if(email) localStorage.setItem('gestor_email', email);
+  }
+  return email;
+}
+let composeOnSentCallback = null;
+function enviarAlGestorDoc(id){
+  const doc = documentosRealesById[id];
+  if(!doc) return;
+  const email = getGestorEmail();
+  if(!email) return;
+  const archivoUrl = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
+  document.getElementById('mail-to').value = email;
+  document.getElementById('mail-subject').value = `Factura ${doc.numero||''} — ${doc.client||''}`.trim();
+  document.getElementById('mail-body').value = `Adjunto factura${doc.numero?' Nº '+doc.numero:''} de ${doc.client||'cliente'}.\n\n${archivoUrl ? 'Archivo: '+archivoUrl : '(sin archivo adjuntado)'}`;
+  composeOnSentCallback = async () => {
+    const hoy = new Date().toISOString().slice(0,10);
+    const {error} = await sb.from('documentos_economicos').update({enviado_gestor: true, enviado_gestor_fecha: hoy}).eq('id', id);
+    if(!error){ if(documentosRealesById[id]){ documentosRealesById[id].enviado_gestor = true; documentosRealesById[id].enviado_gestor_fecha = hoy; } const celda = document.querySelector('.celda-gestor-'+id); if(celda) celda.innerHTML = gestorPillHtml(id, true, hoy); }
+  };
+  openComposeDrawer();
+}
+async function enviarSeleccionadasAlGestor(claseChk){
+  const marcados = Array.from(document.querySelectorAll('.'+claseChk+':checked'));
+  if(!marcados.length) return;
+  const ids = marcados.map(c=>c.dataset.id).filter(Boolean);
+  const docs = ids.map(id=>documentosRealesById[id]).filter(Boolean);
+  const email = getGestorEmail();
+  if(!email) return;
+  document.getElementById('mail-to').value = email;
+  document.getElementById('mail-subject').value = `Facturas (${docs.length}) — envío al gestor`;
+  document.getElementById('mail-body').value = 'Adjunto las siguientes facturas:\n\n' + docs.map(d=>{
+    const url = d.archivo_url || (d.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${d.archivo_path}` : null);
+    return `- Factura ${d.numero||''} (${d.client||''})${url?': '+url:' (sin archivo)'}`;
+  }).join('\n');
+  composeOnSentCallback = async () => {
+    const hoy = new Date().toISOString().slice(0,10);
+    const {error} = await sb.from('documentos_economicos').update({enviado_gestor: true, enviado_gestor_fecha: hoy}).in('id', ids);
+    if(!error){
+      ids.forEach(id=>{
+        if(documentosRealesById[id]){ documentosRealesById[id].enviado_gestor = true; documentosRealesById[id].enviado_gestor_fecha = hoy; }
+        const celda = document.querySelector('.celda-gestor-'+id);
+        if(celda) celda.innerHTML = gestorPillHtml(id, true, hoy);
+      });
+      actualizarSeleccionDoc(claseChk, claseChk.replace('-chk','-borrar-sel-btn'), claseChk.replace('-chk','-sel-count'));
+    }
+  };
+  openComposeDrawer();
 }
 async function marcarTrimestreEnviado(){
   const anio = document.getElementById('fact-filtro-anio-chips')?.querySelector('.chip-filter.active')?.dataset.anio || '';
