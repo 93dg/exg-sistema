@@ -1911,7 +1911,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.75</div>
+        <div class="sub">V1.76</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7938,11 +7938,29 @@ function toggleClientPicker(prefix){
     setTimeout(()=>search.focus(), 30);
   }
 }
+function clientesOrdenadosPorUso(){
+  const stats = {};
+  Object.values(documentosRealesById).forEach(d=>{
+    if(!d.entidad_id || !['factura','albaran','presupuesto','proforma'].includes(d.type)) return;
+    const s = stats[d.entidad_id] || (stats[d.entidad_id] = {count:0, ultima:0});
+    s.count++;
+    const t = d.dateRaw ? new Date(d.dateRaw).getTime() : 0;
+    if(t > s.ultima) s.ultima = t;
+  });
+  return [...clientes].sort((a,b)=>{
+    const sa = stats[a.id] || {count:0, ultima:0};
+    const sb = stats[b.id] || {count:0, ultima:0};
+    if(sb.count !== sa.count) return sb.count - sa.count;
+    if(sb.ultima !== sa.ultima) return sb.ultima - sa.ultima;
+    return a.name.localeCompare(b.name);
+  });
+}
 function renderClientPickerOptions(prefix){
   const q = (document.getElementById(prefix+'-client-search')?.value || '').toLowerCase().trim();
   const cont = document.getElementById(prefix+'-client-options');
   if(!cont) return;
-  const filtrados = q ? clientes.filter(c=>c.name.toLowerCase().includes(q)) : clientes;
+  const base = clientesOrdenadosPorUso();
+  const filtrados = q ? base.filter(c=>c.name.toLowerCase().includes(q)) : base;
   const filas = filtrados.slice(0, 60).map(c=>`<div class="cp-option" onclick="selectClientPickerOption('${prefix}','${c.name.replace(/'/g,"\\'")}')">${c.name}</div>`).join('');
   const nuevoHtml = `<div class="cp-option cp-new" onclick="openNewClientModal('${prefix}-client'); document.getElementById('${prefix}-client-picker')?.classList.remove('open');">+ Nuevo cliente${q ? ` "${q}"` : ''}</div>`;
   cont.innerHTML = nuevoHtml + (filas || '<div class="cp-option-empty">Sin resultados</div>');
