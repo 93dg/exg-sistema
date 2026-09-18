@@ -1762,7 +1762,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.45</div>
+        <div class="sub">V1.46</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3894,10 +3894,19 @@ function poblarFiltroAniosChips(tbodyId, contenedorId){
     });
   });
 }
+function toggleChipMultiple(chip, contenedor, dataAttr){
+  if(chip.dataset[dataAttr]===''){
+    contenedor.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+  } else {
+    contenedor.querySelector(`.chip-filter[data-${dataAttr}=""]`)?.classList.remove('active');
+    chip.classList.toggle('active');
+    if(!contenedor.querySelector('.chip-filter.active')) contenedor.querySelector(`.chip-filter[data-${dataAttr}=""]`)?.classList.add('active');
+  }
+}
 document.querySelectorAll('#fact-filtro-trim-chips .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
-    document.querySelectorAll('#fact-filtro-trim-chips .chip-filter').forEach(c=>c.classList.remove('active'));
-    chip.classList.add('active');
+    toggleChipMultiple(chip, document.getElementById('fact-filtro-trim-chips'), 'trim');
     filtrarTablaOrdenable('econ-facturas-tbody');
     renderFacturasKPIs();
   });
@@ -3941,8 +3950,7 @@ function renderPresupuestosKPIs(){
 document.querySelectorAll('#alb-filtro-trim-chips .chip-filter, #pres-filtro-trim-chips .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     const contenedor = chip.closest('.filters');
-    contenedor.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
-    chip.classList.add('active');
+    toggleChipMultiple(chip, contenedor, 'trim');
     const tbodyId = contenedor.id.startsWith('alb') ? 'albaranes-tbody-standalone' : 'presupuestos-tbody-standalone';
     filtrarPorAnioTrim(tbodyId, contenedor.id.startsWith('alb') ? 'alb' : 'pres');
   });
@@ -3960,11 +3968,11 @@ function filtrarPorAnioTrim(tbodyId, prefijo){
   const tbody = document.getElementById(tbodyId);
   if(!tbody) return;
   const aniosSel = new Set(Array.from(document.getElementById(prefijo+'-filtro-anio-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.anio).filter(Boolean));
-  const trimSel = document.getElementById(prefijo+'-filtro-trim-chips')?.querySelector('.chip-filter.active')?.dataset.trim || '';
+  const trimsSel = new Set(Array.from(document.getElementById(prefijo+'-filtro-trim-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.trim).filter(Boolean));
   const estadosSel = new Set(Array.from(document.getElementById(prefijo+'-filtro-estado-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.estado));
   tbody.querySelectorAll('tr').forEach(tr=>{
     const okAnio = aniosSel.size===0 || aniosSel.has(tr.dataset.anio);
-    const okTrim = !trimSel || tr.dataset.trimestre === trimSel;
+    const okTrim = trimsSel.size===0 || trimsSel.has(tr.dataset.trimestre);
     let okEstado = true;
     if(estadosSel.size){
       const pillEl = tr.querySelector('.pill, select');
@@ -4011,13 +4019,12 @@ function filtrarTablaOrdenable(tbodyId){
   if(!tbody) return;
   const prefijo = tbodyId.startsWith('fact') || tbodyId==='econ-facturas-tbody' ? 'fact' : tbodyId;
   const aniosSel = new Set(Array.from(document.getElementById('fact-filtro-anio-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.anio).filter(Boolean));
-  const trimSel = document.getElementById('fact-filtro-trim-chips')?.querySelector('.chip-filter.active')?.dataset.trim
-    ?? document.getElementById('fact-filtro-trim')?.value ?? '';
+  const trimsSel = new Set(Array.from(document.getElementById('fact-filtro-trim-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.trim).filter(Boolean));
   const kpiSel = tbodyId==='econ-facturas-tbody' ? (document.querySelector('#facturas-kpi-strip .kpi.active')?.dataset.kpi || '') : '';
   const estadosSel = new Set(Array.from(document.getElementById('fact-filtro-estado-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.estado));
   tbody.querySelectorAll('tr').forEach(tr=>{
     const okAnio = aniosSel.size===0 || aniosSel.has(tr.dataset.anio);
-    const okTrim = !trimSel || tr.dataset.trimestre === trimSel;
+    const okTrim = trimsSel.size===0 || trimsSel.has(tr.dataset.trimestre);
     let okKpi = true;
     if(kpiSel && kpiSel!=='todo'){
       const estadoTexto = tr.children[10]?.textContent.toLowerCase() || '';
@@ -8844,23 +8851,22 @@ function poblarFiltroAniosEconomia(){
 }
 document.querySelectorAll('#econ-filtro-trim-chips .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
-    document.querySelectorAll('#econ-filtro-trim-chips .chip-filter').forEach(c=>c.classList.remove('active'));
-    chip.classList.add('active');
+    toggleChipMultiple(chip, document.getElementById('econ-filtro-trim-chips'), 'trim');
     recalcularResumenEconomia();
   });
 });
 function recalcularResumenEconomia(){
   const filtro = document.querySelector('#econ-contabilidad-filter .chip-filter.active')?.dataset.cf || '';
   const aniosSel = new Set(Array.from(document.getElementById('econ-filtro-anio-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.anio).filter(Boolean));
-  const trimSel = document.getElementById('econ-filtro-trim-chips')?.querySelector('.chip-filter.active')?.dataset.trim || '';
+  const trimsSel = new Set(Array.from(document.getElementById('econ-filtro-trim-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.trim).filter(Boolean));
   const docs = Object.values(documentosRealesById);
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   const enRango = d => {
-    if(!d.dateRaw) return aniosSel.size===0 && !trimSel;
+    if(!d.dateRaw) return aniosSel.size===0 && trimsSel.size===0;
     const dt = new Date(d.dateRaw);
     if(isNaN(dt)) return false;
     if(aniosSel.size && !aniosSel.has(String(dt.getFullYear()))) return false;
-    if(trimSel && String(Math.floor(dt.getMonth()/3)+1)!==trimSel) return false;
+    if(trimsSel.size && !trimsSel.has(String(Math.floor(dt.getMonth()/3)+1))) return false;
     return true;
   };
 
