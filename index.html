@@ -1777,7 +1777,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.58</div>
+        <div class="sub">V1.59</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3748,9 +3748,13 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <div class="ie-footer" id="ie-payment-block">
           <div class="ie-payment" id="ie-payment-fields">
             <div class="field" style="margin-bottom:10px;"><div class="l">Forma de pago</div>
-              <select class="search-box" style="width:100%;" id="ni-payment">
+              <select class="search-box" style="width:100%;" id="ni-payment" onchange="onPaymentChange()">
+                <option value="">— Sin definir —</option>
                 <option>Transferencia</option>
                 <option>Efectivo</option>
+                <option>Bizum</option>
+                <option>Tarjeta</option>
+                <option>Pago aplazado</option>
               </select>
             </div>
             <div id="ie-bank-fields">
@@ -8141,6 +8145,12 @@ function onMachineChange(select){
   }
 }
 
+function onPaymentChange(){
+  const t = document.getElementById('ni-doctype').value;
+  const cfg = DOC_TYPES[t];
+  const val = document.getElementById('ni-payment').value;
+  document.getElementById('ie-bank-fields').style.display = (cfg.hasBank && val==='Transferencia') ? '' : 'none';
+}
 function onDocTypeChange(){
   const t = document.getElementById('ni-doctype').value;
   const cfg = DOC_TYPES[t];
@@ -8162,6 +8172,8 @@ function onDocTypeChange(){
   document.getElementById('ie-paper-edit').classList.toggle('hide-precios', !cfg.hasPrecios);
   document.getElementById('ie-paper-edit').classList.toggle('hide-bank', !cfg.hasBank);
   document.getElementById('ie-paper-edit').classList.toggle('hide-totales', !cfg.hasTotales);
+  document.getElementById('ni-payment').value = (t==='presupuesto' || t==='proforma') ? '' : 'Transferencia';
+  onPaymentChange();
   updateConceptoTransferencia();
   recalcTotals();
 }
@@ -8311,7 +8323,7 @@ function descargarPDF(){
     doc.text('TOTAL:', 150, y, {align:'right'}); doc.text(total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
   }
 
-  if(cfg.hasPayment){
+  if(cfg.hasPayment && payment){
     y += 14;
     doc.setFont('helvetica','normal'); doc.setFontSize(9);
     doc.text('Forma de pago: '+payment, 15, y);
@@ -8381,7 +8393,7 @@ function togglePreview(){
     </table>
     <div class="ie-footer">
       <div class="ie-payment" style="font-size:13px;">
-        ${cfg.hasPayment ? `<div><b>Forma de pago:</b> ${payment}</div>` : ''}
+        ${cfg.hasPayment && payment ? `<div><b>Forma de pago:</b> ${payment}</div>` : ''}
         ${cfg.hasBank && payment==='Transferencia' ? `<div><b>IBAN:</b> ${iban}</div><div><b>Titular:</b> ${titular}</div><div><b>Concepto:</b> ${concepto}</div>` : ''}
       </div>
       ${cfg.hasTotales ? `<div class="ie-totals">
@@ -8931,6 +8943,7 @@ function openDocumentViewer(id){
   document.getElementById('ie-paper-edit').classList.toggle('hide-precios', !DOC_TYPES[doc.type].hasPrecios);
   document.getElementById('ie-paper-edit').classList.toggle('hide-bank', !DOC_TYPES[doc.type].hasBank);
   document.getElementById('ie-paper-edit').classList.toggle('hide-totales', !DOC_TYPES[doc.type].hasTotales);
+  onPaymentChange();
   document.getElementById('ni-title').textContent = DOC_TYPES[doc.type].title;
   document.getElementById('ni-explain').textContent = DOC_TYPES[doc.type].explain;
   document.getElementById('ni-submit').textContent = doc.status==='Borrador' ? 'Guardar y numerar en firme' : 'Guardar cambios';
