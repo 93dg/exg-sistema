@@ -1762,7 +1762,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.43</div>
+        <div class="sub">V1.44</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2230,6 +2230,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="chip-filter" data-trim="3">3º trimestre</div>
             <div class="chip-filter" data-trim="4">4º trimestre</div>
           </div>
+          <div class="filters" id="fact-filtro-estado-chips" style="margin:0;">
+            <div class="chip-filter" data-estado="borrador">0. Borrador</div>
+            <div class="chip-filter active" data-estado="pendiente_enviar">1. Pendiente de enviar</div>
+            <div class="chip-filter" data-estado="pendiente_cobrar">2. Pendiente de cobrar</div>
+            <div class="chip-filter" data-estado="parcial">3. Cobro parcial</div>
+            <div class="chip-filter" data-estado="cobrado">4. Cobrado</div>
+          </div>
         </div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl" id="econ-facturas-table">
@@ -2283,6 +2290,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="chip-filter" data-trim="3">3º trimestre</div>
             <div class="chip-filter" data-trim="4">4º trimestre</div>
           </div>
+          <div class="filters" id="alb-filtro-estado-chips" style="margin:0;">
+            <div class="chip-filter active" data-estado="en_proceso">En proceso</div>
+            <div class="chip-filter" data-estado="entregado">Entregado</div>
+            <div class="chip-filter" data-estado="cobrado_efectivo">Cobrado en efectivo</div>
+          </div>
         </div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
@@ -2328,6 +2340,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="chip-filter" data-trim="2">2º trimestre</div>
             <div class="chip-filter" data-trim="3">3º trimestre</div>
             <div class="chip-filter" data-trim="4">4º trimestre</div>
+          </div>
+          <div class="filters" id="pres-filtro-estado-chips" style="margin:0;">
+            <div class="chip-filter active" data-estado="pendiente">Pendiente</div>
+            <div class="chip-filter" data-estado="porconfirmar">Borrador</div>
+            <div class="chip-filter" data-estado="validado">Validado</div>
+            <div class="chip-filter" data-estado="enviado">Enviado</div>
           </div>
         </div>
         <div class="panel-body" style="padding:0;">
@@ -3929,15 +3947,31 @@ document.querySelectorAll('#alb-filtro-trim-chips .chip-filter, #pres-filtro-tri
     filtrarPorAnioTrim(tbodyId, contenedor.id.startsWith('alb') ? 'alb' : 'pres');
   });
 });
+document.querySelectorAll('#fact-filtro-estado-chips .chip-filter, #alb-filtro-estado-chips .chip-filter, #pres-filtro-estado-chips .chip-filter').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    chip.classList.toggle('active');
+    const cont = chip.closest('.filters');
+    if(cont.id==='fact-filtro-estado-chips'){ filtrarTablaOrdenable('econ-facturas-tbody'); renderFacturasKPIs(); }
+    else if(cont.id==='alb-filtro-estado-chips'){ filtrarPorAnioTrim('albaranes-tbody-standalone','alb'); }
+    else if(cont.id==='pres-filtro-estado-chips'){ filtrarPorAnioTrim('presupuestos-tbody-standalone','pres'); }
+  });
+});
 function filtrarPorAnioTrim(tbodyId, prefijo){
   const tbody = document.getElementById(tbodyId);
   if(!tbody) return;
   const anioSel = document.getElementById(prefijo+'-filtro-anio-chips')?.querySelector('.chip-filter.active')?.dataset.anio || '';
   const trimSel = document.getElementById(prefijo+'-filtro-trim-chips')?.querySelector('.chip-filter.active')?.dataset.trim || '';
+  const estadosSel = new Set(Array.from(document.getElementById(prefijo+'-filtro-estado-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.estado));
   tbody.querySelectorAll('tr').forEach(tr=>{
     const okAnio = !anioSel || tr.dataset.anio === anioSel;
     const okTrim = !trimSel || tr.dataset.trimestre === trimSel;
-    tr.style.display = (okAnio && okTrim) ? '' : 'none';
+    let okEstado = true;
+    if(estadosSel.size){
+      const pillEl = tr.querySelector('.pill, select');
+      const estadoActual = pillEl ? (pillEl.classList ? Array.from(pillEl.classList).find(c=>c!=='pill') : pillEl.value) : null;
+      okEstado = estadoActual ? estadosSel.has(estadoActual) : true;
+    }
+    tr.style.display = (okAnio && okTrim && okEstado) ? '' : 'none';
   });
 }
 function poblarFiltroAniosChipsGenerico(tbodyId, contenedorId, prefijo){
@@ -3973,6 +4007,7 @@ function filtrarTablaOrdenable(tbodyId){
   const trimSel = document.getElementById('fact-filtro-trim-chips')?.querySelector('.chip-filter.active')?.dataset.trim
     ?? document.getElementById('fact-filtro-trim')?.value ?? '';
   const kpiSel = tbodyId==='econ-facturas-tbody' ? (document.querySelector('#facturas-kpi-strip .kpi.active')?.dataset.kpi || '') : '';
+  const estadosSel = new Set(Array.from(document.getElementById('fact-filtro-estado-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.estado));
   tbody.querySelectorAll('tr').forEach(tr=>{
     const okAnio = aniosSel.size===0 || aniosSel.has(tr.dataset.anio);
     const okTrim = !trimSel || tr.dataset.trimestre === trimSel;
@@ -3983,7 +4018,13 @@ function filtrarTablaOrdenable(tbodyId){
       else if(kpiSel==='pendiente') okKpi = estadoTexto.includes('pendiente');
       else if(kpiSel==='vencida') okKpi = estadoTexto.includes('vencid');
     }
-    tr.style.display = (okAnio && okTrim && okKpi) ? '' : 'none';
+    let okEstado = true;
+    if(estadosSel.size){
+      const pillEl = tr.querySelector('.pill');
+      const estadoActual = pillEl ? Array.from(pillEl.classList).find(c=>c!=='pill') : null;
+      okEstado = estadoActual ? estadosSel.has(estadoActual) : true;
+    }
+    tr.style.display = (okAnio && okTrim && okKpi && okEstado) ? '' : 'none';
   });
 }
 function formatFechaCorta(dateRaw){
@@ -9035,6 +9076,9 @@ async function cargarDocumentosEconomicosReales(){
     poblarFiltroAniosChipsGenerico('albaranes-tbody-standalone','alb-filtro-anio-chips','alb');
     poblarFiltroAniosChipsGenerico('presupuestos-tbody-standalone','pres-filtro-anio-chips','pres');
     poblarFiltroAniosChips('econ-facturas-tbody','fact-filtro-anio-chips');
+    filtrarTablaOrdenable('econ-facturas-tbody');
+    filtrarPorAnioTrim('albaranes-tbody-standalone','alb');
+    filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
   }catch(err){ console.error('No se pudieron cargar los documentos reales', err); }
 }
 cargarDocumentosEconomicosReales();
