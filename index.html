@@ -1762,7 +1762,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.38</div>
+        <div class="sub">V1.39</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -1810,7 +1810,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
         <div class="quickactions">
           <button class="btn" onclick="openNewJobModal()">+ Nuevo trabajo</button>
-          <button class="btn" style="border-color:var(--red);color:var(--red);" onclick="abrirAveria()">⚠ Avería</button>
+          <button class="btn" style="border-color:var(--red);color:var(--red);" onclick="abrirAveria()">⚠ Incidente</button>
           <button class="btn primary" onclick="abrirMenuTipoDoc()">+ Crear documento</button>
         </div>
       </div>
@@ -2099,7 +2099,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="topbar">
         <div><h1>Flota y maquinaria</h1><div class="desc">Estado, mantenimiento, documentación y repuestos</div></div>
         <div class="quickactions">
-          <button class="btn" style="border-color:var(--red);color:var(--red);" onclick="abrirAveria()">⚠ Avería</button>
+          <button class="btn" style="border-color:var(--red);color:var(--red);" onclick="abrirAveria()">⚠ Incidente</button>
           <button class="btn primary" onclick="addMaquina()">+ Añadir máquina</button>
         </div>
       </div>
@@ -4278,6 +4278,33 @@ async function cargarAveriasReales(){
 cargarAveriasReales();
 
 async function abrirAveria(){
+  const tipo = await elegirDeLista('¿Qué tipo de incidente?', ['Avería de máquina', 'Personal (permiso, baja, vacaciones…)']);
+  if(!tipo) return;
+  if(tipo.startsWith('Personal')) return abrirIncidentePersonal();
+  return abrirAveriaMaquina();
+}
+async function abrirIncidentePersonal(){
+  const resp = await pedirCampos('Incidente de personal', [
+    {id:'nombre', label:'Nombre del trabajador', tipo:'text', requerido:true},
+    {id:'motivo', label:'Motivo (permiso, baja, vacaciones, otro)', tipo:'text', requerido:true},
+    {id:'dias', label:'¿Cuántos días? (opcional)', tipo:'text', requerido:false},
+    {id:'notas', label:'Notas', tipo:'textarea', requerido:false},
+  ]);
+  if(!resp) return;
+  const lista = JSON.parse(localStorage.getItem('incidentes_personal') || '[]');
+  const registro = {id: 'ip-'+Date.now(), nombre: resp.nombre, motivo: resp.motivo, dias: resp.dias||'', notas: resp.notas||'', fecha: new Date().toISOString()};
+  lista.push(registro);
+  localStorage.setItem('incidentes_personal', JSON.stringify(lista));
+  atencionBase.push({
+    sev: 'yellow',
+    t: `${resp.nombre} — ${resp.motivo}${resp.dias ? ' ('+resp.dias+' día(s))' : ''}`,
+    s: resp.notas || 'Incidente de personal registrado',
+    action: () => { mostrarToast(`${resp.nombre}: ${resp.motivo}${resp.notas ? ' — '+resp.notas : ''}`); }
+  });
+  renderAtencion();
+  mostrarToast('Incidente de personal registrado ✓', 'ok');
+}
+async function abrirAveriaMaquina(){
   if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
   const disponibles = fleet.filter(f=>f.state!=='averia');
   if(!disponibles.length){ mostrarToast('No hay máquinas disponibles para marcar.'); return; }
