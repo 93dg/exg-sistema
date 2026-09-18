@@ -1762,7 +1762,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.47</div>
+        <div class="sub">V1.48</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -1871,6 +1871,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
       </div>
 
+      <div class="panel">
+        <div class="panel-head"><h3>Requiere atención</h3><span class="count">7</span></div>
+        <div class="panel-body" id="atencion-list" style="max-height:400px;overflow-y:auto;"></div>
+      </div>
+
       <div class="grid-2">
         <div>
           <div class="panel">
@@ -1895,11 +1900,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
 
         <div>
-          <div class="panel">
-            <div class="panel-head"><h3>Requiere atención</h3><span class="count">7</span></div>
-            <div class="panel-body" id="atencion-list" style="max-height:400px;overflow-y:auto;"></div>
-          </div>
-
           <div class="panel">
             <div class="panel-head"><h3>Alertas</h3></div>
             <div class="panel-body" id="alertas-list"></div>
@@ -2216,6 +2216,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <th class="ord" onclick="ordenarTabla('clientes-tbl',2,'text')">Tipo ⇅</th>
               <th>NIF/CIF</th>
               <th>Dirección</th>
+              <th>CP</th>
               <th>Población</th>
               <th>Provincia</th>
               <th>Email</th>
@@ -7312,10 +7313,35 @@ function renderClientesTable(){
   const falta = v => v ? v : '—';
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   document.getElementById('clientes-tbl').innerHTML = clientes.map(c=>`
-    <tr onclick="openClientDrawer('${c.name}')"><td onclick="event.stopPropagation();"><input type="checkbox" class="clientes-sel-chk" data-id="${c.id||''}" onchange="actualizarSeleccionClientes()"></td><td><b>${c.name}</b></td><td><span class="zone-badge">${c.type}</span></td>
-    <td>${falta(c.nif)}</td><td>${falta(c.direccion)}</td><td>${falta(c.poblacion)}</td><td>${falta(c.provincia)}</td><td>${falta(c.email)}</td><td>${falta(c.telefono)}</td>
+    <tr onclick="toggleExpandirClienteFila('${c.id}')"><td onclick="event.stopPropagation();"><input type="checkbox" class="clientes-sel-chk" data-id="${c.id||''}" onchange="actualizarSeleccionClientes()"></td><td><b onclick="event.stopPropagation();openClientDrawer('${(c.name||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${c.name}</b></td><td><span class="zone-badge">${c.type}</span></td>
+    <td>${falta(c.nif)}</td><td>${falta(c.direccion)}</td><td>${falta(c.cp)}</td><td>${falta(c.poblacion)}</td><td>${falta(c.provincia)}</td><td>${falta(c.email)}</td><td>${falta(c.telefono)}</td>
     <td class="num">${euro(c.facturado)}</td><td class="num">${euro(c.enB)}</td><td class="num"><b>${euro((c.facturado||0)+(c.enB||0))}</b></td>
     <td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnCliente('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')">🗑</span></td></tr>`).join('');
+}
+function toggleExpandirClienteFila(id){
+  const existente = document.getElementById('cliente-detalle-'+id);
+  if(existente){ existente.remove(); return; }
+  document.querySelectorAll('tr[id^="cliente-detalle-"]').forEach(f=>f.remove());
+  if(!id) return;
+  const docs = Object.values(documentosRealesById).filter(d=>d.entidad_id===id)
+    .sort((a,b)=> new Date(b.dateRaw||0) - new Date(a.dateRaw||0));
+  const filas = document.querySelectorAll('#clientes-tbl tr');
+  let filaCliente = null;
+  filas.forEach(tr=>{ if(tr.querySelector(`[data-id="${id}"]`)) filaCliente = tr; });
+  if(!filaCliente) return;
+  const detalle = document.createElement('tr');
+  detalle.id = 'cliente-detalle-'+id;
+  detalle.onclick = ev=>ev.stopPropagation();
+  const tipoLabel = {factura:'Factura', albaran:'Albarán', presupuesto:'Presupuesto', proforma:'Presupuesto'};
+  const filasHtml = docs.length ? `<table class="tbl" style="margin-top:6px;">
+      <tr><th>Tipo</th><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Archivo</th></tr>
+      ${docs.map(d=>{
+        const url = d.archivo_url || (d.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${d.archivo_path}` : null);
+        return `<tr onclick="event.stopPropagation();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td>${tipoLabel[d.type]||d.type}</td><td class="mono">${d.numero||'—'}</td><td class="mono">${formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td><td>${url?`<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${url}')">📎 Ver</a>`:'—'}</td></tr>`;
+      }).join('')}
+    </table>` : '<span class="sub-t">Sin facturas, albaranes ni presupuestos asociados</span>';
+  detalle.innerHTML = `<td colspan="14" style="background:var(--concrete);padding:10px 20px;">${filasHtml}</td>`;
+  filaCliente.after(detalle);
 }
 async function borrarUnCliente(id, nombre){
   if(!id){ mostrarToast('Este cliente no está guardado todavía.'); return; }
@@ -7354,9 +7380,10 @@ async function cargarEntidadesReales(){
         existente.telefono = e.telefono || existente.telefono || '';
         existente.direccion = e.direccion || existente.direccion || '';
         existente.poblacion = e.poblacion || existente.poblacion || '';
+        existente.cp = e.cp || existente.cp || '';
         existente.provincia = e.provincia || existente.provincia || '';
       } else {
-        clientes.push({id: e.id, name: e.nombre, type: tipoMap[(e.tipo||'').toLowerCase()] || 'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media', nif: e.nif||'', email: e.email||'', telefono: e.telefono||'', direccion: e.direccion||'', poblacion: e.poblacion||'', provincia: e.provincia||''});
+        clientes.push({id: e.id, name: e.nombre, type: tipoMap[(e.tipo||'').toLowerCase()] || 'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media', nif: e.nif||'', email: e.email||'', telefono: e.telefono||'', direccion: e.direccion||'', poblacion: e.poblacion||'', provincia: e.provincia||'', cp: e.cp||''});
       }
     });
     renderClientesTable();
