@@ -557,6 +557,21 @@ table{border-collapse:collapse;width:100%;}
 .combo-item:hover, .combo-item.hl{background:var(--concrete);}
 .combo-item .sub{font-size:11px;color:var(--ink-soft);}
 
+.doc-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line);}
+.doc-toolbar-title{display:flex;align-items:baseline;gap:8px;min-width:0;}
+.doc-toolbar-title .dt-ico{font-size:16px;flex-shrink:0;}
+.doc-toolbar-title h3{font-size:15.5px;font-weight:700;margin:0;color:var(--ink);letter-spacing:-0.01em;}
+.doc-toolbar-title .dt-count{color:var(--ink-faint,#9AA0A8);font-size:13px;font-weight:500;flex-shrink:0;}
+.dt-filter-btn{
+  position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  width:38px;height:38px;border-radius:50%;background:var(--concrete);border:1px solid var(--line);
+  cursor:pointer;font-size:16px;color:var(--ink-soft);transition:background .15s,border-color .15s;
+}
+.dt-filter-btn:hover{background:var(--paper);}
+.dt-filter-btn.active-filters{background:var(--orange);border-color:var(--orange);color:#fff;}
+.dt-filter-btn .dt-dot{position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:var(--orange);border:2px solid var(--paper);display:none;}
+.dt-filter-btn.has-changes .dt-dot{display:block;}
+
 .client-picker{position:relative;}
 .client-picker-trigger{
   display:flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid var(--line);border-radius:var(--radius);
@@ -1913,7 +1928,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.81</div>
+        <div class="sub">V1.82</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -1979,12 +1994,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
 
       <div class="panel">
-        <div class="panel-head">
-          <h3>📑 Documentos</h3>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span class="count" id="control-docs-count">0</span>
-            <button type="button" class="btn sm" id="control-docs-filtros-toggle" onclick="toggleControlDocsFiltros()"><span id="control-docs-filtros-badge">🔎</span> Filtros</button>
+        <div class="doc-toolbar">
+          <div class="doc-toolbar-title">
+            <span class="dt-ico">📑</span>
+            <h3>Documentos</h3>
+            <span class="dt-count" id="control-docs-count">0</span>
           </div>
+          <button type="button" class="dt-filter-btn" id="control-docs-filtros-toggle" onclick="toggleControlDocsFiltros()" aria-label="Filtros">
+            <span class="dt-filter-ico">🎚️</span>
+            <span class="dt-dot"></span>
+          </button>
         </div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
@@ -9386,9 +9405,25 @@ const controlDocsTipoLabel = {factura:'🧾 Factura', albaran:'📋 Albarán', p
 let controlDocsLimite = 15;
 let controlDocsAniosPoblado = false;
 function controlDocsMostrarMas(){ controlDocsLimite += 15; renderControlDocs(); }
+let controlDocsDefaults = null;
 function renderControlDocs(){
   const tbody = document.getElementById('control-docs-tbody');
   if(!tbody) return;
+  if(!controlDocsDefaults){
+    controlDocsDefaults = {
+      tipo: Array.from(document.querySelectorAll('#control-docs-tipo-chips .chip-filter.active')).map(c=>c.dataset.tipo).sort().join(','),
+      estado: Array.from(document.querySelectorAll('#control-docs-estado-chips .chip-filter.active')).map(c=>c.dataset.estado).sort().join(','),
+      trim: Array.from(document.querySelectorAll('#control-docs-trim-chips .chip-filter.active')).map(c=>c.dataset.trim).sort().join(','),
+    };
+  }
+  const actual = {
+    tipo: Array.from(document.querySelectorAll('#control-docs-tipo-chips .chip-filter.active')).map(c=>c.dataset.tipo).sort().join(','),
+    estado: Array.from(document.querySelectorAll('#control-docs-estado-chips .chip-filter.active')).map(c=>c.dataset.estado).sort().join(','),
+    trim: Array.from(document.querySelectorAll('#control-docs-trim-chips .chip-filter.active')).map(c=>c.dataset.trim).sort().join(','),
+  };
+  const anioActivo = Array.from(document.querySelectorAll('#control-docs-anio-chips .chip-filter.active')).some(c=>c.dataset.anio);
+  const cambiado = anioActivo || actual.tipo!==controlDocsDefaults.tipo || actual.estado!==controlDocsDefaults.estado || actual.trim!==controlDocsDefaults.trim;
+  document.getElementById('control-docs-filtros-toggle')?.classList.toggle('has-changes', cambiado);
   const todos = Object.values(documentosRealesById).filter(d=>['factura','albaran','presupuesto','proforma'].includes(d.type));
   if(!controlDocsAniosPoblado){
     const anios = [...new Set(todos.map(d=>d.dateRaw ? String(new Date(d.dateRaw).getFullYear()) : null).filter(Boolean))].sort().reverse();
