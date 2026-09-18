@@ -378,7 +378,7 @@ table{border-collapse:collapse;width:100%;}
 .ie-doc-explain{flex:1;font-size:12px;color:var(--ink-soft);}
 .ie-paper{padding:26px 30px;border:1px solid var(--line);margin:20px;background:var(--paper);}
 #ie-paper-edit.hide-fiscal #ie-company-fiscal{display:none;}
-#ie-paper-edit.hide-precios .col-precio,#ie-paper-edit.hide-precios .col-total{display:none;}
+#ie-paper-edit.hide-precios .col-precio{display:none;}
 #ie-paper-edit.hide-bank #ie-bank-fields{display:none;}
 #ie-paper-edit.hide-totales .ie-totals{display:none;}
 #ie-preview-pane.ie-paper{
@@ -1777,7 +1777,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.60</div>
+        <div class="sub">V1.61</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7996,22 +7996,22 @@ function proximoNumero(tipoDoc){
 const DOC_TYPES = {
   factura: {
     title:'FACTURA', button:'Crear factura', prefix:'F', seqRef:()=>proximoNumero('factura'), hasIva:true,
-    hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasPayment:true, hasBank:true,
+    hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasBaseIva:true, hasPayment:true, hasBank:true,
     explain:'Documento fiscal definitivo. Genera obligación de cobro y de declarar IVA.',
   },
   proforma: {
     title:'FACTURA PROFORMA', button:'Crear proforma', prefix:'PF', seqRef:()=>proximoNumero('proforma'), hasIva:true,
-    hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasPayment:true, hasBank:true,
+    hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasBaseIva:true, hasPayment:true, hasBank:true,
     explain:'Anticipo informativo sin validez fiscal, antes de que el cliente se comprometa.',
   },
   presupuesto: {
     title:'PRESUPUESTO', button:'Crear presupuesto', prefix:'P', seqRef:()=>proximoNumero('presupuesto'), hasIva:true,
-    hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasPayment:true, hasBank:false,
+    hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasBaseIva:true, hasPayment:true, hasBank:false,
     explain:'Propuesta de precio. No obliga a nada — si se acepta, se convierte en trabajo.',
   },
   albaran: {
     title:'ALBARÁN', button:'Crear albarán', prefix:'ALB', seqRef:()=>proximoNumero('albaran'), hasIva:false,
-    hasFiscalHeader:false, hasPrecios:false, hasTotales:false, hasPayment:false, hasBank:false,
+    hasFiscalHeader:false, hasPrecios:false, hasTotales:true, hasBaseIva:false, hasPayment:false, hasBank:false,
     explain:'Justificante de entrega/trabajo realizado. No es un documento fiscal, así que no lleva IVA ni desglose.',
   },
 };
@@ -8297,7 +8297,8 @@ function descargarPDF(){
   y += 10;
   doc.setFont('helvetica','bold'); doc.setFontSize(9);
   doc.text('Cant.', 15, y); doc.text('Concepto', 30, y);
-  if(cfg.hasPrecios){ doc.text('Precio', 150, y, {align:'right'}); doc.text('Total', 195, y, {align:'right'}); }
+  if(cfg.hasPrecios){ doc.text('Precio', 150, y, {align:'right'}); }
+  doc.text('Total', 195, y, {align:'right'});
   y += 2; doc.line(15,y,195,y); y += 5;
   doc.setFont('helvetica','normal');
   items.forEach(it=>{
@@ -8306,17 +8307,19 @@ function descargarPDF(){
     doc.text(doc.splitTextToSize(it.concept||'—', cfg.hasPrecios ? 110 : 160)[0], 30, y);
     if(cfg.hasPrecios){
       doc.text(it.price.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 150, y, {align:'right'});
-      doc.text(lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
     }
+    doc.text(lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
     y += 6;
   });
 
   if(cfg.hasTotales){
     y += 4; doc.line(120,y,195,y); y += 6;
-    doc.text('Base imponible:', 150, y, {align:'right'}); doc.text(base.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
-    if(cfg.hasIva){
-      const ivaPct = document.getElementById('ie-iva-pct').value;
-      doc.text(`IVA (${ivaPct}%):`, 150, y, {align:'right'}); doc.text(iva.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
+    if(cfg.hasBaseIva){
+      doc.text('Base imponible:', 150, y, {align:'right'}); doc.text(base.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
+      if(cfg.hasIva){
+        const ivaPct = document.getElementById('ie-iva-pct').value;
+        doc.text(`IVA (${ivaPct}%):`, 150, y, {align:'right'}); doc.text(iva.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
+      }
     }
     doc.setFont('helvetica','bold'); doc.setFontSize(11);
     doc.text('TOTAL:', 150, y, {align:'right'}); doc.text(total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
@@ -8387,8 +8390,8 @@ function togglePreview(){
       <b>Cliente:</b> ${client}
     </div>
     <table class="ie-items">
-      <thead><tr><th>Cant.</th><th>Concepto</th>${cfg.hasPrecios ? '<th style="text-align:right;">Precio</th><th style="text-align:right;">Total</th>' : ''}</tr></thead>
-      <tbody>${items.map(i=>`<tr><td>${i.qty}</td><td>${i.concept||'—'}</td>${cfg.hasPrecios ? `<td style="text-align:right;" class="mono">${i.price.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td><td style="text-align:right;" class="mono">${i.total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>` : ''}</tr>`).join('')}</tbody>
+      <thead><tr><th>Cant.</th><th>Concepto</th>${cfg.hasPrecios ? '<th style="text-align:right;">Precio</th>' : ''}<th style="text-align:right;">Total</th></tr></thead>
+      <tbody>${items.map(i=>`<tr><td>${i.qty}</td><td>${i.concept||'—'}</td>${cfg.hasPrecios ? `<td style="text-align:right;" class="mono">${i.price.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>` : ''}<td style="text-align:right;" class="mono">${i.total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td></tr>`).join('')}</tbody>
     </table>
     <div class="ie-footer">
       <div class="ie-payment" style="font-size:13px;">
@@ -8396,8 +8399,8 @@ function togglePreview(){
         ${cfg.hasBank && payment==='Transferencia' ? `<div><b>IBAN:</b> ${iban}</div><div><b>Titular:</b> ${titular}</div><div><b>Concepto:</b> ${concepto}</div>` : ''}
       </div>
       ${cfg.hasTotales ? `<div class="ie-totals">
-        <div class="econ-line"><span>Base imponible</span><span class="v mono">${base.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>
-        ${cfg.hasIva ? `<div class="econ-line"><span>IVA</span><span class="v mono">${iva.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>` : ''}
+        ${cfg.hasBaseIva ? `<div class="econ-line"><span>Base imponible</span><span class="v mono">${base.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>` : ''}
+        ${cfg.hasBaseIva && cfg.hasIva ? `<div class="econ-line"><span>IVA</span><span class="v mono">${iva.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>` : ''}
         <div class="econ-line"><span>TOTAL</span><span class="v mono">${total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>
       </div>` : ''}
     </div>
