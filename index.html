@@ -1940,6 +1940,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
 <div id="mobile-add-backdrop" onclick="toggleMobileAddMenu()"></div>
 <div id="mobile-add-menu">
+  <button onclick="closeMobileAddMenuAndRun(abrirAsistenteIA)"><span class="ma-ico">🤖</span> Asistente</button>
   <button onclick="closeMobileAddMenuAndRun(abrirMenuTipoDoc)"><span class="ma-ico">📄</span> Documento</button>
   <button onclick="closeMobileAddMenuAndRun(()=>openNewJobModal())"><span class="ma-ico">▤</span> Trabajo</button>
   <button onclick="closeMobileAddMenuAndRun(abrirAveria)"><span class="ma-ico">⚠</span> Incidente</button>
@@ -1953,7 +1954,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.84</div>
+        <div class="sub">V1.85</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2001,6 +2002,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div class="desc">Martes, 9 de septiembre — vista general de la empresa</div>
         </div>
         <div class="quickactions" id="control-quickactions">
+          <button class="btn" style="border-color:var(--orange);color:var(--orange);" onclick="abrirAsistenteIA()">🤖 Asistente</button>
           <button class="btn" onclick="openNewJobModal()">+ Nuevo trabajo</button>
           <button class="btn" style="border-color:var(--red);color:var(--red);" onclick="abrirAveria()">⚠ Incidente</button>
           <button class="btn primary" onclick="abrirMenuTipoDoc()">+ Crear documento</button>
@@ -3819,6 +3821,21 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 </div>
 
 <!-- ================= MENÚ: QUÉ TIPO DE DOCUMENTO CREAR ================= -->
+<div class="overlay" id="asistente-ia-overlay" onclick="if(event.target===this) cerrarAsistenteIA()">
+  <div class="drawer" style="max-width:480px;">
+    <div class="drawer-head">
+      <div><h2>🤖 Asistente</h2><div style="color:var(--ink-soft);font-size:12.5px;margin-top:3px;">Cuéntame qué ha pasado o qué necesitas</div></div>
+      <button class="close-x" onclick="cerrarAsistenteIA()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <textarea id="asistente-ia-input" class="search-box" style="width:100%;min-height:90px;resize:vertical;" placeholder="Ej. He echado 80 litros de gasoil en el camión MAN, 130 euros&#10;Ej. Necesito una factura para José López, 4 horas de retroexcavadora&#10;Ej. Se ha averiado la pala cargadora, no arranca"></textarea>
+      <button class="btn primary" style="width:100%;margin-top:10px;" id="asistente-ia-enviar" onclick="enviarAsistenteIA()">Enviar</button>
+      <div id="asistente-ia-estado" style="margin-top:12px;font-size:13px;color:var(--ink-soft);"></div>
+      <div id="asistente-ia-propuestas" style="margin-top:14px;display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="tipo-doc-menu-overlay" onclick="if(event.target===this) document.getElementById('tipo-doc-menu-overlay').classList.remove('active')">
   <div class="drawer" style="max-width:320px;">
     <div class="drawer-head">
@@ -8901,6 +8918,67 @@ async function pickerNuevo(){
   cerrarPicker(r ? r.nombre : null);
 }
 
+function abrirAsistenteIA(){
+  document.getElementById('asistente-ia-input').value = '';
+  document.getElementById('asistente-ia-estado').textContent = '';
+  document.getElementById('asistente-ia-propuestas').innerHTML = '';
+  document.getElementById('asistente-ia-overlay').classList.add('active');
+  setTimeout(()=>document.getElementById('asistente-ia-input').focus(), 50);
+}
+function cerrarAsistenteIA(){ document.getElementById('asistente-ia-overlay').classList.remove('active'); }
+let asistenteIAPropuestas = [];
+async function enviarAsistenteIA(){
+  const mensaje = document.getElementById('asistente-ia-input').value.trim();
+  if(!mensaje){ mostrarToast('Escribe algo primero.'); return; }
+  const estado = document.getElementById('asistente-ia-estado');
+  const propuestasEl = document.getElementById('asistente-ia-propuestas');
+  const btn = document.getElementById('asistente-ia-enviar');
+  estado.textContent = 'Pensando…';
+  propuestasEl.innerHTML = '';
+  btn.disabled = true;
+  try{
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/asistente-ia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer '+SUPABASE_ANON_KEY },
+      body: JSON.stringify({ mensaje }),
+    });
+    const data = await resp.json();
+    if(!resp.ok || data.error){ estado.textContent = 'Error: '+(data.error||'algo ha fallado.'); btn.disabled=false; return; }
+    asistenteIAPropuestas = data.propuestas || [];
+    estado.textContent = asistenteIAPropuestas.length ? '¿Cuál de estas?' : 'No he sabido proponer nada, prueba a explicarlo distinto.';
+    const iconos = {gasto:'💸', documento:'📄', incidente:'⚠', trabajo:'▤', nota:'📝'};
+    propuestasEl.innerHTML = asistenteIAPropuestas.map((p,i)=>`
+      <div class="cp-option" style="border:1px solid var(--line);border-radius:var(--radius);padding:12px;" onclick="ejecutarPropuestaIA(${i})">
+        <div style="font-weight:700;margin-bottom:4px;">${iconos[p.tipo]||'📝'} ${p.titulo}</div>
+        <div style="font-size:12.5px;color:var(--ink-soft);">${p.descripcion}</div>
+      </div>`).join('');
+  }catch(err){
+    estado.textContent = 'Error de red: '+err.message;
+  }
+  btn.disabled = false;
+}
+function ejecutarPropuestaIA(i){
+  const p = asistenteIAPropuestas[i];
+  if(!p) return;
+  cerrarAsistenteIA();
+  const datos = p.datos || {};
+  if(p.tipo==='gasto'){
+    abrirRegistrarGasto();
+    setTimeout(()=>{
+      if(datos.concepto) document.getElementById('gasto-concepto').value = datos.concepto;
+      if(datos.importe) document.getElementById('gasto-importe').value = datos.importe;
+    }, 80);
+  } else if(p.tipo==='documento'){
+    if(datos.tipo_doc){ elegirTipoDoc(datos.tipo_doc); }
+    else { abrirMenuTipoDoc(); }
+  } else if(p.tipo==='incidente'){
+    abrirAveria();
+  } else if(p.tipo==='trabajo'){
+    openNewJobModal();
+  } else {
+    mostrarToast('Anotado: '+p.titulo);
+  }
+}
 function abrirMenuTipoDoc(){
   document.getElementById('mobile-tabbar')?.classList.remove('add-open');
   document.getElementById('tipo-doc-menu-overlay').classList.add('active');
