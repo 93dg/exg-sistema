@@ -2032,6 +2032,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <button id="editor-mode-btn" onclick="toggleEditorMode()">✏️ Modo editor</button>
 <button id="report-bug-btn" onclick="openReportBug()">🐞<span class="rb-label"> Reportar</span></button>
 <button id="asistente-ia-fab" onclick="abrirAsistenteIA()"><span id="ai-fab-orb"></span></button>
+<div id="repro-badge" style="display:none;position:fixed;bottom:90px;right:20px;z-index:9998;background:var(--asphalt,#232323);color:#fff;padding:7px 12px;border-radius:20px;font-size:12px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,.3);cursor:pointer;" onclick="document.querySelector('.nav button[data-view=\'reportes\']')?.click()">🔁 Reprocesando…</div>
 
 <div id="report-bug-bar">
   <span class="sub-t" id="report-bug-seccion" style="white-space:nowrap;"></span>
@@ -2083,7 +2084,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.11</div>
+        <div class="sub">V2.12</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -10013,46 +10014,71 @@ async function ejecutarVerificarCalidad(anio){
     cont.innerHTML = '<div style="text-align:center;color:var(--red);font-size:13px;padding:16px 0;">Error: '+err.message+'</div>';
   }
 }
-async function ejecutarReprocesadoMasivo(){
-  const btn = document.getElementById('reprocesar-btn');
+let reprocesoGlobal = { activo:false, procesados:0, total:0, contadores:{} };
+function pintarReprocesoResultado(){
+  const badge = document.getElementById('repro-badge');
+  if(badge){
+    if(reprocesoGlobal.activo){ badge.style.display='block'; badge.textContent = `🔁 Reprocesando ${reprocesoGlobal.procesados}/${reprocesoGlobal.total}`; }
+    else badge.style.display = 'none';
+  }
   const cont = document.getElementById('reprocesar-resultado');
-  if(!sb){ cont.innerHTML = '<div style="color:var(--red);font-size:13px;">Supabase no está conectado.</div>'; return; }
-  btn.disabled = true;
+  if(!cont) return; // el usuario puede estar en otra pantalla — el proceso sigue igual, solo no se pinta
+  const st = reprocesoGlobal;
+  const c = st.contadores;
+  const corregidos = (c.mejorado||0) + (c.confirmado_sin_desglose||0);
+  const revision = (c.revision_manual||0);
+  const errores = (c.inaccesible||0) + (c.error_ia||0) + (c.error_interpretacion||0) + (c.sin_archivo||0);
+  if(st.activo){
+    cont.innerHTML = `
+      <div style="font-weight:800;font-size:15px;margin-bottom:8px;">Reprocesando en segundo plano — ${st.procesados} de ${st.total}</div>
+      <div style="background:var(--concrete);border-radius:6px;height:8px;overflow:hidden;margin-bottom:10px;"><div style="background:var(--orange);height:100%;width:${st.total?Math.round(st.procesados/st.total*100):0}%;"></div></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px;">
+        <span>✓ ${corregidos} corregidos</span><span>— ${c.sin_cambios||0} validados sin cambios</span><span>⚠ ${revision} en revisión</span><span>❌ ${errores} error</span>
+      </div>
+      <div class="two-col-note" style="margin-top:8px;">Puedes cambiar de pantalla o cerrar este panel — sigue corriendo solo hasta terminar.</div>`;
+  } else if(st.total > 0){
+    cont.innerHTML = `
+      <div style="font-weight:800;font-size:15px;margin-bottom:10px;">${st.total} documentos reprocesados — terminado</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div class="econ-line" style="padding:8px 14px;background:var(--concrete);border-radius:8px;">✓ ${c.mejorado||0} mejorados</div>
+        <div class="econ-line" style="padding:8px 14px;background:var(--concrete);border-radius:8px;">📄 ${c.confirmado_sin_desglose||0} confirmados sin desglose (el original nunca lo tuvo)</div>
+        <div class="econ-line" style="padding:8px 14px;background:var(--concrete);border-radius:8px;">⚠ ${revision} en cola de revisión manual</div>
+        <div class="econ-line" style="padding:8px 14px;background:var(--concrete);border-radius:8px;">❌ ${errores} con error</div>
+        <div class="econ-line" style="padding:8px 14px;background:var(--concrete);border-radius:8px;">— ${c.sin_cambios||0} sin cambios</div>
+      </div>`;
+  }
+}
+async function ejecutarReprocesadoMasivo(){
+  if(reprocesoGlobal.activo){ mostrarToast('Ya hay un reprocesado en marcha.'); return; }
+  if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
   const {data: pendientes, error} = await sb.from('documentos_economicos')
     .select('id')
     .in('estado_calidad', ['revision_necesaria','error'])
     .not('archivo_path','is',null)
     .is('reprocesado_at', null);
-  if(error){ cont.innerHTML = '<div style="color:var(--red);font-size:13px;">Error: '+errText(error)+'</div>'; btn.disabled=false; return; }
-  if(!pendientes.length){ cont.innerHTML = '<div style="text-align:center;color:var(--green,#6FA37C);font-size:13px;padding:12px 0;">No hay documentos pendientes de reprocesar.</div>'; btn.disabled=false; return; }
+  if(error){ mostrarToast('Error: '+errText(error)); return; }
+  if(!pendientes.length){ mostrarToast('No hay documentos pendientes de reprocesar.'); return; }
 
-  const total = pendientes.length;
-  const contadores = {mejorado:0, confirmado_sin_desglose:0, sin_cambios:0, revision_manual:0, inaccesible:0, error_ia:0, error_interpretacion:0, sin_archivo:0};
+  reprocesoGlobal = { activo:true, procesados:0, total:pendientes.length, contadores:{} };
+  pintarReprocesoResultado();
   for(let i=0;i<pendientes.length;i++){
-    cont.innerHTML = `<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:12px 0;">Reprocesando ${i+1} de ${total}…</div>`;
     try{
       const resp = await fetch(SUPABASE_URL + '/functions/v1/reprocesar-documento', {
         method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+SUPABASE_ANON_KEY },
         body: JSON.stringify({ documento_id: pendientes[i].id }),
       });
       const data = await resp.json();
-      if(data.resultado && contadores[data.resultado]!==undefined) contadores[data.resultado]++;
-      else contadores.error_ia++;
-    }catch(e){ contadores.error_ia++; }
+      const validos = ['mejorado','confirmado_sin_desglose','sin_cambios','revision_manual','inaccesible','error_ia','error_interpretacion','sin_archivo'];
+      const key = validos.includes(data.resultado) ? data.resultado : 'error_ia';
+      reprocesoGlobal.contadores[key] = (reprocesoGlobal.contadores[key]||0) + 1;
+    }catch(e){ reprocesoGlobal.contadores.error_ia = (reprocesoGlobal.contadores.error_ia||0) + 1; }
+    reprocesoGlobal.procesados = i+1;
+    pintarReprocesoResultado();
   }
+  reprocesoGlobal.activo = false;
   await cargarPropuestasReportes();
-  cont.innerHTML = `
-    <div style="font-weight:800;font-size:15px;margin-bottom:10px;">${total} documentos reprocesados</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;">
-      <div class="econ-line" style="padding:8px 14px;background:var(--concrete);border-radius:8px;">✓ ${contadores.mejorado} mejorados</div>
-      <div class="econ-line" style="padding:8px 14px;background:var(--concrete);border-radius:8px;">📄 ${contadores.confirmado_sin_desglose} confirmados sin desglose (el original nunca lo tuvo)</div>
-      <div class="econ-line" style="padding:8px 14px;background:var(--concrete);border-radius:8px;">⚠ ${contadores.revision_manual} a revisión manual</div>
-      <div class="econ-line" style="padding:8px 14px;background:var(--concrete);border-radius:8px;">🚫 ${contadores.inaccesible} archivos inaccesibles</div>
-      <div class="econ-line" style="padding:8px 14px;background:var(--concrete);border-radius:8px;">— ${contadores.sin_cambios} sin cambios</div>
-    </div>
-    <button class="btn" style="margin-top:10px;" onclick="ejecutarReprocesadoMasivo()">Seguir con el resto</button>
-  `;
-  btn.disabled = false;
+  pintarReprocesoResultado();
+  mostrarToast('Reprocesado masivo terminado.');
 }
 async function cargarPropuestasReportes(){
   const cont = document.getElementById('reportes-ia-propuestas');
