@@ -2100,7 +2100,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.1</div>
+        <div class="sub">V2.2</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3417,6 +3417,14 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </div>
 
       <div class="panel" style="margin-top:16px;">
+        <div class="panel-head"><h3>📇 Conflictos de datos de cliente</h3><span class="count" id="conflictos-cliente-count">0</span></div>
+        <div class="panel-body" id="conflictos-cliente-lista">
+          <div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Cargando…</div>
+        </div>
+        <div class="two-col-note">Cuando un documento trae un dato de cliente distinto al que ya había guardado (ej. otra dirección), aparece aquí para que elijas cuál conservar — nunca se sobrescribe solo.</div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
         <div class="panel-head"><h3>💡 Propuestas de mejora del sistema</h3><span class="count" id="reportes-ia-count">0</span></div>
         <div class="panel-body" id="reportes-ia-propuestas">
           <div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Cargando…</div>
@@ -4482,6 +4490,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     }
     if(btn.dataset.view==='reportes'){
       cargarPropuestasReportes();
+      cargarConflictosCliente();
     }
   });
 });
@@ -9845,6 +9854,40 @@ async function aiRecordarSugerencia(origen, i){
   mostrarToast('Vale, te lo recuerdo en unos días');
 }
 
+const CAMPO_LABEL = {nif:'NIF/CIF', direccion:'Dirección', cp:'Código postal', poblacion:'Población', provincia:'Provincia', telefono:'Teléfono', email:'Email'};
+async function cargarConflictosCliente(){
+  const cont = document.getElementById('conflictos-cliente-lista');
+  const count = document.getElementById('conflictos-cliente-count');
+  if(!cont) return;
+  if(!sb){ cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Supabase no está conectado.</div>'; return; }
+  try{
+    const {data, error} = await sb.from('cliente_conflictos').select('*').eq('resuelto', false).order('created_at',{ascending:false});
+    if(error){ cont.innerHTML = '<div style="text-align:center;color:var(--red);font-size:13px;padding:16px 0;">Error: '+errText(error)+'</div>'; return; }
+    if(count) count.textContent = data.length;
+    cont.innerHTML = data.length ? data.map(c=>{
+      const nombreCliente = (typeof clientes!=='undefined' ? clientes.find(x=>x.id===c.entidad_id)?.name : null) || 'Cliente';
+      return `<div class="econ-line" style="flex-direction:column;align-items:stretch;gap:8px;padding:12px 0;">
+        <div><b>${nombreCliente}</b> — ${CAMPO_LABEL[c.campo]||c.campo}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="ai-btn" onclick="resolverConflictoCliente('${c.id}','actual')">Mantener: "${c.valor_actual}"</button>
+          <button class="ai-btn primary" onclick="resolverConflictoCliente('${c.id}','nuevo')">Usar: "${c.valor_nuevo}"</button>
+        </div>
+      </div>`;
+    }).join('') : '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Sin conflictos pendientes.</div>';
+  }catch(err){
+    cont.innerHTML = '<div style="text-align:center;color:var(--red);font-size:13px;padding:16px 0;">Error: '+err.message+'</div>';
+  }
+}
+async function resolverConflictoCliente(id, cual){
+  const {data: conf} = await sb.from('cliente_conflictos').select('*').eq('id', id).single();
+  if(!conf) return;
+  if(cual==='nuevo'){
+    await sb.from('entidades').update({[conf.campo]: conf.valor_nuevo}).eq('id', conf.entidad_id);
+  }
+  await sb.from('cliente_conflictos').update({resuelto:true}).eq('id', id);
+  mostrarToast('Resuelto');
+  cargarConflictosCliente();
+}
 const CALIDAD_LABEL = {validado:['✓ Validado','var(--green,#6FA37C)'], corregido_automatico:['🔧 Corregido automáticamente','var(--orange)'], revision_necesaria:['⚠ Revisión necesaria','#D8AA3D'], error:['❌ Error','var(--red,#C4685A)']};
 async function ejecutarVerificarCalidad(anio){
   const cont = document.getElementById('calidad-resultado');
