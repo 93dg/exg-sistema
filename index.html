@@ -2084,7 +2084,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.12</div>
+        <div class="sub">V2.13</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2197,7 +2197,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
-            <tr><th>Tipo</th><th>Nº</th><th>Cliente</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th></tr>
+            <tr><th>Tipo</th><th>Nº</th><th>Cliente</th><th>Fecha</th><th class="num">Importe</th><th>Calidad</th><th>Estado</th></tr>
             <tbody id="control-docs-tbody"></tbody>
           </table>
           <div style="padding:10px;text-align:center;display:none;" id="control-docs-cargar-mas-wrap">
@@ -2631,6 +2631,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <th>Estado</th>
               <th>Gestor</th>
               <th>Archivo</th>
+              <th>Calidad</th>
               <th style="width:30px;"></th>
             </tr>
             <tbody id="econ-facturas-tbody">
@@ -2699,6 +2700,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <th class="num ord" onclick="ordenarTabla('albaranes-tbody-standalone',5,'num')">Total ⇅</th>
               <th>Estado</th>
               <th>Archivo</th>
+              <th>Calidad</th>
               <th style="width:30px;"></th>
             </tr>
             <tbody id="albaranes-tbody-standalone"></tbody>
@@ -2766,6 +2768,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <th class="num ord" onclick="ordenarTabla('presupuestos-tbody-standalone',5,'num')">Total ⇅</th>
               <th>Estado</th>
               <th>Archivo</th>
+              <th>Calidad</th>
               <th style="width:30px;"></th>
             </tr>
             <tbody id="presupuestos-tbody-standalone"></tbody>
@@ -3018,7 +3021,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div class="panel-head"><h3>Presupuestos</h3></div>
           <div class="panel-body" style="padding:0;">
             <table class="tbl">
-              <tr><th>Nº</th><th>Cliente</th><th>Trabajo</th><th>Fecha</th><th class="num">Total</th><th>Estado</th></tr>
+              <tr><th>Fecha</th><th>Nº</th><th>Cliente</th><th>Trabajo</th><th class="num">Total</th><th>Estado</th><th>Archivo</th><th>Calidad</th></tr>
               <tbody id="econ-presupuestos-tbody">
               </tbody>
             </table>
@@ -9988,6 +9991,77 @@ async function resolverConflictoCliente(id, cual){
   cargarConflictosCliente();
 }
 const CALIDAD_LABEL = {validado:['✓ Validado','var(--green,#6FA37C)'], corregido_automatico:['🔧 Corregido automáticamente','var(--orange)'], revision_necesaria:['⚠ Revisión necesaria','#D8AA3D'], error:['❌ Error','var(--red,#C4685A)']};
+const CALIDAD_CODIGOS = {lineas:'Líneas', total:'Total', cliente:'Cliente', fecha:'Fecha', numero:'Nº', archivo:'Archivo', precio:'Precio'};
+const CALIDAD_DETALLE = {
+  lineas: {titulo:'Sin líneas de concepto', explicacion:'Este documento no tiene ninguna línea guardada. Cualquier factura, albarán o presupuesto debería tener al menos una — esto sí es un fallo real de digitalización.', corregible:true},
+  total: {titulo:'Importe/total no cuadra', explicacion:'O no tiene importe guardado, o la suma de sus líneas no coincide con el total. Es un conflicto matemático real, no una suposición.', corregible:true},
+  cliente: {titulo:'Sin cliente asociado', explicacion:'El documento no está vinculado a ningún cliente de la ficha.', corregible:false},
+  fecha: {titulo:'Sin fecha', explicacion:'No tiene fecha de devengo guardada.', corregible:false},
+  numero: {titulo:'Sin número de documento', explicacion:'Las facturas, presupuestos y proformas deberían llevar número — los albaranes no, por eso a ellos nunca se les pide.', corregible:false},
+  archivo: {titulo:'Sin archivo original enlazado', explicacion:'No hay ningún archivo vinculado, así que no se puede reprocesar automáticamente — solo revisar a mano.', corregible:false},
+  precio: {titulo:'Líneas con detalle incompleto', explicacion:'Algunas líneas de este documento sí tienen horas/cantidad y precio unitario, y otras no — dentro del mismo documento, lo que indica que el original sí las trae y a alguna línea no se le extrajo bien.', corregible:true},
+};
+function calidadCorta(doc){
+  const estado = doc.estado_calidad;
+  if(estado==='corregido_automatico') return {texto:'Corregido', color:'var(--orange)', codigos:[]};
+  if(!estado || estado==='validado') return {texto:'OK', color:'var(--green,#6FA37C)', codigos:[]};
+  const m = (doc.info_faltante||'').match(/\[control-calidad: ([^\]]+)\]/);
+  const codigos = m ? m[1].split(', ').map(s=>s.trim()).filter(Boolean) : [];
+  if(!codigos.length) return {texto:'OK', color:'var(--green,#6FA37C)', codigos:[]};
+  const color = estado==='error' ? 'var(--red,#C4685A)' : '#D8AA3D';
+  if(codigos.length===1) return {texto: (codigos[0]==='total'&&estado==='error') ? 'Error' : (CALIDAD_CODIGOS[codigos[0]]||codigos[0]), color, codigos};
+  return {texto: codigos.length+' fallos', color, codigos};
+}
+function calidadColumnaHtml(doc){
+  const c = calidadCorta(doc);
+  return `<span onclick="event.stopPropagation();abrirCalidadDetalle('${doc.id}')" style="cursor:pointer;font-weight:700;font-size:11.5px;color:${c.color};border:1px solid ${c.color};border-radius:10px;padding:1px 8px;white-space:nowrap;">${c.texto}</span>`;
+}
+function abrirCalidadDetalle(docId){
+  const doc = documentosRealesById[docId];
+  if(!doc) return;
+  const c = calidadCorta(doc);
+  const bloques = c.codigos.length ? c.codigos.map(cod=>{
+    const d = CALIDAD_DETALLE[cod] || {titulo:cod, explicacion:'', corregible:false};
+    return `<div class="ai-card-block"><div class="ai-card-label">${d.titulo}</div><div class="ai-card-text">${d.explicacion}</div></div>`;
+  }).join('') : `<div class="ai-card-block"><div class="ai-card-label">Sin problemas</div><div class="ai-card-text">Este documento está validado.</div></div>`;
+  const puedeReprocesar = doc.archivo_path && c.codigos.some(cod=>CALIDAD_DETALLE[cod]?.corregible);
+  mostrarModalGenerico('Calidad de este documento', `
+    <div style="margin-bottom:10px;font-size:13px;color:var(--ink-soft);">${doc.type==='factura'?'Factura':doc.type==='albaran'?'Albarán':'Presupuesto'} ${doc.num||doc.numero||''} — ${doc.client||'sin cliente'}</div>
+    ${bloques}
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+      ${puedeReprocesar ? `<button class="ai-btn primary" onclick="reprocesarUnDocumento('${docId}')">🔁 Reprocesar este documento</button>` : ''}
+      <button class="ai-btn" onclick="cerrarModalGenerico();openDocumentViewer('${docId}')">Ver documento completo</button>
+    </div>
+  `);
+}
+async function reprocesarUnDocumento(docId){
+  cerrarModalGenerico();
+  mostrarToast('Reprocesando…');
+  try{
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/reprocesar-documento', {
+      method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+SUPABASE_ANON_KEY },
+      body: JSON.stringify({ documento_id: docId }),
+    });
+    const data = await resp.json();
+    mostrarToast(data.resultado ? 'Resultado: '+data.resultado : 'Hecho.');
+    cargarDocumentosEconomicosReales?.();
+  }catch(e){ mostrarToast('Error: '+e.message); }
+}
+function mostrarModalGenerico(titulo, contenidoHtml){
+  let overlay = document.getElementById('modal-generico-overlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'modal-generico-overlay';
+    overlay.className = 'overlay';
+    overlay.onclick = (e)=>{ if(e.target===overlay) cerrarModalGenerico(); };
+    overlay.innerHTML = `<div class="drawer" style="max-width:460px;"><div class="drawer-head"><h2 id="modal-generico-titulo"></h2><button class="close-x" onclick="cerrarModalGenerico()">✕</button></div><div class="drawer-body" id="modal-generico-body"></div></div>`;
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('modal-generico-titulo').textContent = titulo;
+  document.getElementById('modal-generico-body').innerHTML = contenidoHtml;
+  overlay.classList.add('active');
+}
+function cerrarModalGenerico(){ document.getElementById('modal-generico-overlay')?.classList.remove('active'); }
 function calidadIcoHtml(doc){
   const cal = CALIDAD_LABEL[doc.estado_calidad];
   return (cal && doc.estado_calidad!=='validado') ? ` <span title="${cal[0]}" style="cursor:help;">${cal[0].split(' ')[0]}</span>` : '';
@@ -11013,7 +11087,8 @@ function renderControlDocs(){
   const visibles = filtrados.slice(0, controlDocsLimite);
   tbody.innerHTML = visibles.length ? visibles.map(d=>{
     return `<tr onclick="openDocumentViewer('${d.id}')" style="cursor:pointer;">
-      <td>${controlDocsTipoLabel[d.type]||d.type}${calidadIcoHtml(d)}</td><td class="mono">${d.numero||d.num||'—'}</td><td><span onclick="event.stopPropagation();openClientDrawer('${(d.client||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${d.client}</span></td><td class="mono">${formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td>
+      <td>${controlDocsTipoLabel[d.type]||d.type}</td><td class="mono">${d.numero||d.num||'—'}</td><td><span onclick="event.stopPropagation();openClientDrawer('${(d.client||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${d.client}</span></td><td class="mono">${formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td>
+      <td onclick="event.stopPropagation();">${calidadColumnaHtml(d)}</td>
       <td onclick="event.stopPropagation();">${controlDocsEstadoPill(d)}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="6" class="empty">Sin documentos con estos filtros</td></tr>';
@@ -11341,7 +11416,7 @@ async function cargarDocumentosEconomicosReales(){
         const ivaLabel = ivaNum2.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
         const cobradoNum = doc.cobrado_importe != null ? Number(doc.cobrado_importe) : 0;
         const cobradoLabel = cobradoNum.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}${calidadIcoHtml(doc)}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num">${baseLabel}</td><td class="num">${ivaLabel}</td><td class="num">${ivaPctDoc}%</td><td class="num">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoCobroSelect(doc.id, doc.estado_cobro)}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
+        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num">${baseLabel}</td><td class="num">${ivaLabel}</td><td class="num">${ivaPctDoc}%</td><td class="num">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoCobroSelect(doc.id, doc.estado_cobro)}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
         const clienteHtmlP = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '<span class="pill mantenimiento">Falta cliente</span>';
@@ -11349,12 +11424,12 @@ async function cargarDocumentosEconomicosReales(){
         const fechaCortaP = formatFechaCorta(doc.fecha_devengo);
         const archivoUrlRealP = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
         const archivoHtmlP = archivoUrlRealP ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${archivoUrlRealP}')">📎 Ver</a>` : '—';
-        const baseRowHtml = `<td class="mono">${fechaCortaP}</td><td class="mono">${doc.numero||'—'}${calidadIcoHtml(doc)}</td><td>${clienteHtmlP}</td><td class="mono">${trabajoHtmlP}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td><td>${archivoHtmlP}</td>`;
-        const row = document.createElement('tr'); row.id = 'docrow-'+doc.id; row.onclick = () => toggleExpandirDocFila(doc.id, 7); row.innerHTML = baseRowHtml;
+        const baseRowHtml = `<td class="mono">${fechaCortaP}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlP}</td><td class="mono">${trabajoHtmlP}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td><td>${archivoHtmlP}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td>`;
+        const row = document.createElement('tr'); row.id = 'docrow-'+doc.id; row.onclick = () => toggleExpandirDocFila(doc.id, 8); row.innerHTML = baseRowHtml;
         row.dataset.contabilidad = doc.contabilidad || 'oficial'; row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum;
         document.getElementById('econ-presupuestos-tbody')?.appendChild(row);
         const rowHtml = `<td onclick="event.stopPropagation();"><input type="checkbox" class="pres-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('pres-sel-chk','pres-borrar-sel-btn','pres-sel-count')"></td>` + baseRowHtml + `<td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
-        const row2 = document.createElement('tr'); row2.id = 'presrow-'+doc.id; row2.onclick = () => toggleExpandirDocFila(doc.id, 9); row2.innerHTML = rowHtml;
+        const row2 = document.createElement('tr'); row2.id = 'presrow-'+doc.id; row2.onclick = () => toggleExpandirDocFila(doc.id, 10); row2.innerHTML = rowHtml;
         row2.dataset.contabilidad = doc.contabilidad || 'oficial'; row2.dataset.fechaIso = doc.fecha_devengo || ''; row2.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row2.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row2.dataset.total = totalNum;
         document.getElementById('presupuestos-tbody-standalone')?.appendChild(row2);
       } else if(doc.tipo==='gasto'){
@@ -11375,9 +11450,9 @@ async function cargarDocumentosEconomicosReales(){
         const archivoHtmlA = archivoUrlRealA ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${archivoUrlRealA}')">📎 Ver</a>` : '—';
         const row = document.createElement('tr');
         row.id = 'albrow-'+doc.id;
-        row.onclick = () => toggleExpandirDocFila(doc.id, 9);
+        row.onclick = () => toggleExpandirDocFila(doc.id, 10);
         row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum;
-        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="alb-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('alb-sel-chk','alb-borrar-sel-btn','alb-sel-count')"></td><td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}${calidadIcoHtml(doc)}</td><td>${clienteHtmlA}</td><td class="mono">${trabajoHtmlA}</td><td class="num">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoAlbaranSelect(doc.id, doc.estado_albaran)}</td><td>${archivoHtmlA}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
+        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="alb-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('alb-sel-chk','alb-borrar-sel-btn','alb-sel-count')"></td><td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlA}</td><td class="mono">${trabajoHtmlA}</td><td class="num">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoAlbaranSelect(doc.id, doc.estado_albaran)}</td><td>${archivoHtmlA}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
         document.getElementById('albaranes-tbody-standalone')?.appendChild(row);
       }
     });
