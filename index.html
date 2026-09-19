@@ -2100,7 +2100,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.0</div>
+        <div class="sub">V2.1</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3572,17 +3572,23 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <div class="field"><div class="l">Tiempo medio de pago</div><div class="v" id="c-pago">—</div></div>
       </div>
       <div class="block">
-        <h4>Resumen</h4>
-        <div class="econ-line"><span>Facturado (año)</span><span class="v" id="c-fact">0,00 €</span></div>
+        <h4>Resumen económico</h4>
+        <div class="econ-line"><span>Total facturado — oficial</span><span class="v" id="c-total-oficial">0,00 €</span></div>
+        <div class="econ-line"><span>Total facturado — en B</span><span class="v" id="c-total-enb">0,00 €</span></div>
+        <div class="econ-line"><span><b>Total global</b></span><span class="v" id="c-total-global"><b>0,00 €</b></span></div>
         <div class="econ-line"><span>Pendiente de cobro</span><span class="v" id="c-pend" style="color:var(--orange);">0,00 €</span></div>
+      </div>
+      <div class="block">
+        <h4>Actividad por año</h4>
+        <table class="tbl" id="c-anios-tbl"><tr><th>Año</th><th>Documentos</th><th class="num">Facturado</th></tr></table>
       </div>
       <div class="block">
         <h4>Trabajos de este cliente</h4>
         <table class="tbl" id="c-jobs-tbl"><tr><th>Código</th><th>Fecha</th><th>Estado</th><th class="num">Precio</th></tr></table>
       </div>
       <div class="block">
-        <h4>Documentos reales (del histórico 2023-2026)</h4>
-        <table class="tbl" id="c-docs-tbl"><tr><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Archivo original</th></tr></table>
+        <h4>Todos los documentos</h4>
+        <table class="tbl" id="c-docs-tbl"><tr><th>Tipo</th><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th></tr></table>
         <div class="two-col-note">Aquí aparecerán los documentos reales que subas y vincules a este cliente.</div>
       </div>
     </div>
@@ -8204,17 +8210,40 @@ function openClientDrawer(name){
   document.getElementById('c-provincia').value = c.provincia || '';
   document.getElementById('c-contacto-status').textContent = '';
   clientDrawerAbiertoId = c.id;
-  const cDocs = Object.values(documentosRealesById).filter(d=>d.entidad_id === c.id && d.type!=='albaran');
-  const facturasEsteAnio = cDocs.filter(d=>d.type==='factura' && d.status!=='Borrador' && new Date().getFullYear()===Number((d.dateRaw||'').slice(0,4)));
-  const totalFacturado = facturasEsteAnio.reduce((s,d)=>s+(d.total||0),0);
-  const totalPendiente = cDocs.filter(d=>d.type==='factura' && d.status==='Pendiente').reduce((s,d)=>s+(d.total||0),0);
-  document.getElementById('c-fact').textContent = totalFacturado.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  document.getElementById('c-pend').textContent = totalPendiente.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  const cDocs = Object.values(documentosRealesById).filter(d=>d.entidad_id === c.id);
+
+  // totales por contabilidad, de todo el historial
+  const totalOficial = cDocs.filter(d=>(d.contabilidad||'oficial')==='oficial' && d.type!=='gasto').reduce((s,d)=>s+(d.total||d.importe||0),0);
+  const totalEnB = cDocs.filter(d=>d.contabilidad==='en_b' && d.type!=='gasto').reduce((s,d)=>s+(d.total||d.importe||0),0);
+  document.getElementById('c-total-oficial').textContent = euro(totalOficial);
+  document.getElementById('c-total-enb').textContent = euro(totalEnB);
+  document.getElementById('c-total-global').innerHTML = '<b>'+euro(totalOficial+totalEnB)+'</b>';
+
+  // pendiente de cobro real (facturas no cobradas)
+  const totalPendiente = cDocs.filter(d=>d.type==='factura' && d.estado_cobro && d.estado_cobro!=='cobrado').reduce((s,d)=>s+(d.total||d.importe||0),0);
+  document.getElementById('c-pend').textContent = euro(totalPendiente);
+
+  // actividad por a\u00f1o
+  const porAnio = {};
+  cDocs.forEach(d=>{
+    const a = d.dateRaw ? new Date(d.dateRaw).getFullYear() : 's/f';
+    porAnio[a] = porAnio[a] || {n:0, total:0};
+    porAnio[a].n++;
+    if(d.type!=='gasto') porAnio[a].total += (d.total||d.importe||0);
+  });
+  const aniosOrdenados = Object.entries(porAnio).sort((a,b)=> String(b[0]).localeCompare(String(a[0])));
+  document.getElementById('c-anios-tbl').innerHTML = '<tr><th>Año</th><th>Documentos</th><th class="num">Facturado</th></tr>' +
+    (aniosOrdenados.length ? aniosOrdenados.map(([a,v])=>`<tr><td class="mono">${a}</td><td>${v.n}</td><td class="num">${euro(v.total)}</td></tr>`).join('') : '<tr><td colspan="3" class="empty">Sin actividad todavía</td></tr>');
+
   const cJobs = jobs.filter(j=>j.client===name);
   document.getElementById('c-jobs-tbl').innerHTML = '<tr><th>Código</th><th>Fecha</th><th>Estado</th><th class="num">Precio</th></tr>' +
     (cJobs.length ? cJobs.map(j=>`<tr onclick="closeClientDrawer();openJobDrawer('${j.code}')"><td class="mono">${j.code}</td><td>${j.date}</td><td>${pill(j.state)}</td><td class="num">${j.price}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">Sin trabajos registrados</td></tr>');
-  document.getElementById('c-docs-tbl').innerHTML = '<tr><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Tipo</th></tr>' +
-    (cDocs.length ? cDocs.map(d=>`<tr onclick="closeClientDrawer();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td class="mono">${d.num||'—'}</td><td>${d.dateLabel}</td><td class="num">${d.amountLabel}</td><td>${DOC_TYPES[d.type] ? DOC_TYPES[d.type].title : d.type}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">Sin documentos todavía</td></tr>');
+
+  const tipoLabelDrawer = {factura:'🧾 Factura', albaran:'📋 Albarán', presupuesto:'📄 Presupuesto', proforma:'📄 Proforma', gasto:'💸 Gasto'};
+  const docsOrdenados = cDocs.slice().sort((a,b)=> new Date(b.dateRaw||0) - new Date(a.dateRaw||0));
+  document.getElementById('c-docs-tbl').innerHTML = '<tr><th>Tipo</th><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th></tr>' +
+    (docsOrdenados.length ? docsOrdenados.map(d=>`<tr onclick="closeClientDrawer();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td>${tipoLabelDrawer[d.type]||d.type}</td><td class="mono">${d.num||d.numero||'—'}</td><td>${d.dateLabel||formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td><td>${d.status||'—'}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">Sin documentos todavía</td></tr>');
   document.getElementById('client-overlay').classList.add('active');
 }
 function closeClientDrawer(){ document.getElementById('client-overlay').classList.remove('active'); }
@@ -10053,6 +10082,39 @@ async function aiCalcularSugerenciasSistema(){
     }
   }catch(e){}
 
+  // 5) fichas de cliente incompletas — NIF, dirección, CP, población
+  try{
+    const {data: ents} = await sb.from('entidades').select('id,nombre,nif,direccion,cp,poblacion,telefono,email');
+    if(ents && ents.length){
+      const incompletos = ents.filter(e=>!e.nif || !e.direccion || !e.cp || !e.poblacion);
+      if(incompletos.length>=3){
+        sug.push({icono:'📇', titulo:`${incompletos.length} de ${ents.length} clientes con la ficha incompleta`,
+          detectado:`${incompletos.length} clientes no tienen NIF, dirección, código postal o población guardados.`,
+          razon:'Esos datos suelen aparecer en las propias facturas y albaranes originales, pero no siempre se extrajeron al digitalizar.',
+          impacto:'Bajo/medio — no afecta a las cuentas, pero limita usar la ficha de cliente para gestiones (contratos, envíos, gestoría).',
+          accion:'Al revisar documentos antiguos o crear nuevos, aprovechar para completar la ficha del cliente si el original trae esos datos.', tipo_ui:'navegacion', vista_destino:'clientes'});
+      }
+    }
+  }catch(e){}
+
+  // 6) l\u00edneas de albar\u00e1n sin horas/precio unitario (solo texto e importe)
+  try{
+    const {data: albs} = await sb.from('documentos_economicos').select('id,fecha_devengo,conceptos').eq('tipo','albaran');
+    if(albs){
+      const conLineasIncompletas = albs.filter(d=>{
+        if(!d.conceptos || !d.conceptos.length) return false;
+        return d.conceptos.some(c=> c.horas===undefined && c.precio_unitario===undefined);
+      });
+      if(conLineasIncompletas.length>=3){
+        sug.push({icono:'📏', titulo:`${conLineasIncompletas.length} albaranes con líneas sin horas ni precio unitario`,
+          detectado:`Esos albaranes solo tienen descripción e importe por línea, sin desglosar horas y precio/hora como sí ocurre en la mayoría.`,
+          razon:'La mayoría de albaranes digitalizados sí guardan horas y precio unitario por línea — estos se quedaron con menos detalle.',
+          impacto:'Bajo — el importe total es correcto, pero se pierde el desglose para analizar tarifas por máquina/hora.',
+          accion:'Revisar el archivo original de cada uno y completar horas y precio unitario si aparecen ahí.', tipo_ui:'dato'});
+      }
+    }
+  }catch(e){}
+
   // aplicar clave estable + filtrar por estado guardado (resuelta/descartada/recordar)
   sug.forEach(s=>{ s.clave = aiSlug(s.titulo); });
   try{
@@ -10686,7 +10748,7 @@ function renderControlDocs(){
     const cal = CALIDAD_LABEL[d.estado_calidad];
     const calidadIco = (cal && d.estado_calidad!=='validado') ? `<span title="${cal[0]}" style="margin-left:4px;">${cal[0].split(' ')[0]}</span>` : '';
     return `<tr onclick="openDocumentViewer('${d.id}')" style="cursor:pointer;">
-      <td>${controlDocsTipoLabel[d.type]||d.type}${calidadIco}</td><td class="mono">${d.numero||d.num||'—'}</td><td>${d.client}</td><td class="mono">${formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td>
+      <td>${controlDocsTipoLabel[d.type]||d.type}${calidadIco}</td><td class="mono">${d.numero||d.num||'—'}</td><td><span onclick="event.stopPropagation();openClientDrawer('${(d.client||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${d.client}</span></td><td class="mono">${formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td>
       <td onclick="event.stopPropagation();">${controlDocsEstadoPill(d)}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="6" class="empty">Sin documentos con estos filtros</td></tr>';
