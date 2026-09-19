@@ -2100,7 +2100,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.2</div>
+        <div class="sub">V2.3</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3572,6 +3572,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         </div>
         <button class="btn primary" style="margin-top:10px;" onclick="guardarContactoCliente()">Guardar datos de contacto</button>
         <div class="sub-t" id="c-contacto-status" style="margin-top:6px;"></div>
+        <div class="two-col-note" style="margin-top:8px;">¿Has comprobado que algún dato no aparece en ninguno de sus documentos? <span onclick="marcarCampoNoDisponible()" style="color:var(--orange);cursor:pointer;text-decoration:underline;">Marcar campo como no disponible en origen</span></div>
       </div>
       <div class="field-grid" style="margin-bottom:20px;">
         <div class="field"><div class="l">Zona</div><div class="v" id="c-zone">Zona Norte</div></div>
@@ -8256,6 +8257,20 @@ function openClientDrawer(name){
   document.getElementById('client-overlay').classList.add('active');
 }
 function closeClientDrawer(){ document.getElementById('client-overlay').classList.remove('active'); }
+async function marcarCampoNoDisponible(){
+  if(!clientDrawerAbiertoId){ mostrarToast('Abre primero la ficha de un cliente guardado.'); return; }
+  const opciones = ['NIF/CIF','Dirección','Código postal','Población','Provincia','Teléfono','Email'];
+  const campoMap = {'NIF/CIF':'nif','Dirección':'direccion','Código postal':'cp','Población':'poblacion','Provincia':'provincia','Teléfono':'telefono','Email':'email'};
+  const elegido = await elegirDeLista('¿Qué dato no aparece en ninguno de sus documentos?', opciones);
+  if(!elegido || !sb) return;
+  const campo = campoMap[elegido];
+  const {data: ent} = await sb.from('entidades').select('datos_no_disponibles').eq('id', clientDrawerAbiertoId).single();
+  const actual = ent?.datos_no_disponibles || [];
+  if(!actual.includes(campo)){
+    await sb.from('entidades').update({datos_no_disponibles:[...actual, campo]}).eq('id', clientDrawerAbiertoId);
+  }
+  mostrarToast('Marcado — ya no saldrá como pendiente por ese dato.');
+}
 
 /* Expedientes (reales, en Supabase) */
 const expedientesById = {};
@@ -10125,17 +10140,21 @@ async function aiCalcularSugerenciasSistema(){
     }
   }catch(e){}
 
-  // 5) fichas de cliente incompletas — NIF, dirección, CP, población
+  // 5) fichas de cliente incompletas — NIF, dirección, CP, población (descontando lo confirmado como "no disponible en origen")
   try{
-    const {data: ents} = await sb.from('entidades').select('id,nombre,nif,direccion,cp,poblacion,telefono,email');
+    const {data: ents} = await sb.from('entidades').select('id,nombre,nif,direccion,cp,poblacion,telefono,email,datos_no_disponibles');
     if(ents && ents.length){
-      const incompletos = ents.filter(e=>!e.nif || !e.direccion || !e.cp || !e.poblacion);
+      const camposClave = ['nif','direccion','cp','poblacion'];
+      const incompletos = ents.filter(e=>{
+        const na = e.datos_no_disponibles || [];
+        return camposClave.some(c => !e[c] && !na.includes(c));
+      });
       if(incompletos.length>=3){
-        sug.push({icono:'📇', titulo:`${incompletos.length} de ${ents.length} clientes con la ficha incompleta`,
-          detectado:`${incompletos.length} clientes no tienen NIF, dirección, código postal o población guardados.`,
-          razon:'Esos datos suelen aparecer en las propias facturas y albaranes originales, pero no siempre se extrajeron al digitalizar.',
+        sug.push({icono:'📇', titulo:`${incompletos.length} de ${ents.length} clientes con la ficha por completar`,
+          detectado:`${incompletos.length} clientes no tienen NIF, dirección, código postal o población guardados, y no están marcados como "no disponible en origen".`,
+          razon:'No todos los documentos originales traen estos datos — solo cuenta como fallo cuando el dato SÍ aparece en el original y no se guardó. Al revisar un cliente, márcalo como "no disponible" si compruebas que ningún documento lo trae, para que deje de salir aquí.',
           impacto:'Bajo/medio — no afecta a las cuentas, pero limita usar la ficha de cliente para gestiones (contratos, envíos, gestoría).',
-          accion:'Al revisar documentos antiguos o crear nuevos, aprovechar para completar la ficha del cliente si el original trae esos datos.', tipo_ui:'navegacion', vista_destino:'clientes'});
+          accion:'Abrir la ficha de cada cliente: si el dato aparece en algún documento suyo, añadirlo; si no aparece en ninguno, marcarlo como no disponible.', tipo_ui:'navegacion', vista_destino:'clientes'});
       }
     }
   }catch(e){}
