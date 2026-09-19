@@ -2101,7 +2101,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.6</div>
+        <div class="sub">V2.7</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4898,6 +4898,13 @@ function formatFechaCorta(dateRaw){
   const aa = String(d.getFullYear()).slice(-2);
   return `${dd}/${mm}/${aa}`;
 }
+const MESES_ABREV = ['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'];
+function formatFechaLabel(dateRaw){
+  if(!dateRaw) return 'sin fecha';
+  const d = new Date(dateRaw);
+  if(isNaN(d)) return 'sin fecha';
+  return d.getDate()+' '+MESES_ABREV[d.getMonth()];
+}
 function toggleExpandirDocFila(id, colspan){
   const filaExistente = document.getElementById('docrow-detalle-'+id);
   if(filaExistente){ filaExistente.remove(); return; }
@@ -5180,7 +5187,7 @@ async function cargarAveriasReales(){
     data.forEach(a=>{
       const maquina = fleet.find(f=>f.id===a.flota_id);
       const d = new Date(a.created_at);
-      const fechaLabel = d.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][d.getMonth()];
+      const fechaLabel = formatFechaLabel(d);
       let downtimeLabel = '—';
       if(a.resuelta_at){
         const horas = Math.round((new Date(a.resuelta_at) - d) / 3600000);
@@ -5243,7 +5250,7 @@ async function abrirAveriaMaquina(){
 
   const d = new Date(data.created_at);
   averiasById[data.id] = {...data, machineName: maquina.name, codigoCorto: 'B-'+data.id.slice(0,4),
-    fechaLabel: d.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][d.getMonth()], downtimeLabel:'en curso'};
+    fechaLabel: formatFechaLabel(d), downtimeLabel:'en curso'};
 
   const afectados = jobs.filter(j => (j.machines||[]).includes(maquina.name) && ['planificado','porconfirmar','confirmado','encurso'].includes(j.state));
   if(afectados.length){
@@ -8604,7 +8611,7 @@ function submitNewJob(ev){
     dateTentative = document.getElementById('nj-date-tentative').checked;
     if(scheduledDate){
       const d = new Date(scheduledDate);
-      const label = d.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][d.getMonth()];
+      const label = formatFechaLabel(d);
       dateLabel = dateTentative ? label+' (orientativa)' : label;
     } else {
       dateLabel = 'fecha por confirmar';
@@ -10396,7 +10403,7 @@ async function guardarGasto(){
     const {data, error} = await sb.from('documentos_economicos').insert(payload).select().single();
     if(error){ statusEl.textContent = 'Error al guardar: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
     const dRaw = new Date(fecha);
-    const dateLabel = isNaN(dRaw) ? fecha : dRaw.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][dRaw.getMonth()];
+    const dateLabel = isNaN(dRaw) ? fecha : formatFechaLabel(dRaw);
     documentosRealesById[data.id] = {...payload, id:data.id, type:'gasto', client: proveedorNombre||'—', dateRaw:fecha, dateLabel, amountLabel: importe.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', total: importe, status:'Pagado', num:'—'};
     const row = document.createElement('tr');
     row.dataset.contabilidad = contabilidad;
@@ -10711,7 +10718,7 @@ async function submitNewInvoice(ev, isDraft){
   const dateRaw = document.getElementById('ni-date').value;
   const {base, iva, total} = recalcTotals();
   const d = new Date(dateRaw);
-  const dateLabel = isNaN(d) ? (dateRaw||'sin fecha') : d.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][d.getMonth()];
+  const dateLabel = isNaN(d) ? (dateRaw||'sin fecha') : formatFechaLabel(d);
   const amountLabel = total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   const items = Array.from(document.querySelectorAll('#ie-items-body tr')).map(tr=>({
     fecha: tr.querySelector('.ie-linea-fecha')?.value || '',
@@ -11188,7 +11195,7 @@ async function cargarDocumentosEconomicosReales(){
       const trabajo = jobs.find(j=>j.id===doc.trabajo_id);
       const items = (doc.conceptos||[]).map(c=>({qty:c.cantidad, concept:c.descripcion, price:c.precio_unitario, machine:c.maquina, fecha:c.fecha}));
       const dRaw = doc.fecha_devengo ? new Date(doc.fecha_devengo) : null;
-      const dateLabel = (dRaw && !isNaN(dRaw)) ? dRaw.getDate()+' '+['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'][dRaw.getMonth()] : 'sin fecha';
+      const dateLabel = formatFechaLabel(dRaw);
       const amountLabel = Number(doc.importe||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
       const totalNum = Number(doc.importe||0);
       const baseNum = totalNum / 1.21;
