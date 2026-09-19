@@ -2093,7 +2093,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.93</div>
+        <div class="sub">V1.94</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2803,10 +2803,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div class="chip-filter" data-cont="oficial">Oficial</div>
           <div class="chip-filter" data-cont="en_b">En B</div>
         </div>
+        <div class="filters" style="margin-top:0;">
+          <div class="chip-filter" data-just="pendiente">⚠ Pendiente de justificante</div>
+        </div>
         <div class="panel">
           <div class="panel-body" style="padding:0;">
             <table class="tbl">
-              <tr><th>Fecha</th><th>Concepto</th><th>Proveedor</th><th>Contabilidad</th><th>Recurrencia</th><th class="num">Importe</th></tr>
+              <tr><th>Fecha</th><th>Concepto</th><th>Proveedor</th><th>Categoría</th><th>Contabilidad</th><th>Recurrencia</th><th class="num">Importe</th><th>Justificante</th></tr>
               <tbody id="gpro-lista-tbody"></tbody>
             </table>
           </div>
@@ -3901,6 +3904,33 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <div class="field" style="flex:1;"><div class="l">Importe (€)</div><input class="search-box" style="width:100%;" id="gasto-importe" type="number" step="0.01"></div>
         <div class="field" style="flex:1;"><div class="l">Fecha</div><input class="search-box" style="width:100%;" id="gasto-fecha" type="date"></div>
       </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Categoría</div>
+        <select class="search-box" style="width:100%;" id="gasto-categoria">
+          <option value="">— Sin especificar —</option>
+          <option>Combustible</option><option>Reparaciones y averías</option><option>Repuestos</option><option>Neumáticos</option>
+          <option>Aceites y lubricantes</option><option>Herramientas</option><option>Alquiler de maquinaria</option><option>Transporte</option>
+          <option>Materiales</option><option>Subcontratas</option><option>Personal</option><option>Seguridad Social</option>
+          <option>Dietas</option><option>Comidas</option><option>Alojamientos</option><option>Peajes y parking</option>
+          <option>Seguros</option><option>Impuestos y tasas</option><option>Gestoría/profesionales</option><option>Telefonía/internet</option>
+          <option>Software/suscripciones</option><option>Oficina</option><option>Suministros</option><option>Comisiones bancarias</option>
+          <option>Financiación</option><option>Otros</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div class="field" style="flex:1;"><div class="l">Forma de pago</div>
+          <select class="search-box" style="width:100%;" id="gasto-forma-pago">
+            <option value="">— Sin especificar —</option>
+            <option>Tarjeta</option><option>Transferencia</option><option>Efectivo</option><option>Domiciliado</option>
+          </select>
+        </div>
+        <div class="field" style="flex:1;"><div class="l">Cuenta / origen</div>
+          <input class="search-box" style="width:100%;" id="gasto-cuenta-origen" placeholder="Ej. Caja Rural, efectivo Manolo...">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Justificante (ticket, factura o foto)</div>
+        <input type="file" id="gasto-justificante" accept="image/*,.pdf" capture="environment" style="width:100%;">
+        <div id="gasto-justificante-nombre" class="sub-t" style="margin-top:4px;"></div>
+      </div>
       <div class="field" style="margin-bottom:12px;"><div class="l">Contabilidad</div>
         <select class="search-box" style="width:100%;" id="gasto-contabilidad">
           <option value="oficial">Oficial (declarado a Hacienda)</option>
@@ -4582,16 +4612,19 @@ function renderGastosProResumen(){
 }
 function renderGastosProLista(){
   const buscar = (document.getElementById('gpro-lista-buscar')?.value||'').toLowerCase();
-  const cont = document.querySelector('#gpro-lista .chip-filter.active')?.dataset.cont || '';
+  const cont = document.querySelector('#gpro-lista .chip-filter[data-cont].active')?.dataset.cont || '';
+  const soloPendientes = document.querySelector('#gpro-lista .chip-filter[data-just]')?.classList.contains('active');
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   let docs = gastosProDocs().sort((a,b)=> new Date(b.dateRaw||0) - new Date(a.dateRaw||0));
   if(cont) docs = docs.filter(d=>(d.contabilidad||'oficial')===cont);
+  if(soloPendientes) docs = docs.filter(d=>(d.estado_justificante||'pendiente')!=='completo');
   if(buscar) docs = docs.filter(d=>(d.concepto||'').toLowerCase().includes(buscar) || (clientes.find(c=>c.id===d.entidad_id)?.name||'').toLowerCase().includes(buscar));
   document.getElementById('gpro-lista-tbody').innerHTML = docs.length ? docs.map(d=>{
     const nombre = clientes.find(c=>c.id===d.entidad_id)?.name || '—';
     const contPill = (d.contabilidad||'oficial')==='en_b' ? '<span class="pill mantenimiento">En B</span>' : '<span class="pill adjudicado">Oficial</span>';
-    return `<tr><td class="mono">${formatFechaCorta ? formatFechaCorta(d.dateRaw) : (d.dateLabel||'—')}</td><td>${d.concepto||'—'}</td><td>${nombre}</td><td>${contPill}</td><td>${d.recurrencia?`<span class="pill mantenimiento">${d.recurrencia}</span>`:'—'}</td><td class="num">${euro(d.importe||d.total)}</td></tr>`;
-  }).join('') : '<tr><td colspan="6" class="empty">Todavía no hay gastos registrados. Usa "+ Registrar gasto" desde Economía para empezar.</td></tr>';
+    const justPill = d.estado_justificante==='completo' ? '<span class="pill adjudicado">✓ Justificado</span>' : '<span class="pill noadjudicado">Pendiente</span>';
+    return `<tr><td class="mono">${formatFechaCorta ? formatFechaCorta(d.dateRaw) : (d.dateLabel||'—')}</td><td>${d.concepto||'—'}</td><td>${nombre}</td><td>${d.categoria||'—'}</td><td>${contPill}</td><td>${d.recurrencia?`<span class="pill mantenimiento">${d.recurrencia}</span>`:'—'}</td><td class="num">${euro(d.importe||d.total)}</td><td>${justPill}</td></tr>`;
+  }).join('') : '<tr><td colspan="8" class="empty">Todavía no hay gastos registrados. Usa "+ Registrar gasto" desde Economía para empezar.</td></tr>';
 }
 function renderGastosProRecurrentes(){
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
@@ -9784,9 +9817,18 @@ function abrirRegistrarGasto(){
   document.getElementById('gasto-status').textContent = '';
   document.getElementById('gasto-contabilidad').value = 'oficial';
   document.getElementById('gasto-recurrencia').value = '';
+  document.getElementById('gasto-categoria').value = '';
+  document.getElementById('gasto-forma-pago').value = '';
+  document.getElementById('gasto-cuenta-origen').value = '';
+  document.getElementById('gasto-justificante').value = '';
+  document.getElementById('gasto-justificante-nombre').textContent = '';
   document.getElementById('gasto-proveedores-list').innerHTML = clientes.map(c=>`<option value="${c.name}">`).join('');
   document.getElementById('gasto-overlay').classList.add('active');
 }
+document.getElementById('gasto-justificante')?.addEventListener('change', function(){
+  const nombreEl = document.getElementById('gasto-justificante-nombre');
+  nombreEl.textContent = this.files[0] ? '📎 '+this.files[0].name : '';
+});
 function cerrarRegistrarGasto(){ document.getElementById('gasto-overlay').classList.remove('active'); }
 
 async function guardarGasto(){
@@ -9797,14 +9839,31 @@ async function guardarGasto(){
   const proveedorNombre = document.getElementById('gasto-proveedor').value.trim();
   const contabilidad = document.getElementById('gasto-contabilidad').value;
   const recurrencia = document.getElementById('gasto-recurrencia').value || null;
+  const categoria = document.getElementById('gasto-categoria').value || null;
+  const forma_pago = document.getElementById('gasto-forma-pago').value || null;
+  const cuenta_origen = document.getElementById('gasto-cuenta-origen').value.trim() || null;
+  const archivoJustificante = document.getElementById('gasto-justificante').files[0] || null;
   if(!concepto){ statusEl.textContent = 'Falta el concepto.'; statusEl.style.color = 'var(--red)'; return; }
   if(!importe || importe<=0){ statusEl.textContent = 'Pon un importe válido.'; statusEl.style.color = 'var(--red)'; return; }
   if(!sb){ statusEl.textContent = 'Supabase no está conectado.'; statusEl.style.color = 'var(--red)'; return; }
   const entidad = proveedorNombre ? clientes.find(c=>c.name===proveedorNombre) : null;
+
+  let justificante_url = null;
+  if(archivoJustificante){
+    statusEl.textContent = 'Subiendo justificante…'; statusEl.style.color = 'var(--ink-soft)';
+    try{
+      const path = `gastos/${Date.now()}_${archivoJustificante.name}`;
+      const {error: upErr} = await sb.storage.from(DOC_BUCKET).upload(path, archivoJustificante, {upsert:true});
+      if(!upErr) justificante_url = sb.storage.from(DOC_BUCKET).getPublicUrl(path).data.publicUrl;
+    }catch(e){}
+  }
+  const estado_justificante = justificante_url ? 'completo' : 'pendiente';
+
   const payload = {
     tipo: 'gasto', estado: 'emitido', concepto,
     fecha_devengo: fecha || null,
     entidad_id: entidad ? entidad.id : null, importe, contabilidad, recurrencia,
+    categoria, forma_pago, cuenta_origen, justificante_url, estado_justificante,
   };
   try{
     const {data, error} = await sb.from('documentos_economicos').insert(payload).select().single();
@@ -9815,10 +9874,11 @@ async function guardarGasto(){
     const row = document.createElement('tr');
     row.dataset.contabilidad = contabilidad;
     row.dataset.recurrencia = recurrencia || '';
-    row.innerHTML = `<td>${dateLabel}</td><td>${concepto}</td><td>${proveedorNombre||'—'}</td><td>${recurrencia ? `<span class="pill planificado">${recurrencia}</span>` : '—'}</td><td class="num">${importe.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>`;
+    row.innerHTML = `<td>${dateLabel}</td><td>${concepto}</td><td>${proveedorNombre||'—'}</td><td>${categoria||'—'}</td><td>${recurrencia ? `<span class="pill planificado">${recurrencia}</span>` : '—'}</td><td class="num">${importe.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td><td>${estado_justificante==='pendiente'?'<span class="pill noadjudicado">Pendiente justificante</span>':'<span class="pill adjudicado">✓ Justificado</span>'}</td>`;
     document.getElementById('econ-gastos-tbody')?.prepend(row);
-    document.getElementById('gastos-tbody-standalone')?.insertAdjacentHTML('afterbegin', `<tr>${row.innerHTML}</tr>`);
-    aiRegistrarEvento('gasto_creado', 'gastos', {contabilidad, recurrencia});
+    if(typeof renderGastosPro==='function') renderGastosPro();
+    aiRegistrarEvento('gasto_creado', 'gastos', {contabilidad, recurrencia, categoria, estado_justificante});
+    if(estado_justificante==='pendiente') mostrarToast('Gasto guardado — pendiente de justificante', 'ok');
     cerrarRegistrarGasto();
   }catch(err){ statusEl.textContent = 'Error de red: '+errText(err); statusEl.style.color = 'var(--red)'; }
 }
@@ -10640,14 +10700,11 @@ async function cargarDocumentosEconomicosReales(){
         const row = document.createElement('tr');
         row.dataset.contabilidad = doc.contabilidad || 'oficial';
         row.dataset.recurrencia = doc.recurrencia || '';
+        row.dataset.justificante = doc.estado_justificante || 'pendiente';
         const recurrenciaHtml = doc.recurrencia ? `<span class="pill planificado">${doc.recurrencia}</span>` : '—';
-        row.innerHTML = `<td>${dateLabel}</td><td>${doc.concepto||'—'}</td><td>${entidad?entidad.name:'—'}</td><td>${recurrenciaHtml}</td><td class="num">${amountLabel}</td>`;
+        const justHtml = doc.estado_justificante==='completo' ? '<span class="pill adjudicado">✓ Justificado</span>' : '<span class="pill noadjudicado">Pendiente justificante</span>';
+        row.innerHTML = `<td>${dateLabel}</td><td>${doc.concepto||'—'}</td><td>${entidad?entidad.name:'—'}</td><td>${doc.categoria||'—'}</td><td>${recurrenciaHtml}</td><td class="num">${amountLabel}</td><td>${justHtml}</td>`;
         document.getElementById('econ-gastos-tbody')?.appendChild(row);
-        const row2 = document.createElement('tr');
-        row2.dataset.contabilidad = doc.contabilidad || 'oficial';
-        row2.dataset.recurrencia = doc.recurrencia || '';
-        row2.innerHTML = row.innerHTML;
-        document.getElementById('gastos-tbody-standalone')?.appendChild(row2);
       } else if(doc.tipo==='albaran'){
         const clienteHtmlA = entidad ? entidad.name : '<span class="pill mantenimiento">Falta cliente</span>';
         const trabajoHtmlA = trabajo ? trabajo.code : '—';
