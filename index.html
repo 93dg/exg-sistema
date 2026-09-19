@@ -2100,7 +2100,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.97</div>
+        <div class="sub">V1.98</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9988,6 +9988,25 @@ async function aiCalcularSugerenciasSistema(){
         detectado:'Todavía hay poco historial de navegación y acciones registradas.',
         razon:'El sistema necesita un mínimo de actividad para detectar patrones fiables.', impacto:'Ninguno todavía.',
         accion:'Sigue usando la app con normalidad — esto se irá llenando solo.', tipo_ui:'dato'});
+    }
+  }catch(e){}
+
+  // 4) documentos digitalizados sin l\u00edneas de concepto — probable fallo de digitalizaci\u00f3n, no que no las tenga
+  try{
+    const {data: vacios} = await sb.from('documentos_economicos')
+      .select('id,numero,tipo,fecha_devengo,archivo_path')
+      .in('tipo', ['factura','albaran','presupuesto'])
+      .not('archivo_path','is',null)
+      .eq('conceptos','[]');
+    if(vacios && vacios.length>=1){
+      const porAnio = {};
+      vacios.forEach(d=>{ const a = d.fecha_devengo ? new Date(d.fecha_devengo).getFullYear() : 's/f'; (porAnio[a]=porAnio[a]||[]).push(d); });
+      const resumenAnios = Object.entries(porAnio).map(([a,ds])=>`${a} (${ds.length})`).join(', ');
+      sug.push({icono:'📎', titulo:`${vacios.length} documento${vacios.length>1?'s':''} digitalizado${vacios.length>1?'s':''} sin líneas de concepto guardadas`,
+        detectado:`${vacios.length} facturas/albaranes/presupuestos tienen un archivo original enlazado pero ningún concepto guardado. Por año: ${resumenAnios}.`,
+        razon:'Casi siempre significa que el documento original no se llegó a leer del todo durante la digitalización, no que de verdad no tenga líneas — se ha comprobado con un caso real (factura 35 del Excmo. Ayuntamiento, 2006) que sí tenía 6 líneas en el archivo original.',
+        impacto:'Medio — esos documentos están incompletos para consulta, aunque el importe total sí es correcto.',
+        accion:'Revisar cada uno contra su archivo original (botón "Ver") y añadir las líneas que falten. Al digitalizar años nuevos, comprobar que ningún documento se quede con conceptos vacíos antes de darlo por terminado.', tipo_ui:'dato'});
     }
   }catch(e){}
 
