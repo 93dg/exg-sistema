@@ -2101,7 +2101,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.4</div>
+        <div class="sub">V2.5</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5418,7 +5418,7 @@ function renderJobs(filter){
     const benefCell = benef==='Empresa' ? '<span class="tag">Empresa</span>' : `<span class="tag" style="border-color:var(--orange);color:var(--orange);font-weight:700;">${benef}</span>`;
     return `
     <tr onclick="openJobDrawer('${j.code}')">
-      <td class="mono">${j.code}</td><td>${j.client}</td><td><span class="zone-badge">${j.type}</span></td>
+      <td class="mono">${j.code}</td><td><span onclick="event.stopPropagation();openClientDrawer('${(j.client||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${j.client}</span></td><td><span class="zone-badge">${j.type}</span></td>
       <td>${j.zone}</td><td>${j.machine}</td><td>${j.worker || '<span class="tag">Sin asignar</span>'}</td><td>${benefCell}</td><td class="${j.dateTentative?'date-tentative':''}">${j.date}</td><td>${pill(j.state)}</td><td>${nextCell}</td><td class="num">${j.price}</td>
     </tr>`;
   }).join('');
@@ -9936,6 +9936,10 @@ async function resolverConflictoCliente(id, cual){
   cargarConflictosCliente();
 }
 const CALIDAD_LABEL = {validado:['✓ Validado','var(--green,#6FA37C)'], corregido_automatico:['🔧 Corregido automáticamente','var(--orange)'], revision_necesaria:['⚠ Revisión necesaria','#D8AA3D'], error:['❌ Error','var(--red,#C4685A)']};
+function calidadIcoHtml(doc){
+  const cal = CALIDAD_LABEL[doc.estado_calidad];
+  return (cal && doc.estado_calidad!=='validado') ? ` <span title="${cal[0]}" style="cursor:help;">${cal[0].split(' ')[0]}</span>` : '';
+}
 async function ejecutarVerificarCalidad(anio){
   const cont = document.getElementById('calidad-resultado');
   if(!sb){ cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Supabase no está conectado.</div>'; return; }
@@ -10886,10 +10890,8 @@ function renderControlDocs(){
   document.getElementById('control-docs-count').textContent = filtrados.length;
   const visibles = filtrados.slice(0, controlDocsLimite);
   tbody.innerHTML = visibles.length ? visibles.map(d=>{
-    const cal = CALIDAD_LABEL[d.estado_calidad];
-    const calidadIco = (cal && d.estado_calidad!=='validado') ? `<span title="${cal[0]}" style="margin-left:4px;">${cal[0].split(' ')[0]}</span>` : '';
     return `<tr onclick="openDocumentViewer('${d.id}')" style="cursor:pointer;">
-      <td>${controlDocsTipoLabel[d.type]||d.type}${calidadIco}</td><td class="mono">${d.numero||d.num||'—'}</td><td><span onclick="event.stopPropagation();openClientDrawer('${(d.client||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${d.client}</span></td><td class="mono">${formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td>
+      <td>${controlDocsTipoLabel[d.type]||d.type}${calidadIcoHtml(d)}</td><td class="mono">${d.numero||d.num||'—'}</td><td><span onclick="event.stopPropagation();openClientDrawer('${(d.client||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${d.client}</span></td><td class="mono">${formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td>
       <td onclick="event.stopPropagation();">${controlDocsEstadoPill(d)}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="6" class="empty">Sin documentos con estos filtros</td></tr>';
@@ -11206,7 +11208,7 @@ async function cargarDocumentosEconomicosReales(){
         row.dataset.contabilidad = doc.contabilidad || 'oficial';
         const gestorPill = gestorPillHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha);
         const archivoUrlReal = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
-        const clienteHtml = entidad ? entidad.name : '<span class="pill mantenimiento">Falta cliente</span>';
+        const clienteHtml = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '<span class="pill mantenimiento">Falta cliente</span>';
         const trabajoHtml = trabajo ? trabajo.code : '—';
         const fechaCorta = formatFechaCorta(doc.fecha_devengo);
         const archivoHtml = archivoUrlReal ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${archivoUrlReal}')">📎 Ver</a>` : '—';
@@ -11217,15 +11219,15 @@ async function cargarDocumentosEconomicosReales(){
         const ivaLabel = ivaNum2.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
         const cobradoNum = doc.cobrado_importe != null ? Number(doc.cobrado_importe) : 0;
         const cobradoLabel = cobradoNum.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num">${baseLabel}</td><td class="num">${ivaLabel}</td><td class="num">${ivaPctDoc}%</td><td class="num">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoCobroSelect(doc.id, doc.estado_cobro)}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
+        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}${calidadIcoHtml(doc)}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num">${baseLabel}</td><td class="num">${ivaLabel}</td><td class="num">${ivaPctDoc}%</td><td class="num">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoCobroSelect(doc.id, doc.estado_cobro)}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
-        const clienteHtmlP = entidad ? entidad.name : '<span class="pill mantenimiento">Falta cliente</span>';
+        const clienteHtmlP = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '<span class="pill mantenimiento">Falta cliente</span>';
         const trabajoHtmlP = trabajo ? trabajo.code : '—';
         const fechaCortaP = formatFechaCorta(doc.fecha_devengo);
         const archivoUrlRealP = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
         const archivoHtmlP = archivoUrlRealP ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${archivoUrlRealP}')">📎 Ver</a>` : '—';
-        const baseRowHtml = `<td class="mono">${fechaCortaP}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlP}</td><td class="mono">${trabajoHtmlP}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td><td>${archivoHtmlP}</td>`;
+        const baseRowHtml = `<td class="mono">${fechaCortaP}</td><td class="mono">${doc.numero||'—'}${calidadIcoHtml(doc)}</td><td>${clienteHtmlP}</td><td class="mono">${trabajoHtmlP}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td><td>${archivoHtmlP}</td>`;
         const row = document.createElement('tr'); row.id = 'docrow-'+doc.id; row.onclick = () => toggleExpandirDocFila(doc.id, 7); row.innerHTML = baseRowHtml;
         row.dataset.contabilidad = doc.contabilidad || 'oficial'; row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum;
         document.getElementById('econ-presupuestos-tbody')?.appendChild(row);
@@ -11240,10 +11242,11 @@ async function cargarDocumentosEconomicosReales(){
         row.dataset.justificante = doc.estado_justificante || 'pendiente';
         const recurrenciaHtml = doc.recurrencia ? `<span class="pill planificado">${doc.recurrencia}</span>` : '—';
         const justHtml = doc.estado_justificante==='completo' ? '<span class="pill adjudicado">✓ Justificado</span>' : '<span class="pill noadjudicado">Pendiente justificante</span>';
-        row.innerHTML = `<td>${dateLabel}</td><td>${doc.concepto||'—'}</td><td>${entidad?entidad.name:'—'}</td><td>${doc.categoria||'—'}</td><td>${recurrenciaHtml}</td><td class="num">${amountLabel}</td><td>${justHtml}</td>`;
+        const clienteHtmlG = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '—';
+        row.innerHTML = `<td>${dateLabel}</td><td>${doc.concepto||'—'}</td><td>${clienteHtmlG}</td><td>${doc.categoria||'—'}</td><td>${recurrenciaHtml}</td><td class="num">${amountLabel}</td><td>${justHtml}</td>`;
         document.getElementById('econ-gastos-tbody')?.appendChild(row);
       } else if(doc.tipo==='albaran'){
-        const clienteHtmlA = entidad ? entidad.name : '<span class="pill mantenimiento">Falta cliente</span>';
+        const clienteHtmlA = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '<span class="pill mantenimiento">Falta cliente</span>';
         const trabajoHtmlA = trabajo ? trabajo.code : '—';
         const fechaCortaA = formatFechaCorta(doc.fecha_devengo);
         const archivoUrlRealA = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
@@ -11252,7 +11255,7 @@ async function cargarDocumentosEconomicosReales(){
         row.id = 'albrow-'+doc.id;
         row.onclick = () => toggleExpandirDocFila(doc.id, 9);
         row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum;
-        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="alb-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('alb-sel-chk','alb-borrar-sel-btn','alb-sel-count')"></td><td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlA}</td><td class="mono">${trabajoHtmlA}</td><td class="num">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoAlbaranSelect(doc.id, doc.estado_albaran)}</td><td>${archivoHtmlA}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
+        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="alb-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('alb-sel-chk','alb-borrar-sel-btn','alb-sel-count')"></td><td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}${calidadIcoHtml(doc)}</td><td>${clienteHtmlA}</td><td class="mono">${trabajoHtmlA}</td><td class="num">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoAlbaranSelect(doc.id, doc.estado_albaran)}</td><td>${archivoHtmlA}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
         document.getElementById('albaranes-tbody-standalone')?.appendChild(row);
       }
     });
