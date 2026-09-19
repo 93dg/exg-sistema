@@ -763,6 +763,12 @@ table{border-collapse:collapse;width:100%;}
 .ai-chip:hover{border-color:var(--orange);}
 .ai-chip.sel{background:var(--orange);border-color:var(--orange);color:#fff;}
 .ai-edit-volver{font-size:12px;color:var(--orange);cursor:pointer;margin-bottom:12px;font-weight:600;}
+
+.ai-sug-card{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden;background:var(--concrete);}
+.ai-sug-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-weight:700;font-size:13px;}
+.ai-sug-head:hover{background:var(--paper);}
+.ai-sug-caret{font-size:11px;color:var(--ink-faint,#8b8275);flex-shrink:0;margin-left:8px;}
+.ai-sug-body{padding:0 14px 14px 14px;border-top:1px solid var(--line);padding-top:12px;}
 .ai-card-actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;}
 .ai-btn{flex:1;padding:11px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid var(--line);background:var(--paper);color:var(--ink);min-width:100px;}
 .ai-btn.primary{background:linear-gradient(135deg,#FF8A3D,#D8560F);color:#fff;border:none;}
@@ -2094,7 +2100,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.96</div>
+        <div class="sub">V1.97</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9737,6 +9743,64 @@ document.addEventListener('change', (e)=>{
 })();
 /* ---------------- fin instrumentación automática ---------------- */
 
+let aiSugerenciasActuales = [];
+function aiRenderSugerenciasHtml(sugerencias, origen){
+  aiSugerenciasActuales = sugerencias;
+  if(!sugerencias.length) return `<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">Todavía no hay suficiente actividad registrada para detectar patrones.</div>`;
+  return sugerencias.map((s,i)=>`
+    <div class="ai-sug-card" id="ai-sug-${origen}-${i}">
+      <div class="ai-sug-head" onclick="aiToggleSugerencia('${origen}',${i})">
+        <span>${s.icono} ${s.titulo}</span>
+        <span class="ai-sug-caret">▾</span>
+      </div>
+      <div class="ai-sug-body" style="display:none;">
+        <div class="ai-card-block"><div class="ai-card-label">Qué he detectado</div><div class="ai-card-text">${s.detectado}</div></div>
+        <div class="ai-card-block"><div class="ai-card-label">Por qué lo propongo</div><div class="ai-card-text">${s.razon}</div></div>
+        <div class="ai-card-block"><div class="ai-card-label">Impacto</div><div class="ai-card-text">${s.impacto}</div></div>
+        <div class="ai-card-block"><div class="ai-card-label">Qué recomiendo</div><div class="ai-card-text">${s.accion}</div></div>
+        <div id="ai-sug-extra-${origen}-${i}"></div>
+        <div class="ai-card-actions">
+          ${s.tipo_ui==='navegacion' ? `<button class="ai-btn primary" onclick="aiIrASeccion('${s.vista_destino}','${s.clave}')">Ir a la sección</button>` : ''}
+          ${s.tipo_ui==='error' ? `<button class="ai-btn primary" onclick="aiVerErrorSugerencia('${origen}',${i})">Ver detalle del error</button>` : ''}
+          ${s.tipo_ui==='dato' ? `<button class="ai-btn primary" onclick="aiResolverSugerencia('${origen}',${i})">Entendido</button>` : ''}
+          <button class="ai-btn ghost" onclick="aiRecordarSugerencia('${origen}',${i})">Recordar más tarde</button>
+          <button class="ai-btn danger" onclick="aiDescartarSugerencia('${origen}',${i})">Descartar</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+function aiToggleSugerencia(origen, i){
+  const body = document.querySelector(`#ai-sug-${origen}-${i} .ai-sug-body`);
+  if(body) body.style.display = body.style.display==='none' ? '' : 'none';
+}
+function aiIrASeccion(vista, clave){
+  cerrarAsistenteIA();
+  document.querySelector(`.nav button[data-view="${vista}"]`)?.click();
+  aiMarcarSugerencia(clave, 'recordar'); // se vuelve a mostrar en unos días si no se resuelve del todo
+}
+function aiVerErrorSugerencia(origen, i){
+  const s = aiSugerenciasActuales[i];
+  const extra = document.getElementById(`ai-sug-extra-${origen}-${i}`);
+  if(extra) extra.innerHTML = `<div class="ai-card-block ai-card-falta"><div class="ai-card-label" style="color:#D8AA3D;">Mensaje técnico exacto</div><div class="ai-card-text" style="font-family:monospace;font-size:11.5px;">${s.contexto_error||'—'}</div><div style="font-size:11.5px;color:var(--ink-faint);margin-top:6px;">Copia este mensaje y pídeselo a Claude directamente para que lo corrija — el Asistente no modifica el código de la web por sí mismo.</div></div>`;
+}
+async function aiResolverSugerencia(origen, i){
+  const s = aiSugerenciasActuales[i];
+  await aiMarcarSugerencia(s.clave, 'resuelta');
+  document.getElementById(`ai-sug-${origen}-${i}`)?.remove();
+  mostrarToast('Marcada como resuelta');
+}
+async function aiDescartarSugerencia(origen, i){
+  const s = aiSugerenciasActuales[i];
+  await aiMarcarSugerencia(s.clave, 'descartada');
+  document.getElementById(`ai-sug-${origen}-${i}`)?.remove();
+}
+async function aiRecordarSugerencia(origen, i){
+  const s = aiSugerenciasActuales[i];
+  await aiMarcarSugerencia(s.clave, 'recordar');
+  document.getElementById(`ai-sug-${origen}-${i}`)?.remove();
+  mostrarToast('Vale, te lo recuerdo en unos días');
+}
+
 async function cargarPropuestasReportes(){
   const cont = document.getElementById('reportes-ia-propuestas');
   const count = document.getElementById('reportes-ia-count');
@@ -9746,11 +9810,7 @@ async function cargarPropuestasReportes(){
   try{
     const sugerencias = await aiCalcularSugerenciasSistema();
     if(count) count.textContent = sugerencias.length;
-    cont.innerHTML = sugerencias.length ? sugerencias.map(s=>`
-      <div class="econ-line" style="align-items:flex-start;flex-direction:column;gap:4px;padding:12px 0;">
-        <div style="font-weight:700;">${s.icono} ${s.titulo}</div>
-        <div style="color:var(--ink-soft);font-size:12.5px;">${s.detalle}</div>
-      </div>`).join('') : `<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Todavía no hay suficiente actividad registrada para detectar patrones.</div>`;
+    cont.innerHTML = aiRenderSugerenciasHtml(sugerencias, 'rep');
   }catch(err){
     cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Error: '+err.message+'</div>';
   }
@@ -9763,12 +9823,8 @@ async function abrirAiPropuestas(){
   if(!sb){ cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">Supabase no está conectado.</div>'; return; }
   try{
     const sugerencias = await aiCalcularSugerenciasSistema();
-    cont.innerHTML = sugerencias.length ? sugerencias.map(s=>`
-      <div class="ai-summary-item" style="align-items:flex-start;flex-direction:column;gap:4px;">
-        <div style="font-weight:700;">${s.icono} ${s.titulo}</div>
-        <div style="color:var(--ink-soft);font-size:12.5px;">${s.detalle}</div>
-      </div>`).join('') : `<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">Todavía no hay suficiente actividad registrada para detectar patrones.</div>`;
-    cont.insertAdjacentHTML('beforeend', `<div style="margin-top:14px;font-size:11.5px;color:var(--ink-faint,#8b8275);text-align:center;">Mira facturas, albaranes, gastos, clientes y navegación — no solo lo que pasa por el Asistente. Son solo observaciones — nada se cambia solo.</div>`);
+    cont.innerHTML = aiRenderSugerenciasHtml(sugerencias, 'ai');
+    cont.insertAdjacentHTML('beforeend', `<div style="margin-top:14px;font-size:11.5px;color:var(--ink-faint,#8b8275);text-align:center;">Toca cada propuesta para ver el detalle completo y decidir qué hacer.</div>`);
   }catch(err){
     cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">Error: '+err.message+'</div>';
   }
@@ -9812,6 +9868,7 @@ function aiCalcularSugerencias(rows){
   }
   return sug;
 }
+function aiSlug(txt){ return txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'').slice(0,60); }
 async function aiCalcularSugerenciasSistema(){
   const sug = [];
   if(!sb) return sug;
@@ -9819,7 +9876,9 @@ async function aiCalcularSugerenciasSistema(){
   // 1) lo que ya sabemos del Asistente
   try{
     const {data: logAsistente} = await sb.from('asistente_log').select('*').order('created_at',{ascending:false}).limit(300);
-    if(logAsistente) sug.push(...aiCalcularSugerencias(logAsistente));
+    if(logAsistente) sug.push(...aiCalcularSugerencias(logAsistente).map(s=>({...s,
+      detectado:s.detalle, razon:'Patrón repetido en las tareas confirmadas del Asistente.', impacto:'Bajo — solo afecta a cómo el Asistente prioriza sugerencias.',
+      accion:'Informativo, ya se aplica solo en el orden de sugerencias.', tipo_ui:'dato'})));
   }catch(e){}
 
   // 2) toda la actividad real de documentos (facturas, albaranes, presupuestos, proformas, gastos)
@@ -9829,43 +9888,51 @@ async function aiCalcularSugerenciasSistema(){
       const hoy = Date.now();
       const dias = ms => Math.floor(ms/(1000*60*60*24));
 
-      // cliente con m\u00e1s documentos, de todo el historial
       const porCliente = {};
       docs.forEach(d=>{ if(d.entidad_id) porCliente[d.entidad_id] = (porCliente[d.entidad_id]||0)+1; });
       const topCliente = Object.entries(porCliente).sort((a,b)=>b[1]-a[1])[0];
       if(topCliente && topCliente[1]>=5){
         const nombre = (typeof clientes!=='undefined' ? clientes.find(c=>c.id===topCliente[0])?.name : null) || 'Un cliente';
-        sug.push({icono:'👤', titulo:`${nombre} es tu cliente con más movimiento`, detalle:`${topCliente[1]} documentos en total (facturas, albaranes, presupuestos). Es de los datos más sólidos que tenemos — ya aparece el primero al buscar cliente.`});
+        sug.push({icono:'👤', titulo:`${nombre} es tu cliente con más movimiento`,
+          detectado:`${topCliente[1]} documentos en total (facturas, albaranes, presupuestos) a nombre de ${nombre}.`,
+          razon:'Es el cliente con más actividad de todo tu historial.', impacto:'Bajo — solo es información útil, no cambia nada por sí solo.',
+          accion:'Ya sale el primero al buscar cliente en cualquier formulario, por este motivo.', tipo_ui:'dato'});
       }
 
-      // facturas pendientes de cobro desde hace tiempo
       const facturasPendientes = docs.filter(d=>d.tipo==='factura' && d.estado_cobro && d.estado_cobro!=='cobrado' && d.fecha_devengo);
       const antiguas = facturasPendientes.filter(d=> dias(hoy - new Date(d.fecha_devengo).getTime()) > 60);
       if(antiguas.length>=1){
         const totalAntiguas = antiguas.reduce((s,d)=>s+(Number(d.total)||0),0);
-        sug.push({icono:'💰', titulo:`${antiguas.length} factura${antiguas.length>1?'s':''} sin cobrar desde hace más de 2 meses`, detalle:`Suman ${totalAntiguas.toLocaleString('es-ES',{minimumFractionDigits:2})} €. Podría ser útil un aviso automático en Centro de control cuando una factura lleva mucho pendiente.`});
+        sug.push({icono:'💰', titulo:`${antiguas.length} factura${antiguas.length>1?'s':''} sin cobrar desde hace más de 2 meses`,
+          detectado:`${antiguas.length} factura(s) con fecha de hace más de 60 días que siguen sin marcarse como cobradas, por un total de ${totalAntiguas.toLocaleString('es-ES',{minimumFractionDigits:2})} €.`,
+          razon:'Una factura pendiente tanto tiempo suele significar que se ha olvidado reclamar el cobro o actualizar su estado.', impacto:'Medio — dinero real pendiente de entrar, y datos de cobro desactualizados.',
+          accion:'Revisar esas facturas y, si ya están cobradas, marcarlas; si no, reclamar el cobro.', tipo_ui:'navegacion', vista_destino:'facturas'});
       }
 
-      // albaranes en proceso desde hace tiempo, sin facturar
       const albaranesAbiertos = docs.filter(d=>d.tipo==='albaran' && d.estado_albaran==='en_proceso' && d.fecha_devengo);
       const albaranesViejos = albaranesAbiertos.filter(d=> dias(hoy - new Date(d.fecha_devengo).getTime()) > 30);
       if(albaranesViejos.length>=1){
-        sug.push({icono:'📋', titulo:`${albaranesViejos.length} albarán${albaranesViejos.length>1?'es':''} lleva${albaranesViejos.length>1?'n':''} más de 30 días sin facturarse`, detalle:`Aparecen en "Albaranes en proceso" de Centro de control. Si ya están cobrados o no van a facturarse, conviene actualizarlos para que no se acumulen.`});
+        sug.push({icono:'📋', titulo:`${albaranesViejos.length} albarán${albaranesViejos.length>1?'es':''} lleva${albaranesViejos.length>1?'n':''} más de 30 días sin facturarse`,
+          detectado:`${albaranesViejos.length} albarán(es) en estado "en proceso" con más de 30 días desde su fecha.`,
+          razon:'Un albarán abierto mucho tiempo puede quedar olvidado y no llegar a facturarse nunca.', impacto:'Medio — trabajo ya hecho que podría no estar cobrándose.',
+          accion:'Revisar en Centro de control y actualizar su estado o convertirlos en factura.', tipo_ui:'navegacion', vista_destino:'control'});
       }
 
-      // reparto oficial / en B
       const conContabilidad = docs.filter(d=>d.contabilidad);
       if(conContabilidad.length>=10){
         const enB = conContabilidad.filter(d=>d.contabilidad==='en_b').length;
         const pct = Math.round(enB/conContabilidad.length*100);
         if(pct>=25){
-          sug.push({icono:'📊', titulo:`El ${pct}% de tus movimientos son "en B"`, detalle:`Es solo un dato informativo del reparto real que hay entre oficial y en B, por si te sirve para tus cuentas.`});
+          sug.push({icono:'📊', titulo:`El ${pct}% de tus movimientos son "en B"`,
+            detectado:`De ${conContabilidad.length} movimientos con contabilidad marcada, el ${pct}% son "en B".`,
+            razon:'Solo un dato del reparto real entre oficial y en B en tu actividad.', impacto:'Ninguno — es puramente informativo.',
+            accion:'Nada que hacer, es solo para que lo tengas presente en tus cuentas.', tipo_ui:'dato'});
         }
       }
     }
   }catch(e){}
 
-  // 3) navegaci\u00f3n real — qu\u00e9 secciones se usan m\u00e1s (se va acumulando con el uso)
+  // 3) navegaci\u00f3n, errores y fricci\u00f3n real de toda la web
   try{
     const {data: eventos} = await sb.from('sistema_eventos').select('accion,vista,contexto,created_at').order('created_at',{ascending:false}).limit(500);
     if(eventos && eventos.length>=15){
@@ -9874,45 +9941,77 @@ async function aiCalcularSugerenciasSistema(){
       navs.forEach(e=>{ porVista[e.vista]=(porVista[e.vista]||0)+1; });
       const topVista = Object.entries(porVista).sort((a,b)=>b[1]-a[1])[0];
       if(topVista && topVista[1]>=8){
-        sug.push({icono:'🧭', titulo:`"${topVista[0]}" es la sección que más visitas`, detalle:`${topVista[1]} veces en las últimas ${eventos.length} acciones registradas. Si no está ya en un acceso rápido, podría convenir ponerla más a mano.`});
+        sug.push({icono:'🧭', titulo:`"${topVista[0]}" es la sección que más visitas`,
+          detectado:`${topVista[1]} visitas a "${topVista[0]}" de las últimas ${eventos.length} acciones registradas.`,
+          razon:'Es, con diferencia, la sección donde más tiempo pasas.', impacto:'Bajo — cuestión de comodidad, no de datos.',
+          accion:'Si no está ya en un acceso rápido, podría convenir ponerla más a mano.', tipo_ui:'navegacion', vista_destino:topVista[0]});
       }
 
-      // errores reales de la app — la señal más directa de fricción
       const errores = eventos.filter(e=>e.accion==='error_js' || e.accion==='error_promesa');
       if(errores.length>=3){
         const conteo = {};
-        errores.forEach(e=>{ const k=(e.contexto?.mensaje||'error').slice(0,60); conteo[k]=(conteo[k]||0)+1; });
+        errores.forEach(e=>{ const k=(e.contexto?.mensaje||'error').slice(0,80); conteo[k]=(conteo[k]||0)+1; });
         const topError = Object.entries(conteo).sort((a,b)=>b[1]-a[1])[0];
-        sug.push({icono:'🐞', titulo:`${errores.length} errores reales detectados en la app`, detalle:`El más repetido: "${topError[0]}" (${topError[1]} veces). Merece la pena revisarlo — puede estar rompiendo algo en silencio.`});
+        sug.push({icono:'🐞', titulo:`${errores.length} errores reales detectados en la app`,
+          detectado:`${errores.length} errores de JavaScript registrados. El más repetido: "${topError[0]}" (${topError[1]} veces).`,
+          razon:'Un error que salta en el navegador casi siempre significa que algo se rompe en silencio para el usuario.', impacto:'Alto si se repite mucho — puede impedir completar una acción sin que se note por qué.',
+          accion:'Revisar el mensaje de error exacto y decirle a Claude que lo corrija.', tipo_ui:'error', contexto_error:topError[0]});
       }
 
-      // acciones que se abren y se cierran muy rápido sin completar — posible fricción/confusión
       const cierresRapidos = eventos.filter(e=>e.accion?.startsWith('cierre_rapido:'));
       if(cierresRapidos.length>=4){
         const conteo = {};
         cierresRapidos.forEach(e=>{ const k=e.accion.split(':')[1]||'algo'; conteo[k]=(conteo[k]||0)+1; });
         const top = Object.entries(conteo).sort((a,b)=>b[1]-a[1])[0];
         if(top[1]>=3){
-          sug.push({icono:'🚪', titulo:`Abres y cierras "${top[0]}" muy rápido a menudo`, detalle:`${top[1]} veces en menos de 2,5 segundos. Puede que esa pantalla no muestre lo que esperabas a primera vista, o que sea fácil abrirla sin querer.`});
+          sug.push({icono:'🚪', titulo:`Abres y cierras "${top[0]}" muy rápido a menudo`,
+            detectado:`${top[1]} veces que se abre y se cierra "${top[0]}" en menos de 2,5 segundos.`,
+            razon:'Suele indicar que esa pantalla no muestra lo esperado a primera vista, o que se abre sin querer.', impacto:'Bajo/medio — puede ser solo fricción de interfaz, o una pantalla mal ubicada.',
+            accion:'Revisar esa pantalla para ver si su contenido o su posición generan confusión.', tipo_ui:'dato'});
         }
       }
 
-      // acci\u00f3n m\u00e1s repetida en general
       const acciones = eventos.filter(e=>e.accion?.startsWith('accion:'));
       if(acciones.length>=20){
         const conteo = {};
         acciones.forEach(e=>{ conteo[e.accion]=(conteo[e.accion]||0)+1; });
         const top = Object.entries(conteo).sort((a,b)=>b[1]-a[1])[0];
         if(top[1]>=10){
-          sug.push({icono:'🔁', titulo:`Repites mucho: "${top[0].replace('accion:','')}"`, detalle:`${top[1]} veces registradas. Si es un botón que usas todo el rato, podría convenir tenerlo más a mano o convertirlo en un acceso rápido.`});
+          sug.push({icono:'🔁', titulo:`Repites mucho: "${top[0].replace('accion:','')}"`,
+            detectado:`${top[1]} veces registradas usando "${top[0].replace('accion:','')}".`,
+            razon:'Es de las acciones más repetidas de toda tu actividad reciente.', impacto:'Bajo — cuestión de comodidad y rapidez de uso.',
+            accion:'Si es un botón que usas todo el rato, podría convenir tenerlo más a mano o como acceso rápido.', tipo_ui:'dato'});
         }
       }
     } else {
-      sug.push({icono:'🧭', titulo:'Aún reuniendo datos de uso', detalle:'Desde ahora registro navegación, acciones, búsquedas, errores y aperturas/cierres rápidos de toda la web, para ir sugiriendo mejoras según el uso real. Todavía hay poco historial.'});
+      sug.push({icono:'🧭', titulo:'Aún reuniendo datos de uso',
+        detectado:'Todavía hay poco historial de navegación y acciones registradas.',
+        razon:'El sistema necesita un mínimo de actividad para detectar patrones fiables.', impacto:'Ninguno todavía.',
+        accion:'Sigue usando la app con normalidad — esto se irá llenando solo.', tipo_ui:'dato'});
     }
   }catch(e){}
 
-  return sug.slice(0,6);
+  // aplicar clave estable + filtrar por estado guardado (resuelta/descartada/recordar)
+  sug.forEach(s=>{ s.clave = aiSlug(s.titulo); });
+  try{
+    const {data: estados} = await sb.from('sugerencias_estado').select('*');
+    const mapa = {};
+    (estados||[]).forEach(e=>{ mapa[e.clave]=e; });
+    const ahora = Date.now();
+    return sug.filter(s=>{
+      const e = mapa[s.clave];
+      if(!e) return true;
+      if(e.estado==='resuelta' || e.estado==='descartada') return false;
+      if(e.estado==='recordar' && e.recordar_hasta && new Date(e.recordar_hasta).getTime() > ahora) return false;
+      return true;
+    }).slice(0,8);
+  }catch(e){ return sug.slice(0,8); }
+}
+async function aiMarcarSugerencia(clave, estado){
+  if(!sb) return;
+  const payload = { clave, estado, updated_at: new Date().toISOString() };
+  if(estado==='recordar') payload.recordar_hasta = new Date(Date.now()+7*24*60*60*1000).toISOString();
+  await sb.from('sugerencias_estado').upsert(payload).then(()=>{}).catch(()=>{});
 }
 function aiMostrarResumen(){
   const lista = document.getElementById('ai-summary-list');
