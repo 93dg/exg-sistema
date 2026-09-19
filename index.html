@@ -762,6 +762,7 @@ table{border-collapse:collapse;width:100%;}
 .ai-chip{padding:8px 13px;border-radius:18px;background:var(--paper);border:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;}
 .ai-chip:hover{border-color:var(--orange);}
 .ai-chip.sel{background:var(--orange);border-color:var(--orange);color:#fff;}
+.ai-edit-volver{font-size:12px;color:var(--orange);cursor:pointer;margin-bottom:12px;font-weight:600;}
 .ai-card-actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;}
 .ai-btn{flex:1;padding:11px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid var(--line);background:var(--paper);color:var(--ink);min-width:100px;}
 .ai-btn.primary{background:linear-gradient(135deg,#FF8A3D,#D8560F);color:#fff;border:none;}
@@ -2093,7 +2094,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.94</div>
+        <div class="sub">V1.95</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9337,6 +9338,20 @@ function aiRenderTarjeta(){
   const yaResuelta = t.estado==='confirmada' || t.estado==='descartada';
   const editando = !!t._editando && !yaResuelta;
 
+  // ---------- MODO EDICIÓN: sugerencias clicables, no formulario ----------
+  if(editando){
+    card.innerHTML = `
+      <span class="ai-card-tipo">${AI_TIPO_LABEL[t.tipo]||t.tipo}</span>
+      <div class="ai-card-titulo">${t.titulo}</div>
+      <div id="ai-edit-zone">${aiRenderZonaEdicion(t)}</div>
+      <div class="ai-card-actions">
+        <button class="ai-btn primary" onclick="aiTerminarEdicion(${aiTareaActiva})">Listo, guardar cambios</button>
+        <button class="ai-btn ghost" onclick="aiCancelarEdicion(${aiTareaActiva})">Cancelar</button>
+      </div>
+    `;
+    return;
+  }
+
   let widgetHtml = '';
   // tipo de documento — chips, siempre editable
   if(t.tipo==='documento'){
@@ -9351,15 +9366,15 @@ function aiRenderTarjeta(){
     widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Tipo de incidente</div>
       <div class="ai-chip-row">${opciones.map(([v,l])=>`<div class="ai-chip ${t.datos.subtipo===v?'sel':''}" onclick="aiSetCampo(${aiTareaActiva},'subtipo','${v}')">${l}</div>`).join('')}</div></div>`;
   }
-  // cliente — buscador clicable, se puede reabrir en modo edición aunque ya haya uno
+  // cliente — buscador clicable, solo si hace falta
   if((t.tipo==='documento' || t.tipo==='trabajo')){
-    if(t.datos.cliente && !editando){
+    if(t.datos.cliente){
       widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Cliente</div>
         <div class="ai-chip sel" style="display:inline-flex;" onclick="aiSetCampo(${aiTareaActiva},'cliente',null)">${t.datos.cliente} ✕</div></div>`;
     } else {
       const sugeridos = (typeof clientesOrdenadosPorUso==='function' ? clientesOrdenadosPorUso() : (typeof clientes!=='undefined'?clientes:[])).slice(0,6);
-      widgetHtml += `<div class="ai-card-block ${t.datos.cliente?'':'ai-card-falta'}">
-        <div class="ai-card-label" ${t.datos.cliente?'':'style="color:#D8AA3D;"'}>${t.datos.cliente?'Cambiar cliente':'Falta el cliente'}</div>
+      widgetHtml += `<div class="ai-card-block ai-card-falta">
+        <div class="ai-card-label" style="color:#D8AA3D;">Falta el cliente</div>
         <input type="text" id="ai-cliente-buscar-${aiTareaActiva}" placeholder="Buscar cliente…" oninput="aiFiltrarClientes(${aiTareaActiva})" style="margin-bottom:8px;">
         <div class="ai-chip-row" id="ai-cliente-lista-${aiTareaActiva}">
           ${sugeridos.map(c=>`<div class="ai-chip" onclick="aiSetCampo(${aiTareaActiva},'cliente','${c.name.replace(/'/g,"\\'")}')">${c.name}</div>`).join('')}
@@ -9367,22 +9382,10 @@ function aiRenderTarjeta(){
       </div>`;
     }
   }
-  // gasto — concepto/importe editables en modo edición
+  // gasto — resumen (la edición se hace por sugerencias, no aquí)
   if(t.tipo==='gasto'){
-    if(editando){
-      widgetHtml += `<div class="ai-card-block">
-        <div class="ai-card-label">Concepto</div>
-        <input type="text" id="ai-edit-concepto" value="${t.datos.concepto||''}" placeholder="Ej. Gasoil">
-        <div class="ai-card-label" style="margin-top:10px;">Importe (€)</div>
-        <input type="number" step="0.01" id="ai-edit-importe" value="${t.datos.importe??''}" placeholder="0,00">
-      </div>`;
-    } else {
-      widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Concepto / importe</div>
-        <div class="ai-card-text">${t.datos.concepto||'—'}${t.datos.importe?` · ${t.datos.importe} €`:''}</div></div>`;
-    }
-  }
-  if(editando){
-    widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Título</div><input type="text" id="ai-edit-titulo" value="${t.titulo}"></div>`;
+    widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Concepto / importe</div>
+      <div class="ai-card-text">${t.datos.concepto||'—'}${t.datos.importe?` · ${t.datos.importe} €`:''}</div></div>`;
   }
 
   const bloqueada = (t.tipo==='documento'||t.tipo==='trabajo') && !t.datos.cliente;
@@ -9395,31 +9398,185 @@ function aiRenderTarjeta(){
     ${widgetHtml}
     ${yaResuelta ? `<div class="ai-card-block" style="margin-top:6px;"><div class="ai-card-text" style="color:${t.estado==='confirmada'?'var(--green)':'var(--red)'};font-weight:700;">${t.estado==='confirmada'?'✓ Confirmada':'✕ Descartada'}</div></div>` : ''}
     <div class="ai-card-actions">
-      ${!yaResuelta ? (editando ? `
-        <button class="ai-btn primary" onclick="aiGuardarEdicion(${aiTareaActiva})">Guardar cambios</button>
-        <button class="ai-btn ghost" onclick="aiCancelarEdicion(${aiTareaActiva})">Cancelar</button>
-      ` : `
+      ${!yaResuelta ? `
         <button class="ai-btn" onclick="aiEditarTarea(${aiTareaActiva})">✎ Editar/Corregir</button>
         <button class="ai-btn primary" ${bloqueada?'disabled style="opacity:.5;"':''} onclick="aiConfirmarTarea(${aiTareaActiva})">Confirmar</button>
         <button class="ai-btn danger" onclick="aiDescartarTarea(${aiTareaActiva})">Descartar</button>
-      `) : ''}
+      ` : ''}
     </div>
   `;
 }
-function aiEditarTarea(i){ aiTareas[i]._editando = true; aiRenderTareas(); }
-function aiCancelarEdicion(i){ aiTareas[i]._editando = false; aiRenderTareas(); }
-function aiGuardarEdicion(i){
-  const t = aiTareas[i];
-  const nuevoTitulo = document.getElementById('ai-edit-titulo')?.value?.trim();
-  if(nuevoTitulo) t.titulo = nuevoTitulo;
+
+/* ---------- pool de sugerencias de edición, seg\u00fan tipo de tarea ---------- */
+function aiPoolSugerencias(t){
+  const pool = [];
   if(t.tipo==='gasto'){
-    const c = document.getElementById('ai-edit-concepto')?.value?.trim();
-    const imp = document.getElementById('ai-edit-importe')?.value;
-    t.datos = t.datos || {};
-    if(c) t.datos.concepto = c;
-    if(imp) t.datos.importe = Number(imp);
+    pool.push({ico:'💶', texto:'Cambiar importe', campo:'importe'});
+    pool.push({ico:'📝', texto:'Cambiar concepto', campo:'concepto'});
+    pool.push({ico:'🏷️', texto:'Cambiar categoría', campo:'categoria'});
+    pool.push({ico:'💳', texto:'Cambiar forma de pago', campo:'forma_pago'});
+    pool.push({ico:'🏦', texto:'Cambiar contabilidad (oficial/en B)', campo:'contabilidad'});
+    pool.push({ico:'🔁', texto:'Marcar como recurrente', campo:'recurrencia'});
   }
-  t._editando = false;
+  if(t.tipo==='documento' || t.tipo==='trabajo'){
+    pool.push({ico:'👤', texto: t.datos.cliente ? 'Cambiar cliente' : 'Elegir cliente', campo:'cliente'});
+  }
+  if(t.tipo==='documento'){
+    pool.push({ico:'📄', texto:'Cambiar tipo de documento', campo:'tipo_doc'});
+  }
+  if(t.tipo==='incidente'){
+    pool.push({ico:'⚙️', texto:'Cambiar tipo de incidente', campo:'subtipo'});
+  }
+  pool.push({ico:'✏️', texto:'Cambiar título de la tarea', campo:'titulo'});
+  pool.push({ico:'🗑️', texto:'Descartar esta tarea', campo:'_descartar'});
+  return pool;
+}
+function aiRenderZonaEdicion(t){
+  // si hay un submenú de campo concreto abierto, mostrar ese editor
+  if(t._editMenu) return aiRenderEditorCampo(t, t._editMenu);
+
+  const pool = aiPoolSugerencias(t);
+  const revelados = t._editRevelados || 3;
+  const visibles = pool.slice(0, revelados);
+  const quedanMas = pool.length > revelados;
+  return `
+    <div class="ai-card-label" style="margin-bottom:8px;">¿Qué quieres cambiar?</div>
+    <div class="ai-chip-row" style="margin-bottom:10px;">
+      ${visibles.map(s=>`<div class="ai-chip" onclick="aiAbrirEditorCampo(${aiTareaActiva},'${s.campo}')">${s.ico} ${s.texto}</div>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      ${quedanMas ? `<button class="ai-btn ghost" style="flex:1;min-width:130px;" onclick="aiMasSugerencias(${aiTareaActiva})">🔄 Sugerir más cambios</button>` : ''}
+      <button class="ai-btn ghost" style="flex:1;min-width:130px;" onclick="aiAbrirEditorCampo(${aiTareaActiva},'_libre')">💬 Otro cambio (escribir o dictar)</button>
+    </div>
+  `;
+}
+function aiMasSugerencias(i){ aiTareas[i]._editRevelados = (aiTareas[i]._editRevelados||3) + 3; aiRenderTareas(); }
+function aiAbrirEditorCampo(i, campo){ aiTareas[i]._editMenu = campo; aiRenderTareas(); }
+function aiVolverASugerencias(i){ aiTareas[i]._editMenu = null; aiRenderTareas(); }
+
+function aiRenderEditorCampo(t, campo){
+  const volver = `<div class="ai-edit-volver" onclick="aiVolverASugerencias(${aiTareaActiva})">← Volver a sugerencias</div>`;
+  if(campo==='importe'){
+    const actual = t.datos.importe || 0;
+    const deltas = [-50,-10,-5,5,10,50];
+    return `${volver}<div class="ai-card-label">Importe (€)</div>
+      <input type="number" step="0.01" id="ai-inline-importe" value="${actual}" style="margin-bottom:8px;">
+      <div class="ai-chip-row">${deltas.map(d=>`<div class="ai-chip" onclick="aiAjustarImporte(${aiTareaActiva},${d})">${d>0?'+':''}${d}€</div>`).join('')}
+      <div class="ai-chip sel" onclick="aiGuardarImporteInline(${aiTareaActiva})">✓ Aplicar</div></div>`;
+  }
+  if(campo==='concepto'){
+    const sugeridos = ['Gasoil','Reparación','Material','Peajes','Neumáticos','Dietas'];
+    return `${volver}<div class="ai-card-label">Concepto</div>
+      <div class="ai-chip-row" style="margin-bottom:8px;">${sugeridos.map(s=>`<div class="ai-chip ${t.datos.concepto===s?'sel':''}" onclick="aiSetCampoEdit(${aiTareaActiva},'concepto','${s}')">${s}</div>`).join('')}</div>
+      <input type="text" id="ai-inline-concepto" placeholder="O escribe otro…" value="${t.datos.concepto||''}" onchange="aiSetCampoEdit(${aiTareaActiva},'concepto',this.value)">`;
+  }
+  if(campo==='categoria'){
+    const cats = ['Combustible','Reparaciones y averías','Repuestos','Neumáticos','Material','Dietas','Seguros','Otros'];
+    return `${volver}<div class="ai-card-label">Categoría</div>
+      <div class="ai-chip-row">${cats.map(c=>`<div class="ai-chip ${t.datos.categoria===c?'sel':''}" onclick="aiSetCampoEdit(${aiTareaActiva},'categoria','${c}')">${c}</div>`).join('')}</div>`;
+  }
+  if(campo==='forma_pago'){
+    const opts = ['Tarjeta','Transferencia','Efectivo','Domiciliado'];
+    return `${volver}<div class="ai-card-label">Forma de pago</div>
+      <div class="ai-chip-row">${opts.map(o=>`<div class="ai-chip ${t.datos.forma_pago===o?'sel':''}" onclick="aiSetCampoEdit(${aiTareaActiva},'forma_pago','${o}')">${o}</div>`).join('')}</div>`;
+  }
+  if(campo==='contabilidad'){
+    const opts = [['oficial','Oficial'],['en_b','En B']];
+    return `${volver}<div class="ai-card-label">Contabilidad</div>
+      <div class="ai-chip-row">${opts.map(([v,l])=>`<div class="ai-chip ${t.datos.contabilidad===v?'sel':''}" onclick="aiSetCampoEdit(${aiTareaActiva},'contabilidad','${v}')">${l}</div>`).join('')}</div>`;
+  }
+  if(campo==='recurrencia'){
+    const opts = [['','No recurrente'],['mensual','Mensual'],['trimestral','Trimestral'],['anual','Anual']];
+    return `${volver}<div class="ai-card-label">Recurrencia</div>
+      <div class="ai-chip-row">${opts.map(([v,l])=>`<div class="ai-chip ${(t.datos.recurrencia||'')===v?'sel':''}" onclick="aiSetCampoEdit(${aiTareaActiva},'recurrencia','${v}')">${l}</div>`).join('')}</div>`;
+  }
+  if(campo==='cliente'){
+    const sugeridos = (typeof clientesOrdenadosPorUso==='function' ? clientesOrdenadosPorUso() : (typeof clientes!=='undefined'?clientes:[])).slice(0,6);
+    return `${volver}<div class="ai-card-label">Cliente</div>
+      <input type="text" id="ai-cliente-buscar-${aiTareaActiva}" placeholder="Buscar cliente…" oninput="aiFiltrarClientes(${aiTareaActiva})" style="margin-bottom:8px;">
+      <div class="ai-chip-row" id="ai-cliente-lista-${aiTareaActiva}">
+        ${sugeridos.map(c=>`<div class="ai-chip" onclick="aiSetCampoEditYVolver(${aiTareaActiva},'cliente','${c.name.replace(/'/g,"\\'")}')">${c.name}</div>`).join('')}
+      </div>`;
+  }
+  if(campo==='tipo_doc'){
+    const opciones = [['factura','Factura'],['presupuesto','Presupuesto'],['albaran','Albarán'],['proforma','Proforma']];
+    return `${volver}<div class="ai-card-label">Tipo de documento</div>
+      <div class="ai-chip-row">${opciones.map(([v,l])=>`<div class="ai-chip ${t.datos.tipo_doc===v?'sel':''}" onclick="aiSetCampoEditYVolver(${aiTareaActiva},'tipo_doc','${v}')">${l}</div>`).join('')}</div>`;
+  }
+  if(campo==='subtipo'){
+    const opciones = [['maquina','⚙ Máquina'],['personal','🧑 Personal']];
+    return `${volver}<div class="ai-card-label">Tipo de incidente</div>
+      <div class="ai-chip-row">${opciones.map(([v,l])=>`<div class="ai-chip ${t.datos.subtipo===v?'sel':''}" onclick="aiSetCampoEditYVolver(${aiTareaActiva},'subtipo','${v}')">${l}</div>`).join('')}</div>`;
+  }
+  if(campo==='titulo'){
+    return `${volver}<div class="ai-card-label">Título</div>
+      <input type="text" id="ai-inline-titulo" value="${t.titulo}" onchange="aiTareas[${aiTareaActiva}].titulo=this.value">`;
+  }
+  if(campo==='_descartar'){
+    return `${volver}<div class="ai-card-text" style="margin-bottom:10px;">¿Seguro que quieres descartar esta tarea?</div>
+      <button class="ai-btn danger" style="width:100%;" onclick="aiDescartarTarea(${aiTareaActiva})">Sí, descartar</button>`;
+  }
+  // _libre — texto o dictado, único caso de escritura libre
+  return `${volver}<div class="ai-card-label">Escribe o dicta qué cambiar</div>
+    <div style="position:relative;">
+      <input type="text" id="ai-inline-libre" placeholder="Ej. cámbialo a 95 euros y ponlo en efectivo…" style="padding-right:44px;">
+      <button class="ai-tool-btn" style="position:absolute;right:2px;top:1px;width:34px;height:34px;" onclick="aiDictarInline(${aiTareaActiva})" title="Dictar">🎙️</button>
+    </div>
+    <button class="ai-btn primary" style="width:100%;margin-top:8px;" onclick="aiAplicarLibre(${aiTareaActiva})">Aplicar</button>`;
+}
+function aiSetCampoEdit(i, campo, valor){
+  const t = aiTareas[i];
+  t.datos = t.datos || {};
+  t.datos[campo] = valor;
+  aiRenderTareas();
+}
+function aiSetCampoEditYVolver(i, campo, valor){
+  aiSetCampoEdit(i, campo, valor);
+  aiTareas[i]._editMenu = null;
+  aiRenderTareas();
+}
+function aiAjustarImporte(i, delta){
+  const t = aiTareas[i];
+  const input = document.getElementById('ai-inline-importe');
+  const actual = Number(input?.value||t.datos.importe||0);
+  const nuevo = Math.max(0, actual + delta);
+  if(input) input.value = nuevo;
+}
+function aiGuardarImporteInline(i){
+  const val = Number(document.getElementById('ai-inline-importe')?.value);
+  if(!isNaN(val)) aiTareas[i].datos.importe = val;
+  aiTareas[i]._editMenu = null;
+  aiRenderTareas();
+}
+function aiDictarInline(i){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ mostrarToast('Este navegador no permite dictar aquí.'); return; }
+  const r = new SR();
+  r.lang = 'es-ES';
+  r.onresult = (e)=>{ document.getElementById('ai-inline-libre').value = e.results[0][0].transcript; };
+  r.start();
+}
+function aiAplicarLibre(i){
+  const texto = document.getElementById('ai-inline-libre')?.value?.trim();
+  if(!texto) return;
+  const t = aiTareas[i];
+  // interpretaci\u00f3n simple sin llamar a la IA: si hay un n\u00famero, se toma como importe (gasto); si no, se guarda como nota en el t\u00edtulo/entendido
+  const numMatch = texto.match(/[\d.,]+/);
+  if(t.tipo==='gasto' && numMatch){
+    t.datos.importe = Number(numMatch[0].replace(',','.'));
+    t.datos.concepto = t.datos.concepto || texto.replace(numMatch[0],'').replace(/€|euros?/gi,'').trim();
+  } else {
+    t.entendido = (t.entendido||'') + ' — ' + texto;
+  }
+  t._editMenu = null;
+  aiRenderTareas();
+}
+function aiEditarTarea(i){ aiTareas[i]._editando = true; aiTareas[i]._editMenu = null; aiTareas[i]._editRevelados = 3; aiRenderTareas(); }
+function aiCancelarEdicion(i){ aiTareas[i]._editando = false; aiTareas[i]._editMenu = null; aiRenderTareas(); }
+function aiTerminarEdicion(i){
+  aiTareas[i]._editando = false;
+  aiTareas[i]._editMenu = null;
+  if(aiTareas[i].estado==='pendiente' && aiTareas[i].datos.cliente) aiTareas[i].estado = 'lista';
   aiRenderTareas();
 }
 function aiSetCampo(i, campo, valor){
