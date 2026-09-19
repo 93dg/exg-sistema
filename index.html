@@ -2088,6 +2088,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <div id="mobile-add-menu">
   <button onclick="closeMobileAddMenuAndRun(abrirAsistenteIA)"><span class="ma-ico">🤖</span> Asistente</button>
   <button onclick="closeMobileAddMenuAndRun(abrirMenuTipoDoc)"><span class="ma-ico">📄</span> Documento</button>
+  <button onclick="closeMobileAddMenuAndRun(abrirDigitalizar)"><span class="ma-ico">📥</span> Digitalizar archivo</button>
   <button onclick="closeMobileAddMenuAndRun(()=>openNewJobModal())"><span class="ma-ico">▤</span> Trabajo</button>
   <button onclick="closeMobileAddMenuAndRun(abrirAveria)"><span class="ma-ico">⚠</span> Incidente</button>
   <button onclick="closeMobileAddMenuAndRun(()=>openNewClientModal(null))"><span class="ma-ico">◈</span> Cliente</button>
@@ -2100,7 +2101,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.3</div>
+        <div class="sub">V2.4</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3375,7 +3376,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     <div class="view" id="view-reportes">
       <div class="topbar">
         <div><h1>Reportes</h1><div class="desc">Lo que has ido reportando desde la web, con captura y estado</div></div>
-        <div class="quickactions"><button class="btn" onclick="openReportBug()">+ Añadir</button></div>
+        <div class="quickactions"><button class="btn primary" onclick="abrirDigitalizar()">📥 Digitalizar documento</button><button class="btn" onclick="openReportBug()">+ Añadir</button></div>
       </div>
       <div class="panel">
         <div class="panel-head">
@@ -4105,6 +4106,37 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       <button id="ai-propuestas-volver" style="margin-top:16px;" onclick="reiniciarAsistenteIA()">Volver</button>
     </div>
 
+  </div>
+</div>
+
+<div class="overlay" id="digitalizar-overlay" onclick="if(event.target===this) cerrarDigitalizar()">
+  <div class="drawer" style="max-width:460px;">
+    <div class="drawer-head">
+      <div><h2>📥 Digitalizar documento</h2><div style="color:var(--ink-soft);font-size:12.5px;margin-top:3px;">Sube una foto, PDF o Excel — la IA lo lee y lo guarda solo</div></div>
+      <button class="close-x" onclick="cerrarDigitalizar()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field" style="margin-bottom:12px;"><div class="l">Archivo</div>
+        <input type="file" id="digitalizar-file" accept="image/*,.pdf,.xls,.xlsx" style="width:100%;">
+      </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Tipo (si lo sabes — si no, la IA lo detecta sola)</div>
+        <select class="search-box" style="width:100%;" id="digitalizar-tipo">
+          <option value="">— Que lo detecte la IA —</option>
+          <option value="factura">Factura</option>
+          <option value="albaran">Albarán</option>
+          <option value="presupuesto">Presupuesto</option>
+          <option value="proforma">Proforma</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:12px;"><div class="l">Contabilidad</div>
+        <select class="search-box" style="width:100%;" id="digitalizar-contabilidad">
+          <option value="oficial">Oficial</option>
+          <option value="en_b">En B</option>
+        </select>
+      </div>
+      <button class="btn primary" style="width:100%;" id="digitalizar-btn" onclick="ejecutarDigitalizar()">Digitalizar</button>
+      <div id="digitalizar-resultado" style="margin-top:14px;"></div>
+    </div>
   </div>
 </div>
 
@@ -10209,6 +10241,53 @@ function aiMostrarResumen(){
     </div>`).join('');
   document.getElementById('ai-panel-sub').textContent = 'Resumen';
   aiMostrarVista('summary');
+}
+function abrirDigitalizar(){
+  document.getElementById('digitalizar-file').value = '';
+  document.getElementById('digitalizar-tipo').value = '';
+  document.getElementById('digitalizar-contabilidad').value = 'oficial';
+  document.getElementById('digitalizar-resultado').innerHTML = '';
+  document.getElementById('digitalizar-overlay').classList.add('active');
+}
+function cerrarDigitalizar(){ document.getElementById('digitalizar-overlay').classList.remove('active'); }
+async function ejecutarDigitalizar(){
+  const file = document.getElementById('digitalizar-file').files[0];
+  const resEl = document.getElementById('digitalizar-resultado');
+  if(!file){ mostrarToast('Elige un archivo primero.'); return; }
+  const btn = document.getElementById('digitalizar-btn');
+  btn.disabled = true;
+  resEl.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:12px 0;">Leyendo el documento…</div>';
+  try{
+    const base64 = await new Promise((res,rej)=>{
+      const r = new FileReader();
+      r.onload = ()=>res(r.result.split(',')[1]);
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/digitalizar-documento', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+SUPABASE_ANON_KEY },
+      body: JSON.stringify({
+        archivo_base64: base64, archivo_nombre: file.name, media_type: file.type || 'application/octet-stream',
+        tipo_sugerido: document.getElementById('digitalizar-tipo').value || null,
+        contabilidad: document.getElementById('digitalizar-contabilidad').value,
+      }),
+    });
+    const data = await resp.json();
+    if(!resp.ok || data.error){ resEl.innerHTML = `<div style="color:var(--red);font-size:13px;">Error: ${data.error||'algo ha fallado.'}</div>`; btn.disabled=false; return; }
+    const conf = {alta:['✓ Confianza alta','var(--green,#6FA37C)'], media:['⚠ Confianza media','#D8AA3D'], baja:['❗ Confianza baja — revísalo','var(--red,#C4685A)']}[data.confianza_general] || ['—','var(--ink-soft)'];
+    resEl.innerHTML = `
+      <div style="font-weight:700;color:${conf[1]};margin-bottom:8px;">${conf[0]}</div>
+      <div class="ai-card-block"><div class="ai-card-label">Detectado</div><div class="ai-card-text">${data.extraido.tipo_documento} nº ${data.extraido.numero||'—'} · ${data.extraido.cliente?.nombre||'sin cliente'} · ${data.extraido.total?data.extraido.total+' €':'sin total'}</div></div>
+      ${data.campos_dudosos?.length ? `<div class="ai-card-block ai-card-falta"><div class="ai-card-label" style="color:#D8AA3D;">Dudoso, revisar</div><div class="ai-card-text">${data.campos_dudosos.join(', ')}</div></div>` : ''}
+      ${data.conflictos_cliente?.length ? `<div class="ai-card-block ai-card-falta"><div class="ai-card-label" style="color:#D8AA3D;">Conflicto con datos de cliente ya guardados</div><div class="ai-card-text">${data.conflictos_cliente.map(c=>c.campo).join(', ')} — resuélvelo en Reportes → Conflictos de datos de cliente</div></div>` : ''}
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:8px;">Guardado. Calidad: ${data.calidad ? `${data.calidad.validados} validado, ${data.calidad.revision} revisión, ${data.calidad.error} error` : '—'}</div>
+      <button class="ai-btn primary" style="width:100%;margin-top:10px;" onclick="cerrarDigitalizar();openDocumentViewer('${data.documento_id}')">Ver documento guardado</button>
+    `;
+  }catch(err){
+    resEl.innerHTML = `<div style="color:var(--red);font-size:13px;">Error de red: ${err.message}</div>`;
+  }
+  btn.disabled = false;
 }
 function abrirMenuTipoDoc(){
   document.getElementById('mobile-tabbar')?.classList.remove('add-open');
