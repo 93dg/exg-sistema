@@ -2093,7 +2093,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.91</div>
+        <div class="sub">V1.92</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3392,11 +3392,11 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </div>
 
       <div class="panel" style="margin-top:16px;">
-        <div class="panel-head"><h3>💡 Propuestas de mejora del Asistente</h3><span class="count" id="reportes-ia-count">0</span></div>
+        <div class="panel-head"><h3>💡 Propuestas de mejora del sistema</h3><span class="count" id="reportes-ia-count">0</span></div>
         <div class="panel-body" id="reportes-ia-propuestas">
           <div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Cargando…</div>
         </div>
-        <div class="two-col-note">Basadas en las tareas que has ido confirmando en el 🤖 Asistente. Son solo observaciones — nada se aplica solo.</div>
+        <div class="two-col-note">Mira facturas, albaranes, gastos, clientes, navegación y lo confirmado en el 🤖 Asistente. Son solo observaciones — nada se aplica solo.</div>
       </div>
     </div>
 
@@ -4409,6 +4409,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     document.getElementById('view-'+btn.dataset.view).classList.add('active');
     document.getElementById('app').classList.remove('mobile-nav-open');
     localStorage.setItem('vista_activa', btn.dataset.view);
+    aiRegistrarEvento('navegacion', btn.dataset.view);
     document.querySelectorAll('.mobile-tab-btn[data-view]').forEach(b=>b.classList.remove('active'));
     const tabBtn = document.querySelector(`.mobile-tab-btn[data-view="${btn.dataset.view}"]`);
     if(tabBtn) tabBtn.classList.add('active');
@@ -8324,6 +8325,7 @@ function submitNewClient(){
     if(clientTargetSelect==='ni-client') onClientChange();
     if(clientTargetSelect==='wiz-client'){ wiz.clientName = name; wizNext(); }
   }
+  aiRegistrarEvento('cliente_creado', 'clientes', {type});
   closeNewClientModal();
 }
 
@@ -9458,42 +9460,42 @@ function aiRegistrarLog(t){
   if(!sb) return;
   sb.from('asistente_log').insert({ tipo: t.tipo, titulo: t.titulo, datos: t.datos||{} }).then(()=>{}).catch(()=>{});
 }
+function aiRegistrarEvento(accion, vista, contexto){
+  if(!sb) return;
+  sb.from('sistema_eventos').insert({ accion, vista: vista||null, contexto: contexto||{} }).then(()=>{}).catch(()=>{});
+}
 async function cargarPropuestasReportes(){
   const cont = document.getElementById('reportes-ia-propuestas');
   const count = document.getElementById('reportes-ia-count');
   if(!cont) return;
-  cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Mirando el historial…</div>';
+  cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Mirando el sistema…</div>';
   if(!sb){ cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Supabase no está conectado.</div>'; return; }
   try{
-    const {data, error} = await sb.from('asistente_log').select('*').order('created_at',{ascending:false}).limit(300);
-    if(error || !data){ cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">No he podido leer el historial.</div>'; return; }
-    const sugerencias = aiCalcularSugerencias(data);
+    const sugerencias = await aiCalcularSugerenciasSistema();
     if(count) count.textContent = sugerencias.length;
     cont.innerHTML = sugerencias.length ? sugerencias.map(s=>`
       <div class="econ-line" style="align-items:flex-start;flex-direction:column;gap:4px;padding:12px 0;">
         <div style="font-weight:700;">${s.icono} ${s.titulo}</div>
         <div style="color:var(--ink-soft);font-size:12.5px;">${s.detalle}</div>
-      </div>`).join('') : `<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Todavía no hay suficiente historial de uso del Asistente para detectar patrones.</div>`;
+      </div>`).join('') : `<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Todavía no hay suficiente actividad registrada para detectar patrones.</div>`;
   }catch(err){
     cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Error: '+err.message+'</div>';
   }
 }
 async function abrirAiPropuestas(){
   aiMostrarVista('propuestas');
-  document.getElementById('ai-panel-sub').textContent = 'Propuestas de mejora';
+  document.getElementById('ai-panel-sub').textContent = 'Propuestas de mejora del sistema';
   const cont = document.getElementById('ai-propuestas-list');
-  cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">Mirando el historial…</div>';
+  cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">Mirando el sistema…</div>';
   if(!sb){ cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">Supabase no está conectado.</div>'; return; }
   try{
-    const {data, error} = await sb.from('asistente_log').select('*').order('created_at',{ascending:false}).limit(300);
-    if(error || !data){ cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">No he podido leer el historial.</div>'; return; }
-    const sugerencias = aiCalcularSugerencias(data);
+    const sugerencias = await aiCalcularSugerenciasSistema();
     cont.innerHTML = sugerencias.length ? sugerencias.map(s=>`
       <div class="ai-summary-item" style="align-items:flex-start;flex-direction:column;gap:4px;">
         <div style="font-weight:700;">${s.icono} ${s.titulo}</div>
         <div style="color:var(--ink-soft);font-size:12.5px;">${s.detalle}</div>
-      </div>`).join('') : `<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">Todavía no hay suficiente historial de uso (mínimo unas cuantas tareas confirmadas) para detectar patrones.</div>`;
-    cont.insertAdjacentHTML('beforeend', `<div style="margin-top:14px;font-size:11.5px;color:var(--ink-faint,#8b8275);text-align:center;">Estas son solo observaciones — nada se cambia solo. Si quieres aplicar alguna, dímelo o hazlo tú directamente en la sección correspondiente.</div>`);
+      </div>`).join('') : `<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">Todavía no hay suficiente actividad registrada para detectar patrones.</div>`;
+    cont.insertAdjacentHTML('beforeend', `<div style="margin-top:14px;font-size:11.5px;color:var(--ink-faint,#8b8275);text-align:center;">Mira facturas, albaranes, gastos, clientes y navegación — no solo lo que pasa por el Asistente. Son solo observaciones — nada se cambia solo.</div>`);
   }catch(err){
     cont.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">Error: '+err.message+'</div>';
   }
@@ -9510,13 +9512,13 @@ function aiCalcularSugerencias(rows){
     docs.forEach(d=>{ const c=d.datos?.cliente; if(c) conteo[c]=(conteo[c]||0)+1; });
     const top = Object.entries(conteo).sort((a,b)=>b[1]-a[1])[0];
     if(top && top[1]/docs.length >= 0.3){
-      sug.push({icono:'👤', titulo:`${top[0]} es tu cliente más repetido`, detalle:`Aparece en ${top[1]} de tus últimos ${docs.length} documentos (${Math.round(top[1]/docs.length*100)}%). Ya sale el primero en el buscador de clientes por este motivo.`});
+      sug.push({icono:'👤', titulo:`${top[0]} es tu cliente más repetido (Asistente)`, detalle:`Aparece en ${top[1]} de tus últimos ${docs.length} documentos pedidos al Asistente (${Math.round(top[1]/docs.length*100)}%). Ya sale el primero en el buscador de clientes por este motivo.`});
     }
     const tiposDoc = {};
     docs.forEach(d=>{ const td=d.datos?.tipo_doc; if(td) tiposDoc[td]=(tiposDoc[td]||0)+1; });
     const topTipo = Object.entries(tiposDoc).sort((a,b)=>b[1]-a[1])[0];
     if(topTipo && topTipo[0]!=='presupuesto' && topTipo[1]/docs.length >= 0.5){
-      sug.push({icono:'📄', titulo:`Casi siempre pides "${topTipo[0]}"`, detalle:`El ${Math.round(topTipo[1]/docs.length*100)}% de tus documentos son de tipo "${topTipo[0]}", no presupuesto. Podría tener sentido que ese fuera el tipo por defecto en vez de presupuesto.`});
+      sug.push({icono:'📄', titulo:`Casi siempre pides "${topTipo[0]}"`, detalle:`El ${Math.round(topTipo[1]/docs.length*100)}% de tus documentos por el Asistente son de tipo "${topTipo[0]}", no presupuesto. Podría tener sentido que ese fuera el tipo por defecto.`});
     }
   }
   // conceptos de gasto repetidos
@@ -9526,7 +9528,7 @@ function aiCalcularSugerencias(rows){
     gastos.forEach(g=>{ const c=(g.datos?.concepto||'').toLowerCase().trim(); if(c) conteo[c]=(conteo[c]||0)+1; });
     const top = Object.entries(conteo).sort((a,b)=>b[1]-a[1])[0];
     if(top && top[1]>=3){
-      sug.push({icono:'💸', titulo:`Gasto que repites: "${top[0]}"`, detalle:`Lo has registrado ${top[1]} veces. Si quieres, podría dejarlo como sugerencia rápida al abrir "Registrar gasto".`});
+      sug.push({icono:'💸', titulo:`Gasto que repites: "${top[0]}"`, detalle:`Lo has registrado ${top[1]} veces por el Asistente. Podría dejarlo como sugerencia rápida al abrir "Registrar gasto".`});
     }
   }
   // incidentes de m\u00e1quina
@@ -9535,7 +9537,78 @@ function aiCalcularSugerencias(rows){
   if(averias.length>=4){
     sug.push({icono:'⚙️', titulo:`${averias.length} averías de máquina registradas por el asistente`, detalle:`Si suelen ser siempre de la misma máquina, dímelo la próxima vez y puedo sugerirla directamente.`});
   }
-  return sug.slice(0,4);
+  return sug;
+}
+async function aiCalcularSugerenciasSistema(){
+  const sug = [];
+  if(!sb) return sug;
+
+  // 1) lo que ya sabemos del Asistente
+  try{
+    const {data: logAsistente} = await sb.from('asistente_log').select('*').order('created_at',{ascending:false}).limit(300);
+    if(logAsistente) sug.push(...aiCalcularSugerencias(logAsistente));
+  }catch(e){}
+
+  // 2) toda la actividad real de documentos (facturas, albaranes, presupuestos, proformas, gastos)
+  try{
+    const {data: docs} = await sb.from('documentos_economicos').select('tipo,estado_cobro,estado_albaran,contabilidad,total,entidad_id,created_at,fecha_devengo').limit(2000);
+    if(docs && docs.length){
+      const hoy = Date.now();
+      const dias = ms => Math.floor(ms/(1000*60*60*24));
+
+      // cliente con m\u00e1s documentos, de todo el historial
+      const porCliente = {};
+      docs.forEach(d=>{ if(d.entidad_id) porCliente[d.entidad_id] = (porCliente[d.entidad_id]||0)+1; });
+      const topCliente = Object.entries(porCliente).sort((a,b)=>b[1]-a[1])[0];
+      if(topCliente && topCliente[1]>=5){
+        const nombre = (typeof clientes!=='undefined' ? clientes.find(c=>c.id===topCliente[0])?.name : null) || 'Un cliente';
+        sug.push({icono:'👤', titulo:`${nombre} es tu cliente con más movimiento`, detalle:`${topCliente[1]} documentos en total (facturas, albaranes, presupuestos). Es de los datos más sólidos que tenemos — ya aparece el primero al buscar cliente.`});
+      }
+
+      // facturas pendientes de cobro desde hace tiempo
+      const facturasPendientes = docs.filter(d=>d.tipo==='factura' && d.estado_cobro && d.estado_cobro!=='cobrado' && d.fecha_devengo);
+      const antiguas = facturasPendientes.filter(d=> dias(hoy - new Date(d.fecha_devengo).getTime()) > 60);
+      if(antiguas.length>=1){
+        const totalAntiguas = antiguas.reduce((s,d)=>s+(Number(d.total)||0),0);
+        sug.push({icono:'💰', titulo:`${antiguas.length} factura${antiguas.length>1?'s':''} sin cobrar desde hace más de 2 meses`, detalle:`Suman ${totalAntiguas.toLocaleString('es-ES',{minimumFractionDigits:2})} €. Podría ser útil un aviso automático en Centro de control cuando una factura lleva mucho pendiente.`});
+      }
+
+      // albaranes en proceso desde hace tiempo, sin facturar
+      const albaranesAbiertos = docs.filter(d=>d.tipo==='albaran' && d.estado_albaran==='en_proceso' && d.fecha_devengo);
+      const albaranesViejos = albaranesAbiertos.filter(d=> dias(hoy - new Date(d.fecha_devengo).getTime()) > 30);
+      if(albaranesViejos.length>=1){
+        sug.push({icono:'📋', titulo:`${albaranesViejos.length} albarán${albaranesViejos.length>1?'es':''} lleva${albaranesViejos.length>1?'n':''} más de 30 días sin facturarse`, detalle:`Aparecen en "Albaranes en proceso" de Centro de control. Si ya están cobrados o no van a facturarse, conviene actualizarlos para que no se acumulen.`});
+      }
+
+      // reparto oficial / en B
+      const conContabilidad = docs.filter(d=>d.contabilidad);
+      if(conContabilidad.length>=10){
+        const enB = conContabilidad.filter(d=>d.contabilidad==='en_b').length;
+        const pct = Math.round(enB/conContabilidad.length*100);
+        if(pct>=25){
+          sug.push({icono:'📊', titulo:`El ${pct}% de tus movimientos son "en B"`, detalle:`Es solo un dato informativo del reparto real que hay entre oficial y en B, por si te sirve para tus cuentas.`});
+        }
+      }
+    }
+  }catch(e){}
+
+  // 3) navegaci\u00f3n real — qu\u00e9 secciones se usan m\u00e1s (se va acumulando con el uso)
+  try{
+    const {data: eventos} = await sb.from('sistema_eventos').select('accion,vista,created_at').order('created_at',{ascending:false}).limit(500);
+    if(eventos && eventos.length>=15){
+      const navs = eventos.filter(e=>e.accion==='navegacion' && e.vista);
+      const porVista = {};
+      navs.forEach(e=>{ porVista[e.vista]=(porVista[e.vista]||0)+1; });
+      const topVista = Object.entries(porVista).sort((a,b)=>b[1]-a[1])[0];
+      if(topVista && topVista[1]>=8){
+        sug.push({icono:'🧭', titulo:`"${topVista[0]}" es la sección que más visitas`, detalle:`${topVista[1]} veces en las últimas ${eventos.length} acciones registradas. Si no está ya en un acceso rápido, podría convenir ponerla más a mano.`});
+      }
+    } else {
+      sug.push({icono:'🧭', titulo:'Aún reuniendo datos de navegación', detalle:'Desde ahora registro qué secciones usas más, para ir sugiriendo accesos rápidos y mejoras de organización según el uso real. Todavía hay poco historial.'});
+    }
+  }catch(e){}
+
+  return sug.slice(0,6);
 }
 function aiMostrarResumen(){
   const lista = document.getElementById('ai-summary-list');
@@ -9631,6 +9704,7 @@ async function guardarGasto(){
     row.innerHTML = `<td>${dateLabel}</td><td>${concepto}</td><td>${proveedorNombre||'—'}</td><td>${recurrencia ? `<span class="pill planificado">${recurrencia}</span>` : '—'}</td><td class="num">${importe.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>`;
     document.getElementById('econ-gastos-tbody')?.prepend(row);
     document.getElementById('gastos-tbody-standalone')?.insertAdjacentHTML('afterbegin', `<tr>${row.innerHTML}</tr>`);
+    aiRegistrarEvento('gasto_creado', 'gastos', {contabilidad, recurrencia});
     cerrarRegistrarGasto();
   }catch(err){ statusEl.textContent = 'Error de red: '+errText(err); statusEl.style.color = 'var(--red)'; }
 }
@@ -10041,6 +10115,7 @@ async function submitNewInvoice(ev, isDraft){
     document.querySelector('[data-view="control"]').click();
   }
 
+  aiRegistrarEvento('documento_creado', 'documentos', {type, client});
   editingDocId = null;
   convirtiendoDesde = null;
   closeNewInvoiceModal();
