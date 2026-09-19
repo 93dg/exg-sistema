@@ -732,24 +732,25 @@ table{border-collapse:collapse;width:100%;}
 @keyframes ai-bounce{0%,80%,100%{transform:scale(0.6);opacity:0.5;}40%{transform:scale(1);opacity:1;}}
 #ai-loading-text{font-size:13.5px;color:var(--ink-soft);}
 
-#ai-task-tabs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:16px;}
+#ai-task-tabs{display:flex;align-items:flex-end;gap:2px;margin-bottom:0;overflow-x:auto;scrollbar-width:none;}
+#ai-task-tabs::-webkit-scrollbar{display:none;}
 .ai-tab{
-  display:flex;flex-direction:column;gap:4px;padding:12px 13px;border-radius:12px;background:var(--concrete);
-  border:1px solid var(--line);border-left:3px solid var(--line);cursor:pointer;
+  display:flex;align-items:center;gap:5px;padding:9px 12px;border-radius:9px 9px 0 0;background:var(--paper);
+  border:1px solid var(--line);border-bottom:none;cursor:pointer;flex:1 1 0;min-width:0;max-width:170px;
+  position:relative;top:1px;
 }
-.ai-tab .ai-tab-top{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--ink);}
-.ai-tab .ai-tab-status{font-size:10px;text-transform:uppercase;letter-spacing:0.04em;font-weight:700;}
-.ai-tab.active{background:var(--ochre-soft,#3A2C16);border-color:var(--orange);}
-.ai-tab[data-estado="pendiente"]{border-left-color:#D8AA3D;}
-.ai-tab[data-estado="pendiente"] .ai-tab-status{color:#D8AA3D;}
-.ai-tab[data-estado="lista"]{border-left-color:var(--ink-faint,#8b8275);}
-.ai-tab[data-estado="lista"] .ai-tab-status{color:var(--ink-faint,#8b8275);}
-.ai-tab[data-estado="confirmada"]{border-left-color:var(--green,#6FA37C);}
-.ai-tab[data-estado="confirmada"] .ai-tab-status{color:var(--green,#6FA37C);}
-.ai-tab[data-estado="descartada"]{border-left-color:var(--red,#C4685A);opacity:.6;}
-.ai-tab[data-estado="descartada"] .ai-tab-status{color:var(--red,#C4685A);}
+.ai-tab-ico{flex-shrink:0;font-size:12px;}
+.ai-tab-nombre{font-size:12px;font-weight:600;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.ai-tab-estado-ico{flex-shrink:0;font-size:10px;font-weight:700;margin-left:auto;}
+.ai-tab.active{background:var(--concrete);border-color:var(--line);z-index:2;box-shadow:0 -2px 0 var(--orange) inset;}
+.ai-tab.active .ai-tab-nombre{color:var(--ink);}
+.ai-tab[data-estado="pendiente"] .ai-tab-estado-ico{color:#D8AA3D;}
+.ai-tab[data-estado="lista"] .ai-tab-estado-ico{color:var(--ink-faint,#8b8275);}
+.ai-tab[data-estado="confirmada"] .ai-tab-estado-ico{color:var(--green,#6FA37C);}
+.ai-tab[data-estado="descartada"]{opacity:.55;}
+.ai-tab[data-estado="descartada"] .ai-tab-estado-ico{color:var(--red,#C4685A);}
 
-#ai-task-card{background:var(--concrete);border:1px solid var(--line);border-radius:14px;padding:20px;}
+#ai-task-card{background:var(--concrete);border:1px solid var(--line);border-top-left-radius:0;border-radius:0 10px 10px 10px;padding:20px;}
 .ai-card-tipo{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--orange);background:var(--ochre-soft,rgba(216,86,15,0.12));padding:3px 10px;border-radius:10px;margin-bottom:10px;}
 .ai-card-titulo{font-family:'Archivo',sans-serif;font-weight:800;font-size:18px;color:var(--ink);margin-bottom:14px;}
 .ai-card-block{margin-bottom:14px;}
@@ -783,7 +784,8 @@ table{border-collapse:collapse;width:100%;}
   #ai-panel-head{padding:16px 18px;}
   #ai-panel-body{padding:18px;}
   .ai-btn{min-width:0;padding:14px;font-size:14px;}
-  #ai-task-tabs{grid-template-columns:1fr;}
+  #ai-task-tabs{overflow-x:auto;}
+  .ai-tab{max-width:130px;flex:0 0 auto;min-width:90px;}
   .ai-tool-btn{width:46px;height:46px;font-size:18px;}
 }
 #report-bug-bar{
@@ -2091,7 +2093,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.90</div>
+        <div class="sub">V1.91</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9282,11 +9284,12 @@ async function enviarAsistenteIA(){
 }
 function aiRenderTareas(){
   const tabs = document.getElementById('ai-task-tabs');
-  const estLabel = {pendiente:'Falta un dato', lista:'Lista', confirmada:'Confirmada', descartada:'Descartada'};
+  const estIco = {pendiente:'●', lista:'○', confirmada:'✓', descartada:'✕'};
   tabs.innerHTML = aiTareas.map((t,i)=>`
-    <div class="ai-tab ${i===aiTareaActiva?'active':''}" data-estado="${t.estado}" onclick="aiSeleccionarTarea(${i})">
-      <div class="ai-tab-top">${AI_ICONOS[t.tipo]||'📝'} ${t.titulo}</div>
-      <div class="ai-tab-status">${estLabel[t.estado]||t.estado}</div>
+    <div class="ai-tab ${i===aiTareaActiva?'active':''}" data-estado="${t.estado}" onclick="aiSeleccionarTarea(${i})" title="${t.titulo}">
+      <span class="ai-tab-ico">${AI_ICONOS[t.tipo]||'📝'}</span>
+      <span class="ai-tab-nombre">${t.titulo}</span>
+      <span class="ai-tab-estado-ico">${estIco[t.estado]||''}</span>
     </div>`).join('');
   aiRenderTarjeta();
 }
@@ -9297,6 +9300,7 @@ function aiRenderTarjeta(){
   if(!t){ card.innerHTML=''; return; }
   t.datos = t.datos || {};
   const yaResuelta = t.estado==='confirmada' || t.estado==='descartada';
+  const editando = !!t._editando && !yaResuelta;
 
   let widgetHtml = '';
   // tipo de documento — chips, siempre editable
@@ -9312,21 +9316,38 @@ function aiRenderTarjeta(){
     widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Tipo de incidente</div>
       <div class="ai-chip-row">${opciones.map(([v,l])=>`<div class="ai-chip ${t.datos.subtipo===v?'sel':''}" onclick="aiSetCampo(${aiTareaActiva},'subtipo','${v}')">${l}</div>`).join('')}</div></div>`;
   }
-  // cliente — buscador clicable, solo si hace falta
+  // cliente — buscador clicable, se puede reabrir en modo edición aunque ya haya uno
   if((t.tipo==='documento' || t.tipo==='trabajo')){
-    if(t.datos.cliente){
+    if(t.datos.cliente && !editando){
       widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Cliente</div>
         <div class="ai-chip sel" style="display:inline-flex;" onclick="aiSetCampo(${aiTareaActiva},'cliente',null)">${t.datos.cliente} ✕</div></div>`;
     } else {
       const sugeridos = (typeof clientesOrdenadosPorUso==='function' ? clientesOrdenadosPorUso() : (typeof clientes!=='undefined'?clientes:[])).slice(0,6);
-      widgetHtml += `<div class="ai-card-block ai-card-falta">
-        <div class="ai-card-label" style="color:#D8AA3D;">Falta el cliente</div>
+      widgetHtml += `<div class="ai-card-block ${t.datos.cliente?'':'ai-card-falta'}">
+        <div class="ai-card-label" ${t.datos.cliente?'':'style="color:#D8AA3D;"'}>${t.datos.cliente?'Cambiar cliente':'Falta el cliente'}</div>
         <input type="text" id="ai-cliente-buscar-${aiTareaActiva}" placeholder="Buscar cliente…" oninput="aiFiltrarClientes(${aiTareaActiva})" style="margin-bottom:8px;">
         <div class="ai-chip-row" id="ai-cliente-lista-${aiTareaActiva}">
           ${sugeridos.map(c=>`<div class="ai-chip" onclick="aiSetCampo(${aiTareaActiva},'cliente','${c.name.replace(/'/g,"\\'")}')">${c.name}</div>`).join('')}
         </div>
       </div>`;
     }
+  }
+  // gasto — concepto/importe editables en modo edición
+  if(t.tipo==='gasto'){
+    if(editando){
+      widgetHtml += `<div class="ai-card-block">
+        <div class="ai-card-label">Concepto</div>
+        <input type="text" id="ai-edit-concepto" value="${t.datos.concepto||''}" placeholder="Ej. Gasoil">
+        <div class="ai-card-label" style="margin-top:10px;">Importe (€)</div>
+        <input type="number" step="0.01" id="ai-edit-importe" value="${t.datos.importe??''}" placeholder="0,00">
+      </div>`;
+    } else {
+      widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Concepto / importe</div>
+        <div class="ai-card-text">${t.datos.concepto||'—'}${t.datos.importe?` · ${t.datos.importe} €`:''}</div></div>`;
+    }
+  }
+  if(editando){
+    widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Título</div><input type="text" id="ai-edit-titulo" value="${t.titulo}"></div>`;
   }
 
   const bloqueada = (t.tipo==='documento'||t.tipo==='trabajo') && !t.datos.cliente;
@@ -9339,13 +9360,32 @@ function aiRenderTarjeta(){
     ${widgetHtml}
     ${yaResuelta ? `<div class="ai-card-block" style="margin-top:6px;"><div class="ai-card-text" style="color:${t.estado==='confirmada'?'var(--green)':'var(--red)'};font-weight:700;">${t.estado==='confirmada'?'✓ Confirmada':'✕ Descartada'}</div></div>` : ''}
     <div class="ai-card-actions">
-      ${!yaResuelta ? `
+      ${!yaResuelta ? (editando ? `
+        <button class="ai-btn primary" onclick="aiGuardarEdicion(${aiTareaActiva})">Guardar cambios</button>
+        <button class="ai-btn ghost" onclick="aiCancelarEdicion(${aiTareaActiva})">Cancelar</button>
+      ` : `
+        <button class="ai-btn" onclick="aiEditarTarea(${aiTareaActiva})">✎ Editar/Corregir</button>
         <button class="ai-btn primary" ${bloqueada?'disabled style="opacity:.5;"':''} onclick="aiConfirmarTarea(${aiTareaActiva})">Confirmar</button>
         <button class="ai-btn danger" onclick="aiDescartarTarea(${aiTareaActiva})">Descartar</button>
-      ` : ''}
-      ${aiTareaActiva < aiTareas.length-1 ? `<button class="ai-btn ghost" onclick="aiSeleccionarTarea(${aiTareaActiva+1})">Siguiente →</button>` : ''}
+      `) : ''}
     </div>
   `;
+}
+function aiEditarTarea(i){ aiTareas[i]._editando = true; aiRenderTareas(); }
+function aiCancelarEdicion(i){ aiTareas[i]._editando = false; aiRenderTareas(); }
+function aiGuardarEdicion(i){
+  const t = aiTareas[i];
+  const nuevoTitulo = document.getElementById('ai-edit-titulo')?.value?.trim();
+  if(nuevoTitulo) t.titulo = nuevoTitulo;
+  if(t.tipo==='gasto'){
+    const c = document.getElementById('ai-edit-concepto')?.value?.trim();
+    const imp = document.getElementById('ai-edit-importe')?.value;
+    t.datos = t.datos || {};
+    if(c) t.datos.concepto = c;
+    if(imp) t.datos.importe = Number(imp);
+  }
+  t._editando = false;
+  aiRenderTareas();
 }
 function aiSetCampo(i, campo, valor){
   const t = aiTareas[i];
