@@ -2093,7 +2093,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.92</div>
+        <div class="sub">V1.93</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9460,10 +9460,93 @@ function aiRegistrarLog(t){
   if(!sb) return;
   sb.from('asistente_log').insert({ tipo: t.tipo, titulo: t.titulo, datos: t.datos||{} }).then(()=>{}).catch(()=>{});
 }
+
+/* ---------------- INSTRUMENTACIÓN AUTOMÁTICA GENERAL ---------------- */
+/* Registra en cola y envía por lotes, sin tener que marcar acción por acción */
+let sistemaEventosCola = [];
+let sistemaEventosThrottle = {};
+function aiVistaActual(){ return document.querySelector('.nav button[data-view].active')?.dataset.view || localStorage.getItem('vista_activa') || null; }
 function aiRegistrarEvento(accion, vista, contexto){
   if(!sb) return;
-  sb.from('sistema_eventos').insert({ accion, vista: vista||null, contexto: contexto||{} }).then(()=>{}).catch(()=>{});
+  sistemaEventosCola.push({ accion, vista: vista||aiVistaActual(), contexto: contexto||{}, created_at: new Date().toISOString() });
+  if(sistemaEventosCola.length >= 15) aiVolcarEventos();
 }
+function aiRegistrarEventoThrottled(accion, vista, contexto, ventanaMs){
+  const clave = accion+'|'+vista;
+  const ahora = Date.now();
+  if(sistemaEventosThrottle[clave] && ahora - sistemaEventosThrottle[clave] < (ventanaMs||3000)) return;
+  sistemaEventosThrottle[clave] = ahora;
+  aiRegistrarEvento(accion, vista, contexto);
+}
+function aiVolcarEventos(sync){
+  if(!sb || !sistemaEventosCola.length) return;
+  const lote = sistemaEventosCola.splice(0, sistemaEventosCola.length);
+  sb.from('sistema_eventos').insert(lote).then(()=>{}).catch(()=>{ sistemaEventosCola.unshift(...lote.slice(0,20)); });
+}
+setInterval(()=>aiVolcarEventos(), 20000);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') aiVolcarEventos(); });
+window.addEventListener('beforeunload', ()=>aiVolcarEventos());
+
+// 1) clics en botones/acciones reales de toda la web, sin marcar uno a uno
+document.addEventListener('click', (e)=>{
+  if(e.target.closest('.nav button[data-view], #ai-panel, #mobile-tabbar, #mobile-add-menu')) return; // ya tienen su propio registro o son ruido
+  const el = e.target.closest('button, .btn, [onclick]');
+  if(!el) return;
+  let etiqueta = (el.getAttribute('aria-label') || el.title || el.textContent || '').replace(/\s+/g,' ').trim().slice(0,50);
+  if(!etiqueta) etiqueta = el.id || el.className.toString().split(' ')[0] || 'acción sin nombre';
+  aiRegistrarEventoThrottled('accion:'+etiqueta, aiVistaActual());
+}, true);
+
+// 2) envío de formularios (crear/guardar cosas)
+document.addEventListener('submit', (e)=>{
+  const id = e.target.id || e.target.className || 'formulario';
+  aiRegistrarEvento('form_submit:'+id, aiVistaActual());
+}, true);
+
+// 3) errores reales de la aplicación — la señal más directa de fricción
+window.addEventListener('error', (e)=>{
+  aiRegistrarEvento('error_js', aiVistaActual(), { mensaje: (e.message||'').slice(0,200), archivo: (e.filename||'').split('/').pop(), linea: e.lineno });
+});
+window.addEventListener('unhandledrejection', (e)=>{
+  aiRegistrarEvento('error_promesa', aiVistaActual(), { mensaje: String(e.reason?.message||e.reason||'').slice(0,200) });
+});
+
+// 4) uso de buscadores y filtros (sin registrar lo que se escribe, solo que se usan)
+document.addEventListener('input', (e)=>{
+  const el = e.target;
+  if(!(el.matches?.('input.search-box, .cp-search-row input, #asistente-ia-input'))) return;
+  const campo = el.id || el.placeholder?.slice(0,30) || 'búsqueda';
+  aiRegistrarEventoThrottled('busqueda:'+campo, aiVistaActual(), null, 4000);
+}, true);
+document.addEventListener('change', (e)=>{
+  if(!e.target.matches?.('input[type=checkbox]')) return;
+  const panel = e.target.closest('.dd-filter');
+  if(!panel) return;
+  aiRegistrarEventoThrottled('filtro:'+panel.id, aiVistaActual(), null, 4000);
+}, true);
+
+// 5) aperturas y cierres de overlays/modales — para detectar abandonos (se abre y se cierra sin completar nada)
+(function(){
+  const abiertos = {};
+  const cb = (muts)=>{
+    muts.forEach(m=>{
+      const el = m.target;
+      const activo = el.classList.contains('active');
+      const clave = el.id || 'overlay';
+      if(activo){ abiertos[clave] = Date.now(); }
+      else if(abiertos[clave]){
+        const duracion = Date.now() - abiertos[clave];
+        delete abiertos[clave];
+        if(duracion < 2500) aiRegistrarEvento('cierre_rapido:'+clave, aiVistaActual(), { ms: duracion });
+      }
+    });
+  };
+  document.querySelectorAll('.overlay, #ai-panel').forEach(el=>{
+    new MutationObserver(cb).observe(el, { attributes:true, attributeFilter:['class'] });
+  });
+})();
+/* ---------------- fin instrumentación automática ---------------- */
+
 async function cargarPropuestasReportes(){
   const cont = document.getElementById('reportes-ia-propuestas');
   const count = document.getElementById('reportes-ia-count');
@@ -9594,7 +9677,7 @@ async function aiCalcularSugerenciasSistema(){
 
   // 3) navegaci\u00f3n real — qu\u00e9 secciones se usan m\u00e1s (se va acumulando con el uso)
   try{
-    const {data: eventos} = await sb.from('sistema_eventos').select('accion,vista,created_at').order('created_at',{ascending:false}).limit(500);
+    const {data: eventos} = await sb.from('sistema_eventos').select('accion,vista,contexto,created_at').order('created_at',{ascending:false}).limit(500);
     if(eventos && eventos.length>=15){
       const navs = eventos.filter(e=>e.accion==='navegacion' && e.vista);
       const porVista = {};
@@ -9603,8 +9686,39 @@ async function aiCalcularSugerenciasSistema(){
       if(topVista && topVista[1]>=8){
         sug.push({icono:'🧭', titulo:`"${topVista[0]}" es la sección que más visitas`, detalle:`${topVista[1]} veces en las últimas ${eventos.length} acciones registradas. Si no está ya en un acceso rápido, podría convenir ponerla más a mano.`});
       }
+
+      // errores reales de la app — la señal más directa de fricción
+      const errores = eventos.filter(e=>e.accion==='error_js' || e.accion==='error_promesa');
+      if(errores.length>=3){
+        const conteo = {};
+        errores.forEach(e=>{ const k=(e.contexto?.mensaje||'error').slice(0,60); conteo[k]=(conteo[k]||0)+1; });
+        const topError = Object.entries(conteo).sort((a,b)=>b[1]-a[1])[0];
+        sug.push({icono:'🐞', titulo:`${errores.length} errores reales detectados en la app`, detalle:`El más repetido: "${topError[0]}" (${topError[1]} veces). Merece la pena revisarlo — puede estar rompiendo algo en silencio.`});
+      }
+
+      // acciones que se abren y se cierran muy rápido sin completar — posible fricción/confusión
+      const cierresRapidos = eventos.filter(e=>e.accion?.startsWith('cierre_rapido:'));
+      if(cierresRapidos.length>=4){
+        const conteo = {};
+        cierresRapidos.forEach(e=>{ const k=e.accion.split(':')[1]||'algo'; conteo[k]=(conteo[k]||0)+1; });
+        const top = Object.entries(conteo).sort((a,b)=>b[1]-a[1])[0];
+        if(top[1]>=3){
+          sug.push({icono:'🚪', titulo:`Abres y cierras "${top[0]}" muy rápido a menudo`, detalle:`${top[1]} veces en menos de 2,5 segundos. Puede que esa pantalla no muestre lo que esperabas a primera vista, o que sea fácil abrirla sin querer.`});
+        }
+      }
+
+      // acci\u00f3n m\u00e1s repetida en general
+      const acciones = eventos.filter(e=>e.accion?.startsWith('accion:'));
+      if(acciones.length>=20){
+        const conteo = {};
+        acciones.forEach(e=>{ conteo[e.accion]=(conteo[e.accion]||0)+1; });
+        const top = Object.entries(conteo).sort((a,b)=>b[1]-a[1])[0];
+        if(top[1]>=10){
+          sug.push({icono:'🔁', titulo:`Repites mucho: "${top[0].replace('accion:','')}"`, detalle:`${top[1]} veces registradas. Si es un botón que usas todo el rato, podría convenir tenerlo más a mano o convertirlo en un acceso rápido.`});
+        }
+      }
     } else {
-      sug.push({icono:'🧭', titulo:'Aún reuniendo datos de navegación', detalle:'Desde ahora registro qué secciones usas más, para ir sugiriendo accesos rápidos y mejoras de organización según el uso real. Todavía hay poco historial.'});
+      sug.push({icono:'🧭', titulo:'Aún reuniendo datos de uso', detalle:'Desde ahora registro navegación, acciones, búsquedas, errores y aperturas/cierres rápidos de toda la web, para ir sugiriendo mejoras según el uso real. Todavía hay poco historial.'});
     }
   }catch(e){}
 
