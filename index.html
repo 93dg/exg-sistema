@@ -2094,7 +2094,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.95</div>
+        <div class="sub">V1.96</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2810,7 +2810,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="panel">
           <div class="panel-body" style="padding:0;">
             <table class="tbl">
-              <tr><th>Fecha</th><th>Concepto</th><th>Proveedor</th><th>Categoría</th><th>Contabilidad</th><th>Recurrencia</th><th class="num">Importe</th><th>Justificante</th></tr>
+              <tr><th>Fecha</th><th>Concepto</th><th>Proveedor</th><th>Categoría</th><th>Contabilidad</th><th>Recurrencia</th><th class="num">Importe</th><th>Justificante</th><th>Gestor</th></tr>
               <tbody id="gpro-lista-tbody"></tbody>
             </table>
           </div>
@@ -4624,8 +4624,8 @@ function renderGastosProLista(){
     const nombre = clientes.find(c=>c.id===d.entidad_id)?.name || '—';
     const contPill = (d.contabilidad||'oficial')==='en_b' ? '<span class="pill mantenimiento">En B</span>' : '<span class="pill adjudicado">Oficial</span>';
     const justPill = d.estado_justificante==='completo' ? '<span class="pill adjudicado">✓ Justificado</span>' : '<span class="pill noadjudicado">Pendiente</span>';
-    return `<tr><td class="mono">${formatFechaCorta ? formatFechaCorta(d.dateRaw) : (d.dateLabel||'—')}</td><td>${d.concepto||'—'}</td><td>${nombre}</td><td>${d.categoria||'—'}</td><td>${contPill}</td><td>${d.recurrencia?`<span class="pill mantenimiento">${d.recurrencia}</span>`:'—'}</td><td class="num">${euro(d.importe||d.total)}</td><td>${justPill}</td></tr>`;
-  }).join('') : '<tr><td colspan="8" class="empty">Todavía no hay gastos registrados. Usa "+ Registrar gasto" desde Economía para empezar.</td></tr>';
+    return `<tr><td class="mono">${formatFechaCorta ? formatFechaCorta(d.dateRaw) : (d.dateLabel||'—')}</td><td>${d.concepto||'—'}</td><td>${nombre}</td><td>${d.categoria||'—'}</td><td>${contPill}</td><td>${d.recurrencia?`<span class="pill mantenimiento">${d.recurrencia}</span>`:'—'}</td><td class="num">${euro(d.importe||d.total)}</td><td>${justPill}</td><td class="celda-gestor-${d.id}">${gestorPillHtml(d.id, d.enviado_gestor, d.enviado_gestor_fecha)}</td></tr>`;
+  }).join('') : '<tr><td colspan="9" class="empty">Todavía no hay gastos registrados. Usa "+ Registrar gasto" desde Economía para empezar.</td></tr>';
 }
 function renderGastosProRecurrentes(){
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
@@ -10707,6 +10707,10 @@ document.querySelectorAll('#econ-contabilidad-filter .chip-filter').forEach(el=>
 async function toggleEnviadoGestor(id){
   if(!sb) return;
   const doc = documentosRealesById[id];
+  if(doc?.tipo==='gasto' && doc.estado_justificante!=='completo'){
+    mostrarToast('Este gasto no tiene justificante todavía — no se puede marcar como enviado al gestor.', 'err');
+    return;
+  }
   const nuevoValor = !(doc?.enviado_gestor);
   const hoy = new Date().toISOString().slice(0,10);
   const {error} = await sb.from('documentos_economicos').update({enviado_gestor: nuevoValor, enviado_gestor_fecha: nuevoValor ? hoy : null}).eq('id', id);
@@ -10717,6 +10721,10 @@ async function toggleEnviadoGestor(id){
   if(celda) celda.innerHTML = gestorPillHtml(id, nuevoValor, hoy);
 }
 function gestorPillHtml(id, enviado, fecha){
+  const doc = documentosRealesById[id];
+  if(doc?.tipo==='gasto' && doc.estado_justificante!=='completo' && !enviado){
+    return `<span class="pill noadjudicado" title="Falta el justificante — no se puede enviar todavía">Falta justificante</span>`;
+  }
   return enviado
     ? `<span class="pill terminado" style="cursor:pointer;" title="Enviada el ${fecha||''} — clic para desmarcar" onclick="event.stopPropagation();toggleEnviadoGestor('${id}')">Enviada ✓</span>`
     : `<span style="display:flex;gap:4px;"><button class="btn" style="padding:3px 6px;font-size:11px;" title="Marcar como enviada sin mandar correo" onclick="event.stopPropagation();toggleEnviadoGestor('${id}')">Marcar</button><button class="btn primary" style="padding:3px 6px;font-size:11px;" title="Enviar por correo al gestor" onclick="event.stopPropagation();enviarAlGestorDoc('${id}')">Enviar</button></span>`;
@@ -10733,6 +10741,10 @@ let composeOnSentCallback = null;
 function enviarAlGestorDoc(id){
   const doc = documentosRealesById[id];
   if(!doc) return;
+  if(doc.tipo==='gasto' && doc.estado_justificante!=='completo'){
+    mostrarToast('Este gasto no tiene justificante todavía — súbelo antes de enviarlo al gestor.', 'err');
+    return;
+  }
   const email = getGestorEmail();
   if(!email) return;
   const archivoUrl = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
