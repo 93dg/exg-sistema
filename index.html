@@ -734,6 +734,10 @@ table{border-collapse:collapse;width:100%;}
 .ai-card-text{font-size:13.5px;color:var(--ink);line-height:1.5;}
 .ai-card-falta{background:rgba(216,170,61,0.12);border:1px solid rgba(216,170,61,0.4);border-radius:8px;padding:12px;margin-top:6px;}
 .ai-card-falta input{width:100%;margin-top:8px;padding:9px 10px;border-radius:6px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-family:inherit;font-size:13.5px;}
+.ai-chip-row{display:flex;flex-wrap:wrap;gap:7px;}
+.ai-chip{padding:8px 13px;border-radius:18px;background:var(--paper);border:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;}
+.ai-chip:hover{border-color:var(--orange);}
+.ai-chip.sel{background:var(--orange);border-color:var(--orange);color:#fff;}
 .ai-card-actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;}
 .ai-btn{flex:1;padding:11px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid var(--line);background:var(--paper);color:var(--ink);min-width:100px;}
 .ai-btn.primary{background:linear-gradient(135deg,#FF8A3D,#D8560F);color:#fff;border:none;}
@@ -2062,7 +2066,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V1.87</div>
+        <div class="sub">V1.88</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9163,41 +9167,71 @@ function aiRenderTarjeta(){
   const t = aiTareas[aiTareaActiva];
   const card = document.getElementById('ai-task-card');
   if(!t){ card.innerHTML=''; return; }
+  t.datos = t.datos || {};
   const yaResuelta = t.estado==='confirmada' || t.estado==='descartada';
+
+  let widgetHtml = '';
+  // tipo de documento — chips, siempre editable
+  if(t.tipo==='documento'){
+    if(!t.datos.tipo_doc) t.datos.tipo_doc = 'presupuesto';
+    const opciones = [['factura','Factura'],['presupuesto','Presupuesto'],['albaran','Albarán'],['proforma','Proforma']];
+    widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Tipo de documento</div>
+      <div class="ai-chip-row">${opciones.map(([v,l])=>`<div class="ai-chip ${t.datos.tipo_doc===v?'sel':''}" onclick="aiSetCampo(${aiTareaActiva},'tipo_doc','${v}')">${l}</div>`).join('')}</div></div>`;
+  }
+  // subtipo de incidente — chips, siempre editable
+  if(t.tipo==='incidente'){
+    const opciones = [['maquina','⚙ Máquina'],['personal','🧑 Personal']];
+    widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Tipo de incidente</div>
+      <div class="ai-chip-row">${opciones.map(([v,l])=>`<div class="ai-chip ${t.datos.subtipo===v?'sel':''}" onclick="aiSetCampo(${aiTareaActiva},'subtipo','${v}')">${l}</div>`).join('')}</div></div>`;
+  }
+  // cliente — buscador clicable, solo si hace falta
+  if((t.tipo==='documento' || t.tipo==='trabajo')){
+    if(t.datos.cliente){
+      widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Cliente</div>
+        <div class="ai-chip sel" style="display:inline-flex;" onclick="aiSetCampo(${aiTareaActiva},'cliente',null)">${t.datos.cliente} ✕</div></div>`;
+    } else {
+      const sugeridos = (typeof clientesOrdenadosPorUso==='function' ? clientesOrdenadosPorUso() : (typeof clientes!=='undefined'?clientes:[])).slice(0,6);
+      widgetHtml += `<div class="ai-card-block ai-card-falta">
+        <div class="ai-card-label" style="color:#D8AA3D;">Falta el cliente</div>
+        <input type="text" id="ai-cliente-buscar-${aiTareaActiva}" placeholder="Buscar cliente…" oninput="aiFiltrarClientes(${aiTareaActiva})" style="margin-bottom:8px;">
+        <div class="ai-chip-row" id="ai-cliente-lista-${aiTareaActiva}">
+          ${sugeridos.map(c=>`<div class="ai-chip" onclick="aiSetCampo(${aiTareaActiva},'cliente','${c.name.replace(/'/g,"\\'")}')">${c.name}</div>`).join('')}
+        </div>
+      </div>`;
+    }
+  }
+
+  const bloqueada = (t.tipo==='documento'||t.tipo==='trabajo') && !t.datos.cliente;
+
   card.innerHTML = `
     <span class="ai-card-tipo">${AI_TIPO_LABEL[t.tipo]||t.tipo}</span>
     <div class="ai-card-titulo">${t.titulo}</div>
     <div class="ai-card-block"><div class="ai-card-label">He entendido</div><div class="ai-card-text">${t.entendido||'—'}</div></div>
     <div class="ai-card-block"><div class="ai-card-label">Propongo</div><div class="ai-card-text">${t.propuesta||'—'}</div></div>
-    ${t.falta && t.estado==='pendiente' ? `
-      <div class="ai-card-falta">
-        <div class="ai-card-label" style="color:#D8AA3D;">Falta un dato</div>
-        <div class="ai-card-text">${t.falta}</div>
-        <input type="text" id="ai-falta-input" placeholder="Escríbelo aquí…">
-      </div>` : ''}
+    ${widgetHtml}
     ${yaResuelta ? `<div class="ai-card-block" style="margin-top:6px;"><div class="ai-card-text" style="color:${t.estado==='confirmada'?'var(--green)':'var(--red)'};font-weight:700;">${t.estado==='confirmada'?'✓ Confirmada':'✕ Descartada'}</div></div>` : ''}
     <div class="ai-card-actions">
       ${!yaResuelta ? `
-        ${t.estado==='pendiente' ? `<button class="ai-btn" onclick="aiCompletarFalta(${aiTareaActiva})">Completar dato</button>` : ''}
-        <button class="ai-btn primary" ${t.estado==='pendiente'?'disabled style="opacity:.5;"':''} onclick="aiConfirmarTarea(${aiTareaActiva})">Confirmar</button>
+        <button class="ai-btn primary" ${bloqueada?'disabled style="opacity:.5;"':''} onclick="aiConfirmarTarea(${aiTareaActiva})">Confirmar</button>
         <button class="ai-btn danger" onclick="aiDescartarTarea(${aiTareaActiva})">Descartar</button>
       ` : ''}
       ${aiTareaActiva < aiTareas.length-1 ? `<button class="ai-btn ghost" onclick="aiSeleccionarTarea(${aiTareaActiva+1})">Siguiente →</button>` : ''}
     </div>
   `;
 }
-function aiCompletarFalta(i){
-  const val = document.getElementById('ai-falta-input')?.value?.trim();
-  if(!val){ mostrarToast('Escribe el dato que falta.'); return; }
+function aiSetCampo(i, campo, valor){
   const t = aiTareas[i];
   t.datos = t.datos || {};
-  t.datos._completado = val;
-  if(t.tipo==='documento' && !t.datos.cliente) t.datos.cliente = val;
-  if(t.tipo==='trabajo' && !t.datos.cliente) t.datos.cliente = val;
-  if(t.tipo==='gasto' && !t.datos.concepto) t.datos.concepto = val;
-  t.falta = null;
-  t.estado = 'lista';
+  t.datos[campo] = valor;
+  if(valor && t.estado==='pendiente') t.estado = 'lista';
   aiRenderTareas();
+}
+function aiFiltrarClientes(i){
+  const q = (document.getElementById('ai-cliente-buscar-'+i)?.value||'').toLowerCase().trim();
+  const base = typeof clientesOrdenadosPorUso==='function' ? clientesOrdenadosPorUso() : (typeof clientes!=='undefined'?clientes:[]);
+  const filtrados = (q ? base.filter(c=>c.name.toLowerCase().includes(q)) : base).slice(0,6);
+  const cont = document.getElementById('ai-cliente-lista-'+i);
+  if(cont) cont.innerHTML = filtrados.map(c=>`<div class="ai-chip" onclick="aiSetCampo(${i},'cliente','${c.name.replace(/'/g,"\\'")}')">${c.name}</div>`).join('') || '<div style="font-size:12px;color:var(--ink-faint);padding:6px 0;">Sin resultados</div>';
 }
 function aiEjecutarAccionTarea(t){
   const datos = t.datos || {};
@@ -9208,11 +9242,17 @@ function aiEjecutarAccionTarea(t){
       if(datos.importe) document.getElementById('gasto-importe').value = datos.importe;
     }, 80);
   } else if(t.tipo==='documento'){
-    if(datos.tipo_doc){ elegirTipoDoc(datos.tipo_doc); } else { abrirMenuTipoDoc(); }
+    const contexto = { tipo: datos.tipo_doc || 'presupuesto' };
+    if(datos.cliente) contexto.clientName = datos.cliente;
+    document.getElementById('tipo-doc-menu-overlay')?.classList.remove('active');
+    openNewInvoiceModal(contexto);
   } else if(t.tipo==='incidente'){
-    abrirAveria();
+    if(datos.subtipo==='personal') abrirIncidentePersonal();
+    else if(datos.subtipo==='maquina') abrirAveriaMaquina();
+    else abrirAveria();
   } else if(t.tipo==='trabajo'){
     openNewJobModal();
+    if(datos.cliente) setTimeout(()=>setClientPickerValue('nj', datos.cliente), 100);
   } else if(t.tipo==='consulta'){
     const destino = { trabajos_urgentes:'trabajos', pendiente_cobro:'facturas', facturado_mes:'economia' }[datos.destino];
     if(destino) document.querySelector(`.nav button[data-view="${destino}"]`)?.click();
