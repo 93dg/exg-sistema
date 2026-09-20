@@ -303,6 +303,12 @@ table{border-collapse:collapse;width:100%;}
 
 /* filters */
 .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.chip-reset-filtro{
+  margin-left:auto;flex-shrink:0;cursor:pointer;user-select:none;
+  width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:13px;color:var(--ink-soft);border:1px solid var(--line);background:var(--paper);
+}
+.chip-reset-filtro:hover{color:var(--orange);border-color:var(--orange);}
 .chip-filter{
   padding:6px 12px;border:1px solid var(--line);border-radius:20px;font-size:12px;font-weight:600;color:var(--ink-soft);
   cursor:pointer;
@@ -2117,7 +2123,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.25</div>
+        <div class="sub">V2.26</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4707,25 +4713,6 @@ document.querySelectorAll('.topbar').forEach(topbar=>{
   let acciones = topbar.querySelector('.quickactions');
   if(!acciones){ acciones = document.createElement('div'); acciones.className = 'quickactions'; topbar.appendChild(acciones); }
 });
-// Botón "Restablecer filtros" — solo en las secciones que de verdad tienen filtros guardables,
-// mismo icono ↻ que el de Actualizar (arriba a la derecha, fijo), pero aquí restablece filtros.
-document.querySelectorAll('.view').forEach(view=>{
-  const filtrosDeEstaVista = view.querySelectorAll('.filters[id]');
-  if(!filtrosDeEstaVista.length) return;
-  const topbar = view.querySelector('.topbar');
-  const acciones = topbar && topbar.querySelector('.quickactions');
-  if(!acciones) return;
-  const btnReset = document.createElement('button');
-  btnReset.className = 'btn icon-btn';
-  btnReset.title = 'Restablecer filtros de esta sección a sus valores por defecto';
-  btnReset.textContent = '↻';
-  btnReset.onclick = function(){
-    filtrosDeEstaVista.forEach(f=>{ try{ localStorage.removeItem('exg_filtro_'+f.id); }catch(e){} });
-    mostrarToast('Filtros restablecidos.');
-    location.reload();
-  };
-  acciones.insertBefore(btnReset, acciones.firstChild);
-});
 
 /* ---------------- SUB-TABS genéricas (Entradas, Flota, Economía) ---------------- */
 function renderFacturasKPIs(){
@@ -7187,7 +7174,10 @@ initGmailAuth();
    Regla general: cada grupo de chips de filtro (.filters con id) recuerda
    el último elegido, en localStorage, por su propio id — independiente
    de los demás. Cubre los grupos que ya tienen id propio en el HTML; los
-   que no tienen id (algunos filtros muy locales) se quedan sin persistir. */
+   que no tienen id (algunos filtros muy locales) se quedan sin persistir.
+   Cada grupo lleva también, dentro de la misma fila (a la derecha de los
+   chips), un icono ↻ para restablecer SOLO ese grupo — se reinserta solo
+   si el contenedor se regenera (algunos chips son dinámicos: años, etc.). */
 const FILTRO_PERSIST_PREFIX = 'exg_filtro_';
 function guardarEstadoFiltroPersistente(containerId, chip){
   if(!containerId || !chip) return;
@@ -7205,6 +7195,21 @@ function restaurarFiltroPersistente(container){
   const objetivo = chips.find(c=>c.textContent.trim()===guardado);
   if(objetivo) objetivo.click();
 }
+function asegurarBotonResetFiltro(container){
+  if(!container.id || container.querySelector(':scope > .chip-reset-filtro')) return;
+  const btn = document.createElement('span');
+  btn.className = 'chip-reset-filtro';
+  btn.title = 'Restablecer este filtro';
+  btn.textContent = '↻';
+  btn.onclick = function(e){
+    e.stopPropagation();
+    try{ localStorage.removeItem(FILTRO_PERSIST_PREFIX+container.id); }catch(err){}
+    const chips = Array.from(container.querySelectorAll('.chip-filter'));
+    if(chips.length) chips[0].click(); // el primer chip es siempre el valor por defecto ("Todos", "Todo", etc.)
+    mostrarToast('Filtro restablecido.');
+  };
+  container.appendChild(btn);
+}
 document.addEventListener('click', function(e){
   const chip = e.target.closest('.filters[id] .chip-filter');
   if(!chip) return;
@@ -7214,7 +7219,8 @@ document.addEventListener('click', function(e){
 function iniciarFiltrosPersistentes(){
   document.querySelectorAll('.filters[id]').forEach(container=>{
     restaurarFiltroPersistente(container);
-    const obs = new MutationObserver(()=>restaurarFiltroPersistente(container));
+    asegurarBotonResetFiltro(container);
+    const obs = new MutationObserver(()=>{ restaurarFiltroPersistente(container); asegurarBotonResetFiltro(container); });
     obs.observe(container, {childList:true});
   });
 }
