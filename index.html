@@ -2084,7 +2084,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.19</div>
+        <div class="sub">V2.20</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3270,27 +3270,51 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     <!-- ================= CORREO ================= -->
     <div class="view" id="view-correo">
       <div class="topbar">
-        <div><h1>Correo</h1><div class="desc">Gmail de la empresa — leer y enviar desde aquí</div></div>
+        <div><h1>Correo</h1><div class="desc">Gmail de la empresa — clasificado y analizado automáticamente</div></div>
         <div class="quickactions" id="correo-auth-actions">
           <button class="btn primary" id="correo-connect-btn" onclick="connectGmail()">Conectar con Gmail</button>
         </div>
       </div>
       <div id="correo-body" style="display:none;">
         <div class="panel">
-          <div class="panel-head">
-            <h3>Bandeja de entrada</h3>
-            <div style="display:flex;gap:8px;">
+          <div class="panel-head" style="flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px;">
+              <input class="search-box" id="correo-search" style="width:100%;max-width:340px;" placeholder="Buscar en el correo…" onkeydown="if(event.key==='Enter') buscarCorreo()">
+              <button class="btn" onclick="buscarCorreo()">Buscar</button>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select class="search-box" id="correo-orden" style="font-size:12px;padding:5px 8px;" onchange="renderCorreoInbox()">
+                <option value="fecha_desc">Más recientes</option>
+                <option value="fecha_asc">Más antiguos</option>
+                <option value="remitente">Remitente (A-Z)</option>
+                <option value="prioridad">Prioridad</option>
+                <option value="categoria">Categoría</option>
+              </select>
               <button class="btn primary" onclick="openComposeDrawer()">✏️ Redactar</button>
-              <button class="btn" onclick="loadGmailInbox()">↻ Actualizar</button>
+              <button class="btn" onclick="loadGmailInbox()">↻</button>
             </div>
           </div>
-          <div class="filters" id="correo-filters" style="padding:0 16px;">
-            <div class="chip-filter active" data-f="relevante">Relevante</div>
-            <div class="chip-filter" data-f="sin_clasificar">Sin clasificar</div>
-            <div class="chip-filter" data-f="basura">Basura</div>
-            <div class="chip-filter" data-f="todo">Todo</div>
+          <div class="filters" id="correo-filters" style="padding:8px 16px;flex-wrap:wrap;">
+            <div class="chip-filter active" data-f="todos">Todos</div>
+            <div class="chip-filter" data-f="no_leidos">No leídos</div>
+            <div class="chip-filter" data-f="leidos">Leídos</div>
+            <div class="chip-filter" data-f="importantes">⭐ Importantes</div>
+            <div class="chip-filter" data-f="adjuntos">📎 Con adjuntos</div>
+            <div class="chip-filter" data-f="atencion">🔴 Requiere atención</div>
+            <div class="chip-filter" data-f="spam">🚫 Spam</div>
           </div>
-          <div class="panel-body" id="correo-inbox">
+          <div id="correo-select-bar" style="display:none;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--line);background:var(--concrete);">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);">
+              <input type="checkbox" id="correo-select-all" onchange="toggleCorreoSelectAll(this.checked)"> <span id="correo-select-count">0</span> seleccionados
+            </label>
+            <span style="flex:1;"></span>
+            <span title="Marcar leído" onclick="accionMasivaCorreo('leido')" style="cursor:pointer;">✓ Leído</span>
+            <span title="Marcar no leído" onclick="accionMasivaCorreo('no_leido')" style="cursor:pointer;">● No leído</span>
+            <span title="Archivar" onclick="accionMasivaCorreo('archivar')" style="cursor:pointer;">📥 Archivar</span>
+            <span title="Marcar spam" onclick="accionMasivaCorreo('spam')" style="cursor:pointer;color:var(--orange);">🚫 Spam</span>
+            <span title="Eliminar" onclick="accionMasivaCorreo('eliminar')" style="cursor:pointer;color:var(--red);">🗑 Eliminar</span>
+          </div>
+          <div class="panel-body" style="padding:0;" id="correo-inbox">
             <div class="empty">Cargando…</div>
           </div>
         </div>
@@ -3298,18 +3322,39 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     </div>
 
     <div class="overlay" id="correo-overlay" onclick="if(event.target===this) closeCorreoDrawer()">
-      <div class="drawer">
+      <div class="drawer" style="width:min(760px,94vw);">
         <div class="drawer-head">
-          <div><div class="code" id="correo-d-from">—</div><h2 id="correo-d-subject">—</h2></div>
+          <div><div class="code" id="correo-d-from">—</div><h2 id="correo-d-subject" style="font-size:18px;">—</h2></div>
           <button class="close-x" onclick="closeCorreoDrawer()">✕</button>
         </div>
         <div class="drawer-body">
-          <div class="sub-t" style="margin-bottom:14px;" id="correo-d-date"></div>
-          <div id="correo-d-content" style="max-height:55vh;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);"></div>
-          <div class="state-row" style="margin-top:14px;">
+          <div class="sub-t" style="margin-bottom:10px;" id="correo-d-date"></div>
+          <div id="correo-d-thread-badge" style="display:none;margin-bottom:10px;"></div>
+
+          <div id="correo-d-smart" class="block" style="margin-bottom:14px;background:var(--concrete);display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+              <div style="flex:1;">
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px;" id="correo-d-tags"></div>
+                <div id="correo-d-que-es" style="font-weight:700;font-size:14px;margin-bottom:4px;"></div>
+                <div id="correo-d-resumen" class="sub-t" style="line-height:1.5;"></div>
+                <div id="correo-d-datos" style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);"></div>
+              </div>
+              <button class="btn" style="font-size:11px;padding:4px 8px;white-space:nowrap;" onclick="reanalizarCorreoActual()" title="Volver a analizar">↻ IA</button>
+            </div>
+          </div>
+          <div id="correo-d-acciones-contextuales" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;"></div>
+
+          <div id="correo-d-content" style="max-height:45vh;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);"></div>
+
+          <div class="state-row" style="margin-top:14px;flex-wrap:wrap;gap:8px;">
             <button class="btn primary" onclick="replyToCorreo()">↩ Responder</button>
-            <button class="btn" onclick="archivarCorreo()">📥 Archivar</button>
-            <button class="btn" style="color:var(--red);" onclick="borrarCorreo()">🗑 Borrar</button>
+            <button class="btn" onclick="forwardCorreo()">➦ Reenviar</button>
+            <span style="flex:1;"></span>
+            <span title="Marcar importante" onclick="toggleImportanteCorreoActual()" id="correo-d-star" style="cursor:pointer;font-size:18px;">☆</span>
+            <span title="Archivar" onclick="archivarCorreo()" style="cursor:pointer;font-size:16px;">📥</span>
+            <span title="Marcar como spam" onclick="marcarSpamCorreoActual()" style="cursor:pointer;font-size:16px;color:var(--orange);">🚫</span>
+            <span title="Bloquear remitente" onclick="bloquearRemitenteActual()" style="cursor:pointer;font-size:16px;">⛔</span>
+            <span title="Eliminar" onclick="borrarCorreo()" style="cursor:pointer;font-size:16px;color:var(--red);">🗑</span>
           </div>
         </div>
       </div>
@@ -6402,7 +6447,9 @@ function desconectarGmail(){
 let correoMessagesCache = [];
 let correoEstadoCache = {};
 let correoEntidadesCache = [];
-let correoFiltroActivo = 'relevante';
+let correoFiltroActivo = 'todos';
+let correoSeleccionMulti = new Set();
+let correoBloqueadosCache = [];
 
 function extraerEmail(fromHeader){
   const m = (fromHeader||'').match(/<([^>]+)>/);
@@ -6410,6 +6457,7 @@ function extraerEmail(fromHeader){
 }
 
 let correoNextPageToken = null;
+let correoQueryActiva = '';
 
 async function fetchMailDetail(m){
   const detRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, {
@@ -6422,9 +6470,16 @@ async function fetchMailDetail(m){
   const email = extraerEmail(fromHeader);
   const entidad = correoEntidadesCache.find(e=>(e.email||'').toLowerCase()===email);
   const estado = correoEstadoCache[m.id];
-  const noLeido = (det.labelIds||[]).includes('UNREAD');
+  const labelIds = det.labelIds || [];
+  const noLeido = labelIds.includes('UNREAD');
+  const importante = labelIds.includes('STARRED');
   const nombreRemitente = fromHeader.replace(/<[^>]+>/,'').replace(/"/g,'').trim() || email;
-  return {id:m.id, from:fromHeader, nombreRemitente, email, subject:get('Subject')||'(sin asunto)', date:get('Date'), snippet: det.snippet||'', entidad, categoria: estado ? estado.categoria : (entidad ? 'relevante' : 'sin_clasificar'), noLeido};
+  return {
+    id:m.id, threadId: m.threadId, from:fromHeader, nombreRemitente, email,
+    subject:get('Subject')||'(sin asunto)', date:get('Date'), snippet: det.snippet||'',
+    entidad, noLeido, importante, labelIds,
+    estado: estado || null,
+  };
 }
 
 async function loadGmailInbox(){
@@ -6434,15 +6489,18 @@ async function loadGmailInbox(){
   box.innerHTML = '<div class="empty">Cargando…</div>';
   try{
     if(sb){
-      const [{data: entidades}, {data: estados}] = await Promise.all([
+      const [{data: entidades}, {data: estados}, {data: bloqueados}] = await Promise.all([
         sb.from('entidades').select('*'),
         sb.from('correo_estado').select('*'),
+        sb.from('remitentes_bloqueados').select('*'),
       ]);
       correoEntidadesCache = entidades || [];
+      correoBloqueadosCache = (bloqueados||[]).map(b=>b.email);
       correoEstadoCache = {};
       (estados||[]).forEach(e=>{ correoEstadoCache[e.message_id] = e; });
     }
-    const listRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=30&labelIds=INBOX', {
+    const q = correoQueryActiva ? `&q=${encodeURIComponent(correoQueryActiva)}` : '';
+    const listRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=40&labelIds=INBOX${q}`, {
       headers: {Authorization: 'Bearer '+gmailAccessToken}
     });
     const listData = await listRes.json();
@@ -6452,6 +6510,7 @@ async function loadGmailInbox(){
     if(!messages.length){ box.innerHTML = '<div class="empty">Sin mensajes.</div>'; return; }
     correoMessagesCache = await Promise.all(messages.map(fetchMailDetail));
     renderCorreoInbox();
+    analizarCorreosVisiblesEnSegundoPlano();
   }catch(err){
     box.innerHTML = `<div class="empty" style="color:var(--red);">Error de red: ${err && err.message ? err.message : err}</div>`;
   }
@@ -6463,7 +6522,8 @@ async function loadMoreGmailInbox(){
   const btn = document.getElementById('correo-load-more-btn');
   if(btn){ btn.disabled = true; btn.textContent = 'Cargando…'; }
   try{
-    const listRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=30&labelIds=INBOX&pageToken=${correoNextPageToken}`, {
+    const q = correoQueryActiva ? `&q=${encodeURIComponent(correoQueryActiva)}` : '';
+    const listRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=40&labelIds=INBOX${q}&pageToken=${correoNextPageToken}`, {
       headers: {Authorization: 'Bearer '+gmailAccessToken}
     });
     const listData = await listRes.json();
@@ -6471,29 +6531,118 @@ async function loadMoreGmailInbox(){
     const nuevos = await Promise.all((listData.messages||[]).map(fetchMailDetail));
     correoMessagesCache = correoMessagesCache.concat(nuevos);
     renderCorreoInbox();
+    analizarCorreosVisiblesEnSegundoPlano();
   }catch(err){
     mostrarToast('Error al cargar más: '+(err && err.message ? err.message : err));
   }
 }
 
+function buscarCorreo(){
+  correoQueryActiva = document.getElementById('correo-search').value.trim();
+  loadGmailInbox();
+}
+
+// Llama a la IA para los correos visibles que aún no tienen análisis guardado.
+// Usa asunto+remitente+snippet (rápido, sin descargar el cuerpo completo de cada uno).
+// Se relanza sola cuando entra un correo nuevo a la lista; no bloquea la vista.
+let correoAnalizando = new Set();
+async function analizarCorreosVisiblesEnSegundoPlano(){
+  const pendientes = correoMessagesCache.filter(m => !m.estado?.analizado_at && !correoAnalizando.has(m.id)).slice(0, 15);
+  for(const m of pendientes){
+    correoAnalizando.add(m.id);
+    analizarUnCorreo(m, m.snippet).then(analisis=>{
+      if(analisis){ m.estado = {...(m.estado||{}), ...analisis, message_id:m.id, analizado_at:new Date().toISOString()}; renderCorreoInbox(); }
+      correoAnalizando.delete(m.id);
+    }).catch(()=>{ correoAnalizando.delete(m.id); });
+  }
+}
+async function analizarUnCorreo(msg, cuerpoTexto){
+  try{
+    const resp = await fetch('https://sshctqnpuolawtcujxkt.supabase.co/functions/v1/analizar-correo', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        message_id: msg.id, thread_id: msg.threadId, remitente_email: msg.email, remitente_nombre: msg.nombreRemitente,
+        asunto: msg.subject, cuerpo: cuerpoTexto || msg.snippet,
+        es_entidad_conocida: !!msg.entidad, tipo_entidad: msg.entidad?.tipo, nombre_entidad: msg.entidad?.nombre,
+      })
+    });
+    const data = await resp.json();
+    if(data.error || !data.analisis) return null;
+    return data.analisis;
+  }catch(e){ return null; }
+}
+
+function contarHilo(threadId){
+  if(!threadId) return 1;
+  return correoMessagesCache.filter(m=>m.threadId===threadId).length;
+}
+
+const CATEGORIA_LABEL = {licitaciones:'🏛 Licitación', banco:'🏦 Banco', facturas:'🧾 Factura', clientes:'👤 Cliente', trabajos:'🚜 Trabajo', gestoria:'📋 Gestoría', administracion:'📑 Admin.', proveedores:'📦 Proveedor', spam:'🚫 Spam', otros:'✉ Otros'};
+const PRIORIDAD_COLOR = {alta:'var(--red)', media:'var(--orange)', baja:'var(--ink-faint,#8b8275)'};
+
+function filtrarCorreos(lista){
+  const f = correoFiltroActivo;
+  return lista.filter(r=>{
+    if(correoBloqueadosCache.includes(r.email) && f!=='spam') return false;
+    const estado = r.estado || {};
+    if(f==='no_leidos') return r.noLeido;
+    if(f==='leidos') return !r.noLeido;
+    if(f==='importantes') return r.importante;
+    if(f==='adjuntos') return !!estado.tiene_adjuntos_importantes;
+    if(f==='atencion') return !!estado.requiere_accion && !estado.es_spam;
+    if(f==='spam') return !!estado.es_spam || correoBloqueadosCache.includes(r.email);
+    // 'todos': oculta spam claro por defecto
+    return !estado.es_spam;
+  });
+}
+
+function ordenarCorreos(lista){
+  const orden = document.getElementById('correo-orden')?.value || 'fecha_desc';
+  const arr = lista.slice();
+  if(orden==='fecha_asc') return arr.reverse();
+  if(orden==='remitente') return arr.sort((a,b)=>(a.nombreRemitente||'').localeCompare(b.nombreRemitente||''));
+  if(orden==='prioridad'){ const rank={alta:0,media:1,baja:2}; return arr.sort((a,b)=>(rank[a.estado?.prioridad]??3)-(rank[b.estado?.prioridad]??3)); }
+  if(orden==='categoria') return arr.sort((a,b)=>(a.estado?.categoria||'zzz').localeCompare(b.estado?.categoria||'zzz'));
+  return arr; // fecha_desc = orden natural de Gmail
+}
+
 function renderCorreoInbox(){
   const box = document.getElementById('correo-inbox');
-  const f = correoFiltroActivo;
-  const rows = correoMessagesCache.filter(r=> f==='todo' || r.categoria===f);
+  const vistos = new Set();
+  const base = correoMessagesCache.filter(m=>{ if(vistos.has(m.threadId)) return false; vistos.add(m.threadId); return true; });
+  const rows = ordenarCorreos(filtrarCorreos(base));
   if(!rows.length){ box.innerHTML = '<div class="empty">Nada aquí.</div>'; return; }
-  box.innerHTML = rows.map(r=>`
-    <div class="attention-row" style="cursor:pointer;${r.noLeido?'background:var(--concrete-2);':''}" onclick="openCorreoDrawer('${r.id}')">
-      <div style="width:32px;height:32px;border-radius:50%;background:var(--asphalt-2);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">${(r.nombreRemitente||'?').charAt(0).toUpperCase()}</div>
-      <div style="flex:1;min-width:0;">
-        <div class="t" style="${r.noLeido?'font-weight:800;':''}">${r.subject} ${r.entidad ? `<span class="tag" style="border-color:var(--green);color:var(--green);">${r.entidad.tipo==='proveedor'?'Proveedor':'Cliente'}: ${r.entidad.nombre}</span>` : ''}</div>
+  box.innerHTML = rows.map(r=>{
+    const estado = r.estado || {};
+    const nHilo = contarHilo(r.threadId);
+    const catTag = estado.categoria ? `<span class="tag" style="font-size:10.5px;">${CATEGORIA_LABEL[estado.categoria]||estado.categoria}</span>` : '';
+    const prioDot = estado.prioridad==='alta' ? `<span style="color:${PRIORIDAD_COLOR.alta};font-size:15px;" title="Prioridad alta">●</span>` : '';
+    const atencionTag = estado.requiere_accion ? `<span class="tag" style="font-size:10.5px;color:var(--red);border-color:var(--red);">Requiere atención</span>` : '';
+    return `
+    <div class="inbox-row" style="grid-template-columns:26px 30px 1fr auto;cursor:pointer;${r.noLeido?'background:var(--concrete-2);':''}" onclick="openCorreoDrawer('${r.id}')">
+      <span onclick="event.stopPropagation();toggleSeleccionCorreo('${r.id}')" style="display:flex;align-items:center;justify-content:center;">
+        <input type="checkbox" ${correoSeleccionMulti.has(r.id)?'checked':''} onclick="event.stopPropagation();toggleSeleccionCorreo('${r.id}')">
+      </span>
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--asphalt-2);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${(r.nombreRemitente||'?').charAt(0).toUpperCase()}</div>
+      <div style="min-width:0;">
+        <div class="t" style="display:flex;align-items:center;gap:6px;${r.noLeido?'font-weight:800;':''}">
+          ${prioDot}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.subject}</span>
+          ${nHilo>1?`<span class="tag" style="font-size:10px;">🧵 ${nHilo}</span>`:''}
+          ${r.entidad ? `<span class="tag" style="font-size:10.5px;border-color:var(--green);color:var(--green);">${r.entidad.tipo==='proveedor'?'Proveedor':'Cliente'}: ${r.entidad.nombre}</span>` : ''}
+          ${catTag}${atencionTag}
+        </div>
         <div class="s">${r.nombreRemitente} · ${r.date}</div>
-        <div class="s" style="color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.snippet}</div>
+        <div class="s" style="color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${estado.que_es || r.snippet}</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:4px;">
-        ${!r.entidad ? `<button class="btn sm" onclick="event.stopPropagation();vincularCorreo('${r.id}')">Vincular a cliente</button>` : ''}
-        ${r.categoria!=='basura' ? `<button class="btn sm danger" onclick="event.stopPropagation();marcarCorreo('${r.id}','basura')">🗑 Basura</button>` : `<button class="btn sm" onclick="event.stopPropagation();marcarCorreo('${r.id}','sin_clasificar')">↺ No es basura</button>`}
+      <div style="display:flex;align-items:center;gap:10px;" onclick="event.stopPropagation();">
+        <span title="${r.importante?'Quitar importante':'Marcar importante'}" onclick="toggleImportanteCorreo('${r.id}')" style="cursor:pointer;font-size:16px;color:${r.importante?'var(--orange)':'var(--ink-faint,#8b8275)'};">${r.importante?'★':'☆'}</span>
+        <span title="${r.noLeido?'Marcar leído':'Marcar no leído'}" onclick="toggleLeidoCorreo('${r.id}')" style="cursor:pointer;font-size:14px;">${r.noLeido?'●':'○'}</span>
+        <span title="Archivar" onclick="archivarCorreoId('${r.id}')" style="cursor:pointer;font-size:14px;">📥</span>
+        <span title="Marcar spam" onclick="marcarSpamCorreoId('${r.id}')" style="cursor:pointer;font-size:14px;color:var(--orange);">🚫</span>
+        <span title="Eliminar" onclick="borrarCorreoId('${r.id}')" style="cursor:pointer;font-size:14px;color:var(--red);">🗑</span>
       </div>
-    </div>`).join('') + (correoNextPageToken ? `<div style="text-align:center;padding:14px;"><button class="btn" id="correo-load-more-btn" onclick="loadMoreGmailInbox()">Cargar más</button></div>` : '');
+    </div>`;
+  }).join('') + (correoNextPageToken ? `<div style="text-align:center;padding:14px;"><button class="btn" id="correo-load-more-btn" onclick="loadMoreGmailInbox()">Cargar más</button></div>` : '');
 }
 
 document.querySelectorAll('#correo-filters .chip-filter').forEach(el=>{
@@ -6505,13 +6654,90 @@ document.querySelectorAll('#correo-filters .chip-filter').forEach(el=>{
   });
 });
 
-async function marcarCorreo(messageId, categoria){
-  const msg = correoMessagesCache.find(r=>r.id===messageId);
-  if(msg) msg.categoria = categoria;
+function toggleSeleccionCorreo(id){
+  if(correoSeleccionMulti.has(id)) correoSeleccionMulti.delete(id); else correoSeleccionMulti.add(id);
+  const bar = document.getElementById('correo-select-bar');
+  bar.style.display = correoSeleccionMulti.size ? 'flex' : 'none';
+  document.getElementById('correo-select-count').textContent = correoSeleccionMulti.size;
   renderCorreoInbox();
-  if(!sb) return;
-  const {error} = await sb.from('correo_estado').upsert({message_id: messageId, categoria});
-  if(error) console.error('No se pudo guardar la categoría del correo', error);
+}
+function toggleCorreoSelectAll(checked){
+  const rows = filtrarCorreos(correoMessagesCache);
+  correoSeleccionMulti = new Set(checked ? rows.map(r=>r.id) : []);
+  document.getElementById('correo-select-count').textContent = correoSeleccionMulti.size;
+  renderCorreoInbox();
+}
+async function accionMasivaCorreo(accion){
+  const ids = Array.from(correoSeleccionMulti);
+  if(!ids.length) return;
+  await asegurarTokenGmail();
+  for(const id of ids){
+    if(accion==='leido') await modificarLabelsGmail(id, [], ['UNREAD']);
+    else if(accion==='no_leido') await modificarLabelsGmail(id, ['UNREAD'], []);
+    else if(accion==='archivar') await modificarLabelsGmail(id, [], ['INBOX']);
+    else if(accion==='spam') await marcarSpamCorreoId(id, true);
+    else if(accion==='eliminar') await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}/trash`, {method:'POST', headers:{Authorization:'Bearer '+gmailAccessToken}});
+  }
+  if(accion==='archivar' || accion==='eliminar') correoMessagesCache = correoMessagesCache.filter(r=>!ids.includes(r.id));
+  correoSeleccionMulti.clear();
+  document.getElementById('correo-select-bar').style.display = 'none';
+  renderCorreoInbox();
+  mostrarToast('Hecho.');
+}
+
+async function modificarLabelsGmail(messageId, addLabelIds, removeLabelIds){
+  await asegurarTokenGmail();
+  await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`, {
+    method:'POST', headers:{Authorization:'Bearer '+gmailAccessToken,'Content-Type':'application/json'},
+    body: JSON.stringify({addLabelIds, removeLabelIds})
+  });
+}
+function actualizarMsgLocal(id, cambios){
+  const m = correoMessagesCache.find(r=>r.id===id);
+  if(m) Object.assign(m, cambios);
+}
+async function toggleImportanteCorreo(id){
+  const m = correoMessagesCache.find(r=>r.id===id); if(!m) return;
+  await modificarLabelsGmail(id, m.importante?[]:['STARRED'], m.importante?['STARRED']:[]);
+  actualizarMsgLocal(id, {importante: !m.importante});
+  if(!m.importante && sb) sb.rpc('registrar_decision_correo', {p_remitente: m.email, p_tipo:'importante'});
+  renderCorreoInbox();
+}
+async function toggleLeidoCorreo(id){
+  const m = correoMessagesCache.find(r=>r.id===id); if(!m) return;
+  await modificarLabelsGmail(id, m.noLeido?[]:['UNREAD'], m.noLeido?['UNREAD']:[]);
+  actualizarMsgLocal(id, {noLeido: !m.noLeido});
+  renderCorreoInbox();
+}
+async function archivarCorreoId(id){
+  await modificarLabelsGmail(id, [], ['INBOX']);
+  correoMessagesCache = correoMessagesCache.filter(r=>r.id!==id);
+  renderCorreoInbox();
+  mostrarToast('Archivado.');
+}
+async function borrarCorreoId(id){
+  if(!(await confirmarAccion('¿Mover este correo a la papelera?'))) return;
+  await asegurarTokenGmail();
+  await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}/trash`, {method:'POST', headers:{Authorization:'Bearer '+gmailAccessToken}});
+  correoMessagesCache = correoMessagesCache.filter(r=>r.id!==id);
+  renderCorreoInbox();
+}
+async function marcarSpamCorreoId(id, silencioso){
+  const m = correoMessagesCache.find(r=>r.id===id); if(!m) return;
+  await modificarLabelsGmail(id, ['SPAM'], ['INBOX']);
+  if(sb){
+    await sb.from('correo_estado').upsert({message_id:id, es_spam:true, categoria:'spam', remitente_email:m.email});
+    await sb.rpc('registrar_decision_correo', {p_remitente: m.email, p_tipo:'spam'});
+  }
+  actualizarMsgLocal(id, {estado:{...(m.estado||{}), es_spam:true, categoria:'spam'}});
+  if(!silencioso){ correoMessagesCache = correoMessagesCache.filter(r=>r.id!==id); renderCorreoInbox(); mostrarToast('Marcado como spam.'); }
+}
+async function bloquearRemitente(email, nombre){
+  if(!sb || !email) return;
+  await sb.from('remitentes_bloqueados').upsert({email, nombre});
+  correoBloqueadosCache.push(email);
+  mostrarToast('Remitente bloqueado — sus correos irán directos a Spam.');
+  renderCorreoInbox();
 }
 
 async function vincularCorreo(messageId){
@@ -6532,9 +6758,9 @@ async function vincularCorreo(messageId){
     entidad.email = msg.email;
   }
   msg.entidad = entidad;
-  msg.categoria = 'relevante';
   renderCorreoInbox();
-  await sb.from('correo_estado').upsert({message_id: messageId, categoria:'relevante', entidad_id: entidad.id});
+  if(correoAbiertoActual && correoAbiertoActual.id===messageId) renderPanelInteligente(msg);
+  mostrarToast('Vinculado a '+entidad.nombre+'.');
 }
 
 function b64urlEncode(str){
@@ -6620,7 +6846,6 @@ function extraerCuerpoMensaje(payload){
     }
     return null;
   }
-  // preferimos el HTML real (se ve como un correo de verdad), el texto plano queda de reserva
   let html = buscar(payload, 'text/html');
   if(html) return {tipo:'html', contenido: html};
   let texto = buscar(payload, 'text/plain');
@@ -6628,13 +6853,115 @@ function extraerCuerpoMensaje(payload){
   if(payload.body && payload.body.data) return {tipo:'texto', contenido: decodeB64Url(payload.body.data)};
   return {tipo:'texto', contenido:'(sin contenido)'};
 }
+function textoPlanoDesdeHtml(html){
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return (div.textContent||div.innerText||'').replace(/\s+/g,' ').trim();
+}
 
 function limpiarHtmlCorreo(html){
-  // quita scripts y manejadores de eventos in-line, básico pero suficiente para mostrar sin ejecutar nada
   return html
     .replace(/<script[\s\S]*?<\/script>/gi,'')
     .replace(/\son\w+="[^"]*"/gi,'')
     .replace(/\son\w+='[^']*'/gi,'');
+}
+
+function extraerAdjuntos(payload, lista){
+  lista = lista || [];
+  if(!payload) return lista;
+  if(payload.filename && payload.body && (payload.body.attachmentId || payload.body.size>0) && payload.filename.length>0){
+    lista.push({filename: payload.filename, mimeType: payload.mimeType, attachmentId: payload.body.attachmentId, size: payload.body.size});
+  }
+  if(payload.parts) payload.parts.forEach(p=>extraerAdjuntos(p, lista));
+  return lista;
+}
+
+const TAG_ES_SPAM = {alta:'var(--red)', media:'var(--orange)', baja:'var(--ink-faint,#8b8275)'};
+
+function renderPanelInteligente(msg){
+  const estado = msg.estado || {};
+  const smart = document.getElementById('correo-d-smart');
+  const acciones = document.getElementById('correo-d-acciones-contextuales');
+  document.getElementById('correo-d-star').textContent = msg.importante ? '★' : '☆';
+  document.getElementById('correo-d-star').style.color = msg.importante ? 'var(--orange)' : 'var(--ink-faint,#8b8275)';
+  const nHilo = contarHilo(msg.threadId);
+  const badge = document.getElementById('correo-d-thread-badge');
+  if(nHilo>1){ badge.style.display=''; badge.innerHTML = `<span class="tag">🧵 Este hilo tiene ${nHilo} mensajes</span>`; }
+  else badge.style.display = 'none';
+
+  if(!estado.analizado_at){
+    smart.style.display = '';
+    document.getElementById('correo-d-tags').innerHTML = '';
+    document.getElementById('correo-d-que-es').textContent = 'Analizando con IA…';
+    document.getElementById('correo-d-resumen').textContent = '';
+    document.getElementById('correo-d-datos').innerHTML = '';
+    acciones.innerHTML = '';
+    return;
+  }
+  smart.style.display = '';
+  const tags = [];
+  if(estado.categoria) tags.push(`<span class="tag">${CATEGORIA_LABEL[estado.categoria]||estado.categoria}</span>`);
+  if(estado.prioridad) tags.push(`<span class="tag" style="color:${TAG_ES_SPAM[estado.prioridad]};border-color:${TAG_ES_SPAM[estado.prioridad]};">Prioridad ${estado.prioridad}</span>`);
+  if(estado.requiere_accion) tags.push(`<span class="tag" style="color:var(--red);border-color:var(--red);">Requiere acción</span>`);
+  if(estado.posible_duplicado) tags.push(`<span class="tag">Posible duplicado</span>`);
+  if(estado.es_spam) tags.push(`<span class="tag" style="color:var(--red);border-color:var(--red);">🚫 Probable spam (${estado.spam_confianza||'?'})</span>`);
+  document.getElementById('correo-d-tags').innerHTML = tags.join('');
+  document.getElementById('correo-d-que-es').textContent = estado.que_es || '';
+  document.getElementById('correo-d-resumen').textContent = estado.resumen_ia || '';
+  const datos = [];
+  if(estado.importe) datos.push('💶 ' + Number(estado.importe).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €');
+  if(estado.fecha_limite) datos.push('📅 Fecha límite: ' + estado.fecha_limite);
+  if(estado.numero_referencia) datos.push('# ' + estado.numero_referencia);
+  document.getElementById('correo-d-datos').innerHTML = datos.map(d=>`<span style="margin-right:14px;">${d}</span>`).join('');
+
+  // acciones contextuales según categoría + lo que detectó la IA
+  const btns = [];
+  if(estado.accion_recomendada){
+    btns.push(`<span class="tag" style="font-style:italic;">💡 ${estado.accion_recomendada}</span>`);
+  }
+  if(!msg.entidad){
+    btns.push(`<button class="btn sm" onclick="vincularCorreo('${msg.id}')">Vincular a cliente/proveedor</button>`);
+  }
+  if(estado.categoria==='facturas' || estado.categoria==='proveedores'){
+    btns.push(`<button class="btn sm" onclick="crearGastoDesdeCorreo()">Registrar gasto</button>`);
+  }
+  if(estado.categoria==='banco'){
+    btns.push(`<button class="btn sm" onclick="crearGastoDesdeCorreo()">Registrar movimiento</button>`);
+  }
+  if(estado.categoria==='licitaciones'){
+    btns.push(`<button class="btn sm" onclick="document.querySelector('[data-view=\\'ayuntamiento\\']').click();closeCorreoDrawer();">Ver Ayuntamiento / expedientes</button>`);
+  }
+  if(estado.categoria==='clientes' || estado.categoria==='trabajos'){
+    btns.push(`<button class="btn sm" onclick="document.querySelector('[data-view=\\'trabajos\\']').click();closeCorreoDrawer();">Ir a Trabajos</button>`);
+  }
+  if(estado.fecha_limite){
+    btns.push(`<button class="btn sm" onclick="crearRecordatorioDesdeCorreo()">🔔 Crear recordatorio (${estado.fecha_limite})</button>`);
+  }
+  btns.push(`<button class="btn sm" onclick="crearTareaDesdeCorreo()">✅ Crear tarea</button>`);
+  if(estado.requiere_accion){
+    const resuelto = estado.seguimiento_estado==='resuelto';
+    btns.push(`<button class="btn sm" onclick="marcarSeguimientoCorreo('${resuelto?'pendiente':'resuelto'}')">${resuelto?'↺ Reabrir':'✓ Marcar resuelto'}</button>`);
+  }
+  if(estado.es_spam){
+    btns.push(`<button class="btn sm" style="color:var(--red);" onclick="bloquearRemitenteActual()">⛔ Bloquear remitente</button>`);
+  }
+  acciones.innerHTML = btns.join('');
+}
+
+async function reanalizarCorreoActual(){
+  if(!correoAbiertoActual) return;
+  document.getElementById('correo-d-que-es').textContent = 'Analizando…';
+  const cuerpoEl = document.getElementById('correo-d-content');
+  const cuerpoTexto = correoAbiertoActual._cuerpoTextoPlano || correoAbiertoActual.snippet;
+  const analisis = await analizarUnCorreo(correoAbiertoActual, cuerpoTexto);
+  if(analisis){
+    correoAbiertoActual.estado = {...(correoAbiertoActual.estado||{}), ...analisis, analizado_at:new Date().toISOString()};
+    actualizarMsgLocal(correoAbiertoActual.id, {estado: correoAbiertoActual.estado});
+    renderPanelInteligente(correoAbiertoActual);
+    renderCorreoInbox();
+  } else {
+    mostrarToast('No se pudo analizar ahora mismo.');
+  }
 }
 
 async function openCorreoDrawer(messageId){
@@ -6647,45 +6974,104 @@ async function openCorreoDrawer(messageId){
   document.getElementById('correo-d-date').textContent = msg.date;
   document.getElementById('correo-d-content').innerHTML = '<div class="empty">Cargando…</div>';
   document.getElementById('correo-overlay').classList.add('active');
+  renderPanelInteligente(msg);
+  if(msg.noLeido){ modificarLabelsGmail(messageId, [], ['UNREAD']); actualizarMsgLocal(messageId, {noLeido:false}); }
   try{
     const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`, {
       headers: {Authorization: 'Bearer '+gmailAccessToken}
     });
     const data = await res.json();
     const cuerpo = extraerCuerpoMensaje(data.payload);
+    correoAbiertoActual._cuerpoTextoPlano = cuerpo.tipo==='html' ? textoPlanoDesdeHtml(cuerpo.contenido) : cuerpo.contenido;
+    correoAbiertoActual._adjuntos = extraerAdjuntos(data.payload);
+    correoAbiertoActual._gmailMessageIdHeader = (data.payload.headers||[]).find(h=>h.name==='Message-ID')?.value || '';
     const box = document.getElementById('correo-d-content');
+    let adjuntosHtml = '';
+    if(correoAbiertoActual._adjuntos.length){
+      adjuntosHtml = `<div style="padding:10px 14px;border-bottom:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;">` +
+        correoAbiertoActual._adjuntos.map((a,i)=>`<span class="tag" style="cursor:pointer;" onclick="descargarAdjuntoCorreo(${i})">📎 ${a.filename}</span>`).join('') + `</div>`;
+      if(correoAbiertoActual._adjuntos.length && !msg.estado?.tiene_adjuntos_importantes){
+        actualizarMsgLocal(msg.id, {estado:{...(msg.estado||{}), tiene_adjuntos_importantes:true}});
+      }
+    }
     if(cuerpo.tipo==='html'){
-      box.innerHTML = `<iframe sandbox="allow-popups allow-popups-to-escape-sandbox" style="width:100%;height:50vh;border:none;background:#fff;" srcdoc="${limpiarHtmlCorreo(cuerpo.contenido).replace(/"/g,'&quot;')}"></iframe>`;
+      box.innerHTML = adjuntosHtml + `<iframe sandbox="allow-popups allow-popups-to-escape-sandbox" style="width:100%;height:42vh;border:none;background:#fff;" srcdoc="${limpiarHtmlCorreo(cuerpo.contenido).replace(/"/g,'&quot;')}"></iframe>`;
     } else {
-      box.innerHTML = `<div style="white-space:pre-wrap;font-size:13.5px;line-height:1.6;padding:4px;">${(cuerpo.contenido || msg.snippet).replace(/</g,'&lt;')}</div>`;
+      box.innerHTML = adjuntosHtml + `<div style="white-space:pre-wrap;font-size:13.5px;line-height:1.6;padding:12px;">${(cuerpo.contenido || msg.snippet).replace(/</g,'&lt;')}</div>`;
+    }
+    // reanálisis con el cuerpo completo real (más fiable que el snippet)
+    if(!msg.estado?.analizado_at || (msg.estado.resumen_ia||'').length < 5){
+      reanalizarCorreoActual();
     }
   }catch(err){
     document.getElementById('correo-d-content').innerHTML = `<div class="empty" style="color:var(--red);">Error al cargar el mensaje: ${err && err.message ? err.message : err}</div>`;
   }
 }
-function closeCorreoDrawer(){ document.getElementById('correo-overlay').classList.remove('active'); }
-
-async function archivarCorreo(){
-  if(!correoAbiertoActual) return;
+async function descargarAdjuntoCorreo(idx){
+  const a = correoAbiertoActual?._adjuntos?.[idx];
+  if(!a) return;
   await asegurarTokenGmail();
-  await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${correoAbiertoActual.id}/modify`, {
-    method:'POST', headers:{Authorization:'Bearer '+gmailAccessToken,'Content-Type':'application/json'},
-    body: JSON.stringify({removeLabelIds:['INBOX']})
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${correoAbiertoActual.id}/attachments/${a.attachmentId}`, {
+    headers:{Authorization:'Bearer '+gmailAccessToken}
   });
-  correoMessagesCache = correoMessagesCache.filter(r=>r.id!==correoAbiertoActual.id);
-  closeCorreoDrawer();
-  renderCorreoInbox();
+  const data = await res.json();
+  const b64 = (data.data||'').replace(/-/g,'+').replace(/_/g,'/');
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  const blob = new Blob([bytes], {type: a.mimeType||'application/octet-stream'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = a.filename;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
 }
-async function borrarCorreo(){
+function closeCorreoDrawer(){ document.getElementById('correo-overlay').classList.remove('active'); correoAbiertoActual = null; }
+
+async function toggleImportanteCorreoActual(){ if(correoAbiertoActual) await toggleImportanteCorreo(correoAbiertoActual.id); if(correoAbiertoActual) renderPanelInteligente(correoAbiertoActual); }
+async function marcarSpamCorreoActual(){
   if(!correoAbiertoActual) return;
-  if(!(await confirmarAccion('¿Mover este correo a la papelera?'))) return;
-  await asegurarTokenGmail();
-  await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${correoAbiertoActual.id}/trash`, {
-    method:'POST', headers:{Authorization:'Bearer '+gmailAccessToken}
-  });
-  correoMessagesCache = correoMessagesCache.filter(r=>r.id!==correoAbiertoActual.id);
+  await marcarSpamCorreoId(correoAbiertoActual.id);
   closeCorreoDrawer();
-  renderCorreoInbox();
+}
+async function bloquearRemitenteActual(){
+  if(!correoAbiertoActual) return;
+  if(!(await confirmarAccion(`¿Bloquear a ${correoAbiertoActual.email}? Sus correos irán directos a Spam.`))) return;
+  await bloquearRemitente(correoAbiertoActual.email, correoAbiertoActual.nombreRemitente);
+  await marcarSpamCorreoId(correoAbiertoActual.id);
+  closeCorreoDrawer();
+}
+async function marcarSeguimientoCorreo(nuevoEstado){
+  if(!correoAbiertoActual || !sb) return;
+  await sb.from('correo_estado').update({seguimiento_estado: nuevoEstado}).eq('message_id', correoAbiertoActual.id);
+  correoAbiertoActual.estado.seguimiento_estado = nuevoEstado;
+  renderPanelInteligente(correoAbiertoActual);
+  mostrarToast(nuevoEstado==='resuelto' ? 'Marcado como resuelto.' : 'Reabierto.');
+}
+async function crearRecordatorioDesdeCorreo(){
+  if(!correoAbiertoActual || !sb) return;
+  const estado = correoAbiertoActual.estado || {};
+  await sb.from('sistema').insert({tipo:'recordatorio_correo', data:{
+    titulo: correoAbiertoActual.subject, remitente: correoAbiertoActual.email,
+    fecha_limite: estado.fecha_limite, resumen: estado.resumen_ia, message_id: correoAbiertoActual.id,
+    estado: 'pendiente',
+  }});
+  mostrarToast('Recordatorio creado para el ' + estado.fecha_limite + '.');
+}
+async function crearTareaDesdeCorreo(){
+  if(!correoAbiertoActual || !sb) return;
+  const estado = correoAbiertoActual.estado || {};
+  await sb.from('sistema').insert({tipo:'tarea_correo', data:{
+    titulo: correoAbiertoActual.subject, remitente: correoAbiertoActual.email,
+    resumen: estado.resumen_ia || correoAbiertoActual.snippet, message_id: correoAbiertoActual.id,
+    categoria: estado.categoria, estado: 'pendiente',
+  }});
+  mostrarToast('Tarea creada.');
+}
+function crearGastoDesdeCorreo(){
+  closeCorreoDrawer();
+  document.querySelector('[data-view="economia"]')?.click();
+  mostrarToast('Ve a "+ Nuevo gasto" y usa los datos del correo (importe, proveedor, referencia) para rellenarlo.');
 }
 
 function replyToCorreo(){
@@ -6695,6 +7081,26 @@ function replyToCorreo(){
   document.getElementById('mail-to').value = correoAbiertoActual.email;
   document.getElementById('mail-subject').value = /^re:/i.test(correoAbiertoActual.subject) ? correoAbiertoActual.subject : 'Re: '+correoAbiertoActual.subject;
   document.getElementById('mail-body').value = '';
+}
+function forwardCorreo(){
+  if(!correoAbiertoActual) return;
+  const cuerpo = correoAbiertoActual._cuerpoTextoPlano || correoAbiertoActual.snippet || '';
+  closeCorreoDrawer();
+  openComposeDrawer();
+  document.getElementById('mail-to').value = '';
+  document.getElementById('mail-subject').value = /^fwd:/i.test(correoAbiertoActual.subject) ? correoAbiertoActual.subject : 'Fwd: '+correoAbiertoActual.subject;
+  document.getElementById('mail-body').value = `\n\n---------- Mensaje reenviado ----------\nDe: ${correoAbiertoActual.from}\nAsunto: ${correoAbiertoActual.subject}\nFecha: ${correoAbiertoActual.date}\n\n${cuerpo}`;
+}
+
+async function archivarCorreo(){
+  if(!correoAbiertoActual) return;
+  await archivarCorreoId(correoAbiertoActual.id);
+  closeCorreoDrawer();
+}
+async function borrarCorreo(){
+  if(!correoAbiertoActual) return;
+  await borrarCorreoId(correoAbiertoActual.id);
+  closeCorreoDrawer();
 }
 
 async function sendGmail(){
