@@ -2084,7 +2084,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.16</div>
+        <div class="sub">V2.17</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4255,7 +4255,8 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </select>
       <span class="ie-doc-explain" id="ni-explain"></span>
       <button type="button" class="btn sm" onclick="document.getElementById('ie-dictado').classList.toggle('open')">📝 Rellenar desde texto o foto</button>
-      <button type="button" id="ni-ver-original" onclick="abrirVisorArchivoOriginal()" class="btn" style="padding:5px 10px;font-size:11.5px;display:none;">📎 Ver archivo original</button>
+      <button type="button" id="ni-ver-original" onclick="abrirVisorArchivoOriginal()" class="btn sm" style="display:none;">📎 Ver archivo original</button>
+      <span id="ni-otras-acciones" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
       <button class="close-x" onclick="closeNewInvoiceModal()">✕</button>
     </div>
 
@@ -4962,6 +4963,98 @@ function formatFechaLabel(dateRaw){
   if(isNaN(d)) return 'sin fecha';
   return d.getDate()+' '+MESES_ABREV[d.getMonth()];
 }
+// ===== Acciones centralizadas de documentos — una sola fuente de verdad, usada en toda la app =====
+function accionesDocumento(doc){
+  const a = [];
+  const editar = {t:'Editar', fn:`openDocumentViewer('${doc.id}')`};
+  const duplicar = {t:'Duplicar', fn:`duplicarDocumento('${doc.id}')`};
+  const eliminar = {t:'Eliminar', fn:`borrarUnDocumento('${doc.id}')`};
+  if(doc.type==='factura'){
+    const estado = doc.estado_cobro || 'pendiente_enviar';
+    if(doc.enviado_gestor || ['pendiente_cobrar','parcial','cobrado'].includes(estado)){
+      if(estado==='pendiente_cobrar' && !doc.enviado_gestor) a.push(editar);
+      a.push({t:'Rectificar', fn:`rectificarFactura('${doc.id}')`}, duplicar);
+    } else {
+      a.push(editar, duplicar, eliminar);
+    }
+  } else if(doc.type==='presupuesto' || doc.type==='proforma'){
+    a.push(editar, duplicar, eliminar, {t:'Crear factura', fn:`crearFacturaDesdeDocumento('${doc.id}')`});
+  } else if(doc.type==='albaran'){
+    a.push(editar, duplicar, eliminar, {t:'Convertir en factura', fn:`convertirAlbaranEnFactura('${doc.id}')`});
+  } else {
+    a.push(editar, eliminar);
+  }
+  return a;
+}
+function accionesDocumentoHtml(doc){
+  return accionesDocumento(doc).map(x=>`<button class="btn sm" onclick="event.stopPropagation();${x.fn}">${x.t}</button>`).join(' ');
+}
+async function duplicarDocumento(id){
+  const doc = documentosRealesById[id];
+  if(!doc || !sb) return;
+  const {data: original} = await sb.from('documentos_economicos').select('*').eq('id', id).single();
+  if(!original) return;
+  const copia = {...original};
+  delete copia.id; delete copia.created_at; delete copia.reprocesado_at; delete copia.estado_calidad; delete copia.info_faltante;
+  copia.numero = ['factura','presupuesto','proforma'].includes(copia.tipo) ? proximoNumero(copia.tipo) : null;
+  copia.fecha_devengo = new Date().toISOString().slice(0,10);
+  copia.estado_cobro = copia.tipo==='factura' ? 'borrador' : copia.estado_cobro;
+  copia.estado_albaran = copia.tipo==='albaran' ? 'en_proceso' : copia.estado_albaran;
+  copia.enviado_gestor = false; copia.enviado_gestor_fecha = null;
+  const {data: nuevo, error} = await sb.from('documentos_economicos').insert(copia).select().single();
+  if(error){ mostrarToast('Error al duplicar: '+errText(error)); return; }
+  mostrarToast('Duplicado como nuevo documento.');
+  await cargarDocumentosEconomicosReales();
+  openDocumentViewer(nuevo.id);
+}
+async function rectificarFactura(id){
+  const {data: original} = await sb.from('documentos_economicos').select('*').eq('id', id).single();
+  if(!original) return;
+  const rect = {...original};
+  delete rect.id; delete rect.created_at; delete rect.reprocesado_at; delete rect.estado_calidad;
+  rect.numero = proximoNumero('factura');
+  rect.fecha_devengo = new Date().toISOString().slice(0,10);
+  rect.estado_cobro = 'borrador';
+  rect.enviado_gestor = false; rect.enviado_gestor_fecha = null;
+  rect.info_faltante = `Factura rectificativa de la nº ${original.numero||'—'} (id original: ${id})`;
+  const {data: nueva, error} = await sb.from('documentos_economicos').insert(rect).select().single();
+  if(error){ mostrarToast('Error al rectificar: '+errText(error)); return; }
+  mostrarToast('Rectificativa creada — la original no se ha tocado.');
+  await cargarDocumentosEconomicosReales();
+  openDocumentViewer(nueva.id);
+}
+async function convertirAlbaranEnFactura(id){
+  const {data: original} = await sb.from('documentos_economicos').select('*').eq('id', id).single();
+  if(!original) return;
+  const nueva = {
+    tipo:'factura', estado:'borrador', numero: proximoNumero('factura'), fecha_devengo: new Date().toISOString().slice(0,10),
+    entidad_id: original.entidad_id, conceptos: original.conceptos, importe: original.importe, iva_pct: original.iva_pct,
+    contabilidad: original.contabilidad, archivo_path: original.archivo_path, estado_cobro:'borrador',
+    info_faltante: `Creada al convertir el albarán nº ${original.numero||'—'} en factura.`,
+  };
+  const {data: doc, error} = await sb.from('documentos_economicos').insert(nueva).select().single();
+  if(error){ mostrarToast('Error al convertir: '+errText(error)); return; }
+  await sb.from('documentos_economicos').update({estado_albaran:'facturado'}).eq('id', id);
+  mostrarToast('Factura creada — el albarán queda marcado como facturado.');
+  await cargarDocumentosEconomicosReales();
+  openDocumentViewer(doc.id);
+}
+async function crearFacturaDesdeDocumento(id){
+  const {data: original} = await sb.from('documentos_economicos').select('*').eq('id', id).single();
+  if(!original) return;
+  const nueva = {
+    tipo:'factura', estado:'borrador', numero: proximoNumero('factura'), fecha_devengo: new Date().toISOString().slice(0,10),
+    entidad_id: original.entidad_id, conceptos: original.conceptos, importe: original.importe, iva_pct: original.iva_pct,
+    contabilidad: original.contabilidad, estado_cobro:'borrador',
+    info_faltante: `Creada a partir de${original.tipo==='proforma'?' la proforma':' el presupuesto'} nº ${original.numero||'—'}.`,
+  };
+  const {data: doc, error} = await sb.from('documentos_economicos').insert(nueva).select().single();
+  if(error){ mostrarToast('Error: '+errText(error)); return; }
+  await sb.from('documentos_economicos').update({estado: original.tipo==='proforma' ? 'aceptada' : 'aceptado'}).eq('id', id);
+  mostrarToast(`Factura creada — ${original.tipo==='proforma'?'la proforma queda como Aceptada':'el presupuesto queda como Aceptado'}.`);
+  await cargarDocumentosEconomicosReales();
+  openDocumentViewer(doc.id);
+}
 function toggleExpandirDocFila(id, colspan){
   const filaExistente = document.getElementById('docrow-detalle-'+id);
   if(filaExistente){ filaExistente.remove(); return; }
@@ -4981,7 +5074,7 @@ function toggleExpandirDocFila(id, colspan){
     : '<span class="sub-t">Sin líneas de concepto guardadas</span>';
   detalle.innerHTML = `<td colspan="${colspan}" style="background:var(--concrete);padding:10px 20px;">
     ${lineasHtml}
-    <div style="margin-top:8px;"><button class="btn" onclick="openDocumentViewer('${id}')">✏️ Editar completo</button></div>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">${accionesDocumentoHtml(doc)}</div>
   </td>`;
   fila.after(detalle);
 }
@@ -10874,6 +10967,7 @@ function openDocumentViewer(id){
   const urlOriginal = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
   if(urlOriginal){ btnOriginal.dataset.url = urlOriginal; btnOriginal.style.display = ''; }
   else { btnOriginal.style.display = 'none'; }
+  document.getElementById('ni-otras-acciones').innerHTML = accionesDocumento(doc).filter(x=>x.t!=='Editar').map(x=>`<button type="button" class="btn sm" onclick="${x.fn}">${x.t}</button>`).join('');
   onClientChange();
   doc.items.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, undefined, i.fecha));
   document.getElementById('ni-docnum').value = doc.num;
@@ -10896,16 +10990,7 @@ function openDocumentViewer(id){
   const convBtn = document.getElementById('ni-convert-btn');
   const deshacerBtn = document.getElementById('ni-deshacer-btn');
   deshacerBtn.style.display = 'none';
-  if(doc.type==='presupuesto' || doc.type==='proforma'){
-    convBtn.style.display = ''; convBtn.textContent = 'Convertir en albarán';
-  } else if(doc.type==='albaran'){
-    convBtn.style.display = ''; convBtn.textContent = 'Convertir en factura';
-  } else if(doc.type==='factura' && doc.origen_albaran_ids && doc.origen_albaran_ids.length){
-    convBtn.style.display = 'none';
-    deshacerBtn.style.display = '';
-  } else {
-    convBtn.style.display = 'none';
-  }
+  convBtn.style.display = 'none'; // las conversiones (Duplicar/Rectificar/Crear factura/Convertir en factura) se hacen desde las acciones de la fila, con un criterio único — ver accionesDocumento()
   recalcTotals();
   document.getElementById('newinvoice-overlay').classList.add('active');
 }
