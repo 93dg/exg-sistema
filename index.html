@@ -617,21 +617,45 @@ table{border-collapse:collapse;width:100%;}
 
 .mini-modal-body .field{margin-bottom:12px;}
 
-#editor-mode-btn{
-  position:fixed;bottom:20px;right:20px;z-index:4000;
-  background:var(--asphalt);color:#fff;border:none;border-radius:24px;
-  padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;
-  box-shadow:0 4px 14px rgba(0,0,0,0.3);
-}
 #editor-mode-btn:hover{background:var(--orange);}
 #editor-mode-btn.active{background:var(--orange);}
-#report-bug-btn{
-  position:fixed;bottom:20px;right:170px;z-index:4000;
-  background:var(--asphalt);color:#fff;border:none;border-radius:24px;
-  padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;
-  box-shadow:0 4px 14px rgba(0,0,0,0.3);
-}
 #report-bug-btn:hover{background:var(--red);}
+/* editor-mode-btn y report-bug-btn: arriba a la derecha, solo icono, compactos */
+#editor-mode-btn, #report-bug-btn{
+  position:fixed;top:14px;z-index:4000;
+  background:var(--asphalt);color:#fff;border:none;border-radius:50%;
+  width:38px;height:38px;padding:0;font-size:16px;cursor:pointer;
+  box-shadow:0 3px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;
+}
+#editor-mode-btn{right:60px;}
+#report-bug-btn{right:14px;}
+#editor-mode-btn .rb-label, #report-bug-btn .rb-label{display:none;}
+
+/* botón global "+" de escritorio — a la izquierda del asistente */
+#global-add-fab{
+  position:fixed;bottom:24px;right:94px;z-index:5100;
+  width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;padding:0;
+  background:var(--asphalt);color:#fff;font-size:26px;font-weight:400;line-height:1;
+  box-shadow:0 6px 18px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;
+  transition:transform .15s;
+}
+#global-add-fab:hover{transform:scale(1.06);background:var(--orange);}
+#global-add-fab.open{transform:rotate(45deg);}
+#global-add-backdrop{display:none;position:fixed;inset:0;z-index:5050;background:rgba(0,0,0,0.35);}
+#global-add-menu{
+  display:none;position:fixed;bottom:88px;right:94px;z-index:5100;
+  background:var(--panel,var(--asphalt));border:1px solid var(--line-dark,var(--line));border-radius:14px;
+  box-shadow:0 8px 28px rgba(0,0,0,0.4);overflow:hidden;min-width:200px;
+}
+#global-add-backdrop.active, #global-add-menu.active{display:block;}
+#global-add-menu button{
+  display:flex;align-items:center;gap:12px;width:100%;padding:13px 16px;border:none;background:none;
+  color:#fff;font-size:14.5px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);cursor:pointer;
+}
+#global-add-menu button:last-child{border-bottom:none;}
+#global-add-menu button:hover{background:rgba(255,255,255,0.06);}
+#global-add-menu .ma-ico{font-size:17px;width:20px;text-align:center;}
+@media(max-width:768px){ #global-add-fab, #global-add-backdrop, #global-add-menu{display:none !important;} }
 
 /* ============ ASISTENTE — burbuja flotante ============ */
 #asistente-ia-fab{
@@ -2029,8 +2053,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<button id="editor-mode-btn" onclick="toggleEditorMode()">✏️ Modo editor</button>
+<button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
 <button id="report-bug-btn" onclick="openReportBug()">🐞<span class="rb-label"> Reportar</span></button>
+<button id="global-add-fab" onclick="toggleGlobalAddMenu()" title="Crear">+</button>
+<div id="global-add-backdrop" onclick="toggleGlobalAddMenu()"></div>
+<div id="global-add-menu">
+  <button onclick="closeGlobalAddMenuAndRun(abrirMenuTipoDoc)"><span class="ma-ico">📄</span> Documento</button>
+  <button onclick="closeGlobalAddMenuAndRun(abrirAveria)"><span class="ma-ico">⚠</span> Incidente</button>
+  <button onclick="closeGlobalAddMenuAndRun(()=>openNewJobModal())"><span class="ma-ico">▤</span> Trabajo</button>
+  <button onclick="closeGlobalAddMenuAndRun(()=>openNewClientModal(null))"><span class="ma-ico">◈</span> Cliente</button>
+</div>
 <button id="asistente-ia-fab" onclick="abrirAsistenteIA()"><span id="ai-fab-orb"></span></button>
 <div id="repro-badge" style="display:none;position:fixed;bottom:90px;right:20px;z-index:9998;background:var(--asphalt,#232323);color:#fff;padding:7px 12px;border-radius:20px;font-size:12px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,.3);cursor:pointer;" onclick="document.querySelector('.nav button[data-view=\'reportes\']')?.click()">🔁 Reprocesando…</div>
 
@@ -2069,11 +2101,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
 <div id="mobile-add-backdrop" onclick="toggleMobileAddMenu()"></div>
 <div id="mobile-add-menu">
-  <button onclick="closeMobileAddMenuAndRun(abrirAsistenteIA)"><span class="ma-ico">🤖</span> Asistente</button>
   <button onclick="closeMobileAddMenuAndRun(abrirMenuTipoDoc)"><span class="ma-ico">📄</span> Documento</button>
-  <button onclick="closeMobileAddMenuAndRun(abrirDigitalizar)"><span class="ma-ico">📥</span> Digitalizar archivo</button>
-  <button onclick="closeMobileAddMenuAndRun(()=>openNewJobModal())"><span class="ma-ico">▤</span> Trabajo</button>
   <button onclick="closeMobileAddMenuAndRun(abrirAveria)"><span class="ma-ico">⚠</span> Incidente</button>
+  <button onclick="closeMobileAddMenuAndRun(()=>openNewJobModal())"><span class="ma-ico">▤</span> Trabajo</button>
   <button onclick="closeMobileAddMenuAndRun(()=>openNewClientModal(null))"><span class="ma-ico">◈</span> Cliente</button>
 </div>
 
@@ -2084,7 +2114,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.20</div>
+        <div class="sub">V2.21</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2131,12 +2161,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <h1>Centro de control</h1>
           <div class="desc">Martes, 9 de septiembre — vista general de la empresa</div>
         </div>
-        <div class="quickactions" id="control-quickactions">
-          <button class="btn" style="border-color:var(--orange);color:var(--orange);" onclick="abrirAsistenteIA()">🤖 Asistente</button>
-          <button class="btn" onclick="openNewJobModal()">+ Nuevo trabajo</button>
-          <button class="btn" style="border-color:var(--red);color:var(--red);" onclick="abrirAveria()">⚠ Incidente</button>
-          <button class="btn primary" onclick="abrirMenuTipoDoc()">+ Crear documento</button>
-        </div>
+        <div class="quickactions" id="control-quickactions"></div>
       </div>
 
       <div class="kpi-strip">
@@ -2349,7 +2374,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="view" id="view-trabajos">
       <div class="topbar">
         <div><h1>Trabajos</h1><div class="desc">Todos los trabajos de la empresa</div></div>
-        <div class="quickactions"><button class="btn primary" onclick="openNewJobModal()">+ Nuevo trabajo</button></div>
+        <div class="quickactions"></div>
       </div>
       <div class="filters" id="job-filters"></div>
       <div class="panel">
@@ -2457,7 +2482,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="topbar">
         <div><h1>Flota y maquinaria</h1><div class="desc">Estado, mantenimiento, documentación y repuestos</div></div>
         <div class="quickactions">
-          <button class="btn" style="border-color:var(--red);color:var(--red);" onclick="abrirAveria()">⚠ Incidente</button>
           <button class="btn primary" onclick="addMaquina()">+ Añadir máquina</button>
         </div>
       </div>
@@ -2541,7 +2565,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div><h1>Clientes</h1><div class="desc">Ayuntamientos, particulares y empresas</div></div>
         <div class="quickactions">
           <button class="btn" style="color:var(--red);display:none;" id="clientes-borrar-sel-btn" onclick="borrarClientesSeleccionados()">🗑 Borrar seleccionados (<span id="clientes-sel-count">0</span>)</button>
-          <button class="btn primary" onclick="openNewClientModal(null)">+ Nuevo cliente</button>
         </div>
       </div>
       <div class="panel">
@@ -2571,9 +2594,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="view" id="view-facturas">
       <div class="topbar">
         <div><h1>Facturas</h1><div class="desc">Todas las facturas — conectado con Economía</div></div>
-        <div class="quickactions">
-          <button class="btn primary" onclick="abrirMenuTipoDoc()">+ Crear documento</button>
-        </div>
+        <div class="quickactions"></div>
       </div>
 
       <div class="kpi-strip" id="facturas-kpi-strip" style="margin-bottom:16px;"></div>
@@ -2955,7 +2976,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="chip-filter active" data-cf="">Todo</div>
           </div>
           <button class="btn" onclick="abrirRegistrarGasto()">+ Registrar gasto</button>
-          <button class="btn primary" onclick="abrirMenuTipoDoc()">+ Crear documento</button>
         </div>
       </div>
 
@@ -4643,6 +4663,21 @@ document.querySelectorAll('.mobile-tab-btn[data-view]').forEach(btn=>{
   });
 });
 document.getElementById('mobile-tab-mas')?.addEventListener('click', toggleMobileNav);
+function toggleGlobalAddMenu(){
+  const fab = document.getElementById('global-add-fab');
+  const backdrop = document.getElementById('global-add-backdrop');
+  const menu = document.getElementById('global-add-menu');
+  const abrir = !menu.classList.contains('active');
+  fab.classList.toggle('open', abrir);
+  backdrop.classList.toggle('active', abrir);
+  menu.classList.toggle('active', abrir);
+}
+function closeGlobalAddMenuAndRun(fn){
+  document.getElementById('global-add-fab').classList.remove('open');
+  document.getElementById('global-add-backdrop').classList.remove('active');
+  document.getElementById('global-add-menu').classList.remove('active');
+  setTimeout(fn, 60);
+}
 function toggleMobileAddMenu(){
   const tabbar = document.getElementById('mobile-tabbar');
   const backdrop = document.getElementById('mobile-add-backdrop');
