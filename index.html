@@ -2186,7 +2186,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.44</div>
+        <div class="sub">V2.45</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9286,7 +9286,12 @@ function openClientDrawer(name){
 
   const docsOrdenados = cDocs.slice().sort((a,b)=> new Date(b.dateRaw||0) - new Date(a.dateRaw||0));
   document.getElementById('c-docs-tbl').innerHTML = '<tr><th>Tipo</th><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th></tr>' +
-    (docsOrdenados.length ? docsOrdenados.map(d=>`<tr onclick="closeClientDrawer();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td>${tipoDocEtiqueta(d.type)}</td><td class="mono">${d.num||d.numero||'—'}</td><td>${d.dateLabel||formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td><td>${d.status||'—'}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">Sin documentos todavía</td></tr>');
+    (docsOrdenados.length ? docsOrdenados.map(d=>{
+      // mismo estado real que en Facturas/Albaranes/Presupuestos — no el campo "status"
+      // (borrador/no-borrador), que aquí siempre decía "Pendiente" sin relación con el cobro.
+      const estadoLabel = d.type==='gasto' ? (d.status||'—') : (ESTADOS_DOCUMENTO.find(o=>o[0]===(d.estado_cobro||'pendiente_enviar'))?.[1] || d.estado_cobro || '—');
+      return `<tr onclick="closeClientDrawer();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td>${tipoDocEtiqueta(d.type)}</td><td class="mono">${d.num||d.numero||'—'}</td><td>${d.dateLabel||formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td><td>${estadoLabel}</td></tr>`;
+    }).join('') : '<tr><td colspan="5" class="empty">Sin documentos todavía</td></tr>');
   document.getElementById('client-overlay').classList.add('active');
   cargarDireccionesCliente(c.id);
 }
