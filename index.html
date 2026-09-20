@@ -438,7 +438,7 @@ table{border-collapse:collapse;width:100%;}
   table{min-width:600px;}
   .drawer{width:100vw;max-width:100vw;}
   .explorer-grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr)) !important;}
-  #editor-mode-btn, #reset-filtros-btn{display:none;}
+  #editor-mode-btn{display:none;}
   #control-quickactions{display:none !important;}
 
   /* ---- escalado táctil: todo más grande para dedos ---- */
@@ -627,7 +627,6 @@ table{border-collapse:collapse;width:100%;}
   width:38px;height:38px;padding:0;font-size:16px;cursor:pointer;
   box-shadow:0 3px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;
 }
-#reset-filtros-btn{right:106px;}
 #editor-mode-btn{right:60px;}
 #report-bug-btn{right:14px;}
 #editor-mode-btn .rb-label, #report-bug-btn .rb-label{display:none;}
@@ -2054,7 +2053,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<button id="reset-filtros-btn" onclick="if(confirm('¿Restablecer todos los filtros guardados a su valor por defecto?')) restablecerTodosLosFiltros();" title="Restablecer filtros guardados">↺</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
 <button id="report-bug-btn" onclick="openReportBug()">🐞<span class="rb-label"> Reportar</span></button>
 <button id="global-add-fab" onclick="toggleGlobalAddMenu()" title="Crear">+</button>
@@ -2116,7 +2114,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.22</div>
+        <div class="sub">V2.23</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4711,6 +4709,25 @@ document.querySelectorAll('.topbar').forEach(topbar=>{
   btnActualizar.onclick = actualizarSeccionActual;
   acciones.insertBefore(btnActualizar, acciones.firstChild);
 });
+// Botón "Restablecer filtros" — solo en las secciones que de verdad tienen filtros guardables,
+// junto al botón Actualizar de esa misma sección (no un icono global fijo).
+document.querySelectorAll('.view').forEach(view=>{
+  const filtrosDeEstaVista = view.querySelectorAll('.filters[id]');
+  if(!filtrosDeEstaVista.length) return;
+  const topbar = view.querySelector('.topbar');
+  const acciones = topbar && topbar.querySelector('.quickactions');
+  if(!acciones) return;
+  const btnReset = document.createElement('button');
+  btnReset.className = 'btn';
+  btnReset.title = 'Restablecer filtros de esta sección a sus valores por defecto';
+  btnReset.textContent = '↺ Filtros';
+  btnReset.onclick = function(){
+    filtrosDeEstaVista.forEach(f=>{ try{ localStorage.removeItem('exg_filtro_'+f.id); }catch(e){} });
+    mostrarToast('Filtros restablecidos.');
+    location.reload();
+  };
+  acciones.insertBefore(btnReset, acciones.firstChild);
+});
 
 /* ---------------- SUB-TABS genéricas (Entradas, Flota, Economía) ---------------- */
 function renderFacturasKPIs(){
@@ -7205,13 +7222,6 @@ function iniciarFiltrosPersistentes(){
 }
 if(document.readyState !== 'loading') iniciarFiltrosPersistentes();
 else document.addEventListener('DOMContentLoaded', iniciarFiltrosPersistentes);
-
-function restablecerTodosLosFiltros(){
-  try{
-    Object.keys(localStorage).filter(k=>k.startsWith(FILTRO_PERSIST_PREFIX)).forEach(k=>localStorage.removeItem(k));
-  }catch(e){}
-  location.reload();
-}
 
 let documentosCache = [];
 let triageCurrentId = null;
