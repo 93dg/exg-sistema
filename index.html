@@ -2186,7 +2186,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.48</div>
+        <div class="sub">V2.49</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9273,6 +9273,29 @@ function toggleExpandirClienteFila(id){
   detalle.innerHTML = `<td colspan="15" style="background:var(--concrete);padding:10px 20px;">${filasHtml}</td>`;
   filaCliente.after(detalle);
 }
+// ============ Componente único de deduplicación de clientes ============
+// Regla permanente: antes de crear un cliente nuevo, comprobar primero si ya existe uno
+// equivalente (por NIF normalizado, o por nombre normalizado sin puntos/espacios dobles/
+// mayúsculas) — evita crear duplicados como "Las Lomas Del Tomillar S.L" / "LAS LOMAS DEL
+// TOMILLAR .S.L". Usado en todos los puntos de la app donde se puede dar de alta un cliente.
+function normalizarNombreCliente(n){
+  return (n||'').trim().toUpperCase().replace(/[.\s]+/g,' ');
+}
+async function buscarOCrearClienteApp(nombre, extra){
+  extra = extra || {};
+  if(!sb || !nombre || !nombre.trim()) return null;
+  const norm = normalizarNombreCliente(nombre);
+  const nifLimpio = extra.nif ? extra.nif.replace(/[^A-Za-z0-9]/g,'').toUpperCase() : null;
+  const {data: existentes} = await sb.from('entidades').select('id,nombre,nif');
+  let match = null;
+  if(nifLimpio) match = (existentes||[]).find(e => e.nif && e.nif.replace(/[^A-Za-z0-9]/g,'').toUpperCase() === nifLimpio);
+  if(!match) match = (existentes||[]).find(e => normalizarNombreCliente(e.nombre) === norm);
+  if(match) return match.id;
+  const {data, error} = await sb.from('entidades').insert({nombre: nombre.trim(), tipo:'cliente', ...extra}).select().single();
+  if(error){ console.error('No se pudo crear el cliente', error); return null; }
+  return data.id;
+}
+
 async function borrarUnCliente(id, nombre){
   if(!id){ mostrarToast('Este cliente no está guardado todavía.'); return; }
   if(!(await confirmarAccion(`¿Borrar el cliente "${nombre}"? No se puede deshacer.`))) return;
@@ -9637,9 +9660,8 @@ function submitNewClient(){
   clientes.push(nuevoCliente);
   if(nif || addr) clientFiscalData[name] = {nif, addr};
   if(sb){
-    sb.from('entidades').insert({nombre: name, tipo: type.toLowerCase()}).select().single().then(({data, error})=>{
-      if(error){ console.error('No se pudo guardar el cliente en Supabase', error); return; }
-      nuevoCliente.id = data.id;
+    buscarOCrearClienteApp(name, {tipo: type.toLowerCase(), nif: nif||null, direccion: addr||null}).then(id=>{
+      if(id) nuevoCliente.id = id;
     });
   }
   renderClientesTable();
@@ -11849,9 +11871,8 @@ async function wizNuevoCliente(){
   if(!r) return;
   const nuevoCliente = {name: r.nombre, type:'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'};
   clientes.push(nuevoCliente);
-  if(sb) sb.from('entidades').insert({nombre: r.nombre, tipo:'cliente'}).select().single().then(({data,error})=>{
-    if(error){ console.error('No se pudo guardar el cliente en Supabase', error); return; }
-    nuevoCliente.id = data.id;
+  if(sb) buscarOCrearClienteApp(r.nombre).then(id=>{
+    if(id) nuevoCliente.id = id;
   });
   wiz.clientName = r.nombre;
   wizNext();
