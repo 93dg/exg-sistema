@@ -2124,7 +2124,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.33</div>
+        <div class="sub">V2.34</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2636,11 +2636,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-fact-estado')">Estado<span class="dd-caret">▾</span></button>
               <div class="dd-filter-panel">
                 <div class="filters" id="fact-filtro-estado-chips" style="margin:0;">
-                  <div class="chip-filter" data-estado="borrador">0. Borrador</div>
-                  <div class="chip-filter active" data-estado="pendiente_enviar">1. Pendiente de enviar</div>
-                  <div class="chip-filter" data-estado="pendiente_cobrar">2. Pendiente de cobrar</div>
-                  <div class="chip-filter" data-estado="parcial">3. Cobro parcial</div>
-                  <div class="chip-filter" data-estado="cobrado">4. Cobrado</div>
+                  <div class="chip-filter" data-estado="borrador">Borrador</div>
+                  <div class="chip-filter" data-estado="pendiente_enviar">Pendiente de enviar</div>
+                  <div class="chip-filter" data-estado="pendiente_cobrar">Pendiente de cobrar</div>
+                  <div class="chip-filter" data-estado="parcial">Cobro parcial</div>
+                  <div class="chip-filter" data-estado="cobrado">Cobrado</div>
                 </div>
               </div>
             </div>
@@ -2710,9 +2710,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-alb-estado')">Estado<span class="dd-caret">▾</span></button>
               <div class="dd-filter-panel">
                 <div class="filters" id="alb-filtro-estado-chips" style="margin:0;">
-                  <div class="chip-filter active" data-estado="en_proceso">En proceso</div>
-                  <div class="chip-filter" data-estado="entregado">Entregado</div>
-                  <div class="chip-filter" data-estado="cobrado_efectivo">4. Cobrado</div>
+                  <div class="chip-filter" data-estado="borrador">Borrador</div>
+                  <div class="chip-filter" data-estado="pendiente_enviar">Pendiente de enviar</div>
+                  <div class="chip-filter" data-estado="pendiente_cobrar">Pendiente de cobrar</div>
+                  <div class="chip-filter" data-estado="parcial">Cobro parcial</div>
+                  <div class="chip-filter" data-estado="cobrado">Cobrado</div>
                 </div>
               </div>
             </div>
@@ -2775,10 +2777,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-pres-estado')">Estado<span class="dd-caret">▾</span></button>
               <div class="dd-filter-panel">
                 <div class="filters" id="pres-filtro-estado-chips" style="margin:0;">
-                  <div class="chip-filter active" data-estado="pendiente">Pendiente</div>
-                  <div class="chip-filter" data-estado="porconfirmar">Borrador</div>
-                  <div class="chip-filter" data-estado="validado">Validado</div>
-                  <div class="chip-filter" data-estado="enviado">Enviado</div>
+                  <div class="chip-filter" data-estado="borrador">Borrador</div>
+                  <div class="chip-filter" data-estado="pendiente_enviar">Pendiente de enviar</div>
+                  <div class="chip-filter" data-estado="pendiente_cobrar">Pendiente de cobrar</div>
+                  <div class="chip-filter" data-estado="parcial">Cobro parcial</div>
+                  <div class="chip-filter" data-estado="cobrado">Cobrado</div>
                 </div>
               </div>
             </div>
@@ -11562,6 +11565,12 @@ async function submitNewInvoice(ev, isDraft){
     contabilidad: 'oficial',
     iva_pct: ivaPct,
   };
+  // estado_cobro: se fija solo al crear, o al pasar de borrador a numerado en firme —
+  // nunca se pisa un estado de cobro ya elegido a mano al simplemente editar/guardar.
+  const estadoCobroPrevio = editingDocId ? documentosRealesById[editingDocId]?.estado_cobro : null;
+  if(!editingDocId || !estadoCobroPrevio || estadoCobroPrevio==='borrador'){
+    payload.estado_cobro = isDraft ? 'borrador' : 'pendiente_enviar';
+  }
   if(convirtiendoDesde){
     if(convirtiendoDesde.origenTipo==='albaran') payload.origen_albaran_ids = [convirtiendoDesde.origenId];
     else payload.documento_relacionado_id = convirtiendoDesde.origenId;
@@ -11581,7 +11590,8 @@ async function submitNewInvoice(ev, isDraft){
 
   documentosRealesById[savedId] = {...payload, id: savedId, type, iban, titular, payment, concepto_transferencia: concepto, ivaPct, items, num, client, job, dateRaw, dateLabel, amountLabel, status, base, iva, total};
 
-  const estadoPill = `<span class="pill ${status==='Borrador'?'':status==='Pendiente'?'pendiente':status==='Validado'?'validado':''}">${status}</span>`;
+  const estadoCobroActual = payload.estado_cobro || estadoCobroPrevio || 'pendiente_enviar';
+  const estadoPill = estadoDocumentoSelect(type, savedId, estadoCobroActual);
 
   if(editingDocId){
     const prevRow = document.getElementById('docrow-'+editingDocId);
@@ -11665,13 +11675,10 @@ document.addEventListener('click', (e)=>{
   document.querySelectorAll('.dd-filter.open').forEach(f=>{ if(!f.contains(e.target)) f.classList.remove('open'); });
 });
 function controlDocsEstadoDe(d){
-  if(d.type==='factura') return d.estado_cobro||'pendiente_enviar';
-  if(d.type==='albaran') return d.estado_albaran||'en_proceso';
-  return d.status; // presupuesto/proforma: Borrador/Pendiente/Validado/Enviado
+  return d.estado_cobro || 'pendiente_enviar';
 }
 function controlDocsEstadoPill(d){
-  if(d.type==='factura') return estadoCobroSelect(d.id, d.estado_cobro);
-  if(d.type==='albaran') return estadoAlbaranSelect(d.id, d.estado_albaran);
+  if(d.type==='factura'||d.type==='albaran'||d.type==='presupuesto'||d.type==='proforma') return estadoDocumentoSelect(d.type, d.id, d.estado_cobro);
   const estadoClase = d.status==='Borrador'?'porconfirmar':d.status==='Pendiente'?'pendiente':d.status==='Validado'?'validado':'enviado';
   return `<span class="pill ${estadoClase}">${d.status}</span>`;
 }
@@ -11743,15 +11750,19 @@ function renderControlDocs(){
   const wrap = document.getElementById('control-docs-cargar-mas-wrap');
   if(wrap) wrap.style.display = filtrados.length > controlDocsLimite ? '' : 'none';
 }
-const ESTADO_COBRO_OPCIONES = [['borrador','0. Borrador'],['pendiente_enviar','1. Pendiente de enviar'],['pendiente_cobrar','2. Pendiente de cobrar'],['parcial','3. Cobro parcial'],['cobrado','4. Cobrado']];
-function estadoCobroSelect(id, actual){
+/* ============ ESTADO DE DOCUMENTO — componente único compartido ============
+   Facturas, Albaranes, Presupuestos y Proformas usan EXACTAMENTE el mismo
+   desplegable, colores y nombres. Si se cambia un nombre o color aquí, se
+   propaga solo a las cuatro secciones — no hay definiciones paralelas. */
+const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['pendiente_enviar','Pendiente de enviar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Cobro parcial'],['cobrado','Cobrado']];
+function estadoDocumentoSelect(tipo, id, actual){
   const act = actual || 'pendiente_enviar';
-  const label = ESTADO_COBRO_OPCIONES.find(o=>o[0]===act)?.[1] || act;
-  const ddId = 'estado-cobro-dd-'+id;
+  const label = ESTADOS_DOCUMENTO.find(o=>o[0]===act)?.[1] || act;
+  const ddId = 'estado-doc-dd-'+id;
   return `<div class="estado-cobro-dd" id="${ddId}">
     <span class="pill ${act}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${ddId}')">${label}</span>
     <div class="estado-cobro-menu">
-      ${ESTADO_COBRO_OPCIONES.map(([v,l])=>`<span class="pill ${v}" onclick="event.stopPropagation();cambiarEstadoCobro('${id}','${v}','${ddId}')">${l}</span>`).join('')}
+      ${ESTADOS_DOCUMENTO.map(([v,l])=>`<span class="pill ${v}" onclick="event.stopPropagation();cambiarEstadoDocumento('${tipo}','${id}','${v}','${ddId}')">${l}</span>`).join('')}
     </div>
   </div>`;
 }
@@ -11767,10 +11778,10 @@ document.addEventListener('click', (ev)=>{
     if(!dd.contains(ev.target)) dd.classList.remove('open');
   });
 });
-async function cambiarEstadoCobro(id, valor, ddId){
+async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   if(!sb) return;
   const payload = {estado_cobro: valor};
-  if(valor==='cobrado'){
+  if(valor==='cobrado' && tipo==='factura'){
     const doc = documentosRealesById[id];
     payload.cobrado_importe = doc?.total || 0;
   }
@@ -11783,7 +11794,7 @@ async function cambiarEstadoCobro(id, valor, ddId){
   }
   const dd = document.getElementById(ddId);
   if(dd){
-    const label = ESTADO_COBRO_OPCIONES.find(o=>o[0]===valor)?.[1] || valor;
+    const label = ESTADOS_DOCUMENTO.find(o=>o[0]===valor)?.[1] || valor;
     dd.querySelector('.pill').className = 'pill '+valor;
     dd.querySelector('.pill').textContent = label;
     dd.classList.remove('open');
@@ -11810,36 +11821,6 @@ function editarCobrado(id){
   };
   input.addEventListener('blur', guardar);
   input.addEventListener('keydown', e=>{ if(e.key==='Enter') input.blur(); });
-}
-function estadoAlbaranSelect(id, actual){
-  // "cobrado_efectivo" (valor real en la BD) usa la MISMA etiqueta y color que
-  // el "4. Cobrado" de Facturas — es el mismo estado, no una variante distinta.
-  const opciones = [['en_proceso','En proceso'],['entregado','Entregado'],['cobrado_efectivo','4. Cobrado']];
-  const clasePill = {en_proceso:'en_proceso', entregado:'entregado', cobrado_efectivo:'cobrado'};
-  const act = actual || 'en_proceso';
-  const label = opciones.find(o=>o[0]===act)?.[1] || act;
-  const ddId = 'estado-alb-dd-'+id;
-  return `<div class="estado-cobro-dd" id="${ddId}">
-    <span class="pill ${clasePill[act]||act}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${ddId}')">${label}</span>
-    <div class="estado-cobro-menu">
-      ${opciones.map(([v,l])=>`<span class="pill ${clasePill[v]||v}" onclick="event.stopPropagation();cambiarEstadoAlbaran('${id}','${v}','${ddId}')">${l}</span>`).join('')}
-    </div>
-  </div>`;
-}
-async function cambiarEstadoAlbaran(id, valor, ddId){
-  if(!sb) return;
-  const {error} = await sb.from('documentos_economicos').update({estado_albaran: valor}).eq('id', id);
-  if(error){ mostrarToast('Error: '+errText(error), 'err'); return; }
-  if(documentosRealesById[id]) documentosRealesById[id].estado_albaran = valor;
-  if(ddId){
-    const opciones = [['en_proceso','En proceso'],['entregado','Entregado'],['cobrado_efectivo','4. Cobrado']];
-    const clasePill = {en_proceso:'en_proceso', entregado:'entregado', cobrado_efectivo:'cobrado'};
-    const label = opciones.find(o=>o[0]===valor)?.[1] || valor;
-    const dd = document.getElementById(ddId);
-    if(dd){ dd.querySelector('.pill').className = 'pill '+(clasePill[valor]||valor); dd.querySelector('.pill').textContent = label; dd.classList.remove('open'); }
-  }
-  mostrarToast('Estado actualizado ✓', 'ok');
-  renderControlDocs();
 }
 
 function poblarFiltroAniosEconomia(){
@@ -12045,7 +12026,7 @@ async function cargarDocumentosEconomicosReales(){
         ...doc, id: doc.id, type: doc.tipo, num: doc.numero, client: entidad ? entidad.name : '—', job: trabajo ? (trabajo.code+' — '+trabajo.client) : '—',
         dateRaw: doc.fecha_devengo, dateLabel, amountLabel, status, items, ivaPct: 21, total: totalNum, base: baseNum, iva: ivaNum,
       };
-      const estadoPill = `<span class="pill ${status==='Borrador'?'porconfirmar':status==='Pendiente'?'pendiente':status==='Validado'?'validado':'enviado'}">${status}</span>`;
+      const estadoPill = estadoDocumentoSelect(doc.tipo, doc.id, doc.estado_cobro);
       if(doc.tipo==='factura'){
         const row = document.createElement('tr');
         row.id = 'docrow-'+doc.id;
@@ -12068,7 +12049,7 @@ async function cargarDocumentosEconomicosReales(){
         const ivaLabel = ivaNum2.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
         const cobradoNum = doc.cobrado_importe != null ? Number(doc.cobrado_importe) : 0;
         const cobradoLabel = cobradoNum.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num">${baseLabel}</td><td class="num">${ivaLabel}</td><td class="num">${ivaPctDoc}%</td><td class="num">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoCobroSelect(doc.id, doc.estado_cobro)}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
+        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num">${baseLabel}</td><td class="num">${ivaLabel}</td><td class="num">${ivaPctDoc}%</td><td class="num">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('factura', doc.id, doc.estado_cobro)}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
         const clienteHtmlP = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '<span class="pill mantenimiento">Falta cliente</span>';
@@ -12104,7 +12085,7 @@ async function cargarDocumentosEconomicosReales(){
         row.id = 'albrow-'+doc.id;
         row.onclick = () => toggleExpandirDocFila(doc.id, 10);
         row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum;
-        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="alb-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('alb-sel-chk','alb-borrar-sel-btn','alb-sel-count')"></td><td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlA}</td><td class="mono">${trabajoHtmlA}</td><td class="num">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoAlbaranSelect(doc.id, doc.estado_albaran)}</td><td>${archivoHtmlA}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
+        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="alb-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('alb-sel-chk','alb-borrar-sel-btn','alb-sel-count')"></td><td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlA}</td><td class="mono">${trabajoHtmlA}</td><td class="num">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('albaran', doc.id, doc.estado_cobro)}</td><td>${archivoHtmlA}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
         document.getElementById('albaranes-tbody-standalone')?.appendChild(row);
       }
     });
