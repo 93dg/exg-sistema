@@ -438,7 +438,7 @@ table{border-collapse:collapse;width:100%;}
   table{min-width:600px;}
   .drawer{width:100vw;max-width:100vw;}
   .explorer-grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr)) !important;}
-  #editor-mode-btn{display:none;}
+  #editor-mode-btn, #reset-filtros-btn{display:none;}
   #control-quickactions{display:none !important;}
 
   /* ---- escalado táctil: todo más grande para dedos ---- */
@@ -621,12 +621,13 @@ table{border-collapse:collapse;width:100%;}
 #editor-mode-btn.active{background:var(--orange);}
 #report-bug-btn:hover{background:var(--red);}
 /* editor-mode-btn y report-bug-btn: arriba a la derecha, solo icono, compactos */
-#editor-mode-btn, #report-bug-btn{
+#reset-filtros-btn, #editor-mode-btn, #report-bug-btn{
   position:fixed;top:14px;z-index:4000;
   background:var(--asphalt);color:#fff;border:none;border-radius:50%;
   width:38px;height:38px;padding:0;font-size:16px;cursor:pointer;
   box-shadow:0 3px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;
 }
+#reset-filtros-btn{right:106px;}
 #editor-mode-btn{right:60px;}
 #report-bug-btn{right:14px;}
 #editor-mode-btn .rb-label, #report-bug-btn .rb-label{display:none;}
@@ -2053,6 +2054,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
+<button id="reset-filtros-btn" onclick="if(confirm('¿Restablecer todos los filtros guardados a su valor por defecto?')) restablecerTodosLosFiltros();" title="Restablecer filtros guardados">↺</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
 <button id="report-bug-btn" onclick="openReportBug()">🐞<span class="rb-label"> Reportar</span></button>
 <button id="global-add-fab" onclick="toggleGlobalAddMenu()" title="Crear">+</button>
@@ -2114,7 +2116,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.21</div>
+        <div class="sub">V2.22</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7165,6 +7167,51 @@ async function sendGmail(){
   }
 }
 initGmailAuth();
+
+/* ============ FILTROS PERSISTENTES POR VISTA/SECCIÓN ============
+   Regla general: cada grupo de chips de filtro (.filters con id) recuerda
+   el último elegido, en localStorage, por su propio id — independiente
+   de los demás. Cubre los grupos que ya tienen id propio en el HTML; los
+   que no tienen id (algunos filtros muy locales) se quedan sin persistir. */
+const FILTRO_PERSIST_PREFIX = 'exg_filtro_';
+function guardarEstadoFiltroPersistente(containerId, chip){
+  if(!containerId || !chip) return;
+  try{ localStorage.setItem(FILTRO_PERSIST_PREFIX+containerId, chip.textContent.trim()); }catch(e){}
+}
+function restaurarFiltroPersistente(container){
+  if(!container.id) return;
+  let guardado;
+  try{ guardado = localStorage.getItem(FILTRO_PERSIST_PREFIX+container.id); }catch(e){ return; }
+  if(!guardado) return;
+  const chips = Array.from(container.querySelectorAll('.chip-filter'));
+  if(!chips.length) return;
+  const activo = chips.find(c=>c.classList.contains('active'));
+  if(activo && activo.textContent.trim()===guardado) return; // ya coincide, nada que hacer
+  const objetivo = chips.find(c=>c.textContent.trim()===guardado);
+  if(objetivo) objetivo.click();
+}
+document.addEventListener('click', function(e){
+  const chip = e.target.closest('.filters[id] .chip-filter');
+  if(!chip) return;
+  const container = chip.closest('.filters[id]');
+  guardarEstadoFiltroPersistente(container.id, chip);
+});
+function iniciarFiltrosPersistentes(){
+  document.querySelectorAll('.filters[id]').forEach(container=>{
+    restaurarFiltroPersistente(container);
+    const obs = new MutationObserver(()=>restaurarFiltroPersistente(container));
+    obs.observe(container, {childList:true});
+  });
+}
+if(document.readyState !== 'loading') iniciarFiltrosPersistentes();
+else document.addEventListener('DOMContentLoaded', iniciarFiltrosPersistentes);
+
+function restablecerTodosLosFiltros(){
+  try{
+    Object.keys(localStorage).filter(k=>k.startsWith(FILTRO_PERSIST_PREFIX)).forEach(k=>localStorage.removeItem(k));
+  }catch(e){}
+  location.reload();
+}
 
 let documentosCache = [];
 let triageCurrentId = null;
