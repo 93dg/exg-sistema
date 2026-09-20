@@ -2182,7 +2182,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.39</div>
+        <div class="sub">V2.40</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2671,6 +2671,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="panel-head" style="flex-direction:column;align-items:stretch;gap:10px;">
           <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
             <button class="btn" id="fact-enviar-sel-btn" style="display:none;" onclick="enviarSeleccionadasAlGestor('fact-sel-chk')">📤 Enviar seleccionadas al gestor</button>
+            <button class="btn" id="fact-enviarcliente-sel-btn" style="display:none;" onclick="enviarSeleccionadasAlCliente('fact-sel-chk')">✉ Enviar al cliente</button>
+            <button class="btn" id="fact-imprimir-sel-btn" style="display:none;" onclick="imprimirSeleccionadas('fact-sel-chk')">🖨 Imprimir</button>
             <button class="btn" style="color:var(--red);display:none;" id="fact-borrar-sel-btn" onclick="borrarDocumentosSeleccionados('fact-sel-chk')">🗑 Borrar seleccionadas (<span id="fact-sel-count">0</span>)</button>
           </div>
           <div class="dd-filter-row">
@@ -2744,6 +2746,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <h3>Albaranes</h3>
             <span style="display:flex;align-items:center;gap:10px;">
               <button class="btn" style="color:var(--red);display:none;" id="alb-borrar-sel-btn" onclick="borrarDocumentosSeleccionados('alb-sel-chk')">🗑 Borrar seleccionados (<span id="alb-sel-count">0</span>)</button>
+              <button class="btn" id="alb-enviarcliente-sel-btn" style="display:none;" onclick="enviarSeleccionadasAlCliente('alb-sel-chk')">✉ Enviar al cliente</button>
+              <button class="btn" id="alb-imprimir-sel-btn" style="display:none;" onclick="imprimirSeleccionadas('alb-sel-chk')">🖨 Imprimir</button>
               <span class="count" id="albaranes-standalone-count">0</span>
             </span>
           </div>
@@ -2811,6 +2815,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <h3>Presupuestos</h3>
             <span style="display:flex;align-items:center;gap:10px;">
               <button class="btn" style="color:var(--red);display:none;" id="pres-borrar-sel-btn" onclick="borrarDocumentosSeleccionados('pres-sel-chk')">🗑 Borrar seleccionados (<span id="pres-sel-count">0</span>)</button>
+              <button class="btn" id="pres-enviarcliente-sel-btn" style="display:none;" onclick="enviarSeleccionadasAlCliente('pres-sel-chk')">✉ Enviar al cliente</button>
+              <button class="btn" id="pres-imprimir-sel-btn" style="display:none;" onclick="imprimirSeleccionadas('pres-sel-chk')">🖨 Imprimir</button>
               <span class="count" id="presupuestos-standalone-count">0</span>
             </span>
           </div>
@@ -8894,8 +8900,10 @@ function actualizarSeleccionDoc(claseChk, btnId, countId){
   const countEl = document.getElementById(countId);
   if(countEl) countEl.textContent = marcados.length;
   if(btn) btn.style.display = marcados.length ? '' : 'none';
-  const btnEnviar = document.getElementById(btnId.replace('-borrar-sel-btn','-enviar-sel-btn'));
-  if(btnEnviar) btnEnviar.style.display = marcados.length ? '' : 'none';
+  ['-enviar-sel-btn','-enviarcliente-sel-btn','-imprimir-sel-btn'].forEach(suf=>{
+    const b = document.getElementById(btnId.replace('-borrar-sel-btn', suf));
+    if(b) b.style.display = marcados.length ? '' : 'none';
+  });
 }
 async function borrarUnDocumento(id){
   if(!(await confirmarAccion('¿Borrar este documento? No se puede deshacer.'))) return;
@@ -12193,6 +12201,38 @@ function enviarAlGestorDoc(id){
     if(!error){ if(documentosRealesById[id]){ documentosRealesById[id].enviado_gestor = true; documentosRealesById[id].enviado_gestor_fecha = hoy; } const celda = document.querySelector('.celda-gestor-'+id); if(celda) celda.innerHTML = gestorPillHtml(id, true, hoy); }
   };
   openComposeDrawer();
+}
+// ===== Enviar/imprimir varios documentos a la vez — cada uno a SU cliente, uno detrás de otro =====
+let colaEnvioCliente = [];
+function enviarSeleccionadasAlCliente(claseChk){
+  const marcados = Array.from(document.querySelectorAll('.'+claseChk+':checked'));
+  if(!marcados.length) return;
+  colaEnvioCliente = marcados.map(c=>c.dataset.id).filter(Boolean);
+  mostrarToast(`Enviando ${colaEnvioCliente.length} documento(s), cada uno a su cliente…`);
+  procesarSiguienteEnvioCliente();
+}
+function procesarSiguienteEnvioCliente(){
+  if(!colaEnvioCliente.length){ mostrarToast('Envíos completados.', 'ok'); return; }
+  const id = colaEnvioCliente.shift();
+  const doc = documentosRealesById[id];
+  const entidad = doc ? clientes.find(c=>c.name===doc.client) : null;
+  if(!doc || !entidad?.email){
+    mostrarToast(`Saltado ${doc?.num||''}: el cliente no tiene email guardado.`, 'err');
+    procesarSiguienteEnvioCliente();
+    return;
+  }
+  enviarDocumentoAlCliente(id);
+  composeOnSentCallback = () => procesarSiguienteEnvioCliente();
+}
+async function imprimirSeleccionadas(claseChk){
+  const marcados = Array.from(document.querySelectorAll('.'+claseChk+':checked'));
+  if(!marcados.length) return;
+  const ids = marcados.map(c=>c.dataset.id).filter(Boolean);
+  mostrarToast(`Abriendo ${ids.length} vista(s) previa de impresión, una detrás de otra…`);
+  for(const id of ids){
+    imprimirDocumento(id);
+    await new Promise(r=>setTimeout(r, 1200));
+  }
 }
 async function enviarSeleccionadasAlGestor(claseChk){
   const marcados = Array.from(document.querySelectorAll('.'+claseChk+':checked'));
