@@ -2125,7 +2125,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.30</div>
+        <div class="sub">V2.31</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12273,22 +12273,36 @@ if('serviceWorker' in navigator){
     setTimeout(()=>esperarSupabaseYCargar(intentos+1), 500);
   }
 
-  function guardar(containerId, chip){
-    if(!containerId || !chip || typeof sb === 'undefined' || !sb) return;
-    const valor = chip.textContent.trim();
-    if(cache) cache[containerId] = valor;
-    sb.from('filtros_persistentes').upsert({container_id: containerId, valor, actualizado_at: new Date().toISOString()}).then(()=>{});
+  function guardar(container){
+    if(!container.id || typeof sb === 'undefined' || !sb) return;
+    // guarda el conjunto COMPLETO de chips activos — algunos grupos son de
+    // selección múltiple (varios activos a la vez, con toggle), no solo uno.
+    const activos = Array.from(container.querySelectorAll('.chip-filter.active')).map(c=>c.textContent.trim());
+    const valor = JSON.stringify(activos);
+    if(cache) cache[container.id] = valor;
+    sb.from('filtros_persistentes').upsert({container_id: container.id, valor, actualizado_at: new Date().toISOString()}).then(()=>{});
   }
   function restaurar(container){
     if(!container.id || !cacheListo) return;
-    const guardado = cache[container.id];
-    if(!guardado) return;
+    const guardadoRaw = cache[container.id];
+    if(!guardadoRaw) return;
+    let deseados;
+    try{ deseados = JSON.parse(guardadoRaw); }catch(e){ deseados = [guardadoRaw]; } // compat con filas antiguas (texto suelto)
+    if(!Array.isArray(deseados)) deseados = [deseados];
     const chips = Array.from(container.querySelectorAll('.chip-filter'));
     if(!chips.length) return;
-    const activo = chips.find(c=>c.classList.contains('active'));
-    if(activo && activo.textContent.trim()===guardado) return;
-    const objetivo = chips.find(c=>c.textContent.trim()===guardado);
-    if(objetivo) objetivo.click();
+    const activosActuales = chips.filter(c=>c.classList.contains('active')).map(c=>c.textContent.trim());
+    const yaCoincide = activosActuales.length===deseados.length && activosActuales.every(a=>deseados.includes(a));
+    if(yaCoincide) return;
+    // primero se desactiva lo que sobra (necesario en grupos de selección múltiple),
+    // luego se activa lo que falta — en ese orden, para que en grupos de selección
+    // única el resultado final sea siempre el correcto.
+    chips.forEach(c=>{
+      if(c.classList.contains('active') && !deseados.includes(c.textContent.trim())) c.click();
+    });
+    chips.forEach(c=>{
+      if(!c.classList.contains('active') && deseados.includes(c.textContent.trim())) c.click();
+    });
   }
   function aplicarATodosLosContenedoresVisibles(){
     document.querySelectorAll('.filters[id]').forEach(restaurar);
@@ -12322,7 +12336,7 @@ if('serviceWorker' in navigator){
     const chip = e.target.closest('.filters[id] .chip-filter');
     if(!chip) return;
     const container = chip.closest('.filters[id]');
-    guardar(container.id, chip);
+    guardar(container);
   });
   function iniciar(){
     try{
