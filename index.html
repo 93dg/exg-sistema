@@ -2186,7 +2186,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.51</div>
+        <div class="sub">V2.52</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3139,6 +3139,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="filters" id="grafico-modo-chips" style="margin:0;">
               <div class="chip-filter active" data-modo="mensual">Mensual</div>
               <div class="chip-filter" data-modo="trimestral">Trimestral</div>
+              <div class="chip-filter" data-modo="anual">Anual</div>
             </div>
           </div>
           <div class="panel-body">
@@ -5540,6 +5541,18 @@ function renderGraficoFacturacion(){
       else if(esIngreso(d)) ingresos[m] += (d.total||0);
     });
     renderGraficoBarrasDual('grafico-facturacion-svg', MESES, ingresos, gastos);
+  } else if(graficoModo === 'anual'){
+    // comparativa entre TODOS los años con datos, no solo el año seleccionado en el filtro
+    const anios = [...new Set(docs.filter(d=>d.dateRaw).map(d=>new Date(d.dateRaw).getFullYear()))].sort();
+    const ingresos = anios.map(()=>0), gastos = anios.map(()=>0);
+    docs.forEach(d=>{
+      if(!d.dateRaw) return;
+      const idx = anios.indexOf(new Date(d.dateRaw).getFullYear());
+      if(idx<0) return;
+      if(d.type==='gasto') gastos[idx] += (d.total||0);
+      else if(esIngreso(d)) ingresos[idx] += (d.total||0);
+    });
+    renderGraficoBarrasDual('grafico-facturacion-svg', anios.map(String), ingresos, gastos);
   } else {
     const TRIMS = ['1º trim.','2º trim.','3º trim.','4º trim.'];
     const ingresos = new Array(4).fill(0), gastos = new Array(4).fill(0);
