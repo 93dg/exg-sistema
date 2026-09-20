@@ -2186,7 +2186,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.50</div>
+        <div class="sub">V2.51</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2245,6 +2245,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="kpi"><div class="lbl">Cobrado mes</div><div class="val green" id="dash-cobrado">0,00 €</div></div>
         <div class="kpi"><div class="lbl">Gastos mes</div><div class="val" style="color:var(--red)" id="dash-gastos">0,00 €</div></div>
         <div class="kpi"><div class="lbl">Margen mes</div><div class="val green" id="kpi-margen-mes">0,00 €</div></div>
+      </div>
+
+      <div class="panel" id="panel-metricas-ia" style="margin-bottom:16px;">
+        <div class="panel-head" style="justify-content:space-between;">
+          <h3>🤖 Uso de IA — reglas primero, IA solo como excepción</h3>
+          <button class="btn sm" onclick="cargarMetricasIA()">↻ Actualizar</button>
+        </div>
+        <div class="panel-body" id="metricas-ia-body">
+          <div class="empty">Cargando métricas…</div>
+        </div>
       </div>
 
       <div class="panel">
@@ -5569,6 +5579,52 @@ function renderGraficoFacturacion(){
     contTipo.innerHTML = entradas.length ? entradas.map(([tipo,imp])=>`<div class="econ-line"><span>${svgEsc(tipo)}</span><span class="v">${euroFmt(imp)}</span></div>`).join('') : '<div class="empty">Sin datos para este año</div>';
   }
 }
+// ============ Métricas de uso de IA — filosofía "reglas primero, IA como excepción" ============
+async function cargarMetricasIA(){
+  const body = document.getElementById('metricas-ia-body');
+  if(!body || !sb) return;
+  body.innerHTML = '<div class="empty">Cargando métricas…</div>';
+  const [{data: docsPorMetodo}, {data: correoPorMetodo}] = await Promise.all([
+    sb.from('documentos_economicos').select('metodo_extraccion, confianza_extraccion'),
+    sb.from('correo_estado').select('metodo_analisis'),
+  ]);
+  const docs = docsPorMetodo || [];
+  const docsReglas = docs.filter(d=>d.metodo_extraccion==='reglas').length;
+  const docsIA = docs.filter(d=>d.metodo_extraccion && d.metodo_extraccion!=='reglas').length;
+  const docsSinClasificar = docs.length - docsReglas - docsIA;
+  const pctDocsSinIA = (docsReglas+docsIA) ? Math.round(docsReglas/(docsReglas+docsIA)*100) : 0;
+
+  const correos = correoPorMetodo || [];
+  const correoRegla = correos.filter(c=>c.metodo_analisis==='regla').length;
+  const correoIA = correos.filter(c=>c.metodo_analisis!=='regla').length;
+  const pctCorreoSinIA = correos.length ? Math.round(correoRegla/correos.length*100) : 0;
+
+  const confAlta = docs.filter(d=>d.confianza_extraccion==='alta').length;
+  const confMedia = docs.filter(d=>d.confianza_extraccion==='media').length;
+  const confBaja = docs.filter(d=>d.confianza_extraccion==='baja').length;
+
+  body.innerHTML = `
+    <div class="grid-2">
+      <div>
+        <div class="sub-t" style="margin-bottom:8px;"><b>Digitalización de documentos</b></div>
+        <div class="econ-line"><span>Resueltos por reglas (sin IA)</span><span class="v green">${docsReglas}</span></div>
+        <div class="econ-line"><span>Resueltos con IA</span><span class="v" style="color:var(--red);">${docsIA}</span></div>
+        <div class="econ-line"><span>Sin clasificar aún (proceso antiguo)</span><span class="v">${docsSinClasificar}</span></div>
+        <div class="econ-line"><span><b>% resuelto sin IA</b></span><span class="v green"><b>${pctDocsSinIA}%</b></span></div>
+        <div class="sub-t" style="margin-top:10px;">Confianza de las reglas: ${confAlta} alta · ${confMedia} media · ${confBaja} baja (revisión)</div>
+      </div>
+      <div>
+        <div class="sub-t" style="margin-bottom:8px;"><b>Clasificación de correo</b></div>
+        <div class="econ-line"><span>Resueltos por patrón de remitente (sin IA)</span><span class="v green">${correoRegla}</span></div>
+        <div class="econ-line"><span>Resueltos con IA</span><span class="v" style="color:var(--red);">${correoIA}</span></div>
+        <div class="econ-line"><span><b>% resuelto sin IA</b></span><span class="v green"><b>${pctCorreoSinIA}%</b></span></div>
+        <div class="sub-t" style="margin-top:10px;">Un remitente pasa a resolverse por regla en cuanto lleva 3 correos seguidos con la misma categoría — sin contradicciones.</div>
+      </div>
+    </div>`;
+}
+document.addEventListener('DOMContentLoaded', ()=>{ if(sb) cargarMetricasIA(); });
+if(document.readyState !== 'loading' && sb) cargarMetricasIA();
+
 document.querySelectorAll('#grafico-modo-chips .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     document.querySelectorAll('#grafico-modo-chips .chip-filter').forEach(c=>c.classList.remove('active'));
