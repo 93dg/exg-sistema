@@ -298,7 +298,7 @@ table{border-collapse:collapse;width:100%;}
 
 /* ============ Correo — fila de bandeja ============ */
 .correo-row{
-  display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
+  display:grid;grid-template-columns:32px 36px 1fr 76px auto;gap:12px;align-items:flex-start;padding:12px 16px;
   border-bottom:1px solid var(--concrete-2);cursor:pointer;position:relative;
   border-left:3px solid transparent;
 }
@@ -311,26 +311,41 @@ table{border-collapse:collapse;width:100%;}
   display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;margin-top:2px;
 }
 .correo-row.no-leido .correo-row-avatar{background:var(--orange);}
-.correo-row-body{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px;}
+.correo-row-body{min-width:0;display:flex;flex-direction:column;gap:2px;padding-top:2px;}
 .correo-row-linea1{display:flex;align-items:baseline;gap:8px;}
 .correo-row-remitente{font-size:13px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .correo-row.no-leido .correo-row-remitente{color:var(--ink);font-weight:700;}
-.correo-row-fecha{margin-left:auto;font-size:11.5px;color:var(--ink-faint,#8b8275);white-space:nowrap;flex-shrink:0;}
+.correo-row-fecha{
+  font-size:11.5px;color:var(--ink-faint,#8b8275);white-space:nowrap;text-align:right;padding-top:4px;flex-shrink:0;
+}
+.correo-row.no-leido .correo-row-fecha{color:var(--ink-soft);font-weight:600;}
 .correo-row-asunto{font-size:14px;display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .correo-row.no-leido .correo-row-asunto{font-weight:700;}
 .correo-row-adjunto{font-size:13px;flex-shrink:0;}
 .correo-row-resumen{font-size:12.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .correo-row-tags{display:flex;gap:6px;flex-wrap:wrap;}
 .correo-row-tags:empty{display:none;}
-.correo-row-acciones{display:flex;align-items:center;gap:2px;flex-shrink:0;opacity:0;transition:opacity .12s;}
+.correo-row-acciones{display:flex;align-items:center;gap:6px;flex-shrink:0;opacity:0;transition:opacity .12s;}
 .correo-row:hover .correo-row-acciones{opacity:1;}
 .correo-accion-btn{
-  width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;
-  font-size:17px;cursor:pointer;color:var(--ink-soft);
+  width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:50%;
+  font-size:18px;cursor:pointer;color:var(--ink-soft);
 }
 .correo-accion-btn:hover{background:var(--concrete-2);}
 .correo-row-acciones-movil{display:none;}
+/* sugerencias de agrupación por remitente / grupo activo */
+#correo-grupos-remitente:empty{display:none;}
+.correo-grupos-sugeridos{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);}
+.correo-grupos-label{font-size:11.5px;color:var(--ink-faint,#8b8275);text-transform:uppercase;letter-spacing:.03em;flex-shrink:0;}
+.chip-remitente{
+  font-size:12px;padding:5px 12px;border-radius:16px;background:var(--concrete);border:1px solid var(--line);
+  cursor:pointer;white-space:nowrap;
+}
+.chip-remitente:hover{border-color:var(--orange);color:var(--orange);}
+.correo-grupo-activo{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--concrete);font-size:13px;}
+.correo-grupo-activo > span{cursor:pointer;}
 @media(max-width:768px){
+  .correo-row{grid-template-columns:28px 32px 1fr;}
   .correo-row-acciones{display:none;}
   .correo-row-fecha{display:none;}
   .correo-row-acciones-movil{
@@ -2167,7 +2182,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.38</div>
+        <div class="sub">V2.39</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3392,10 +3407,10 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
             <span style="flex:1;"></span>
             <span title="Marcar leído" onclick="accionMasivaCorreo('leido')" style="cursor:pointer;">✓ Leído</span>
             <span title="Marcar no leído" onclick="accionMasivaCorreo('no_leido')" style="cursor:pointer;">● No leído</span>
-            <span title="Archivar" onclick="accionMasivaCorreo('archivar')" style="cursor:pointer;">📥 Archivar</span>
             <span title="Marcar spam" onclick="accionMasivaCorreo('spam')" style="cursor:pointer;color:var(--orange);">🚫 Spam</span>
             <span title="Eliminar" onclick="accionMasivaCorreo('eliminar')" style="cursor:pointer;color:var(--red);">🗑 Eliminar</span>
           </div>
+          <div id="correo-grupos-remitente"></div>
           <div class="panel-body" style="padding:0;" id="correo-inbox">
             <div class="empty">Cargando…</div>
           </div>
@@ -3433,7 +3448,6 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
             <button class="btn" onclick="forwardCorreo()">➦ Reenviar</button>
             <span style="flex:1;"></span>
             <span title="Marcar importante" onclick="toggleImportanteCorreoActual()" id="correo-d-star" style="cursor:pointer;font-size:18px;">☆</span>
-            <span title="Archivar" onclick="archivarCorreo()" style="cursor:pointer;font-size:16px;">📥</span>
             <span title="Marcar como spam" onclick="marcarSpamCorreoActual()" style="cursor:pointer;font-size:16px;color:var(--orange);">🚫</span>
             <span title="Bloquear remitente" onclick="bloquearRemitenteActual()" style="cursor:pointer;font-size:16px;">⛔</span>
             <span title="Eliminar" onclick="borrarCorreo()" style="cursor:pointer;font-size:16px;color:var(--red);">🗑</span>
@@ -6735,11 +6749,72 @@ function ordenarCorreos(lista){
   return arr; // fecha_desc = orden natural de Gmail
 }
 
+let correoRemitenteAgrupado = null; // {email, nombre} cuando hay un grupo de remitente activo
+function renderGruposRemitente(rows){
+  const cont = document.getElementById('correo-grupos-remitente');
+  if(!cont) return;
+  if(correoRemitenteAgrupado){
+    const n = rows.length;
+    cont.innerHTML = `<div class="correo-grupo-activo">
+      <span onclick="quitarAgrupacionRemitente()" style="cursor:pointer;">← Todos</span>
+      <b>${correoRemitenteAgrupado.nombre}</b> · ${n} correo${n===1?'':'s'}
+      <span style="flex:1;"></span>
+      <span onclick="seleccionarTodosVisiblesCorreo()" style="cursor:pointer;">Seleccionar todos</span>
+      <span onclick="marcarTodosVisiblesCorreo('leido')" style="cursor:pointer;">✓ Marcar leídos</span>
+      <span onclick="marcarTodosVisiblesCorreo('spam')" style="cursor:pointer;color:var(--orange);">🚫 Todos a spam</span>
+      <span onclick="marcarTodosVisiblesCorreo('eliminar')" style="cursor:pointer;color:var(--red);">🗑 Eliminar todos</span>
+    </div>`;
+    return;
+  }
+  // sugerencias: agrupa lo que hay cargado ahora mismo por remitente, solo si hay grupos con volumen real
+  const porRemitente = {};
+  rows.forEach(r=>{ (porRemitente[r.email] ||= {email:r.email, nombre:r.nombreRemitente, n:0}).n++; });
+  const grupos = Object.values(porRemitente).filter(g=>g.n>=3).sort((a,b)=>b.n-a.n).slice(0,6);
+  if(!grupos.length){ cont.innerHTML = ''; return; }
+  cont.innerHTML = `<div class="correo-grupos-sugeridos">
+    <span class="correo-grupos-label">Limpiar por remitente:</span>
+    ${grupos.map(g=>`<span class="chip-remitente" onclick="agruparPorRemitente('${g.email}','${(g.nombre||'').replace(/'/g,"\\'")}')">${g.nombre} · ${g.n}</span>`).join('')}
+  </div>`;
+}
+function agruparPorRemitente(email, nombre){
+  correoRemitenteAgrupado = {email, nombre};
+  const filtroActual = CORREO_FILTRO_GMAIL_QUERY[correoFiltroActivo] || '';
+  if(correoFiltroActivo==='atencion' || correoFiltroActivo==='spam'){
+    renderCorreoInbox(); // ya está todo cargado localmente, solo hace falta filtrar por remitente
+    return;
+  }
+  correoQueryActiva = [filtroActual, `from:${email}`].filter(Boolean).join(' ');
+  loadGmailInbox();
+}
+function quitarAgrupacionRemitente(){
+  correoRemitenteAgrupado = null;
+  correoQueryActiva = CORREO_FILTRO_GMAIL_QUERY[correoFiltroActivo] || '';
+  if(correoFiltroActivo==='atencion' || correoFiltroActivo==='spam') renderCorreoInbox();
+  else loadGmailInbox();
+}
+function seleccionarTodosVisiblesCorreo(){
+  const idsVisibles = ordenarCorreos(filtrarCorreos(correoMessagesCache)).map(r=>r.id);
+  idsVisibles.forEach(id=>correoSeleccionMulti.add(id));
+  document.getElementById('correo-select-bar').style.display = 'flex';
+  document.getElementById('correo-select-count').textContent = correoSeleccionMulti.size;
+  renderCorreoInbox();
+}
+async function marcarTodosVisiblesCorreo(accion){
+  const ids = ordenarCorreos(filtrarCorreos(correoMessagesCache)).map(r=>r.id);
+  if(!ids.length) return;
+  if(accion==='eliminar' && !(await confirmarAccion(`¿Eliminar los ${ids.length} correos de ${correoRemitenteAgrupado?.nombre}?`))) return;
+  ids.forEach(id=>correoSeleccionMulti.add(id));
+  await accionMasivaCorreo(accion);
+  if(accion==='eliminar' || accion==='spam') quitarAgrupacionRemitente();
+}
+
 function renderCorreoInbox(){
   const box = document.getElementById('correo-inbox');
   const vistos = new Set();
-  const base = correoMessagesCache.filter(m=>{ if(vistos.has(m.threadId)) return false; vistos.add(m.threadId); return true; });
+  let base = correoMessagesCache.filter(m=>{ if(vistos.has(m.threadId)) return false; vistos.add(m.threadId); return true; });
+  if(correoRemitenteAgrupado) base = base.filter(m=>m.email===correoRemitenteAgrupado.email);
   const rows = ordenarCorreos(filtrarCorreos(base));
+  renderGruposRemitente(rows);
   if(!rows.length){ box.innerHTML = '<div class="empty">Nada aquí.</div>'; return; }
   box.innerHTML = rows.map(r=>{
     const estado = r.estado || {};
@@ -6760,7 +6835,6 @@ function renderCorreoInbox(){
         <div class="correo-row-linea1">
           <span class="correo-row-remitente">${r.nombreRemitente}</span>
           ${r.entidad ? `<span class="tag" style="font-size:10.5px;border-color:var(--green);color:var(--green);">${r.entidad.tipo==='proveedor'?'Proveedor':'Cliente'}: ${r.entidad.nombre}</span>` : ''}
-          <span class="correo-row-fecha">${formatFechaHoraCorta(r.date)}</span>
         </div>
         <div class="correo-row-asunto">
           ${r.subject}
@@ -6770,10 +6844,10 @@ function renderCorreoInbox(){
         ${resumenUtil ? `<div class="correo-row-resumen">${resumenUtil}</div>` : ''}
         <div class="correo-row-tags">${catTag}${atencion?`<span class="tag" style="font-size:10.5px;color:var(--red);border-color:var(--red);">🔴 Requiere atención</span>`:''}</div>
       </div>
+      <div class="correo-row-fecha">${formatFechaHoraCorta(r.date)}</div>
       <div class="correo-row-acciones" onclick="event.stopPropagation();">
         <span class="correo-accion-btn" title="${r.importante?'Quitar importante':'Marcar importante'}" onclick="toggleImportanteCorreo('${r.id}')" style="color:${r.importante?'var(--orange)':'inherit'};">${r.importante?'★':'☆'}</span>
-        <span class="correo-accion-btn" title="${r.noLeido?'Marcar leído':'Marcar no leído'}" onclick="toggleLeidoCorreo('${r.id}')">${r.noLeido?'●':'○'}</span>
-        <span class="correo-accion-btn" title="Archivar" onclick="archivarCorreoId('${r.id}')">📥</span>
+        <span class="correo-accion-btn" title="${r.noLeido?'Marcar leído':'Marcar no leído'}" onclick="toggleLeidoCorreo('${r.id}')">${r.noLeido?'🔵':'✓'}</span>
         <span class="correo-accion-btn" title="Marcar spam" onclick="marcarSpamCorreoId('${r.id}')" style="color:var(--orange);">🚫</span>
         <span class="correo-accion-btn" title="Eliminar" onclick="borrarCorreoId('${r.id}')" style="color:var(--red);">🗑</span>
       </div>
@@ -6784,12 +6858,11 @@ function renderCorreoInbox(){
 function abrirAccionesCorreoMovil(id){
   const r = correoMessagesCache.find(m=>m.id===id);
   if(!r) return;
-  const opciones = [r.importante?'Quitar importante':'Marcar importante', r.noLeido?'Marcar leído':'Marcar no leído', 'Archivar', 'Marcar spam', 'Eliminar'];
+  const opciones = [r.importante?'Quitar importante':'Marcar importante', r.noLeido?'Marcar leído':'Marcar no leído', 'Marcar spam', 'Eliminar'];
   elegirDeLista('Acciones', opciones).then(op=>{
     if(!op) return;
     if(op.includes('importante')) toggleImportanteCorreo(id);
     else if(op.includes('leído')) toggleLeidoCorreo(id);
-    else if(op==='Archivar') archivarCorreoId(id);
     else if(op.includes('spam')) marcarSpamCorreoId(id);
     else if(op==='Eliminar') borrarCorreoId(id);
   });
@@ -6851,11 +6924,10 @@ async function accionMasivaCorreo(accion){
   for(const id of ids){
     if(accion==='leido') await modificarLabelsGmail(id, [], ['UNREAD']);
     else if(accion==='no_leido') await modificarLabelsGmail(id, ['UNREAD'], []);
-    else if(accion==='archivar') await modificarLabelsGmail(id, [], ['INBOX']);
     else if(accion==='spam') await marcarSpamCorreoId(id, true);
     else if(accion==='eliminar') await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}/trash`, {method:'POST', headers:{Authorization:'Bearer '+gmailAccessToken}});
   }
-  if(accion==='archivar' || accion==='eliminar') correoMessagesCache = correoMessagesCache.filter(r=>!ids.includes(r.id));
+  if(accion==='eliminar' || accion==='spam') correoMessagesCache = correoMessagesCache.filter(r=>!ids.includes(r.id));
   correoSeleccionMulti.clear();
   document.getElementById('correo-select-bar').style.display = 'none';
   renderCorreoInbox();
