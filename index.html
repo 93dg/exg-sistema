@@ -2167,7 +2167,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.37</div>
+        <div class="sub">V2.38</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2828,6 +2828,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
                 </div>
               </div>
             </div>
+            <div class="dd-filter" id="dd-pres-tipo">
+              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-pres-tipo')">Tipo<span class="dd-caret">▾</span></button>
+              <div class="dd-filter-panel">
+                <div class="filters" id="pres-filtro-tipo-chips" style="margin:0;">
+                  <div class="chip-filter" data-tipo="presupuesto">Presupuesto</div>
+                  <div class="chip-filter" data-tipo="proforma">Proforma</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="panel-body" style="padding:0;">
@@ -2836,12 +2845,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <th style="width:30px;"><input type="checkbox" id="pres-sel-todo" onchange="toggleSeleccionarTodoDoc(this,'pres-sel-chk')"></th>
               <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',1,'fecha')">Fecha ⇅</th>
               <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',2,'num')">Nº ⇅</th>
-              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',3,'text')">Cliente ⇅</th>
-              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',4,'text')">Trabajo ⇅</th>
-              <th class="num ord" onclick="ordenarTabla('presupuestos-tbody-standalone',5,'num')">Total ⇅</th>
-              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',6,'text')">Estado ⇅</th>
+              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',3,'text')">Tipo ⇅</th>
+              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',4,'text')">Cliente ⇅</th>
+              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',5,'text')">Trabajo ⇅</th>
+              <th class="num ord" onclick="ordenarTabla('presupuestos-tbody-standalone',6,'num')">Total ⇅</th>
+              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',7,'text')">Estado ⇅</th>
               <th>Archivo</th>
-              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',8,'text')">Calidad ⇅</th>
+              <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',9,'text')">Calidad ⇅</th>
               <th style="width:30px;"></th>
             </tr>
             <tbody id="presupuestos-tbody-standalone"></tbody>
@@ -5002,22 +5012,30 @@ document.querySelectorAll('#fact-filtro-estado-chips .chip-filter, #alb-filtro-e
     else if(cont.id==='pres-filtro-estado-chips'){ filtrarPorAnioTrim('presupuestos-tbody-standalone','pres'); }
   });
 });
+document.querySelectorAll('#pres-filtro-tipo-chips .chip-filter').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    chip.classList.toggle('active');
+    filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
+  });
+});
 function filtrarPorAnioTrim(tbodyId, prefijo){
   const tbody = document.getElementById(tbodyId);
   if(!tbody) return;
   const aniosSel = new Set(Array.from(document.getElementById(prefijo+'-filtro-anio-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.anio).filter(Boolean));
   const trimsSel = new Set(Array.from(document.getElementById(prefijo+'-filtro-trim-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.trim).filter(Boolean));
   const estadosSel = new Set(Array.from(document.getElementById(prefijo+'-filtro-estado-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.estado));
+  const tiposSel = new Set(Array.from(document.getElementById(prefijo+'-filtro-tipo-chips')?.querySelectorAll('.chip-filter.active') || []).map(c=>c.dataset.tipo));
   tbody.querySelectorAll('tr').forEach(tr=>{
     const okAnio = aniosSel.size===0 || aniosSel.has(tr.dataset.anio);
     const okTrim = trimsSel.size===0 || trimsSel.has(tr.dataset.trimestre);
+    const okTipo = tiposSel.size===0 || tiposSel.has(tr.dataset.tipo);
     let okEstado = true;
     if(estadosSel.size){
       const pillEl = tr.querySelector('.pill, select');
       const estadoActual = pillEl ? (pillEl.classList ? Array.from(pillEl.classList).find(c=>c!=='pill') : pillEl.value) : null;
       okEstado = estadoActual ? estadosSel.has(estadoActual) : true;
     }
-    tr.style.display = (okAnio && okTrim && okEstado) ? '' : 'none';
+    tr.style.display = (okAnio && okTrim && okEstado && okTipo) ? '' : 'none';
   });
 }
 function poblarFiltroAniosChipsGenerico(tbodyId, contenedorId, prefijo){
@@ -5109,6 +5127,8 @@ function accionesDocumento(doc){
   const editar = {t:'Editar', fn:`openDocumentViewer('${doc.id}')`};
   const duplicar = {t:'Duplicar', fn:`duplicarDocumento('${doc.id}')`};
   const eliminar = {t:'Eliminar', fn:`borrarUnDocumento('${doc.id}')`};
+  const enviarCliente = {t:'Enviar al cliente', fn:`enviarDocumentoAlCliente('${doc.id}')`};
+  const imprimir = {t:'Imprimir', fn:`imprimirDocumento('${doc.id}')`};
   if(doc.type==='factura'){
     const estado = doc.estado_cobro || 'pendiente_enviar';
     if(doc.enviado_gestor || ['pendiente_cobrar','parcial','cobrado'].includes(estado)){
@@ -5117,10 +5137,11 @@ function accionesDocumento(doc){
     } else {
       a.push(editar, duplicar, eliminar);
     }
+    a.push(enviarCliente, imprimir);
   } else if(doc.type==='presupuesto' || doc.type==='proforma'){
-    a.push(editar, duplicar, eliminar, {t:'Crear factura', fn:`crearFacturaDesdeDocumento('${doc.id}')`});
+    a.push(editar, duplicar, eliminar, {t:'Crear factura', fn:`crearFacturaDesdeDocumento('${doc.id}')`}, {t:'Crear albarán', fn:`crearAlbaranDesdeDocumento('${doc.id}')`}, enviarCliente, imprimir);
   } else if(doc.type==='albaran'){
-    a.push(editar, duplicar, eliminar, {t:'Convertir en factura', fn:`convertirAlbaranEnFactura('${doc.id}')`});
+    a.push(editar, duplicar, eliminar, {t:'Convertir en factura', fn:`convertirAlbaranEnFactura('${doc.id}')`}, enviarCliente, imprimir);
   } else {
     a.push(editar, eliminar);
   }
@@ -5192,6 +5213,22 @@ async function crearFacturaDesdeDocumento(id){
   if(error){ mostrarToast('Error: '+errText(error)); return; }
   await sb.from('documentos_economicos').update({estado: original.tipo==='proforma' ? 'aceptada' : 'aceptado'}).eq('id', id);
   mostrarToast(`Factura creada — ${original.tipo==='proforma'?'la proforma queda como Aceptada':'el presupuesto queda como Aceptado'}.`);
+  await cargarDocumentosEconomicosReales();
+  openDocumentViewer(doc.id);
+}
+async function crearAlbaranDesdeDocumento(id){
+  const {data: original} = await sb.from('documentos_economicos').select('*').eq('id', id).single();
+  if(!original) return;
+  const nueva = {
+    tipo:'albaran', estado:'borrador', fecha_devengo: new Date().toISOString().slice(0,10),
+    entidad_id: original.entidad_id, conceptos: original.conceptos, importe: original.importe,
+    contabilidad: original.contabilidad, estado_cobro:'pendiente_enviar', estado_albaran:'en_proceso',
+    info_faltante: `Creado a partir de${original.tipo==='proforma'?' la proforma':' el presupuesto'} nº ${original.numero||'—'}.`,
+  };
+  const {data: doc, error} = await sb.from('documentos_economicos').insert(nueva).select().single();
+  if(error){ mostrarToast('Error: '+errText(error)); return; }
+  await sb.from('documentos_economicos').update({estado: original.tipo==='proforma' ? 'aceptada' : 'aceptado'}).eq('id', id);
+  mostrarToast(`Albarán creado — ${original.tipo==='proforma'?'la proforma queda como Aceptada':'el presupuesto queda como Aceptado'}.`);
   await cargarDocumentosEconomicosReales();
   openDocumentViewer(doc.id);
 }
@@ -12044,6 +12081,27 @@ function getGestorEmail(){
   return email;
 }
 let composeOnSentCallback = null;
+function enviarDocumentoAlCliente(id){
+  const doc = documentosRealesById[id];
+  if(!doc) return;
+  const entidad = clientes.find(c=>c.name===doc.client);
+  const email = entidad?.email;
+  if(!email){ mostrarToast('Este cliente no tiene email guardado en su ficha.', 'err'); return; }
+  const archivoUrl = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
+  const etiquetaTipo = DOC_TYPES[doc.type]?.title || doc.type;
+  document.getElementById('mail-to').value = email;
+  document.getElementById('mail-subject').value = `${etiquetaTipo} ${doc.num||''} — Excavaciones Gómez`.trim();
+  document.getElementById('mail-body').value = `Buenas,\n\nAdjunto ${etiquetaTipo.toLowerCase()}${doc.num?' Nº '+doc.num:''}.\n\n${archivoUrl ? 'Archivo: '+archivoUrl : ''}\n\nUn saludo.`;
+  composeOnSentCallback = null;
+  openComposeDrawer();
+}
+function imprimirDocumento(id){
+  openDocumentViewer(id);
+  setTimeout(()=>{
+    togglePreview();
+    setTimeout(()=>window.print(), 200);
+  }, 250);
+}
 function enviarAlGestorDoc(id){
   const doc = documentosRealesById[id];
   if(!doc) return;
@@ -12164,14 +12222,14 @@ async function cargarDocumentosEconomicosReales(){
         const fechaCortaP = formatFechaCorta(doc.fecha_devengo);
         const archivoUrlRealP = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
         const archivoHtmlP = archivoUrlRealP ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${archivoUrlRealP}')">📎 Ver</a>` : '—';
-        const baseRowHtml = `<td class="mono">${fechaCortaP}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlP}</td><td class="mono">${trabajoHtmlP}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td><td>${archivoHtmlP}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td>`;
-        const row = document.createElement('tr'); row.id = 'docrow-'+doc.id; row.onclick = () => toggleExpandirDocFila(doc.id, 8); row.innerHTML = baseRowHtml;
-        row.dataset.contabilidad = doc.contabilidad || 'oficial'; row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum;
+        const baseRowHtml = `<td class="mono">${fechaCortaP}</td><td class="mono">${doc.numero||'—'}</td><td>${tipoDocEtiqueta(doc.tipo)}</td><td>${clienteHtmlP}</td><td class="mono">${trabajoHtmlP}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td><td>${archivoHtmlP}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td>`;
+        const row = document.createElement('tr'); row.id = 'docrow-'+doc.id; row.onclick = () => toggleExpandirDocFila(doc.id, 9); row.innerHTML = baseRowHtml;
+        row.dataset.contabilidad = doc.contabilidad || 'oficial'; row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum; row.dataset.tipo = doc.tipo;
         document.getElementById('econ-presupuestos-tbody')?.appendChild(row);
         const baseRowHtmlStandalone = baseRowHtml.replace(estadoPill, estadoPillStandalone);
         const rowHtml = `<td onclick="event.stopPropagation();"><input type="checkbox" class="pres-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('pres-sel-chk','pres-borrar-sel-btn','pres-sel-count')"></td>` + baseRowHtmlStandalone + `<td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
-        const row2 = document.createElement('tr'); row2.id = 'presrow-'+doc.id; row2.onclick = () => toggleExpandirDocFila(doc.id, 10); row2.innerHTML = rowHtml;
-        row2.dataset.contabilidad = doc.contabilidad || 'oficial'; row2.dataset.fechaIso = doc.fecha_devengo || ''; row2.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row2.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row2.dataset.total = totalNum;
+        const row2 = document.createElement('tr'); row2.id = 'presrow-'+doc.id; row2.onclick = () => toggleExpandirDocFila(doc.id, 11); row2.innerHTML = rowHtml;
+        row2.dataset.contabilidad = doc.contabilidad || 'oficial'; row2.dataset.fechaIso = doc.fecha_devengo || ''; row2.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row2.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row2.dataset.total = totalNum; row2.dataset.tipo = doc.tipo;
         document.getElementById('presupuestos-tbody-standalone')?.appendChild(row2);
       } else if(doc.tipo==='gasto'){
         const row = document.createElement('tr');
