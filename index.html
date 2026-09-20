@@ -2084,7 +2084,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.18</div>
+        <div class="sub">V2.19</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5641,6 +5641,14 @@ renderJobs('todos');
 const SUPABASE_URL = 'https://sshctqnpuolawtcujxkt.supabase.co'; // proyecto EXG (real)
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzaGN0cW5wdW9sYXd0Y3VqeGt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NDMxNDQsImV4cCI6MjEwNDUxOTE0NH0.NgqSwwtdQjKot2kiCabmF6f_kvl-27QU1kWgfzYPFsQ';
 const DOC_BUCKET = 'documentos-exg'; // bucket real ya existente en el proyecto EXG
+// Mapa único de tipo de documento -> icono + etiqueta. Fuente única de verdad:
+// no crear otro mapa parecido en ningún sitio nuevo, usar TIPO_DOC_ICONO/TIPO_DOC_LABEL.
+const TIPO_DOC_ICONO = {factura:'🧾', albaran:'📋', presupuesto:'📄', proforma:'📄', gasto:'💸'};
+const TIPO_DOC_NOMBRE = {factura:'Factura', albaran:'Albarán', presupuesto:'Presupuesto', proforma:'Proforma', gasto:'Gasto'};
+function tipoDocEtiqueta(tipo, conIcono){
+  const nombre = TIPO_DOC_NOMBRE[tipo] || tipo;
+  return conIcono===false ? nombre : (TIPO_DOC_ICONO[tipo] ? TIPO_DOC_ICONO[tipo]+' '+nombre : nombre);
+}
 let sb = null;
 function safeFetch(input, init){
   // El entorno de vista previa del artifact intercepta fetch() y no puede
@@ -6843,7 +6851,7 @@ function renderInbox(filter){
       <div class="sub-t">${d.sender||'—'} · ${d.created_at ? new Date(d.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'}) : ''}</div>
       <div class="sub-t">${d.linked_label || 'Sin relacionar'}</div>
       <div>${docPill(d.status||'pendiente')}</div>
-      <button class="btn" style="padding:5px 8px;color:var(--red);border-color:var(--red);" onclick="borrarUnDocumento(${d.id}, event)" title="Eliminar">🗑</button>
+      <button class="btn" style="padding:5px 8px;color:var(--red);border-color:var(--red);" onclick="borrarUnDocumento(${d.id}, event)" title="Borrar">🗑</button>
     </div>`).join('');
 }
 loadInbox();
@@ -8318,12 +8326,11 @@ function toggleExpandirClienteFila(id){
   const detalle = document.createElement('tr');
   detalle.id = 'cliente-detalle-'+id;
   detalle.onclick = ev=>ev.stopPropagation();
-  const tipoLabel = {factura:'Factura', albaran:'Albarán', presupuesto:'Presupuesto', proforma:'Presupuesto'};
   const filasHtml = docs.length ? `<table class="tbl" style="margin-top:6px;">
       <tr><th>Tipo</th><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Archivo</th></tr>
       ${docs.map(d=>{
         const url = d.archivo_url || (d.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${d.archivo_path}` : null);
-        return `<tr onclick="event.stopPropagation();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td>${tipoLabel[d.type]||d.type}</td><td class="mono">${d.numero||'—'}</td><td class="mono">${formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td><td>${url?`<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${url}')">📎 Ver</a>`:'—'}</td></tr>`;
+        return `<tr onclick="event.stopPropagation();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td>${tipoDocEtiqueta(d.type)}</td><td class="mono">${d.numero||'—'}</td><td class="mono">${formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td><td>${url?`<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${url}')">📎 Ver</a>`:'—'}</td></tr>`;
       }).join('')}
     </table>` : '<span class="sub-t">Sin facturas, albaranes ni presupuestos asociados</span>';
   detalle.innerHTML = `<td colspan="14" style="background:var(--concrete);padding:10px 20px;">${filasHtml}</td>`;
@@ -8449,10 +8456,9 @@ function openClientDrawer(name){
   document.getElementById('c-jobs-tbl').innerHTML = '<tr><th>Código</th><th>Fecha</th><th>Estado</th><th class="num">Precio</th></tr>' +
     (cJobs.length ? cJobs.map(j=>`<tr onclick="closeClientDrawer();openJobDrawer('${j.code}')"><td class="mono">${j.code}</td><td>${j.date}</td><td>${pill(j.state)}</td><td class="num">${j.price}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">Sin trabajos registrados</td></tr>');
 
-  const tipoLabelDrawer = {factura:'🧾 Factura', albaran:'📋 Albarán', presupuesto:'📄 Presupuesto', proforma:'📄 Proforma', gasto:'💸 Gasto'};
   const docsOrdenados = cDocs.slice().sort((a,b)=> new Date(b.dateRaw||0) - new Date(a.dateRaw||0));
   document.getElementById('c-docs-tbl').innerHTML = '<tr><th>Tipo</th><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th></tr>' +
-    (docsOrdenados.length ? docsOrdenados.map(d=>`<tr onclick="closeClientDrawer();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td>${tipoLabelDrawer[d.type]||d.type}</td><td class="mono">${d.num||d.numero||'—'}</td><td>${d.dateLabel||formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td><td>${d.status||'—'}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">Sin documentos todavía</td></tr>');
+    (docsOrdenados.length ? docsOrdenados.map(d=>`<tr onclick="closeClientDrawer();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td>${tipoDocEtiqueta(d.type)}</td><td class="mono">${d.num||d.numero||'—'}</td><td>${d.dateLabel||formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td><td>${d.status||'—'}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">Sin documentos todavía</td></tr>');
   document.getElementById('client-overlay').classList.add('active');
   cargarDireccionesCliente(c.id);
 }
@@ -11227,7 +11233,6 @@ function controlDocsEstadoPill(d){
   const estadoClase = d.status==='Borrador'?'porconfirmar':d.status==='Pendiente'?'pendiente':d.status==='Validado'?'validado':'enviado';
   return `<span class="pill ${estadoClase}">${d.status}</span>`;
 }
-const controlDocsTipoLabel = {factura:'🧾 Factura', albaran:'📋 Albarán', presupuesto:'📄 Presupuesto', proforma:'📄 Proforma'};
 let controlDocsLimite = 15;
 let controlDocsAniosPoblado = false;
 function controlDocsMostrarMas(){ controlDocsLimite += 15; renderControlDocs(); }
@@ -11279,7 +11284,7 @@ function renderControlDocs(){
     const campo = controlDocsOrdenCampo, asc = controlDocsOrdenAsc ? 1 : -1;
     if(campo==='fecha') return asc*(new Date(a.dateRaw||a.created_at||0) - new Date(b.dateRaw||b.created_at||0));
     if(campo==='importe') return asc*((a.total||a.importe||0) - (b.total||b.importe||0));
-    if(campo==='tipo') return asc*(controlDocsTipoLabel[a.type]||'').localeCompare(controlDocsTipoLabel[b.type]||'');
+    if(campo==='tipo') return asc*(TIPO_DOC_NOMBRE[a.type]||a.type||'').localeCompare(TIPO_DOC_NOMBRE[b.type]||b.type||'');
     if(campo==='numero') return asc*String(a.numero||a.num||'').localeCompare(String(b.numero||b.num||''));
     if(campo==='cliente') return asc*String(a.client||'').localeCompare(String(b.client||''));
     return asc*(new Date(b.dateRaw||b.created_at||0) - new Date(a.dateRaw||a.created_at||0));
@@ -11288,7 +11293,7 @@ function renderControlDocs(){
   const visibles = filtrados.slice(0, controlDocsLimite);
   tbody.innerHTML = visibles.length ? visibles.map(d=>{
     return `<tr onclick="openDocumentViewer('${d.id}')" style="cursor:pointer;">
-      <td>${controlDocsTipoLabel[d.type]||d.type}</td><td class="mono">${d.numero||d.num||'—'}</td><td><span onclick="event.stopPropagation();openClientDrawer('${(d.client||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${d.client}</span></td><td class="mono">${formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td>
+      <td>${tipoDocEtiqueta(d.type)}</td><td class="mono">${d.numero||d.num||'—'}</td><td><span onclick="event.stopPropagation();openClientDrawer('${(d.client||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${d.client}</span></td><td class="mono">${formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td>
       <td onclick="event.stopPropagation();">${calidadColumnaHtml(d)}</td>
       <td onclick="event.stopPropagation();">${controlDocsEstadoPill(d)}</td>
     </tr>`;
