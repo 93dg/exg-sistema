@@ -2185,7 +2185,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.41</div>
+        <div class="sub">V2.42</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5643,7 +5643,7 @@ function openBreakdownDrawer(id){
     : '<div class="state-btn current">Maquinaria no disponible</div>';
   const afectados = jobs.filter(j => (j.machines||[]).includes(b.machineName) && ['planificado','porconfirmar','confirmado','encurso'].includes(j.state));
   document.getElementById('b-afectados-tbody').innerHTML = afectados.length
-    ? afectados.map(j=>`<tr><td class="mono">${j.code}</td><td>${j.client}</td><td>${j.date}</td><td><button class="btn sm" onclick="event.stopPropagation();reasignarMaquina('${j.code}','${b.machineName.replace(/'/g,"\\'")}')">Reasignar</button></td></tr>`).join('')
+    ? afectados.map(j=>`<tr onclick="closeMaquinaAveriaYAbrirTrabajo('${j.code}')" style="cursor:pointer;"><td class="mono">${j.code}</td><td>${j.client}</td><td>${j.date}</td><td><button class="btn sm" onclick="event.stopPropagation();reasignarMaquina('${j.code}','${b.machineName.replace(/'/g,"\\'")}')">Reasignar</button></td></tr>`).join('')
     : '<tr><td colspan="4" class="empty">Sin trabajos afectados</td></tr>';
   document.getElementById('b-reparada-btn').style.display = b.resuelta_at ? 'none' : '';
   document.getElementById('b-reparada-btn').onclick = () => marcarReparada(id);
@@ -5666,6 +5666,10 @@ async function marcarReparada(id){
   closeBreakdownDrawer();
 }
 
+function closeMaquinaAveriaYAbrirTrabajo(jobCode){
+  document.getElementById('breakdown-overlay').classList.remove('active');
+  openJobDrawer(jobCode);
+}
 async function reasignarMaquina(jobCode, maquinaVieja){
   const j = jobs.find(x=>x.code===jobCode);
   if(!j) return;
@@ -10199,7 +10203,7 @@ function calcularCierre(q){
 
   document.getElementById('cierre-fact-count').textContent = facturas.length;
   document.getElementById('cierre-facturas-tbody').innerHTML = facturas.length
-    ? facturas.map(f=>`<tr><td class="mono">${f.num}</td><td>${f.client}</td><td>${f.dateLabel}</td><td class="num">${f.base.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td><td class="num">${f.iva.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td><td class="num">${f.total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td></tr>`).join('')
+    ? facturas.map(f=>`<tr><td class="mono">${f.num}</td><td><span onclick="event.stopPropagation();openClientDrawer('${(f.client||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${f.client}</span></td><td>${f.dateLabel}</td><td class="num">${f.base.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td><td class="num">${f.iva.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td><td class="num">${f.total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td></tr>`).join('')
     : '<tr><td colspan="6" class="empty">Sin facturas en este trimestre</td></tr>';
 
   const qLabel = {1:'1º trimestre (ene-mar)',2:'2º trimestre (abr-jun)',3:'3º trimestre (jul-sept)',4:'4º trimestre (oct-dic)'}[q];
