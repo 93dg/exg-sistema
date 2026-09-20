@@ -2084,7 +2084,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.17</div>
+        <div class="sub">V2.18</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3621,6 +3621,11 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <button class="btn primary" style="margin-top:10px;" onclick="guardarContactoCliente()">Guardar datos de contacto</button>
         <div class="sub-t" id="c-contacto-status" style="margin-top:6px;"></div>
         <div class="two-col-note" style="margin-top:8px;">¿Has comprobado que algún dato no aparece en ninguno de sus documentos? <span onclick="marcarCampoNoDisponible()" style="color:var(--orange);cursor:pointer;text-decoration:underline;">Marcar campo como no disponible en origen</span></div>
+      </div>
+      <div class="block" id="c-direcciones-block" style="margin-bottom:20px;display:none;">
+        <h4>Otras direcciones de este cliente</h4>
+        <div class="two-col-note" style="margin-bottom:8px;">Direcciones distintas encontradas en sus documentos. No sustituyen a la principal — úsalas para etiquetarlas (obra, facturación...) o para ponerlas como principal si corresponde.</div>
+        <table class="tbl" id="c-direcciones-tbl"><tr><th>Dirección</th><th>Etiqueta</th><th></th></tr></table>
       </div>
       <div class="field-grid" style="margin-bottom:20px;">
         <div class="field"><div class="l">Zona</div><div class="v" id="c-zone">Zona Norte</div></div>
@@ -8449,8 +8454,61 @@ function openClientDrawer(name){
   document.getElementById('c-docs-tbl').innerHTML = '<tr><th>Tipo</th><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th></tr>' +
     (docsOrdenados.length ? docsOrdenados.map(d=>`<tr onclick="closeClientDrawer();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td>${tipoLabelDrawer[d.type]||d.type}</td><td class="mono">${d.num||d.numero||'—'}</td><td>${d.dateLabel||formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td><td>${d.status||'—'}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">Sin documentos todavía</td></tr>');
   document.getElementById('client-overlay').classList.add('active');
+  cargarDireccionesCliente(c.id);
 }
 function closeClientDrawer(){ document.getElementById('client-overlay').classList.remove('active'); }
+
+async function cargarDireccionesCliente(entidadId){
+  const bloque = document.getElementById('c-direcciones-block');
+  const tbl = document.getElementById('c-direcciones-tbl');
+  bloque.style.display = 'none';
+  if(!sb || !entidadId) return;
+  const {data, error} = await sb.from('entidad_direcciones').select('*').eq('entidad_id', entidadId).order('created_at',{ascending:false});
+  if(error || !data || !data.length) return;
+  bloque.style.display = '';
+  tbl.innerHTML = '<tr><th>Dirección</th><th>Etiqueta</th><th></th></tr>' + data.map(d=>`
+    <tr>
+      <td>${d.direccion}</td>
+      <td>${d.etiqueta ? d.etiqueta : '<span style="color:var(--ink-faint,#8b8275);">sin etiquetar</span>'}</td>
+      <td style="white-space:nowrap;">
+        <span onclick="etiquetarDireccionCliente('${d.id}')" style="color:var(--orange);cursor:pointer;text-decoration:underline;font-size:11px;">Etiquetar</span>
+        &nbsp;·&nbsp;
+        <span onclick="usarDireccionComoPrincipal('${entidadId}','${d.id}')" style="color:var(--orange);cursor:pointer;text-decoration:underline;font-size:11px;">Usar como principal</span>
+        &nbsp;·&nbsp;
+        <span onclick="eliminarDireccionCliente('${d.id}','${entidadId}')" style="color:#b33;cursor:pointer;text-decoration:underline;font-size:11px;">Eliminar</span>
+      </td>
+    </tr>`).join('');
+}
+async function etiquetarDireccionCliente(direccionId){
+  const opciones = ['Obra','Facturación','Otra sede','Sin etiquetar'];
+  const elegido = await elegirDeLista('¿Qué es esta dirección?', opciones);
+  if(!elegido || !sb) return;
+  const etiqueta = elegido === 'Sin etiquetar' ? null : elegido;
+  await sb.from('entidad_direcciones').update({etiqueta}).eq('id', direccionId);
+  mostrarToast('Etiqueta guardada.');
+  cargarDireccionesCliente(clientDrawerAbiertoId);
+}
+async function usarDireccionComoPrincipal(entidadId, direccionId){
+  if(!sb) return;
+  const {data: dir} = await sb.from('entidad_direcciones').select('*').eq('id', direccionId).single();
+  if(!dir) return;
+  const {data: entActual} = await sb.from('entidades').select('direccion').eq('id', entidadId).single();
+  await sb.from('entidades').update({direccion: dir.direccion}).eq('id', entidadId);
+  // la que era principal pasa a quedar guardada como alternativa, para no perderla
+  if(entActual?.direccion && entActual.direccion !== dir.direccion){
+    await sb.from('entidad_direcciones').insert({entidad_id: entidadId, direccion: entActual.direccion, origen: 'sustituida-como-principal'});
+  }
+  await sb.from('entidad_direcciones').delete().eq('id', direccionId);
+  mostrarToast('Dirección principal actualizada.');
+  const c = clientes.find(x=>x.id===entidadId);
+  if(c){ c.direccion = dir.direccion; openClientDrawer(c.name); }
+}
+async function eliminarDireccionCliente(direccionId, entidadId){
+  if(!sb) return;
+  await sb.from('entidad_direcciones').delete().eq('id', direccionId);
+  mostrarToast('Dirección eliminada.');
+  cargarDireccionesCliente(entidadId);
+}
 async function guardarPrioridadManual(){
   const val = document.getElementById('c-prio-select').value;
   if(!val || !clientDrawerAbiertoId || !sb) return;
