@@ -344,6 +344,9 @@ table{border-collapse:collapse;width:100%;}
 .chip-remitente:hover{border-color:var(--orange);color:var(--orange);}
 .correo-grupo-activo{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--concrete);font-size:13px;}
 .correo-grupo-activo > span{cursor:pointer;}
+.limpieza-grupo{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 4px;border-bottom:1px solid var(--concrete-2);flex-wrap:wrap;}
+.limpieza-grupo-info{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.limpieza-grupo-acciones{display:flex;gap:6px;flex-shrink:0;}
 @media(max-width:768px){
   .correo-row{grid-template-columns:28px 32px 1fr;}
   .correo-row-acciones{display:none;}
@@ -2182,7 +2185,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.40</div>
+        <div class="sub">V2.41</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3394,6 +3397,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
                 <option value="categoria">Categoría</option>
               </select>
               <button class="btn primary" onclick="openComposeDrawer()">✏️ Redactar</button>
+              <button class="btn" onclick="abrirLimpiezaCorreo()">🧹 Limpieza</button>
               <button class="btn" onclick="loadGmailInbox()">↻</button>
             </div>
           </div>
@@ -3417,6 +3421,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
             <span title="Eliminar" onclick="accionMasivaCorreo('eliminar')" style="cursor:pointer;color:var(--red);">🗑 Eliminar</span>
           </div>
           <div id="correo-grupos-remitente"></div>
+          <div id="correo-limpieza-panel" style="display:none;"></div>
           <div class="panel-body" style="padding:0;" id="correo-inbox">
             <div class="empty">Cargando…</div>
           </div>
@@ -6861,6 +6866,141 @@ function renderCorreoInbox(){
     </div>`;
   }).join('') + (correoNextPageToken ? `<div style="text-align:center;padding:14px;"><button class="btn" id="correo-load-more-btn" onclick="loadMoreGmailInbox()">Cargar más</button></div>` : '');
 }
+// ============ LIMPIEZA INTELIGENTE DE CORREO ============
+// Analiza un lote grande del buzón, agrupa por remitente/patrón y deja todo preparado
+// para limpiar con pocos clics — NUNCA borra nada solo. Protege siempre las categorías
+// operativas (facturas, banco, Ayuntamiento, licitaciones, gestoría, clientes,
+// proveedores, adjuntos relevantes) y usa lo ya aprendido de decisiones anteriores.
+const CORREO_LIMPIEZA_LOTE = 150; // tamaño del lote por pasada — se puede repetir para cubrir más
+const CORREO_CATEGORIAS_PROTEGIDAS = new Set(['licitaciones','banco','facturas','clientes','trabajos','gestoria','administracion','proveedores']);
+let correoLimpiezaResultado = null;
+
+async function abrirLimpiezaCorreo(){
+  document.getElementById('correo-inbox').style.display = 'none';
+  document.getElementById('correo-grupos-remitente').style.display = 'none';
+  const panel = document.getElementById('correo-limpieza-panel');
+  panel.style.display = 'block';
+  panel.innerHTML = '<div class="empty">Analizando el buzón… esto puede tardar un poco.</div>';
+  await asegurarTokenGmail();
+  try{
+    let mensajes = [], pageToken = null;
+    do{
+      const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=100&labelIds=INBOX${pageToken?'&pageToken='+pageToken:''}`;
+      const res = await fetch(url, {headers:{Authorization:'Bearer '+gmailAccessToken}});
+      const data = await res.json();
+      mensajes = mensajes.concat(data.messages||[]);
+      pageToken = data.nextPageToken;
+    } while(pageToken && mensajes.length < CORREO_LIMPIEZA_LOTE);
+    mensajes = mensajes.slice(0, CORREO_LIMPIEZA_LOTE);
+
+    const [{data: estados}, {data: bloqueados}, {data: aprendizaje}] = await Promise.all([
+      sb.from('correo_estado').select('*'),
+      sb.from('remitentes_bloqueados').select('*'),
+      sb.from('correo_aprendizaje').select('*'),
+    ]);
+    const estadoPorId = {}; (estados||[]).forEach(e=>estadoPorId[e.message_id]=e);
+    const bloqueadosSet = new Set((bloqueados||[]).map(b=>b.email));
+    const aprendPorEmail = {}; (aprendizaje||[]).forEach(a=>aprendPorEmail[a.remitente_email]=a);
+
+    const detalles = await Promise.all(mensajes.map(async m=>{
+      const r = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=List-Unsubscribe`, {headers:{Authorization:'Bearer '+gmailAccessToken}});
+      const d = await r.json();
+      const headers = (d.payload&&d.payload.headers)||[];
+      const get = n=>(headers.find(h=>h.name===n)||{}).value||'';
+      const from = get('From');
+      const email = extraerEmail(from);
+      const nombre = from.replace(/<[^>]+>/,'').replace(/"/g,'').trim() || email;
+      return { id:m.id, email, nombre, subject:get('Subject')||'', tieneListUnsub:!!get('List-Unsubscribe'), estado: estadoPorId[m.id]||null };
+    }));
+
+    const RE_PROMO = /\b(oferta|descuento|promoci[oó]n|%\s?dto|black\s?friday|rebajas|newsletter|bolet[ií]n|date\s?de\s?baja)\b/i;
+    const gruposPorRemitente = {};
+    detalles.forEach(d=>{
+      const aprend = aprendPorEmail[d.email];
+      // respeta lo ya decidido: si el usuario conservó este remitente más veces de las que lo marcó spam, no se sugiere
+      if(aprend && (aprend.veces_marcado_no_spam||0) > (aprend.veces_marcado_spam||0)) return;
+      const cat = d.estado?.categoria;
+      if(!bloqueadosSet.has(d.email) && cat && CORREO_CATEGORIAS_PROTEGIDAS.has(cat)) return;
+      if(d.estado?.tiene_adjuntos_importantes) return;
+      const esSpamIA = !!d.estado?.es_spam || bloqueadosSet.has(d.email) || (aprend && (aprend.veces_marcado_spam||0) >= 2);
+      const esPromo = d.tieneListUnsub || RE_PROMO.test(d.subject);
+      const esNotif = /no-?reply|noreply|notificaci/i.test(d.email);
+      if(!esSpamIA && !esPromo && !esNotif) return; // sin señal clara, no se sugiere (mejor pecar de conservador)
+      const key = d.email;
+      if(!gruposPorRemitente[key]) gruposPorRemitente[key] = {email:d.email, nombre:d.nombre, ids:[], esSpamIA:false, esPromo:false, esNotif:false};
+      const g = gruposPorRemitente[key];
+      g.ids.push(d.id);
+      if(esSpamIA) g.esSpamIA = true; else if(esPromo) g.esPromo = true; else if(esNotif) g.esNotif = true;
+    });
+    const grupos = Object.values(gruposPorRemitente).filter(g=>g.ids.length>=2 || g.esSpamIA).sort((a,b)=>b.ids.length-a.ids.length);
+    correoLimpiezaResultado = {grupos, analizados: detalles.length};
+    renderLimpiezaCorreo();
+  }catch(err){
+    panel.innerHTML = `<div class="empty" style="color:var(--red);">Error al analizar: ${err&&err.message?err.message:err}</div>`;
+  }
+}
+function cerrarLimpiezaCorreo(){
+  document.getElementById('correo-limpieza-panel').style.display = 'none';
+  document.getElementById('correo-limpieza-panel').innerHTML = '';
+  document.getElementById('correo-inbox').style.display = '';
+  document.getElementById('correo-grupos-remitente').style.display = '';
+}
+function renderLimpiezaCorreo(){
+  const panel = document.getElementById('correo-limpieza-panel');
+  const {grupos, analizados} = correoLimpiezaResultado;
+  if(!grupos.length){
+    panel.innerHTML = `<div style="padding:20px;">
+      <button class="btn" onclick="cerrarLimpiezaCorreo()">← Volver a la bandeja</button>
+      <div class="empty" style="margin-top:14px;">Analizados ${analizados} correos — nada que limpiar por ahora. Protegidas siempre: facturas, bancos, Ayuntamiento, licitaciones, gestoría, clientes, proveedores y correos con adjuntos relevantes.</div>
+    </div>`;
+    return;
+  }
+  const totalCorreos = grupos.reduce((s,g)=>s+g.ids.length,0);
+  panel.innerHTML = `<div style="padding:16px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="btn" onclick="cerrarLimpiezaCorreo()">← Volver a la bandeja</button>
+      <b>${grupos.length} grupos · ${totalCorreos} correos</b> de ${analizados} analizados
+      <span style="flex:1;"></span>
+      <span class="sub-t">Protegidas siempre: facturas, bancos, Ayuntamiento, licitaciones, gestoría, clientes, proveedores, adjuntos relevantes.</span>
+    </div>
+    ${grupos.map((g,i)=>{
+      const tipo = g.esSpamIA ? '🚫 Probable spam' : g.esPromo ? '📣 Publicidad / Newsletter' : '🔔 Notificación automática';
+      return `<div class="limpieza-grupo">
+        <div class="limpieza-grupo-info">
+          <span class="tag">${tipo}</span>
+          <b>${g.nombre}</b>
+          <span class="sub-t">${g.ids.length} correo${g.ids.length===1?'':'s'}</span>
+        </div>
+        <div class="limpieza-grupo-acciones">
+          <button class="btn sm" style="color:var(--red);" onclick="limpiezaAccionGrupo(${i},'eliminar')">🗑 Eliminar todos</button>
+          <button class="btn sm" style="color:var(--orange);" onclick="limpiezaAccionGrupo(${i},'spam')">🚫 Marcar spam</button>
+          <button class="btn sm" onclick="limpiezaAccionGrupo(${i},'conservar')">✓ Conservar</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+async function limpiezaAccionGrupo(idx, accion){
+  const g = correoLimpiezaResultado.grupos[idx];
+  if(!g || !sb) return;
+  await asegurarTokenGmail();
+  if(accion==='eliminar'){
+    if(!(await confirmarAccion(`¿Eliminar los ${g.ids.length} correos de ${g.nombre}?`))) return;
+    for(const id of g.ids) await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}/trash`, {method:'POST', headers:{Authorization:'Bearer '+gmailAccessToken}});
+    await sb.rpc('registrar_decision_correo', {p_remitente: g.email, p_tipo:'spam'});
+  } else if(accion==='spam'){
+    for(const id of g.ids) await modificarLabelsGmail(id, ['SPAM'], ['INBOX']);
+    await sb.rpc('registrar_decision_correo', {p_remitente: g.email, p_tipo:'spam'});
+    await sb.from('correo_estado').upsert(g.ids.map(id=>({message_id:id, es_spam:true, categoria:'spam', remitente_email:g.email})));
+  } else if(accion==='conservar'){
+    await sb.rpc('registrar_decision_correo', {p_remitente: g.email, p_tipo:'no_spam'});
+  }
+  correoMessagesCache = correoMessagesCache.filter(m=>!g.ids.includes(m.id));
+  correoLimpiezaResultado.grupos.splice(idx,1);
+  mostrarToast(accion==='conservar' ? 'Recordado — no se volverá a sugerir este remitente.' : 'Hecho.');
+  renderLimpiezaCorreo();
+}
+
 function abrirAccionesCorreoMovil(id){
   const r = correoMessagesCache.find(m=>m.id===id);
   if(!r) return;
