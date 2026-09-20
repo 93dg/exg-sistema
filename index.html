@@ -202,13 +202,12 @@ table{border-collapse:collapse;width:100%;}
 }
 /* Tonos de estado — fuente única de verdad. Los nombres de clase siguen siendo el vocabulario de cada sección (facturas, licitaciones, máquinas...), pero el color de cada tono se define una sola vez aquí. */
 .pill.pendiente, .pill.recibido, .pill.borrador{background:var(--concrete-2);color:var(--ink-soft);}
-.pill.porconfirmar, .pill.encurso, .pill.mantenimiento, .pill.revisar, .pill.pendiente_cobrar{background:var(--yellow-soft);color:#8A6100;}
-.pill.planificado, .pill.confirmado, .pill.presentado, .pill.enviado, .pill.trabajando, .pill.parcial{background:var(--blue-soft);color:var(--blue);}
-.pill.terminado, .pill.cobrado, .pill.disponible, .pill.validado, .pill.adjudicado, .pill.entregado{background:var(--green-soft);color:var(--green);}
-.pill.facturado, .pill.cobrado_efectivo{background:#E4DEF7;color:#5A3FA0;}
+.pill.porconfirmar, .pill.encurso, .pill.mantenimiento, .pill.revisar, .pill.pendiente_cobrar, .pill.en_proceso{background:var(--yellow-soft);color:#8A6100;}
+.pill.planificado, .pill.confirmado, .pill.presentado, .pill.enviado, .pill.trabajando, .pill.parcial, .pill.entregado{background:var(--blue-soft);color:var(--blue);}
+.pill.terminado, .pill.cobrado, .pill.disponible, .pill.validado, .pill.adjudicado{background:var(--green-soft);color:var(--green);}
+.pill.facturado{background:#E4DEF7;color:#5A3FA0;}
 .pill.cancelado, .pill.descartado, .pill.urgente, .pill.averiada, .pill.noadjudicado{background:var(--red-soft);color:var(--red);}
 .pill.posible{background:var(--concrete-2);color:var(--ink-soft);border:1px dashed var(--ink-soft);}
-.pill.en_proceso{background:var(--yellow-soft);color:#8A6100;}
 .pill.pendiente_enviar{background:#2B5C7A;color:#fff;}
 
 .estado-cobro-dd{position:relative;display:inline-block;}
@@ -304,7 +303,7 @@ table{border-collapse:collapse;width:100%;}
 /* filters */
 .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
 .reset-filtros-vista{
-  cursor:pointer;user-select:none;order:-1;
+  cursor:pointer;user-select:none;order:999;margin-left:auto;
   display:flex;align-items:center;justify-content:center;
   width:32px;padding:7px 12px;border-radius:20px;box-sizing:border-box;
   background:var(--concrete);border:1px solid var(--line);color:var(--ink-soft);
@@ -2125,7 +2124,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.32</div>
+        <div class="sub">V2.33</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2713,7 +2712,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
                 <div class="filters" id="alb-filtro-estado-chips" style="margin:0;">
                   <div class="chip-filter active" data-estado="en_proceso">En proceso</div>
                   <div class="chip-filter" data-estado="entregado">Entregado</div>
-                  <div class="chip-filter" data-estado="cobrado_efectivo">Cobrado</div>
+                  <div class="chip-filter" data-estado="cobrado_efectivo">4. Cobrado</div>
                 </div>
               </div>
             </div>
@@ -11813,14 +11812,17 @@ function editarCobrado(id){
   input.addEventListener('keydown', e=>{ if(e.key==='Enter') input.blur(); });
 }
 function estadoAlbaranSelect(id, actual){
-  const opciones = [['en_proceso','En proceso'],['entregado','Entregado'],['cobrado_efectivo','Cobrado']];
+  // "cobrado_efectivo" (valor real en la BD) usa la MISMA etiqueta y color que
+  // el "4. Cobrado" de Facturas — es el mismo estado, no una variante distinta.
+  const opciones = [['en_proceso','En proceso'],['entregado','Entregado'],['cobrado_efectivo','4. Cobrado']];
+  const clasePill = {en_proceso:'en_proceso', entregado:'entregado', cobrado_efectivo:'cobrado'};
   const act = actual || 'en_proceso';
   const label = opciones.find(o=>o[0]===act)?.[1] || act;
   const ddId = 'estado-alb-dd-'+id;
   return `<div class="estado-cobro-dd" id="${ddId}">
-    <span class="pill ${act}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${ddId}')">${label}</span>
+    <span class="pill ${clasePill[act]||act}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${ddId}')">${label}</span>
     <div class="estado-cobro-menu">
-      ${opciones.map(([v,l])=>`<span class="pill ${v}" onclick="event.stopPropagation();cambiarEstadoAlbaran('${id}','${v}','${ddId}')">${l}</span>`).join('')}
+      ${opciones.map(([v,l])=>`<span class="pill ${clasePill[v]||v}" onclick="event.stopPropagation();cambiarEstadoAlbaran('${id}','${v}','${ddId}')">${l}</span>`).join('')}
     </div>
   </div>`;
 }
@@ -11830,10 +11832,11 @@ async function cambiarEstadoAlbaran(id, valor, ddId){
   if(error){ mostrarToast('Error: '+errText(error), 'err'); return; }
   if(documentosRealesById[id]) documentosRealesById[id].estado_albaran = valor;
   if(ddId){
-    const opciones = [['en_proceso','En proceso'],['entregado','Entregado'],['cobrado_efectivo','Cobrado']];
+    const opciones = [['en_proceso','En proceso'],['entregado','Entregado'],['cobrado_efectivo','4. Cobrado']];
+    const clasePill = {en_proceso:'en_proceso', entregado:'entregado', cobrado_efectivo:'cobrado'};
     const label = opciones.find(o=>o[0]===valor)?.[1] || valor;
     const dd = document.getElementById(ddId);
-    if(dd){ dd.querySelector('.pill').className = 'pill '+valor; dd.querySelector('.pill').textContent = label; dd.classList.remove('open'); }
+    if(dd){ dd.querySelector('.pill').className = 'pill '+(clasePill[valor]||valor); dd.querySelector('.pill').textContent = label; dd.classList.remove('open'); }
   }
   mostrarToast('Estado actualizado ✓', 'ok');
   renderControlDocs();
