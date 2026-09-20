@@ -2084,7 +2084,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.15</div>
+        <div class="sub">V2.16</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11038,7 +11038,20 @@ async function submitNewInvoice(ev, isDraft){
   }
 
   aiRegistrarEvento('documento_creado', 'documentos', {type, client});
-  if(sb && savedId) sb.rpc('verificar_calidad', {p_anio:null, p_id:savedId}).then(()=>{}).catch(()=>{});
+  if(sb && savedId){
+    sb.rpc('verificar_calidad', {p_anio:null, p_id:savedId}).then(async ({data})=>{
+      // regla permanente: si queda marcado con algo, intentar corregirlo solo ANTES de que nadie lo vea marcado
+      if(data && (data.revision>0 || data.error>0)){
+        try{
+          const resp = await fetch(SUPABASE_URL + '/functions/v1/reprocesar-documento', {
+            method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+SUPABASE_ANON_KEY },
+            body: JSON.stringify({ documento_id: savedId }),
+          });
+          await resp.json();
+        }catch(e){ /* si falla el intento automático, se queda con la marca para revisión manual, correcto */ }
+      }
+    }).catch(()=>{});
+  }
   editingDocId = null;
   convirtiendoDesde = null;
   closeNewInvoiceModal();
