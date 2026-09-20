@@ -2186,7 +2186,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.43</div>
+        <div class="sub">V2.44</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4992,9 +4992,11 @@ function renderAlbaranesKPIs(){
   document.querySelectorAll('#albaranes-tbody-standalone tr').forEach(tr=>{
     const totalTr = parseFloat((tr.dataset.total)||'0')||0;
     total += totalTr;
-    const sel = tr.querySelector('select');
-    const v = sel?.value;
-    if(v==='cobrado_efectivo') cobradoEfectivo += totalTr;
+    // el desplegable de estado ya NO es un <select> — es el componente unificado
+    // (estadoDocumentoSelect), la píldora lleva la clase del propio estado.
+    const pillEl = tr.querySelector('.pill');
+    const v = pillEl ? Array.from(pillEl.classList).find(c=>c!=='pill') : null;
+    if(v==='cobrado') cobradoEfectivo += totalTr;
     else if(v==='entregado') entregados++;
     else enProceso++;
   });
@@ -5011,8 +5013,12 @@ function renderPresupuestosKPIs(){
   let total=0, enviados=0, borradores=0;
   document.querySelectorAll('#presupuestos-tbody-standalone tr').forEach(tr=>{
     total += parseFloat((tr.dataset.total)||'0')||0;
-    const estadoTxt = tr.children[5]?.textContent.toLowerCase() || '';
-    if(estadoTxt.includes('borrador')) borradores++;
+    // igual que en Albaranes: leer la píldora de estado real, no un índice de columna
+    // fijo (el índice cambia si se añade/quita una columna, y llevaba tiempo apuntando
+    // a la columna equivocada — nunca detectaba "borrador" de verdad).
+    const pillEl = tr.querySelector('.pill');
+    const v = pillEl ? Array.from(pillEl.classList).find(c=>c!=='pill') : null;
+    if(v==='borrador') borradores++;
     else enviados++;
   });
   strip.innerHTML = `
@@ -5462,13 +5468,17 @@ function calcularKPIsReales(){
   const facturasEmitidasMes = docs.filter(d=>d.type==='factura' && d.status!=='Borrador' && esDelMes(d));
   const facturadoMes = facturasEmitidasMes.reduce((s,d)=>s+(d.total||0),0);
   const cobradoLegalMes = facturasEmitidasMes.reduce((s,d)=>s+Number(d.cobrado_importe||0),0);
-  const cobradoEnBMes = docs.filter(d=>d.type==='albaran' && d.estado_albaran==='cobrado_efectivo' && esDelMes(d)).reduce((s,d)=>s+(d.total||0),0);
+  const cobradoEnBMes = docs.filter(d=>d.type==='albaran' && d.estado_cobro==='cobrado' && esDelMes(d)).reduce((s,d)=>s+(d.total||0),0);
   const cobradoMes = cobradoLegalMes + cobradoEnBMes;
 
   const gastosMes = docs.filter(d=>d.type==='gasto' && esDelMes(d)).reduce((s,d)=>s+(d.total||0),0);
   const margenMes = facturadoMes - gastosMes;
 
-  const pendienteCobro = docs.filter(d=>d.type==='factura' && d.status==='Pendiente').reduce((s,d)=>s+(d.total||0),0);
+  // "Pendiente de cobro" = mismo cálculo que en la ficha de cliente y en Facturas: total
+  // real menos lo realmente cobrado — NO el campo "status" (borrador/no-borrador, nada
+  // que ver con si está cobrado). Una única fórmula, para que Centro de Control, la ficha
+  // de cliente y la vista de Facturas coincidan siempre.
+  const pendienteCobro = docs.filter(d=>d.type==='factura').reduce((s,d)=>s + Math.max(0, (d.total||0) - Number(d.cobrado_importe||0)), 0);
 
   const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
