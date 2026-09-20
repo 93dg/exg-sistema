@@ -2125,7 +2125,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.29</div>
+        <div class="sub">V2.30</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12244,24 +12244,44 @@ if('serviceWorker' in navigator){
 </html>
 
 <script>
-/* ============ FILTROS PERSISTENTES POR VISTA/SECCIÓN ============
+/* ============ FILTROS PERSISTENTES POR VISTA/SECCIÓN (SERVIDOR) ============
    Bloque aislado en su propio <script>, al final del documento, para que
    un error en cualquier otro sitio de la web nunca le impida ejecutarse.
-   Cada grupo de chips de filtro (.filters con id) recuerda el último
-   elegido, en localStorage, por su propio id — independiente de los demás.
-   Cada vista con filtros lleva UN solo botón ↻ (a la izquierda del primer
-   grupo de filtros, gracias a order:-1) que restablece TODOS los filtros
-   de esa vista a la vez. */
+   Guardado en Supabase (tabla filtros_persistentes), NO en localStorage —
+   así se recuerda igual entrando desde el móvil que desde el ordenador,
+   no solo en el navegador donde se eligió. Cada grupo de chips de filtro
+   (.filters con id) recuerda el último elegido, por su propio id —
+   independiente de los demás. Cada vista con filtros lleva UN solo botón ↻
+   (a la izquierda del primer grupo de filtros, gracias a order:-1) que
+   restablece TODOS los filtros de esa vista a la vez. */
 (function(){
-  const PREFIX = 'exg_filtro_';
+  let cache = null; // se rellena una vez con todos los filtros guardados en el servidor
+  let cacheListo = false;
+
+  function esperarSupabaseYCargar(intentos){
+    intentos = intentos || 0;
+    if(typeof sb !== 'undefined' && sb){
+      sb.from('filtros_persistentes').select('*').then(({data, error})=>{
+        cache = {};
+        (data||[]).forEach(f=>{ cache[f.container_id] = f.valor; });
+        cacheListo = true;
+        aplicarATodosLosContenedoresVisibles();
+      });
+      return;
+    }
+    if(intentos > 40) { cache = {}; cacheListo = true; return; } // ~20s de margen, luego se rinde sin bloquear la web
+    setTimeout(()=>esperarSupabaseYCargar(intentos+1), 500);
+  }
+
   function guardar(containerId, chip){
-    if(!containerId || !chip) return;
-    try{ localStorage.setItem(PREFIX+containerId, chip.textContent.trim()); }catch(e){}
+    if(!containerId || !chip || typeof sb === 'undefined' || !sb) return;
+    const valor = chip.textContent.trim();
+    if(cache) cache[containerId] = valor;
+    sb.from('filtros_persistentes').upsert({container_id: containerId, valor, actualizado_at: new Date().toISOString()}).then(()=>{});
   }
   function restaurar(container){
-    if(!container.id) return;
-    let guardado;
-    try{ guardado = localStorage.getItem(PREFIX+container.id); }catch(e){ return; }
+    if(!container.id || !cacheListo) return;
+    const guardado = cache[container.id];
     if(!guardado) return;
     const chips = Array.from(container.querySelectorAll('.chip-filter'));
     if(!chips.length) return;
@@ -12269,6 +12289,9 @@ if('serviceWorker' in navigator){
     if(activo && activo.textContent.trim()===guardado) return;
     const objetivo = chips.find(c=>c.textContent.trim()===guardado);
     if(objetivo) objetivo.click();
+  }
+  function aplicarATodosLosContenedoresVisibles(){
+    document.querySelectorAll('.filters[id]').forEach(restaurar);
   }
   function asegurarBotonVista(view){
     // si los filtros van detrás de desplegables (Año ▾ / Trimestre ▾ / Estado ▾),
@@ -12286,8 +12309,12 @@ if('serviceWorker' in navigator){
     btn.textContent = '↻';
     btn.onclick = function(e){
       e.stopPropagation();
-      contenedores.forEach(c=>{ try{ localStorage.removeItem(PREFIX+c.id); }catch(err){} });
-      location.reload();
+      if(typeof sb !== 'undefined' && sb){
+        const ids = contenedores.map(c=>c.id);
+        sb.from('filtros_persistentes').delete().in('container_id', ids).then(()=>location.reload());
+      } else {
+        location.reload();
+      }
     };
     destino.insertBefore(btn, destino.firstChild);
   }
@@ -12300,7 +12327,6 @@ if('serviceWorker' in navigator){
   function iniciar(){
     try{
       document.querySelectorAll('.filters[id]').forEach(container=>{
-        restaurar(container);
         const obs = new MutationObserver(()=>restaurar(container));
         obs.observe(container, {childList:true});
       });
@@ -12312,6 +12338,7 @@ if('serviceWorker' in navigator){
           obsBtn.observe(primerFiltro, {childList:true});
         }
       });
+      esperarSupabaseYCargar();
     }catch(e){ console.error('filtros-persistentes:', e); }
   }
   if(document.readyState !== 'loading') iniciar();
