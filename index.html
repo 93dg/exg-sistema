@@ -2186,7 +2186,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.46</div>
+        <div class="sub">V2.47</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3096,29 +3096,25 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
 
         <div class="panel">
-          <div class="panel-head"><h3>Facturación por mes</h3></div>
-          <div class="panel-body">
-            <div class="bar-chart">
-              <div class="bar-col"><div class="bar" style="height:52%"></div><span>Abr</span></div>
-              <div class="bar-col"><div class="bar" style="height:61%"></div><span>May</span></div>
-              <div class="bar-col"><div class="bar" style="height:45%"></div><span>Jun</span></div>
-              <div class="bar-col"><div class="bar" style="height:70%"></div><span>Jul</span></div>
-              <div class="bar-col"><div class="bar" style="height:58%"></div><span>Ago</span></div>
-              <div class="bar-col"><div class="bar active" style="height:88%"></div><span>Sept</span></div>
+          <div class="panel-head" style="justify-content:space-between;">
+            <h3>Facturación por mes</h3>
+            <div class="filters" id="grafico-modo-chips" style="margin:0;">
+              <div class="chip-filter active" data-modo="mensual">Mensual</div>
+              <div class="chip-filter" data-modo="trimestral">Trimestral</div>
             </div>
+          </div>
+          <div class="panel-body">
+            <div id="grafico-facturacion-svg"></div>
           </div>
         </div>
 
         <div class="grid-2">
-          <div class="panel"><div class="panel-head"><h3>Facturación por tipo de cliente</h3></div><div class="panel-body">
-            <div class="econ-line"><span>Ayuntamientos</span><span class="v">0,00 €</span></div>
-            <div class="econ-line"><span>Empresas / naves</span><span class="v">0,00 €</span></div>
-            <div class="econ-line"><span>Particulares</span><span class="v">0,00 €</span></div>
+          <div class="panel"><div class="panel-head"><h3>Facturación por tipo de cliente</h3></div><div class="panel-body" id="resumen-por-tipo-cliente">
           </div></div>
-          <div class="panel"><div class="panel-head"><h3>Ingresos vs gastos (mes)</h3></div><div class="panel-body">
-            <div class="econ-line"><span>Ingresos facturados</span><span class="v green">0,00 €</span></div>
-            <div class="econ-line"><span>Gastos</span><span class="v" style="color:var(--red)">0,00 €</span></div>
-            <div class="econ-line"><span>Margen operativo</span><span class="v green">0,00 €</span></div>
+          <div class="panel"><div class="panel-head"><h3>Ingresos vs gastos (año seleccionado)</h3></div><div class="panel-body">
+            <div class="econ-line"><span>Ingresos facturados</span><span class="v green" id="resumen-ingresos-anio">0,00 €</span></div>
+            <div class="econ-line"><span>Gastos</span><span class="v" style="color:var(--red)" id="resumen-gastos-anio">0,00 €</span></div>
+            <div class="econ-line"><span>Margen operativo</span><span class="v green" id="resumen-margen-anio">0,00 €</span></div>
           </div></div>
         </div>
       </div>
@@ -5452,6 +5448,108 @@ async function descartarHistorico(){
   renderHistorico();
   cerrarHistoricoModal();
 }
+// ============ Gráfico real de facturación (SVG, sin librerías) ============
+let graficoModo = 'mensual'; // 'mensual' o 'trimestral'
+function svgEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function renderGraficoBarrasDual(containerId, etiquetas, serieIngresos, serieGastos){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  const W = 700, H = 260, padL = 50, padB = 30, padT = 10, padR = 10;
+  const anchoUtil = W - padL - padR, altoUtil = H - padT - padB;
+  const maxVal = Math.max(1, ...serieIngresos, ...serieGastos);
+  const n = etiquetas.length;
+  const grupoW = anchoUtil / n;
+  const barW = Math.min(18, grupoW / 3);
+  const y0 = H - padB;
+  const escalaY = v => altoUtil * (v / maxVal);
+  let barras = '', ejeX = '', lineasGrid = '';
+  for(let i=0;i<4;i++){
+    const y = padT + altoUtil * i/3;
+    lineasGrid += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`;
+  }
+  for(let i=0;i<n;i++){
+    const cx = padL + grupoW*i + grupoW/2;
+    const hIng = escalaY(serieIngresos[i]||0), hGas = escalaY(serieGastos[i]||0);
+    barras += `<rect x="${cx-barW-2}" y="${y0-hIng}" width="${barW}" height="${hIng}" fill="var(--green)" rx="2"><title>${svgEsc(etiquetas[i])} — Ingresos: ${(serieIngresos[i]||0).toLocaleString('es-ES',{minimumFractionDigits:2})} €</title></rect>`;
+    barras += `<rect x="${cx+2}" y="${y0-hGas}" width="${barW}" height="${hGas}" fill="var(--red)" rx="2"><title>${svgEsc(etiquetas[i])} — Gastos: ${(serieGastos[i]||0).toLocaleString('es-ES',{minimumFractionDigits:2})} €</title></rect>`;
+    ejeX += `<text x="${cx}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-soft)">${svgEsc(etiquetas[i])}</text>`;
+  }
+  el.innerHTML = `
+    <div style="display:flex;gap:16px;align-items:center;margin-bottom:8px;font-size:12px;">
+      <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;background:var(--green);border-radius:2px;display:inline-block;"></span>Ingresos</span>
+      <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;background:var(--red);border-radius:2px;display:inline-block;"></span>Gastos</span>
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:280px;">
+      ${lineasGrid}
+      <line x1="${padL}" y1="${y0}" x2="${W-padR}" y2="${y0}" stroke="var(--ink-soft)" stroke-width="1.5"/>
+      ${barras}${ejeX}
+    </svg>`;
+}
+function renderGraficoFacturacion(){
+  const anioSel = document.getElementById('econ-filtro-anio-chips')?.querySelector('.chip-filter.active')?.dataset.anio;
+  const anio = anioSel ? Number(anioSel) : new Date().getFullYear();
+  const docs = Object.values(documentosRealesById);
+  const esIngreso = d => (d.type==='factura' || (d.type==='albaran' && d.estado_cobro==='cobrado'));
+  if(graficoModo === 'mensual'){
+    const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sept','Oct','Nov','Dic'];
+    const ingresos = new Array(12).fill(0), gastos = new Array(12).fill(0);
+    docs.forEach(d=>{
+      if(!d.dateRaw) return;
+      const dt = new Date(d.dateRaw);
+      if(dt.getFullYear() !== anio) return;
+      const m = dt.getMonth();
+      if(d.type==='gasto') gastos[m] += (d.total||0);
+      else if(esIngreso(d)) ingresos[m] += (d.total||0);
+    });
+    renderGraficoBarrasDual('grafico-facturacion-svg', MESES, ingresos, gastos);
+  } else {
+    const TRIMS = ['1º trim.','2º trim.','3º trim.','4º trim.'];
+    const ingresos = new Array(4).fill(0), gastos = new Array(4).fill(0);
+    docs.forEach(d=>{
+      if(!d.dateRaw) return;
+      const dt = new Date(d.dateRaw);
+      if(dt.getFullYear() !== anio) return;
+      const q = Math.floor(dt.getMonth()/3);
+      if(d.type==='gasto') gastos[q] += (d.total||0);
+      else if(esIngreso(d)) ingresos[q] += (d.total||0);
+    });
+    renderGraficoBarrasDual('grafico-facturacion-svg', TRIMS, ingresos, gastos);
+  }
+  // bloques de resumen del año seleccionado — con datos reales, no fijos
+  let ingresosAnio=0, gastosAnio=0;
+  const porTipo = {};
+  docs.forEach(d=>{
+    if(!d.dateRaw) return;
+    const dt = new Date(d.dateRaw);
+    if(dt.getFullYear() !== anio) return;
+    if(d.type==='gasto') gastosAnio += (d.total||0);
+    else if(esIngreso(d)){
+      ingresosAnio += (d.total||0);
+      const entidad = clientes.find(c=>c.name===d.client);
+      const tipo = entidad?.type || 'Otros';
+      porTipo[tipo] = (porTipo[tipo]||0) + (d.total||0);
+    }
+  });
+  const setTxt = (id,val)=>{ const e=document.getElementById(id); if(e) e.textContent = val; };
+  const euroFmt = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  setTxt('resumen-ingresos-anio', euroFmt(ingresosAnio));
+  setTxt('resumen-gastos-anio', euroFmt(gastosAnio));
+  setTxt('resumen-margen-anio', euroFmt(ingresosAnio-gastosAnio));
+  const contTipo = document.getElementById('resumen-por-tipo-cliente');
+  if(contTipo){
+    const entradas = Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
+    contTipo.innerHTML = entradas.length ? entradas.map(([tipo,imp])=>`<div class="econ-line"><span>${svgEsc(tipo)}</span><span class="v">${euroFmt(imp)}</span></div>`).join('') : '<div class="empty">Sin datos para este año</div>';
+  }
+}
+document.querySelectorAll('#grafico-modo-chips .chip-filter').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#grafico-modo-chips .chip-filter').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    graficoModo = chip.dataset.modo;
+    renderGraficoFacturacion();
+  });
+});
+
 function calcularKPIsReales(){
   const hoy = new Date(); hoy.setHours(0,0,0,0);
   const hoyIso = hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');
@@ -12238,6 +12336,7 @@ function poblarFiltroAniosEconomia(){
         if(!contenedor.querySelector('.chip-filter.active')) contenedor.querySelector('.chip-filter[data-anio=""]')?.classList.add('active');
       }
       recalcularResumenEconomia();
+      renderGraficoFacturacion();
     });
   });
 }
@@ -12552,6 +12651,7 @@ async function cargarDocumentosEconomicosReales(){
     calcularKPIsReales();
     poblarFiltroAniosEconomia();
     recalcularResumenEconomia();
+    renderGraficoFacturacion();
     poblarFiltroAniosChipsGenerico('albaranes-tbody-standalone','alb-filtro-anio-chips','alb');
     poblarFiltroAniosChipsGenerico('presupuestos-tbody-standalone','pres-filtro-anio-chips','pres');
     poblarFiltroAniosChips('econ-facturas-tbody','fact-filtro-anio-chips');
