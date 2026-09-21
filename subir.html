@@ -264,12 +264,36 @@ header .name{font-family:'Archivo',sans-serif;font-weight:800;font-size:14px;}
     pendientesStrip.classList.add("activo");
     pendientesStrip.innerHTML = pendientes.map(p => {
       const cuerpo = p.kind === "audio"
-        ? `<div class="pend-audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0" stroke-linecap="round"/></svg></div>`
+        ? `<div class="pend-audio" onclick="reproducirPendiente('${p.id}')"><svg id="pico-${p.id}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0" stroke-linecap="round"/></svg></div>`
         : `<img src="${p.previewUrl}" alt="">`;
-      return `<div class="pend-item">${cuerpo}<button type="button" class="pend-borrar" onclick="quitarPendiente('${p.id}')">✕</button></div>`;
+      return `<div class="pend-item">${cuerpo}<button type="button" class="pend-borrar" onclick="event.stopPropagation();quitarPendiente('${p.id}')">✕</button></div>`;
     }).join("");
     btnEnviar.disabled = subiendo;
   }
+
+  const ICONO_MIC = `<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0" stroke-linecap="round"/>`;
+  const ICONO_PAUSA = `<rect x="7" y="5" width="4" height="14" rx="1"/><rect x="13" y="5" width="4" height="14" rx="1"/>`;
+  let audioReproduciendo = null;
+  let idReproduciendo = null;
+
+  function reproducirPendiente(id){
+    const p = pendientes.find(x => x.id === id);
+    if (!p) return;
+    const icono = document.getElementById(`pico-${id}`);
+    if (idReproduciendo === id){
+      audioReproduciendo.pause();
+      idReproduciendo = null;
+      if (icono) icono.innerHTML = ICONO_MIC;
+      return;
+    }
+    if (audioReproduciendo){ audioReproduciendo.pause(); const iconoAnterior = document.getElementById(`pico-${idReproduciendo}`); if (iconoAnterior) iconoAnterior.innerHTML = ICONO_MIC; }
+    audioReproduciendo = new Audio(p.previewUrl);
+    idReproduciendo = id;
+    if (icono) icono.innerHTML = ICONO_PAUSA;
+    audioReproduciendo.onended = () => { idReproduciendo = null; if (icono) icono.innerHTML = ICONO_MIC; };
+    audioReproduciendo.play().catch(() => {});
+  }
+  window.reproducirPendiente = reproducirPendiente;
 
   // ---------- Grabar audio ----------
   let grabando = false, mediaRecorder = null, audioChunks = [], audioStream = null, grabarInicio = null, grabarTimer = null;
@@ -432,6 +456,18 @@ header .name{font-family:'Archivo',sans-serif;font-weight:800;font-size:14px;}
     const icono = ICONO_TIPO[p.kind] || "📄";
     const thumb = (p.kind === "foto" && p.previewUrl) ? `<img class="rc-thumb" src="${p.previewUrl}" alt="">` : `<div class="rc-thumb">${icono}</div>`;
     card.innerHTML = `${thumb}<div class="rc-cuerpo"><div class="rc-titulo">Enviando…</div></div><div class="rc-estado cargando">…</div>`;
+    if (p.kind === "audio"){
+      card.style.cursor = "pointer";
+      card.dataset.audioSrc = p.previewUrl;
+      card.addEventListener("click", () => {
+        if (audioReproduciendo && idReproduciendo === "card-" + card.dataset.cardId) { audioReproduciendo.pause(); idReproduciendo = null; return; }
+        if (audioReproduciendo) audioReproduciendo.pause();
+        audioReproduciendo = new Audio(card.dataset.audioSrc);
+        idReproduciendo = "card-" + card.dataset.cardId;
+        audioReproduciendo.play().catch(() => {});
+      });
+      card.dataset.cardId = Date.now() + "" + Math.random();
+    }
     feed.prepend(card);
     return card;
   }
