@@ -2186,7 +2186,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.54</div>
+        <div class="sub">V2.55</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4591,6 +4591,16 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 </div>
 
 <!-- ================= MODAL: CREAR CLIENTE ================= -->
+<div class="overlay" id="fusion-overlay" onclick="if(event.target===this) cerrarComparacionFusion()">
+  <div class="drawer" style="width:520px;">
+    <div class="drawer-head"><div><h2>Comparar antes de fusionar</h2></div><button class="close-x" onclick="cerrarComparacionFusion()">✕</button></div>
+    <div class="drawer-body mini-modal-body" id="fusion-comparacion-body"></div>
+    <div style="padding:14px 20px;border-top:1px solid var(--line);">
+      <button class="btn primary" style="width:100%;" onclick="confirmarFusionDesdeComparacion()">Confirmar fusión</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="newclient-overlay" onclick="if(event.target===this) closeNewClientModal()">
   <div class="drawer" style="width:420px;">
     <div class="drawer-head"><div><h2>Crear cliente</h2></div><button class="close-x" onclick="closeNewClientModal()">✕</button></div>
@@ -9447,34 +9457,109 @@ async function borrarClientesSeleccionados(){
 // ============ Posibles duplicados de clientes (revisión humana) ============
 async function cargarDuplicadosClientes(){
   if(!sb) return;
-  const {data} = await sb.from('duplicados_clientes_pendientes').select('*, a:entidad_a(id,nombre,nif,direccion,poblacion), b:entidad_b(id,nombre,nif,direccion,poblacion)').eq('estado','pendiente').order('puntuacion',{ascending:false});
+  const {data} = await sb.from('duplicados_clientes_pendientes').select('*, a:entidad_a(id,nombre,nif,direccion,cp,poblacion,provincia,telefono,email), b:entidad_b(id,nombre,nif,direccion,cp,poblacion,provincia,telefono,email)').eq('estado','pendiente');
   const panel = document.getElementById('panel-duplicados-clientes');
   const body = document.getElementById('dup-clientes-body');
-  const lista = (data||[]).filter(d=>d.a && d.b); // descarta huérfanos de fusiones ya hechas
+  const lista = (data||[]).filter(d=>d.a && d.b);
+  const ORDEN_NIVEL = {conflicto:0, alta:1, posible:2};
+  lista.sort((x,y)=>(ORDEN_NIVEL[x.motivos?.nivel]??3) - (ORDEN_NIVEL[y.motivos?.nivel]??3));
   document.getElementById('dup-clientes-count').textContent = lista.length;
   panel.style.display = lista.length ? '' : 'none';
-  body.innerHTML = lista.map(d=>`
+  const NIVEL_LABEL = {conflicto:'⚠ Conflicto', alta:'Coincidencia alta', posible:'Posible duplicado'};
+  const NIVEL_COLOR = {conflicto:'var(--red)', alta:'var(--green)', posible:'var(--orange)'};
+  body.innerHTML = lista.map(d=>{
+    const nivel = d.motivos?.nivel || 'posible';
+    const etiquetas = d.motivos?.etiquetas || [];
+    return `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);gap:12px;">
       <div style="flex:1;">
-        <div><b>${d.a.nombre}</b> ${d.a.nif?`— ${d.a.nif}`:''} ${d.a.direccion?`— ${d.a.direccion}`:''}</div>
-        <div style="color:var(--orange);font-size:12px;margin:2px 0;">↕ ${(d.motivos||[]).join(', ')} (puntuación ${d.puntuacion})</div>
+        <span class="tag" style="color:${NIVEL_COLOR[nivel]};border-color:${NIVEL_COLOR[nivel]};font-weight:700;">${NIVEL_LABEL[nivel]}</span>
+        <div style="margin-top:4px;"><b>${d.a.nombre}</b> ${d.a.nif?`— ${d.a.nif}`:''} ${d.a.direccion?`— ${d.a.direccion}`:''}</div>
         <div><b>${d.b.nombre}</b> ${d.b.nif?`— ${d.b.nif}`:''} ${d.b.direccion?`— ${d.b.direccion}`:''}</div>
+        <div style="color:var(--sub);font-size:12px;margin-top:2px;">${etiquetas.join(' · ')}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <button class="btn sm primary" onclick="fusionarDuplicadoPendiente('${d.id}','${d.a.id}','${d.b.id}')">Fusionar</button>
+        <button class="btn sm primary" onclick='abrirComparacionFusion(${JSON.stringify(d.a)},${JSON.stringify(d.b)})'>Fusionar</button>
         <button class="btn sm" onclick="mantenerSeparadosDuplicado('${d.id}')">Mantener separados</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
-async function fusionarDuplicadoPendiente(dupId, idA, idB){
-  const docsA = (await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('entidad_id',idA)).count || 0;
-  const docsB = (await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('entidad_id',idB)).count || 0;
-  const principal = docsA >= docsB ? idA : idB;
-  const duplicado = docsA >= docsB ? idB : idA;
-  if(!(await confirmarAccion('¿Fusionar estos dos clientes? Se conservan todos los documentos, trabajos y datos; el que tenga menos documentos se elimina como registro (sus datos válidos se conservan en el principal).'))) return;
-  const {data, error} = await sb.rpc('fusionar_clientes', {id_principal: principal, id_duplicado: duplicado});
+
+// ---- popup de comparación campo a campo ----
+const CAMPOS_FUSION = [['nombre','Nombre'],['nif','NIF/CIF'],['direccion','Dirección'],['cp','CP'],['poblacion','Población'],['provincia','Provincia'],['telefono','Teléfono'],['email','Email']];
+let fusionEnCurso = null; // {a, b, seleccion: {campo: 'a'|'b'}}
+function valorMasFiable(campo, va, vb){
+  // reglas deterministas: no vacío gana a vacío; NIF válido gana a inválido; más largo/completo gana en empate
+  const vacia = v => v===null || v===undefined || String(v).trim()==='';
+  if(vacia(va) && !vacia(vb)) return 'b';
+  if(!vacia(va) && vacia(vb)) return 'a';
+  if(vacia(va) && vacia(vb)) return 'a';
+  if(campo==='nif'){
+    const validaA = window.__nifValidoCache?.[va], validaB = window.__nifValidoCache?.[vb];
+    if(validaA && !validaB) return 'a';
+    if(!validaA && validaB) return 'b';
+  }
+  if(String(va).trim()===String(vb).trim()) return 'a';
+  return String(va).length >= String(vb).length ? 'a' : 'b';
+}
+async function abrirComparacionFusion(a, b){
+  // consulta rápida de validez de NIF de ambos, para elegir el más fiable
+  const nifs = [a.nif, b.nif].filter(Boolean);
+  window.__nifValidoCache = {};
+  if(nifs.length && sb){
+    for(const n of nifs){
+      const {data} = await sb.rpc('validar_nif_cif', {valor: n});
+      window.__nifValidoCache[n] = data;
+    }
+  }
+  const seleccion = {};
+  CAMPOS_FUSION.forEach(([campo])=>{ seleccion[campo] = valorMasFiable(campo, a[campo], b[campo]); });
+  fusionEnCurso = {a, b, seleccion};
+  renderComparacionFusion();
+  document.getElementById('fusion-overlay').classList.add('active');
+}
+function renderComparacionFusion(){
+  const {a, b, seleccion} = fusionEnCurso;
+  const filas = CAMPOS_FUSION.filter(([campo])=> a[campo] || b[campo]).map(([campo,label])=>{
+    const elegido = seleccion[campo];
+    const conflictoReal = a[campo] && b[campo] && String(a[campo]).trim()!==String(b[campo]).trim();
+    return `<div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);align-items:center;">
+      <div style="font-weight:700;font-size:13px;">${label}${conflictoReal?' <span style="color:var(--orange);">⚠</span>':''}</div>
+      <div onclick="elegirValorFusion('${campo}','a')" style="cursor:pointer;padding:6px 8px;border-radius:6px;font-size:13px;${elegido==='a'?'background:var(--green);color:#fff;font-weight:700;':'background:var(--concrete);'}">${a[campo]||'—'}</div>
+      <div onclick="elegirValorFusion('${campo}','b')" style="cursor:pointer;padding:6px 8px;border-radius:6px;font-size:13px;${elegido==='b'?'background:var(--green);color:#fff;font-weight:700;':'background:var(--concrete);'}">${b[campo]||'—'}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('fusion-comparacion-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px;padding-bottom:6px;font-size:12px;color:var(--sub);">
+      <div></div><div>Cliente A</div><div>Cliente B</div>
+    </div>
+    ${filas}
+    <div style="font-size:12px;color:var(--sub);margin-top:10px;">Toca cualquier valor para elegirlo en su lugar. Se conservarán todos los documentos, trabajos y el historial de ambos; el nombre no elegido queda guardado como alias.</div>
+  `;
+}
+function elegirValorFusion(campo, lado){
+  fusionEnCurso.seleccion[campo] = lado;
+  renderComparacionFusion();
+}
+function cerrarComparacionFusion(){
+  document.getElementById('fusion-overlay').classList.remove('active');
+  fusionEnCurso = null;
+}
+async function confirmarFusionDesdeComparacion(){
+  if(!fusionEnCurso || !sb) return;
+  const {a, b, seleccion} = fusionEnCurso;
+  const selecciones = {};
+  CAMPOS_FUSION.forEach(([campo])=>{ selecciones[campo] = seleccion[campo]==='a' ? a[campo] : b[campo]; });
+  // el principal es siempre el que tenga más documentos; el otro se fusiona en él
+  const docsA = (await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('entidad_id',a.id)).count || 0;
+  const docsB = (await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('entidad_id',b.id)).count || 0;
+  const principal = docsA >= docsB ? a.id : b.id;
+  const duplicado = docsA >= docsB ? b.id : a.id;
+  const {error} = await sb.rpc('fusionar_clientes_con_seleccion', {id_principal: principal, id_duplicado: duplicado, selecciones});
   if(error){ mostrarToast('Error al fusionar: '+errText(error)); return; }
-  mostrarToast(data?.conflictos && Object.keys(data.conflictos).length ? 'Fusionado. Hay campos en conflicto que revisar en la ficha.' : 'Clientes fusionados.', 'ok');
+  mostrarToast('Clientes fusionados.', 'ok');
+  cerrarComparacionFusion();
   cargarDuplicadosClientes();
   if(typeof cargarDatosReales==='function') cargarDatosReales();
 }
