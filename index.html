@@ -2186,7 +2186,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.53</div>
+        <div class="sub">V2.54</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2691,6 +2691,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
       <div class="panel" id="clientes-columnas-panel" style="display:none;margin-bottom:12px;">
         <div class="panel-body" style="display:flex;flex-wrap:wrap;gap:12px;padding:12px 16px;font-size:13px;" id="clientes-columnas-checks"></div>
+      </div>
+      <div class="panel" id="panel-duplicados-clientes" style="margin-bottom:12px;display:none;">
+        <div class="panel-head" style="justify-content:space-between;">
+          <h3>⚠ Posibles clientes duplicados (<span id="dup-clientes-count">0</span>)</h3>
+        </div>
+        <div class="panel-body" id="dup-clientes-body"></div>
       </div>
       <div class="panel">
         <div class="panel-body" style="padding:0;overflow-x:auto;">
@@ -4590,6 +4596,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     <div class="drawer-head"><div><h2>Crear cliente</h2></div><button class="close-x" onclick="closeNewClientModal()">✕</button></div>
     <div class="drawer-body mini-modal-body">
       <div class="field"><div class="l">Nombre</div><input class="search-box" style="width:100%;" id="nc-name" required></div>
+      <div id="nc-sugerencias"></div>
       <div class="field"><div class="l">Tipo</div>
         <input type="hidden" id="nc-type" value="Particular">
         <div class="filters" id="nc-type-chips" style="margin:0;">
@@ -4799,6 +4806,9 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     }
     if(btn.dataset.view==='proyectos'){
       cargarProyectos();
+    }
+    if(btn.dataset.view==='clientes'){
+      cargarDuplicadosClientes();
     }
   });
 });
@@ -9434,6 +9444,45 @@ async function borrarClientesSeleccionados(){
   actualizarSeleccionClientes();
 }
 
+// ============ Posibles duplicados de clientes (revisión humana) ============
+async function cargarDuplicadosClientes(){
+  if(!sb) return;
+  const {data} = await sb.from('duplicados_clientes_pendientes').select('*, a:entidad_a(id,nombre,nif,direccion,poblacion), b:entidad_b(id,nombre,nif,direccion,poblacion)').eq('estado','pendiente').order('puntuacion',{ascending:false});
+  const panel = document.getElementById('panel-duplicados-clientes');
+  const body = document.getElementById('dup-clientes-body');
+  const lista = (data||[]).filter(d=>d.a && d.b); // descarta huérfanos de fusiones ya hechas
+  document.getElementById('dup-clientes-count').textContent = lista.length;
+  panel.style.display = lista.length ? '' : 'none';
+  body.innerHTML = lista.map(d=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);gap:12px;">
+      <div style="flex:1;">
+        <div><b>${d.a.nombre}</b> ${d.a.nif?`— ${d.a.nif}`:''} ${d.a.direccion?`— ${d.a.direccion}`:''}</div>
+        <div style="color:var(--orange);font-size:12px;margin:2px 0;">↕ ${(d.motivos||[]).join(', ')} (puntuación ${d.puntuacion})</div>
+        <div><b>${d.b.nombre}</b> ${d.b.nif?`— ${d.b.nif}`:''} ${d.b.direccion?`— ${d.b.direccion}`:''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <button class="btn sm primary" onclick="fusionarDuplicadoPendiente('${d.id}','${d.a.id}','${d.b.id}')">Fusionar</button>
+        <button class="btn sm" onclick="mantenerSeparadosDuplicado('${d.id}')">Mantener separados</button>
+      </div>
+    </div>`).join('');
+}
+async function fusionarDuplicadoPendiente(dupId, idA, idB){
+  const docsA = (await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('entidad_id',idA)).count || 0;
+  const docsB = (await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('entidad_id',idB)).count || 0;
+  const principal = docsA >= docsB ? idA : idB;
+  const duplicado = docsA >= docsB ? idB : idA;
+  if(!(await confirmarAccion('¿Fusionar estos dos clientes? Se conservan todos los documentos, trabajos y datos; el que tenga menos documentos se elimina como registro (sus datos válidos se conservan en el principal).'))) return;
+  const {data, error} = await sb.rpc('fusionar_clientes', {id_principal: principal, id_duplicado: duplicado});
+  if(error){ mostrarToast('Error al fusionar: '+errText(error)); return; }
+  mostrarToast(data?.conflictos && Object.keys(data.conflictos).length ? 'Fusionado. Hay campos en conflicto que revisar en la ficha.' : 'Clientes fusionados.', 'ok');
+  cargarDuplicadosClientes();
+  if(typeof cargarDatosReales==='function') cargarDatosReales();
+}
+async function mantenerSeparadosDuplicado(dupId){
+  await sb.from('duplicados_clientes_pendientes').update({estado:'mantener_separados'}).eq('id', dupId);
+  cargarDuplicadosClientes();
+}
+
 const CLIENTES_COLUMNAS = [
   ['calidad','Calidad'],['nif','NIF/CIF'],['direccion','Dirección'],['cp','CP'],['poblacion','Población'],
   ['provincia','Provincia'],['email','Email'],['telefono','Teléfono'],['facturado','Facturado (legal)'],
@@ -9558,6 +9607,10 @@ function normalizarNombreCliente(n){
 async function buscarOCrearClienteApp(nombre, extra){
   extra = extra || {};
   if(!sb || !nombre || !nombre.trim()) return null;
+  // primero, coincidencia por puntuación (NIF+nombre+dirección combinados, no solo exacto)
+  const {data: sugerencias} = await sb.rpc('sugerir_clientes_similares', {p_nombre: nombre.trim(), p_nif: extra.nif||null, p_direccion: extra.direccion||null});
+  const mejor = (sugerencias||[])[0];
+  if(mejor && mejor.puntuacion >= 60) return mejor.id; // coincidencia segura: usar el existente sin preguntar
   const norm = normalizarNombreCliente(nombre);
   const nifLimpio = extra.nif ? extra.nif.replace(/[^A-Za-z0-9]/g,'').toUpperCase() : null;
   const {data: existentes} = await sb.from('entidades').select('id,nombre,nif');
@@ -9568,6 +9621,36 @@ async function buscarOCrearClienteApp(nombre, extra){
   const {data, error} = await sb.from('entidades').insert({nombre: nombre.trim(), tipo:'cliente', ...extra}).select().single();
   if(error){ console.error('No se pudo crear el cliente', error); return null; }
   return data.id;
+}
+// sugerencias clicables en tiempo real al crear/editar un cliente a mano
+let sugerenciasClienteTimeout = null;
+function activarSugerenciasCliente(inputNombreId, inputNifId, inputDireccionId, contenedorId){
+  const disparar = async () => {
+    const nombre = document.getElementById(inputNombreId)?.value?.trim();
+    if(!nombre || nombre.length < 3 || !sb) { const c=document.getElementById(contenedorId); if(c) c.innerHTML=''; return; }
+    const nif = inputNifId ? document.getElementById(inputNifId)?.value : null;
+    const direccion = inputDireccionId ? document.getElementById(inputDireccionId)?.value : null;
+    const {data} = await sb.rpc('sugerir_clientes_similares', {p_nombre: nombre, p_nif: nif||null, p_direccion: direccion||null});
+    const cont = document.getElementById(contenedorId);
+    if(!cont) return;
+    if(!data || !data.length){ cont.innerHTML=''; return; }
+    cont.innerHTML = `<div style="background:var(--concrete);border:1px solid var(--orange);border-radius:8px;padding:10px 12px;margin-top:6px;font-size:13px;">
+      <b>⚠ Puede que este cliente ya exista:</b>
+      ${data.map(s=>`<div style="margin-top:6px;padding:6px 0;border-top:1px solid #0002;">
+        <div><b>${s.nombre}</b> ${s.nif?`— ${s.nif}`:''} ${s.direccion?`— ${s.direccion}`:''}</div>
+        <button class="btn sm" onclick="usarClienteSugerido('${s.id}','${inputNombreId}','${contenedorId}')">Usar este cliente</button>
+        <button class="btn sm" onclick="openClientDrawer('${s.nombre.replace(/'/g,"\\'")}')">Ver ficha</button>
+      </div>`).join('')}
+      <button class="btn sm" style="margin-top:6px;" onclick="document.getElementById('${contenedorId}').innerHTML=''">Crear como nuevo de todas formas</button>
+    </div>`;
+  };
+  document.getElementById(inputNombreId)?.addEventListener('input', ()=>{ clearTimeout(sugerenciasClienteTimeout); sugerenciasClienteTimeout=setTimeout(disparar, 500); });
+}
+window.__clienteSugeridoSeleccionado = null;
+function usarClienteSugerido(id, inputNombreId, contenedorId){
+  window.__clienteSugeridoSeleccionado = id;
+  const el = document.getElementById(contenedorId);
+  if(el) el.innerHTML = '<div style="color:var(--green);font-size:13px;margin-top:6px;">✓ Se usará el cliente existente al guardar.</div>';
 }
 
 async function borrarUnCliente(id, nombre){
@@ -9923,6 +10006,9 @@ function openNewClientModal(targetSelectId){
   document.getElementById('nc-addr').value = '';
   document.getElementById('nc-type').value = 'Particular';
   document.querySelectorAll('#nc-type-chips .chip-filter').forEach(c=>c.classList.toggle('active', c.dataset.val==='Particular'));
+  document.getElementById('nc-sugerencias').innerHTML = '';
+  window.__clienteSugeridoSeleccionado = null;
+  activarSugerenciasCliente('nc-name','nc-nif','nc-addr','nc-sugerencias');
   document.getElementById('newclient-overlay').classList.add('active');
 }
 document.querySelectorAll('#nc-type-chips .chip-filter').forEach(chip=>{
@@ -9944,9 +10030,13 @@ function submitNewClient(){
   clientes.push(nuevoCliente);
   if(nif || addr) clientFiscalData[name] = {nif, addr};
   if(sb){
-    buscarOCrearClienteApp(name, {tipo: type.toLowerCase(), nif: nif||null, direccion: addr||null}).then(id=>{
-      if(id) nuevoCliente.id = id;
-    });
+    if(window.__clienteSugeridoSeleccionado){
+      nuevoCliente.id = window.__clienteSugeridoSeleccionado;
+    } else {
+      buscarOCrearClienteApp(name, {tipo: type.toLowerCase(), nif: nif||null, direccion: addr||null}).then(id=>{
+        if(id) nuevoCliente.id = id;
+      });
+    }
   }
   renderClientesTable();
   fillClientSelects();
