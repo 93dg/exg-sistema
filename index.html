@@ -2186,7 +2186,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.52</div>
+        <div class="sub">V2.53</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2209,6 +2209,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="empresa" class="admin-only"><span class="ico">🏢</span><span class="label"> Empresa</span></button>
       <button data-view="facturas"><span class="ico">🧾</span><span class="label"> Facturas</span></button>
       <button data-view="presupuestos"><span class="ico">📋</span><span class="label"> Presupuestos</span></button>
+      <button data-view="proyectos"><span class="ico">✎</span><span class="label"> Proyectos</span></button>
       <button data-view="albaranes"><span class="ico">📄</span><span class="label"> Albaranes</span></button>
       <button data-view="gastospro"><span class="ico">💸</span><span class="label"> Gastos</span></button>
       <button data-view="tarifas"><span class="ico">💶</span><span class="label"> Tarifas</span></button>
@@ -2642,6 +2643,23 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     </div>
 
     <!-- ================= CLIENTES ================= -->
+    <div class="view" id="view-proyectos">
+      <div class="topbar">
+        <div><h1>Proyectos</h1><div class="desc">Encargos en curso, aún sin presupuestar ni facturar</div></div>
+        <div class="quickactions">
+          <button class="btn primary" onclick="abrirNuevoProyecto()">+ Nuevo proyecto</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-body" style="padding:0;">
+          <table class="tbl">
+            <tr><th>Cliente</th><th>Descripción</th><th>Estado</th><th>Notas</th><th>Creado</th><th style="width:220px;"></th></tr>
+            <tbody id="proyectos-tbl"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div class="view" id="view-clientes">
       <div class="topbar">
         <div><h1>Clientes</h1><div class="desc">Ayuntamientos, particulares y empresas</div></div>
@@ -4779,6 +4797,9 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
       cargarPropuestasReportes();
       cargarConflictosCliente();
     }
+    if(btn.dataset.view==='proyectos'){
+      cargarProyectos();
+    }
   });
 });
 document.querySelectorAll('.mobile-tab-btn[data-view]').forEach(btn=>{
@@ -5646,6 +5667,82 @@ document.querySelectorAll('#grafico-modo-chips .chip-filter').forEach(chip=>{
     renderGraficoFacturacion();
   });
 });
+
+// ============ Proyectos: encargos sin formalizar todavía ============
+let proyectosCache = [];
+async function cargarProyectos(){
+  if(!sb) return;
+  const {data, error} = await sb.from('proyectos').select('*, entidades(nombre)').order('creado_at', {ascending:false});
+  if(error){ mostrarToast('Error al cargar proyectos: '+errText(error)); return; }
+  proyectosCache = data || [];
+  renderProyectosTable();
+}
+function renderProyectosTable(){
+  const ESTADO_LABEL = {en_curso:'En curso', pausado:'Pausado', formalizado:'Formalizado', descartado:'Descartado'};
+  const ESTADO_COLOR = {en_curso:'var(--blue)', pausado:'var(--orange)', formalizado:'var(--green)', descartado:'var(--red)'};
+  document.getElementById('proyectos-tbl').innerHTML = proyectosCache.map(p=>{
+    const cliente = p.entidades?.nombre || p.cliente_nombre_libre || '—';
+    const formalizado = p.estado === 'formalizado';
+    return `<tr>
+      <td><b>${cliente}</b></td>
+      <td>${p.descripcion}</td>
+      <td><span class="tag" style="color:${ESTADO_COLOR[p.estado]};border-color:${ESTADO_COLOR[p.estado]};">${ESTADO_LABEL[p.estado]||p.estado}</span></td>
+      <td>${p.notas||'—'}</td>
+      <td>${formatFechaCorta(p.creado_at)}</td>
+      <td style="text-align:right;">
+        ${!formalizado && p.estado!=='descartado' ? `
+          <button class="btn sm" onclick="convertirProyecto('${p.id}','presupuesto')">→ Presupuesto</button>
+          <button class="btn sm" onclick="convertirProyecto('${p.id}','factura')">→ Factura</button>
+          <button class="btn sm" onclick="cambiarEstadoProyecto('${p.id}','pausado')">Pausar</button>
+          <button class="btn sm" style="color:var(--red);" onclick="cambiarEstadoProyecto('${p.id}','descartado')">Descartar</button>
+        ` : ''}
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" class="empty">No hay proyectos en curso.</td></tr>';
+}
+async function abrirNuevoProyecto(){
+  const cliente = prompt('¿Cliente? (nombre; si ya existe se enlaza automáticamente)');
+  if(!cliente || !cliente.trim()) return;
+  const descripcion = prompt('¿Qué es el encargo? (breve descripción)');
+  if(!descripcion || !descripcion.trim()) return;
+  const notas = prompt('¿Notas adicionales? (opcional, deja vacío si no hay)') || null;
+  let entidadId = null;
+  if(sb){
+    const {data: existente} = await sb.from('entidades').select('id').ilike('nombre', cliente.trim()).limit(1).maybeSingle();
+    entidadId = existente?.id || null;
+  }
+  const {error} = await sb.from('proyectos').insert({
+    entidad_id: entidadId, cliente_nombre_libre: entidadId ? null : cliente.trim(),
+    descripcion: descripcion.trim(), notas,
+  });
+  if(error){ mostrarToast('Error: '+errText(error)); return; }
+  mostrarToast('Proyecto creado.', 'ok');
+  cargarProyectos();
+}
+async function cambiarEstadoProyecto(id, estado){
+  if(!(await confirmarAccion(`¿Marcar este proyecto como "${estado}"?`))) return;
+  const {error} = await sb.from('proyectos').update({estado, actualizado_at: new Date().toISOString()}).eq('id', id);
+  if(error){ mostrarToast('Error: '+errText(error)); return; }
+  cargarProyectos();
+}
+async function convertirProyecto(id, tipoDestino){
+  const proyecto = proyectosCache.find(p=>p.id===id);
+  if(!proyecto) return;
+  if(!(await confirmarAccion(`¿Convertir este proyecto en ${tipoDestino}? Se creará el documento real y el proyecto quedará marcado como formalizado.`))) return;
+  let entidadId = proyecto.entidad_id;
+  if(!entidadId && proyecto.cliente_nombre_libre){
+    entidadId = await buscarOCrearClienteApp(proyecto.cliente_nombre_libre);
+  }
+  const {data: doc, error} = await sb.from('documentos_economicos').insert({
+    tipo: tipoDestino, estado: 'borrador', entidad_id: entidadId,
+    concepto: proyecto.descripcion, conceptos: [], importe: 0, contabilidad: 'oficial',
+    info_faltante: `Creado desde Proyecto: ${proyecto.descripcion}`,
+  }).select().single();
+  if(error){ mostrarToast('Error al crear el documento: '+errText(error)); return; }
+  await sb.from('proyectos').update({estado:'formalizado', convertido_a_tipo: tipoDestino, convertido_a_documento_id: doc.id, actualizado_at: new Date().toISOString()}).eq('id', id);
+  mostrarToast(`${tipoDestino==='presupuesto'?'Presupuesto':'Factura'} creado como borrador — complétalo con los datos reales.`, 'ok');
+  cargarProyectos();
+}
 
 function calcularKPIsReales(){
   const hoy = new Date(); hoy.setHours(0,0,0,0);
