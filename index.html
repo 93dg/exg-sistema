@@ -9487,24 +9487,27 @@ async function cargarDuplicadosClientes(){
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
         <button class="btn sm primary" onclick='abrirComparacionFusion(${JSON.stringify(d.a)},${JSON.stringify(d.b)})'>Fusionar</button>
-        ${nivel==='conflicto' ? `<button class="btn sm" style="color:var(--orange);" onclick="marcarPendienteResolver('${d.id}', ${JSON.stringify(etiquetas)})">Pendiente de resolver</button>` : ''}
+        <button class="btn sm" style="color:var(--orange);" onclick='marcarPendienteResolver("${d.id}", ${JSON.stringify(d.a)}, ${JSON.stringify(d.b)})'>Pendiente de resolver</button>
         <button class="btn sm" onclick="mantenerSeparadosDuplicado('${d.id}')">Mantener separados</button>
       </div>
     </div>`;
   }).join('');
 }
-function campoDesdeEtiquetas(etiquetas){
-  const e = (etiquetas||[]).join(' ');
-  if(e.includes('NIF')) return 'nif';
-  if(e.includes('dirección')||e.includes('Dirección')) return 'direccion';
-  if(e.includes('nombre')||e.includes('Nombre')) return 'nombre';
-  if(e.includes('teléfono')||e.includes('Teléfono')) return 'telefono';
-  if(e.includes('email')||e.includes('Email')) return 'email';
-  return 'nif';
+// campo que realmente difiere entre los dos registros — el dato concreto que hay que
+// esperar a resolver. Prioriza NIF, luego dirección/población/teléfono/email, y si nada
+// difiere de verdad (p.ej. son solo "parecidos" por nombre y datos vacíos) usa el nombre.
+function campoRelevanteParaPendiente(a, b){
+  const distinto = (x,y) => x && y && String(x).trim().toUpperCase() !== String(y).trim().toUpperCase();
+  if(distinto(a.nif, b.nif)) return 'nif';
+  if(distinto(a.direccion, b.direccion)) return 'direccion';
+  if(distinto(a.telefono, b.telefono)) return 'telefono';
+  if(distinto(a.email, b.email)) return 'email';
+  if(distinto(a.poblacion, b.poblacion)) return 'poblacion';
+  return 'nombre';
 }
-async function marcarPendienteResolver(dupId, etiquetas){
-  const campo = campoDesdeEtiquetas(etiquetas);
-  if(!(await confirmarAccion(`¿Marcar como "Pendiente de resolver" (conflicto en ${campo})? Ambos clientes seguirán funcionando normalmente; el sistema aprovechará documentos futuros para intentar resolverlo solo.`))) return;
+async function marcarPendienteResolver(dupId, a, b){
+  const campo = campoRelevanteParaPendiente(a, b);
+  if(!(await confirmarAccion(`¿Marcar como "Pendiente de resolver" (dato a confirmar: ${campo})? Ambos clientes seguirán funcionando normalmente; el sistema aprovechará documentos futuros para intentar resolverlo solo.`))) return;
   const {error} = await sb.rpc('abrir_caso_identidad_pendiente', {p_dup_id: dupId, p_campo: campo});
   if(error){ mostrarToast('Error: '+errText(error)); return; }
   mostrarToast('Marcado como pendiente de resolver.', 'ok');
