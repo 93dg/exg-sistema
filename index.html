@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.62</div>
+        <div class="sub">V2.63</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3932,6 +3932,10 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       <div class="block">
         <h4>Original <button class="btn sm" id="e-editar-btn" style="display:none;float:right;" onclick="editarTextoEntrada()">✎ Editar</button></h4>
         <div id="e-preview"><div class="doc-chip" style="padding:30px 8px;">📄 Documento</div></div>
+      </div>
+      <div class="block" id="e-interpretacion-block" style="display:none;">
+        <h4>🔍 Interpretación (a partir del histórico)</h4>
+        <div id="e-interpretacion-body" style="font-size:13px;"></div>
       </div>
       <div class="block" id="e-status-block">
         <h4>Estado</h4>
@@ -8106,8 +8110,38 @@ function openTriageDrawer(id){
   document.getElementById('e-status-current').innerHTML = docPill(d.status||'pendiente') + (d.linked_label ? ` <span class="sub-t" style="margin-left:8px;">${d.linked_label}</span>` : '');
   showTriageMenu();
   document.getElementById('entry-overlay').classList.add('active');
+  interpretarEntradaActual(d);
+}
+window.openTriageDrawer = openTriageDrawer;
+
+// cruza el texto de la entrada contra el conocimiento ya construido (clientes, trabajos,
+// precios históricos) — nunca decide sola, solo propone; el usuario confirma con un clic
+// desde el propio menú de acciones que ya existía (vincular a trabajo / crear factura...)
+async function interpretarEntradaActual(d){
+  const block = document.getElementById('e-interpretacion-block');
+  const body = document.getElementById('e-interpretacion-body');
+  const texto = d.nota || d.transcripcion;
+  if(!sb || !texto || texto.trim().length < 8){ block.style.display = 'none'; return; }
+  const {data, error} = await sb.rpc('interpretar_entrada_texto', {p_texto: texto});
+  if(error || !data){ block.style.display = 'none'; return; }
+  const partes = [];
+  if(data.cliente){
+    partes.push(`<div>👤 Cliente probable: <b>${data.cliente.nombre}</b> <span class="sub-t">(${data.cliente.motivo})</span></div>`);
+  }
+  if(data.trabajo){
+    partes.push(`<div>📋 Trabajo activo de ese cliente: <b>${data.trabajo.codigo}</b> — ${data.trabajo.nombre}
+      <button class="btn sm" style="margin-left:6px;" onclick="selectTriageAction('vincular_trabajo'); const s=document.querySelector('#e-form-fields select'); if(s) s.value='${(data.trabajo.codigo+' — '+data.cliente.nombre).replace(/'/g,"\\'")}'">Vincular</button></div>`);
+  }
+  if(data.precios && data.precios.length){
+    const p = data.precios[0];
+    partes.push(`<div>💶 Precio habitual para algo similar: <b>${Number(p.precio).toLocaleString('es-ES',{minimumFractionDigits:2})} €</b> <span class="sub-t">(${p.concepto}, usado ${p.veces} vez${p.veces==1?'':'ces'})</span></div>`);
+  }
+  if(!partes.length){ block.style.display = 'none'; return; }
+  body.innerHTML = partes.join('');
+  block.style.display = 'block';
 }
 function closeEntryDrawer(){ document.getElementById('entry-overlay').classList.remove('active'); triageCurrentId = null; }
+
 
 function editarTextoEntrada(){
   const d = documentosCache.find(x=>x.id===triageCurrentId);
