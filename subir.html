@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>EXG — Subir foto</title>
+<title>EXG — Subir</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="EXG">
@@ -13,17 +13,19 @@
 <style>
 :root{
   --asphalt:#1B1F24;
-  --asphalt-2:#262C33;
   --concrete:#EEECE6;
   --paper:#FBFAF7;
-  --line:#D8D4C8;
+  --line:#E3DFD3;
   --ink:#1B1F24;
-  --ink-soft:#5B6169;
+  --ink-soft:#6B7178;
   --orange:#D8560F;
+  --orange-soft:#FBE4D6;
   --green:#3C6E47;
   --green-soft:#DCE8DD;
   --red:#B23A2E;
   --red-soft:#F3D9D5;
+  --blue:#2E5FB2;
+  --blue-soft:#DCE5F5;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
@@ -31,322 +33,218 @@ body{
   font-family:'Inter',sans-serif;
   background:var(--concrete);
   color:var(--ink);
-  min-height:100vh;
-  min-height:100dvh;
-  display:flex;
-  flex-direction:column;
+  min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;
+  overflow-x:hidden;
 }
-header{
-  background:var(--asphalt);
-  color:#fff;
-  padding:20px 20px 18px;
-  text-align:center;
-  position:sticky;top:0;z-index:10;
-}
-header .name{
-  font-family:'Archivo',sans-serif;
-  font-weight:800;
-  font-size:19px;
-  letter-spacing:0.01em;
-}
-header .sub{
-  font-family:'IBM Plex Mono',monospace;
-  font-size:11px;
-  color:#8B929C;
-  margin-top:3px;
-}
+svg{display:block;}
 
-#tabs{
-  display:flex;
-  gap:0;
-  border-bottom:1px solid var(--line);
+/* ---------- Header compacto ---------- */
+header{
+  padding:calc(10px + env(safe-area-inset-top)) 16px 8px;
+  display:flex;align-items:center;justify-content:space-between;
   background:var(--paper);
-  position:sticky;top:65px;z-index:9;
+  border-bottom:1px solid var(--line);
 }
+header .name{font-family:'Archivo',sans-serif;font-weight:800;font-size:15px;letter-spacing:.01em;}
+#tabs{display:flex;gap:2px;background:var(--concrete);border-radius:9px;padding:2px;}
 .tab-btn{
   -webkit-appearance:none;appearance:none;border:none;background:none;
-  flex:1;padding:13px 10px;
-  font-family:'Inter',sans-serif;font-size:14px;font-weight:600;
-  color:var(--ink-soft);
-  border-bottom:2.5px solid transparent;
+  padding:6px 13px;border-radius:7px;
+  font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;color:var(--ink-soft);
 }
-.tab-btn.active{color:var(--ink);border-bottom-color:var(--orange);}
+.tab-btn.active{background:var(--paper);color:var(--ink);box-shadow:0 1px 2px rgba(27,31,36,0.08);}
 
-.vista{display:none;}
-.vista.activa{display:block;}
+.vista{display:none;flex:1;min-height:0;}
+.vista.activa{display:flex;flex-direction:column;}
 
-/* -------- Historial -------- */
-#historial-lista{display:flex;flex-direction:column;gap:10px;padding:18px;max-width:480px;margin:0 auto;width:100%;}
-.hist-item{
+/* ---------- Zona de captura (arriba, alcance del pulgar) ---------- */
+#captura{padding:14px 16px 8px;}
+
+#btn-foto{
+  -webkit-appearance:none;appearance:none;border:none;
+  width:100%;
+  background:var(--orange);color:#fff;
+  border-radius:14px;
+  padding:15px 18px;
   display:flex;align-items:center;gap:12px;
-  padding:10px;border-radius:10px;
+  font-family:'Inter',sans-serif;font-size:16px;font-weight:700;
+}
+#btn-foto:active{background:#c14c0d;}
+#btn-foto svg{width:24px;height:24px;flex:0 0 24px;}
+
+.acciones-secundarias{display:flex;gap:8px;margin-top:8px;}
+.btn-secundario{
+  -webkit-appearance:none;appearance:none;border:1.5px solid var(--line);background:var(--paper);
+  flex:1;border-radius:12px;padding:11px 10px;
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  font-family:'Inter',sans-serif;font-size:13.5px;font-weight:600;color:var(--ink);
+}
+.btn-secundario:active{background:var(--concrete);}
+.btn-secundario svg{width:18px;height:18px;flex:0 0 18px;color:var(--ink-soft);}
+.btn-secundario.grabando{background:var(--red);border-color:var(--red);color:#fff;}
+.btn-secundario.grabando svg{color:#fff;animation:pulso 1s infinite;}
+@keyframes pulso{0%,100%{opacity:1;}50%{opacity:.5;}}
+
+#campo-camara,#campo-archivo{display:none;}
+
+/* ---------- Cola de pendientes (compacta) ---------- */
+#pendientes-strip{display:none;gap:8px;padding:0 16px 8px;overflow-x:auto;}
+#pendientes-strip.activo{display:flex;}
+.pend-item{
+  position:relative;flex:0 0 auto;
+  width:56px;height:56px;border-radius:10px;overflow:hidden;
+  border:1.5px solid var(--line);background:var(--asphalt);
+}
+.pend-item img{width:100%;height:100%;object-fit:cover;display:block;}
+.pend-item .pend-audio{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#fff;}
+.pend-item .pend-audio svg{width:20px;height:20px;}
+.pend-item .pend-borrar{
+  position:absolute;top:2px;right:2px;width:17px;height:17px;border-radius:50%;
+  background:rgba(27,31,36,0.8);border:none;color:#fff;font-size:10px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+}
+
+/* ---------- Feed de resultados (aparece tras enviar) ---------- */
+#feed{flex:1;overflow-y:auto;padding:4px 16px 12px;display:flex;flex-direction:column-reverse;gap:10px;}
+.resultado-card{
+  background:var(--paper);border:1.5px solid var(--line);border-radius:13px;
+  padding:12px;display:flex;flex-direction:column;gap:9px;
+  animation:aparecer .2s ease;
+}
+@keyframes aparecer{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+.rc-fila{display:flex;gap:10px;align-items:flex-start;}
+.rc-thumb{
+  width:44px;height:44px;border-radius:9px;flex:0 0 44px;
+  object-fit:cover;background:var(--asphalt);
+  display:flex;align-items:center;justify-content:center;color:#fff;
+}
+.rc-thumb svg{width:19px;height:19px;}
+.rc-cuerpo{flex:1;min-width:0;}
+.rc-titulo{font-size:13.5px;font-weight:700;color:var(--ink);}
+.rc-sub{font-size:12px;color:var(--ink-soft);margin-top:1px;}
+.rc-texto{font-size:13px;color:var(--ink);margin-top:5px;line-height:1.4;}
+.rc-estado{
+  flex:0 0 auto;font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:20px;
+  text-transform:uppercase;letter-spacing:.02em;
+}
+.rc-estado.cargando{background:var(--concrete);color:var(--ink-soft);}
+.rc-estado.ok{background:var(--green-soft);color:var(--green);}
+.rc-estado.enviado{background:var(--blue-soft);color:var(--blue);}
+
+.rc-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.rc-chip{
+  -webkit-appearance:none;appearance:none;border:1.3px solid var(--line);background:var(--paper);
+  border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--ink);
+}
+.rc-chip.elegido{background:var(--orange);border-color:var(--orange);color:#fff;}
+.rc-chip.confirmar{background:var(--asphalt);border-color:var(--asphalt);color:#fff;}
+
+#vacio{margin:auto;text-align:center;color:var(--ink-soft);font-size:13.5px;padding:20px;}
+
+/* ---------- Historial ---------- */
+#historial-lista{flex:1;overflow-y:auto;padding:10px 16px 16px;display:flex;flex-direction:column;gap:8px;}
+.hist-item{
+  display:flex;align-items:center;gap:11px;padding:9px;border-radius:11px;
   background:var(--paper);border:1.5px solid var(--line);
 }
-.hist-item .hist-thumb{
-  width:52px;height:52px;border-radius:8px;object-fit:cover;flex:0 0 52px;
-  background:var(--asphalt);display:flex;align-items:center;justify-content:center;
-  font-size:20px;
+.hist-thumb{
+  width:42px;height:42px;border-radius:8px;object-fit:cover;flex:0 0 42px;
+  background:var(--asphalt);display:flex;align-items:center;justify-content:center;color:#fff;
 }
-.hist-item .hist-info{flex:1;min-width:0;}
-.hist-item .hist-nombre{font-size:13.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.hist-item .hist-meta{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
-.hist-item .hist-nota{font-size:11.5px;color:var(--ink-soft);font-style:italic;margin-top:2px;}
-.hist-item .hist-borrar{
-  flex:0 0 auto;width:34px;height:34px;border-radius:50%;
-  border:1.5px solid var(--red-soft);background:var(--red-soft);color:var(--red);
-  font-size:15px;display:flex;align-items:center;justify-content:center;
+.hist-thumb svg{width:17px;height:17px;}
+.hist-info{flex:1;min-width:0;}
+.hist-titulo{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hist-meta{font-size:11px;color:var(--ink-soft);margin-top:2px;display:flex;gap:6px;align-items:center;}
+.hist-pill{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:20px;text-transform:uppercase;}
+.hist-pill.pendiente{background:var(--concrete);color:var(--ink-soft);}
+.hist-pill.revisar{background:var(--orange-soft);color:var(--orange);}
+.hist-pill.validado{background:var(--green-soft);color:var(--green);}
+.hist-borrar{
+  flex:0 0 auto;width:30px;height:30px;border-radius:50%;border:none;
+  background:var(--red-soft);color:var(--red);display:flex;align-items:center;justify-content:center;
 }
-#historial-vacio{padding:40px 20px;text-align:center;color:var(--ink-soft);font-size:14px;}
+.hist-borrar svg{width:14px;height:14px;}
+#historial-vacio{margin:auto;text-align:center;color:var(--ink-soft);font-size:13.5px;padding:20px;}
 
-main{
-  flex:1;
-  display:flex;
-  flex-direction:column;
-  gap:18px;
-  padding:20px 18px 100px;
-  max-width:480px;
-  margin:0 auto;
-  width:100%;
+/* ---------- Ficha de detalle (historial) ---------- */
+#detalle{
+  position:fixed;inset:0;z-index:100;background:rgba(27,31,36,0.55);
+  display:none;align-items:flex-end;justify-content:center;
 }
+#detalle.activo{display:flex;}
+#detalle-panel{
+  width:100%;max-width:480px;background:var(--paper);border-radius:18px 18px 0 0;
+  padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+  max-height:80vh;overflow-y:auto;
+}
+#detalle-panel img{width:100%;border-radius:11px;margin-bottom:10px;}
+#detalle-panel audio{width:100%;margin-bottom:10px;}
+#detalle-cerrar{
+  width:32px;height:32px;border-radius:50%;background:var(--concrete);border:none;
+  display:flex;align-items:center;justify-content:center;float:right;
+}
+#detalle-cerrar svg{width:15px;height:15px;}
 
-.opciones{
-  display:flex;
-  gap:12px;
-}
-.opcion{
-  -webkit-appearance:none;appearance:none;border:none;
-  flex:1;
-  padding:18px 14px;
-  border-radius:10px;
-  background:var(--paper);
-  border:1.5px solid var(--line);
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:8px;
-  text-align:center;
-  transition:transform .08s ease;
-}
-.opcion:active{transform:scale(0.96);}
-.opcion.principal{background:var(--orange);border-color:var(--orange);}
-.opcion .ico{
-  width:40px;height:40px;
-  border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  background:var(--asphalt);
-}
-.opcion.principal .ico{background:rgba(255,255,255,0.18);}
-.opcion .ico svg{width:20px;height:20px;}
-.opcion .t1{font-size:14.5px;font-weight:700;color:var(--ink);}
-.opcion.principal .t1{color:#fff;}
-.opcion.grabando{background:var(--red);border-color:var(--red);}
-.opcion.grabando .ico{background:rgba(255,255,255,0.2);}
-.opcion.grabando .t1{color:#fff;}
-@keyframes pulso-grabar{0%,100%{opacity:1;}50%{opacity:0.55;}}
-.opcion.grabando .ico{animation:pulso-grabar 1s infinite;}
-
-#campo-camara,#campo-galeria{display:none;}
-
-/* -------- Lista de fotos pendientes -------- */
-#lista-wrap{display:none;flex-direction:column;gap:12px;}
-#lista-wrap.activo{display:flex;}
-#lista-titulo{
-  font-size:12.5px;
-  font-weight:600;
-  color:var(--ink-soft);
-  text-transform:uppercase;
-  letter-spacing:0.03em;
-}
-#lista-fotos{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:10px;
-}
-.foto-item{
-  position:relative;
-  aspect-ratio:1/1;
-  border-radius:10px;
-  overflow:hidden;
-  border:1.5px solid var(--line);
-  background:var(--paper);
-}
-.foto-item img{width:100%;height:100%;object-fit:cover;display:block;}
-.foto-item .borrar{
-  position:absolute;top:5px;right:5px;
-  width:24px;height:24px;border-radius:50%;
-  background:rgba(27,31,36,0.75);color:#fff;
-  display:flex;align-items:center;justify-content:center;
-  font-size:14px;line-height:1;border:none;
-}
-.foto-item .estado-mini{
-  position:absolute;bottom:0;left:0;right:0;
-  padding:4px 6px;font-size:10.5px;font-weight:600;
-  text-align:center;
-}
-.foto-item .estado-mini.ok{background:rgba(60,110,71,0.85);color:#fff;}
-.foto-item .estado-mini.error{background:rgba(178,58,46,0.85);color:#fff;}
-.foto-item .estado-mini.subiendo{background:rgba(27,31,36,0.75);color:#fff;}
-
-.foto-item.es-audio{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:4px;background:var(--asphalt);
-}
-.foto-item.es-audio .ico-audio{font-size:26px;}
-.foto-item.es-audio .dur-audio{font-size:11px;color:#C9CCD1;font-family:'IBM Plex Mono',monospace;}
-
-#lightbox{
-  display:none;
-  position:fixed;inset:0;z-index:100;
-  background:rgba(27,31,36,0.92);
-  align-items:center;justify-content:center;
-  padding:24px;
-}
-#lightbox.activo{display:flex;}
-#lightbox img{
-  max-width:100%;max-height:100%;
-  border-radius:10px;
-  display:block;
-}
-#lightbox-cerrar{
-  position:absolute;top:16px;right:16px;
-  width:38px;height:38px;border-radius:50%;
-  background:rgba(255,255,255,0.15);color:#fff;
-  border:none;font-size:20px;line-height:1;
-  display:flex;align-items:center;justify-content:center;
-}
-
-#nota-wrap{display:flex;flex-direction:column;gap:6px;}
-#nota-wrap label{font-size:12.5px;font-weight:600;color:var(--ink-soft);}
-#nota{
-  width:100%;
-  min-height:64px;
-  border-radius:10px;
-  border:1.5px solid var(--line);
-  background:var(--paper);
-  padding:10px 12px;
-  font-family:'Inter',sans-serif;
-  font-size:14px;
-  color:var(--ink);
-  resize:vertical;
-}
-#nota:focus{outline:none;border-color:var(--orange);}
-
-#estado-general{
-  min-height:20px;
-  font-size:13.5px;
-  font-weight:600;
-  text-align:center;
-}
-#estado-general.ok{color:var(--green);}
-#estado-general.error{color:var(--red);}
-#estado-general.cargando{color:var(--ink-soft);}
-
-/* -------- Barra inferior fija: caja de texto tipo chat -------- */
+/* ---------- Barra inferior: solo texto + dictar + enviar ---------- */
 #barra-inferior{
-  position:fixed;left:0;right:0;bottom:0;
-  padding:10px 18px calc(10px + env(safe-area-inset-bottom));
-  background:var(--paper);
-  border-top:1px solid var(--line);
+  padding:9px 14px calc(9px + env(safe-area-inset-bottom));
+  background:var(--paper);border-top:1px solid var(--line);
 }
-#chat-bar{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  max-width:480px;margin:0 auto;
-}
+#chat-bar{display:flex;gap:7px;align-items:center;}
 #chat-texto{
-  flex:1;
-  border:1.5px solid var(--line);
-  border-radius:22px;
-  padding:11px 16px;
-  font-family:'Inter',sans-serif;
-  font-size:15px;
-  color:var(--ink);
-  background:#fff;
+  flex:1;border:1.5px solid var(--line);border-radius:21px;padding:10px 15px;
+  font-family:'Inter',sans-serif;font-size:15px;color:var(--ink);background:#fff;
 }
 #chat-texto:focus{outline:none;border-color:var(--orange);}
-#btn-dictar{
+.btn-circular{
   -webkit-appearance:none;appearance:none;border:none;
-  width:42px;height:42px;border-radius:50%;flex:0 0 42px;
-  background:var(--asphalt);
+  width:40px;height:40px;border-radius:50%;flex:0 0 40px;
   display:flex;align-items:center;justify-content:center;
 }
-#btn-dictar svg{width:18px;height:18px;}
-#btn-dictar.escuchando{background:var(--red);}
-#btn-dictar.escuchando svg{animation:pulso-grabar 1s infinite;}
-#btn-enviar{
-  -webkit-appearance:none;appearance:none;border:none;
-  width:42px;height:42px;border-radius:50%;flex:0 0 42px;
-  background:var(--orange);
-  display:flex;align-items:center;justify-content:center;
-}
-#btn-enviar:disabled{background:var(--line);}
-#btn-enviar svg{width:19px;height:19px;}
-
-footer{
-  text-align:center;
-  padding:14px;
-  font-size:11px;
-  font-family:'IBM Plex Mono',monospace;
-  color:var(--ink-soft);
-}
+.btn-circular svg{width:18px;height:18px;}
+#btn-dictar{background:var(--concrete);color:var(--ink);}
+#btn-dictar.escuchando{background:var(--red);color:#fff;}
+#btn-dictar.escuchando svg{animation:pulso 1s infinite;}
+#btn-enviar{background:var(--orange);color:#fff;}
+#btn-enviar:disabled{background:var(--line);color:var(--ink-soft);}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="name">Excavaciones Gómez</div>
-  <div class="sub">SUBIR DOCUMENTO</div>
+  <div class="name">EXG</div>
+  <div id="tabs">
+    <button type="button" class="tab-btn active" id="tab-subir" onclick="cambiarVista('subir')">Subir</button>
+    <button type="button" class="tab-btn" id="tab-historial" onclick="cambiarVista('historial')">Historial</button>
+  </div>
 </header>
 
-<div id="tabs">
-  <button type="button" class="tab-btn active" id="tab-subir" onclick="cambiarVista('subir')">Subir</button>
-  <button type="button" class="tab-btn" id="tab-historial" onclick="cambiarVista('historial')">Historial</button>
-</div>
-
 <main id="vista-subir" class="vista activa">
-  <div class="opciones">
-    <button type="button" class="opcion principal" id="btn-camara">
-      <span class="ico">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M4 8a2 2 0 012-2h1.5l1-2h7l1 2H18a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/>
-          <circle cx="12" cy="13" r="3.5" stroke="white" stroke-width="1.8"/>
-        </svg>
-      </span>
-      <span class="t1">Hacer foto</span>
+  <div id="captura">
+    <button type="button" id="btn-foto">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 8a2 2 0 0 1 2-2h1.5l1-2h7l1 2H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" stroke="white" stroke-width="1.8"/></svg>
+      Hacer foto
     </button>
-
-    <button type="button" class="opcion" id="btn-galeria">
-      <span class="ico">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3.5" y="4.5" width="17" height="15" rx="2" stroke="#1B1F24" stroke-width="1.8"/>
-          <circle cx="8.5" cy="9.5" r="1.5" stroke="#1B1F24" stroke-width="1.6"/>
-          <path d="M5 16.5l4.5-4.5 3 3 3.5-3.5 4 4" stroke="#1B1F24" stroke-width="1.6" stroke-linejoin="round"/>
-        </svg>
-      </span>
-      <span class="t1">Subir foto</span>
-    </button>
-
-    <button type="button" class="opcion" id="btn-audio">
-      <span class="ico">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="9" y="3" width="6" height="11" rx="3" stroke="#1B1F24" stroke-width="1.8"/>
-          <path d="M5.5 11a6.5 6.5 0 0013 0" stroke="#1B1F24" stroke-width="1.8" stroke-linecap="round"/>
-          <path d="M12 17.5V21" stroke="#1B1F24" stroke-width="1.8" stroke-linecap="round"/>
-        </svg>
-      </span>
-      <span class="t1" id="btn-audio-texto">Grabar audio</span>
-    </button>
+    <div class="acciones-secundarias">
+      <button type="button" class="btn-secundario" id="btn-archivo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" stroke-linejoin="round"/><path d="M14 3v5h5" stroke-linejoin="round"/></svg>
+        Galería / archivo
+      </button>
+      <button type="button" class="btn-secundario" id="btn-audio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0" stroke-linecap="round"/><path d="M12 17.5V21" stroke-linecap="round"/></svg>
+        <span id="btn-audio-texto">Grabar audio</span>
+      </button>
+    </div>
   </div>
 
   <input id="campo-camara" type="file" accept="image/*" capture="environment">
-  <input id="campo-galeria" type="file" accept="image/*" multiple>
+  <input id="campo-archivo" type="file" accept="image/*,application/pdf" multiple>
 
-  <div id="lista-wrap">
-    <div id="lista-titulo">Fotos listas para subir</div>
-    <div id="lista-fotos"></div>
+  <div id="pendientes-strip"></div>
 
-    <div id="estado-general"></div>
+  <div id="feed">
+    <div id="vacio">Haz una foto, sube un archivo, graba un audio o escribe abajo.</div>
   </div>
 </main>
 
@@ -355,155 +253,71 @@ footer{
   <div id="historial-vacio" style="display:none;">Aún no has subido nada desde este móvil.</div>
 </div>
 
+<div id="detalle">
+  <div id="detalle-panel">
+    <button type="button" id="detalle-cerrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg></button>
+    <div style="clear:both;"></div>
+    <div id="detalle-contenido"></div>
+  </div>
+</div>
+
 <div id="barra-inferior">
   <div id="chat-bar">
-    <input type="text" id="chat-texto" placeholder="Escribe un mensaje…" autocomplete="off">
-    <button type="button" id="btn-dictar" aria-label="Dictar">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="9" y="3" width="6" height="11" rx="3" stroke="white" stroke-width="1.8"/>
-        <path d="M5.5 11a6.5 6.5 0 0013 0" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-        <path d="M12 17.5V21" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-      </svg>
+    <input type="text" id="chat-texto" placeholder="Escribe o dicta…" autocomplete="off">
+    <button type="button" id="btn-dictar" class="btn-circular" aria-label="Dictar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0" stroke-linecap="round"/><path d="M12 17.5V21" stroke-linecap="round"/></svg>
     </button>
-    <button type="button" id="btn-enviar" aria-label="Enviar">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M4 12l16-8-6 8 6 8-16-8z" fill="white"/>
-      </svg>
+    <button type="button" id="btn-enviar" class="btn-circular" aria-label="Enviar">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l16-8-6 8 6 8-16-8z"/></svg>
     </button>
   </div>
-  <div class="sub-t" style="font-size:11px;color:var(--ink-soft);text-align:center;margin-top:6px;">Toca el micrófono del teclado para dictarlo</div>
 </div>
-
-<div id="lightbox">
-  <button type="button" id="lightbox-cerrar">✕</button>
-  <img id="lightbox-img" alt="Foto ampliada">
-  <audio id="lightbox-audio" controls style="display:none;width:280px;max-width:80vw;"></audio>
-</div>
-
-<footer>Excavaciones Gómez</footer>
 
 <script>
 (function(){
   const SUPABASE_URL = "https://sshctqnpuolawtcujxkt.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzaGN0cW5wdW9sYXd0Y3VqeGt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NDMxNDQsImV4cCI6MjEwNDUxOTE0NH0.NgqSwwtdQjKot2kiCabmF6f_kvl-27QU1kWgfzYPFsQ";
   const BUCKET = "documentos-exg";
+  const LS_KEY = "exg_historial_subidas";
 
-  const btnCamara = document.getElementById("btn-camara");
-  const btnGaleria = document.getElementById("btn-galeria");
+  const btnFoto = document.getElementById("btn-foto");
+  const btnArchivo = document.getElementById("btn-archivo");
   const btnAudio = document.getElementById("btn-audio");
   const btnAudioTexto = document.getElementById("btn-audio-texto");
   const campoCamara = document.getElementById("campo-camara");
-  const campoGaleria = document.getElementById("campo-galeria");
-  const listaWrap = document.getElementById("lista-wrap");
-  const listaFotos = document.getElementById("lista-fotos");
+  const campoArchivo = document.getElementById("campo-archivo");
+  const pendientesStrip = document.getElementById("pendientes-strip");
+  const feed = document.getElementById("feed");
+  const vacio = document.getElementById("vacio");
   const chatTexto = document.getElementById("chat-texto");
   const btnDictar = document.getElementById("btn-dictar");
   const btnEnviar = document.getElementById("btn-enviar");
-  const estadoGeneral = document.getElementById("estado-general");
-  const barraInferior = document.getElementById("barra-inferior");
   const historialLista = document.getElementById("historial-lista");
   const historialVacio = document.getElementById("historial-vacio");
-  const LS_KEY = "exg_historial_subidas";
+  const detalle = document.getElementById("detalle");
+  const detalleContenido = document.getElementById("detalle-contenido");
 
+  const ICONO_TIPO = {foto:'📷', audio:'🎙', texto:'💬', pdf:'📄'};
+
+  // ---------- Vistas ----------
   function cambiarVista(v){
     document.getElementById("vista-subir").classList.toggle("activa", v === "subir");
     document.getElementById("vista-historial").classList.toggle("activa", v === "historial");
     document.getElementById("tab-subir").classList.toggle("active", v === "subir");
     document.getElementById("tab-historial").classList.toggle("active", v === "historial");
-    barraInferior.style.display = (v === "subir") ? "block" : "none";
+    document.getElementById("barra-inferior").style.display = (v === "subir") ? "block" : "none";
     if (v === "historial") renderHistorial();
-    render();
   }
   window.cambiarVista = cambiarVista;
 
-  function leerHistorial(){
-    try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
-    catch(e) { return []; }
-  }
-  function guardarHistorial(lista){
-    try { localStorage.setItem(LS_KEY, JSON.stringify(lista.slice(0, 200))); }
-    catch(e) {}
-  }
-  function añadirAlHistorial(entradas){
-    const actual = leerHistorial();
-    guardarHistorial([...entradas, ...actual]);
-  }
-
-  function renderHistorial(){
-    const lista = leerHistorial();
-    if (lista.length === 0){
-      historialLista.style.display = "none";
-      historialVacio.style.display = "block";
-      return;
-    }
-    historialLista.style.display = "flex";
-    historialVacio.style.display = "none";
-    historialLista.innerHTML = lista.map(h => {
-      const fecha = h.created_at ? new Date(h.created_at).toLocaleString("es-ES", {day:"numeric", month:"short", hour:"2-digit", minute:"2-digit"}) : "";
-      const thumb = h.kind === "audio" ? `<div class="hist-thumb">🎙</div>`
-        : h.kind === "texto" ? `<div class="hist-thumb">💬</div>`
-        : `<img class="hist-thumb" src="${h.file_url}" alt="">`;
-      const etiqueta = h.kind === "audio" ? "Audio" : h.kind === "texto" ? "Mensaje" : "Foto";
-      return `
-      <div class="hist-item" data-doc-id="${h.documento_id}">
-        ${thumb}
-        <div class="hist-info">
-          <div class="hist-nombre">${etiqueta} · ${fecha}</div>
-          ${h.nota ? `<div class="hist-nota">${h.kind === "texto" ? h.nota : `"${h.nota}"`}</div>` : ""}
-        </div>
-        <button type="button" class="hist-borrar" onclick="borrarDelHistorial(${h.documento_id})">✕</button>
-      </div>`;
-    }).join("");
-  }
-
-  async function borrarDelHistorial(documentoId){
-    if (!confirm("¿Borrar esto? No se puede deshacer.")) return;
-    const lista = leerHistorial();
-    const entrada = lista.find(h => h.documento_id === documentoId);
-    try {
-      if (entrada && entrada.storage_path) {
-        await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${entrada.storage_path}`, {
-          method: "DELETE",
-          headers: {
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-            "apikey": SUPABASE_ANON_KEY
-          }
-        });
-      }
-      await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=eq.${documentoId}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-          "apikey": SUPABASE_ANON_KEY
-        }
-      });
-    } catch(e) {}
-    guardarHistorial(lista.filter(h => h.documento_id !== documentoId));
-    renderHistorial();
-  }
-  window.borrarDelHistorial = borrarDelHistorial;
-
-  // Cada elemento: { id, kind: 'foto'|'audio', file, previewUrl, duracion }
+  // ---------- Pendientes (cola antes de enviar) ----------
   let pendientes = [];
   let subiendo = false;
-  let grabando = false;
-  let mediaRecorder = null;
-  let audioChunks = [];
-  let audioStream = null;
-  let grabarInicio = null;
-  let grabarTimer = null;
 
-  btnCamara.addEventListener("click", () => campoCamara.click());
-  btnGaleria.addEventListener("click", () => campoGaleria.click());
-
-  campoCamara.addEventListener("change", () => {
-    añadirArchivos(campoCamara.files);
-    campoCamara.value = "";
-  });
-  campoGaleria.addEventListener("change", () => {
-    añadirArchivos(campoGaleria.files);
-    campoGaleria.value = "";
-  });
+  btnFoto.addEventListener("click", () => campoCamara.click());
+  btnArchivo.addEventListener("click", () => campoArchivo.click());
+  campoCamara.addEventListener("change", () => { añadirArchivos(campoCamara.files); campoCamara.value = ""; });
+  campoArchivo.addEventListener("change", () => { añadirArchivos(campoArchivo.files); campoArchivo.value = ""; });
 
   function añadirArchivos(fileList){
     Array.from(fileList).forEach(f => {
@@ -514,23 +328,37 @@ footer{
         previewUrl: URL.createObjectURL(f)
       });
     });
-    render();
+    renderPendientes();
   }
 
-  btnAudio.addEventListener("click", () => {
-    if (grabando) pararGrabacion(); else empezarGrabacion();
-  });
+  function quitarPendiente(id){
+    pendientes = pendientes.filter(p => p.id !== id);
+    renderPendientes();
+  }
+  window.quitarPendiente = quitarPendiente;
+
+  function renderPendientes(){
+    if (pendientes.length === 0){ pendientesStrip.classList.remove("activo"); pendientesStrip.innerHTML = ""; btnEnviar.disabled = chatTexto.value.trim() === ""; return; }
+    pendientesStrip.classList.add("activo");
+    pendientesStrip.innerHTML = pendientes.map(p => {
+      const cuerpo = p.kind === "audio"
+        ? `<div class="pend-audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0" stroke-linecap="round"/></svg></div>`
+        : `<img src="${p.previewUrl}" alt="">`;
+      return `<div class="pend-item">${cuerpo}<button type="button" class="pend-borrar" onclick="quitarPendiente('${p.id}')">✕</button></div>`;
+    }).join("");
+    btnEnviar.disabled = subiendo;
+  }
+
+  // ---------- Grabar audio ----------
+  let grabando = false, mediaRecorder = null, audioChunks = [], audioStream = null, grabarInicio = null, grabarTimer = null;
+
+  btnAudio.addEventListener("click", () => { if (grabando) pararGrabacion(); else empezarGrabacion(); });
 
   async function empezarGrabacion(){
-    try {
-      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (e) {
-      estadoGeneral.textContent = "No se pudo acceder al micrófono";
-      estadoGeneral.className = "error";
-      return;
-    }
-    const mimeCandidatos = ["audio/mp4", "audio/webm", "audio/aac"];
-    const mime = mimeCandidatos.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
+    try { audioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch(e){ mostrarAviso("No se pudo acceder al micrófono"); return; }
+    const candidatos = ["audio/mp4", "audio/webm", "audio/aac"];
+    const mime = candidatos.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
     mediaRecorder = mime ? new MediaRecorder(audioStream, { mimeType: mime }) : new MediaRecorder(audioStream);
     audioChunks = [];
     mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
@@ -540,27 +368,17 @@ footer{
       const duracionSeg = grabarInicio ? Math.round((Date.now() - grabarInicio) / 1000) : 0;
       const extension = tipo.includes("mp4") ? "m4a" : tipo.includes("aac") ? "aac" : "webm";
       const file = new File([blob], `audio-${Date.now()}.${extension}`, { type: tipo });
-      pendientes.push({
-        id: "a" + Date.now() + Math.random().toString(36).slice(2),
-        kind: "audio",
-        file,
-        previewUrl: URL.createObjectURL(blob),
-        duracion: duracionSeg
-      });
+      pendientes.push({ id: "a" + Date.now() + Math.random().toString(36).slice(2), kind: "audio", file, previewUrl: URL.createObjectURL(blob), duracion: duracionSeg });
       audioStream.getTracks().forEach(t => t.stop());
       audioStream = null;
-      render();
+      renderPendientes();
     };
     mediaRecorder.start();
     grabarInicio = Date.now();
     grabando = true;
     btnAudio.classList.add("grabando");
-    grabarTimer = setInterval(() => {
-      const seg = Math.round((Date.now() - grabarInicio) / 1000);
-      btnAudioTexto.textContent = `Grabando… ${seg}s (toca para parar)`;
-    }, 500);
+    grabarTimer = setInterval(() => { btnAudioTexto.textContent = `${Math.round((Date.now() - grabarInicio)/1000)}s — parar`; }, 500);
   }
-
   function pararGrabacion(){
     if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
     grabando = false;
@@ -569,197 +387,83 @@ footer{
     if (grabarTimer) { clearInterval(grabarTimer); grabarTimer = null; }
   }
 
-  function quitar(id){
-    pendientes = pendientes.filter(p => p.id !== id);
-    render();
-  }
-  window.quitarFotoPendiente = quitar;
-
-  function render(){
-    if (pendientes.length === 0){
-      listaWrap.classList.remove("activo");
-    } else {
-      listaWrap.classList.add("activo");
-    }
-    btnEnviar.disabled = subiendo || (pendientes.length === 0 && chatTexto.value.trim() === "");
-
-    listaFotos.innerHTML = pendientes.map(p => {
-      if (p.kind === "audio") {
-        const mm = String(Math.floor((p.duracion||0)/60)).padStart(1,"0");
-        const ss = String((p.duracion||0)%60).padStart(2,"0");
-        return `
-      <div class="foto-item es-audio" data-id="${p.id}" onclick="verFotoPendiente('${p.id}')">
-        <span class="ico-audio">🎙</span>
-        <span class="dur-audio">${mm}:${ss}</span>
-        ${!subiendo ? `<button type="button" class="borrar" onclick="event.stopPropagation();quitarFotoPendiente('${p.id}')">✕</button>` : ""}
-      </div>`;
-      }
-      return `
-      <div class="foto-item" data-id="${p.id}">
-        <img src="${p.previewUrl}" alt="Foto" onclick="verFotoPendiente('${p.id}')">
-        ${!subiendo ? `<button type="button" class="borrar" onclick="quitarFotoPendiente('${p.id}')">✕</button>` : ""}
-      </div>`;
-    }).join("");
-  }
-
-  const lightbox = document.getElementById("lightbox");
-  const lightboxImg = document.getElementById("lightbox-img");
-  const lightboxAudio = document.getElementById("lightbox-audio");
-  document.getElementById("lightbox-cerrar").addEventListener("click", () => {
-    lightbox.classList.remove("activo");
-    lightboxAudio.pause();
-  });
-  lightbox.addEventListener("click", (e) => {
-    if (e.target === lightbox) { lightbox.classList.remove("activo"); lightboxAudio.pause(); }
-  });
-
-  function verFoto(id){
-    const p = pendientes.find(x => x.id === id);
-    if (!p) return;
-    if (p.kind === "audio") {
-      lightboxImg.style.display = "none";
-      lightboxAudio.style.display = "block";
-      lightboxAudio.src = p.previewUrl;
-      lightboxAudio.play().catch(() => {});
-    } else {
-      lightboxAudio.style.display = "none";
-      lightboxAudio.pause();
-      lightboxImg.style.display = "block";
-      lightboxImg.src = p.previewUrl;
-    }
-    lightbox.classList.add("activo");
-  }
-  window.verFotoPendiente = verFoto;
-
-  btnEnviar.addEventListener("click", enviarMensaje);
-  chatTexto.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); enviarMensaje(); }
-  });
-  chatTexto.addEventListener("input", () => {
-    btnEnviar.disabled = subiendo || (pendientes.length === 0 && chatTexto.value.trim() === "");
-  });
-
-  // -------- Dictado por voz --------
+  // ---------- Dictado (oculto en iOS, usa el del teclado) ----------
   const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  if (esIOS) {
-    btnDictar.style.display = "none";
-    chatTexto.placeholder = "Escribe o dicta con el 🎙 del teclado…";
-  }
-
+  if (esIOS) { btnDictar.style.display = "none"; }
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let reconocimiento = null;
-  let dictando = false;
-  let textoAntesDeDictar = "";
-
+  let reconocimiento = null, dictando = false, textoAntesDeDictar = "";
   if (SpeechRec) {
     reconocimiento = new SpeechRec();
-    reconocimiento.lang = "es-ES";
-    reconocimiento.continuous = true;
-    reconocimiento.interimResults = true;
-
+    reconocimiento.lang = "es-ES"; reconocimiento.continuous = true; reconocimiento.interimResults = true;
     reconocimiento.onresult = (e) => {
-      let texto = "";
-      for (let i = 0; i < e.results.length; i++) texto += e.results[i][0].transcript;
+      let texto = ""; for (let i=0;i<e.results.length;i++) texto += e.results[i][0].transcript;
       chatTexto.value = (textoAntesDeDictar + " " + texto).trim();
-      btnEnviar.disabled = subiendo || chatTexto.value.trim() === "";
+      renderPendientes();
     };
-    reconocimiento.onerror = () => {
-      pararDictado();
-      estadoGeneral.textContent = "No se pudo dictar. Inténtalo otra vez.";
-      estadoGeneral.className = "error";
-      setTimeout(() => { estadoGeneral.textContent = ""; estadoGeneral.className = ""; }, 2000);
-    };
+    reconocimiento.onerror = () => { pararDictado(); mostrarAviso("No se pudo dictar."); };
     reconocimiento.onend = () => { if (dictando) pararDictado(); };
   }
-
   function empezarDictado(){
-    if (!reconocimiento) {
-      estadoGeneral.textContent = "Este navegador no permite dictar aquí — usa el micrófono del teclado.";
-      estadoGeneral.className = "error";
-      setTimeout(() => { estadoGeneral.textContent = ""; estadoGeneral.className = ""; }, 3000);
-      return;
-    }
-    textoAntesDeDictar = chatTexto.value;
-    dictando = true;
-    btnDictar.classList.add("escuchando");
+    if (!reconocimiento) { mostrarAviso("Dictado no disponible — usa el micrófono del teclado."); return; }
+    textoAntesDeDictar = chatTexto.value; dictando = true; btnDictar.classList.add("escuchando");
     try { reconocimiento.start(); } catch(e){}
   }
-  function pararDictado(){
-    dictando = false;
-    btnDictar.classList.remove("escuchando");
-    if (reconocimiento) { try { reconocimiento.stop(); } catch(e){} }
-  }
-  btnDictar.addEventListener("click", () => {
-    if (dictando) pararDictado(); else empezarDictado();
-  });
+  function pararDictado(){ dictando = false; btnDictar.classList.remove("escuchando"); if (reconocimiento) { try { reconocimiento.stop(); } catch(e){} } }
+  btnDictar.addEventListener("click", () => { if (dictando) pararDictado(); else empezarDictado(); });
 
-  async function enviarMensaje(){
+  chatTexto.addEventListener("input", renderPendientes);
+  chatTexto.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); enviar(); } });
+  btnEnviar.addEventListener("click", enviar);
+
+  function mostrarAviso(msg){
+    const card = document.createElement("div");
+    card.className = "resultado-card";
+    card.innerHTML = `<div class="rc-texto">${msg}</div>`;
+    feed.prepend(card);
+    vacio.style.display = "none";
+    setTimeout(() => card.remove(), 3000);
+  }
+
+  // ---------- Envío ----------
+  async function enviar(){
     if (subiendo) return;
     const notaTexto = chatTexto.value.trim() || null;
     if (pendientes.length === 0 && !notaTexto) return;
-
     subiendo = true;
     btnEnviar.disabled = true;
-    estadoGeneral.textContent = "Enviando…";
-    estadoGeneral.className = "cargando";
-    render();
+    vacio.style.display = "none";
 
     const loteId = crypto.randomUUID ? crypto.randomUUID() : (Date.now() + "-" + Math.random().toString(36).slice(2));
+    const items = pendientes.slice();
+    pendientes = [];
+    renderPendientes();
+    chatTexto.value = "";
 
-    // Mensaje de solo texto, sin fotos ni audio
-    if (pendientes.length === 0){
+    // Mensaje de solo texto
+    if (items.length === 0){
+      const card = crearCardResultado({ kind:"texto" });
       try {
         const ahora = new Date();
         const filaResp = await fetch(`${SUPABASE_URL}/rest/v1/documentos`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-            "apikey": SUPABASE_ANON_KEY,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-          },
-          body: JSON.stringify({
-            tipo: "otro",
-            fecha: ahora.toISOString().slice(0,10),
-            source: "texto",
-            status: "pendiente",
-            lote_id: loteId,
-            nota: notaTexto
-          })
+          method:"POST",
+          headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json", "Prefer":"return=representation" },
+          body: JSON.stringify({ tipo:"otro", fecha: ahora.toISOString().slice(0,10), source:"texto", status:"pendiente", lote_id: loteId, nota: notaTexto })
         });
         if (!filaResp.ok) throw new Error("tabla " + filaResp.status);
         const filaCreada = await filaResp.json();
-        const documentoId = filaCreada && filaCreada[0] && filaCreada[0].id;
-        if (documentoId) {
-          añadirAlHistorial([{
-            documento_id: documentoId,
-            kind: "texto",
-            nota: notaTexto,
-            created_at: ahora.toISOString()
-          }]);
-        }
-        estadoGeneral.textContent = "✅ Enviado";
-        estadoGeneral.className = "ok";
-      } catch (err) {
-        estadoGeneral.textContent = "No se pudo enviar. Inténtalo otra vez.";
-        estadoGeneral.className = "error";
+        const documentoId = filaCreada?.[0]?.id;
+        if (documentoId) añadirAlHistorial([{ documento_id: documentoId, kind:"texto", nota: notaTexto, created_at: ahora.toISOString() }]);
+        actualizarCard(card, { titulo:"Mensaje", sub: fechaCorta(ahora.toISOString()), texto: notaTexto, estado:"enviado" });
+      } catch(e){
+        actualizarCard(card, { titulo:"Error al enviar", estado:"error", texto:"Inténtalo otra vez." });
       }
-      setTimeout(() => {
-        estadoGeneral.textContent = "";
-        estadoGeneral.className = "";
-        subiendo = false;
-        chatTexto.value = "";
-        render();
-      }, 1400);
+      subiendo = false; btnEnviar.disabled = false;
       return;
     }
 
-    const subidas = pendientes.length;
-    let fallos = 0;
-    const nuevosHistorial = [];
-
-    for (const p of pendientes.slice()){
-      const item = listaFotos.querySelector(`.foto-item[data-id="${p.id}"]`);
+    // Fotos / audios
+    for (const p of items){
+      const card = crearCardResultado(p);
       try {
         const ahora = new Date();
         const fecha = ahora.toISOString().slice(0,10);
@@ -767,117 +471,238 @@ footer{
         const carpeta = p.kind === "audio" ? "audios" : "gastos";
         const nombreArchivo = `sin-clasificar/${carpeta}/${fecha}/${ahora.getTime()}-${Math.random().toString(36).slice(2,7)}.${extension}`;
 
-        const subidaResp = await fetch(
-          `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${nombreArchivo}`,
-          {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-              "apikey": SUPABASE_ANON_KEY,
-              "Content-Type": p.file.type || (p.kind === "audio" ? "audio/webm" : "image/jpeg")
-            },
-            body: p.file
-          }
-        );
+        const subidaResp = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${nombreArchivo}`, {
+          method:"POST",
+          headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY, "Content-Type": p.file.type || (p.kind==="audio"?"audio/webm":"image/jpeg") },
+          body: p.file
+        });
         if (!subidaResp.ok) throw new Error("storage " + subidaResp.status);
-
         const fileUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${nombreArchivo}`;
 
         const filaResp = await fetch(`${SUPABASE_URL}/rest/v1/documentos`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-            "apikey": SUPABASE_ANON_KEY,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-          },
-          body: JSON.stringify({
-            tipo: "otro",
-            fecha: fecha,
-            storage_path: nombreArchivo,
-            file_name: p.file.name,
-            file_url: fileUrl,
-            source: p.kind === "audio" ? "audio" : "foto",
-            status: "pendiente",
-            lote_id: loteId,
-            nota: notaTexto
-          })
+          method:"POST",
+          headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json", "Prefer":"return=representation" },
+          body: JSON.stringify({ tipo:"otro", fecha, storage_path: nombreArchivo, file_name: p.file.name, file_url: fileUrl, source: p.kind==="audio"?"audio":"foto", status:"pendiente", lote_id: loteId, nota: notaTexto })
         });
         if (!filaResp.ok) throw new Error("tabla " + filaResp.status);
-
         const filaCreada = await filaResp.json();
-        const documentoId = filaCreada && filaCreada[0] && filaCreada[0].id;
+        const documentoId = filaCreada?.[0]?.id;
 
-        if (item) {
-          const mini = document.createElement("div");
-          mini.className = "estado-mini ok";
-          mini.textContent = "✓";
-          item.appendChild(mini);
-        }
+        añadirAlHistorial([{ documento_id: documentoId, kind: p.kind, file_url: fileUrl, storage_path: nombreArchivo, nota: notaTexto, created_at: ahora.toISOString() }]);
+        actualizarCard(card, { titulo: p.kind === "audio" ? "Audio" : "Foto", sub: fechaCorta(ahora.toISOString()), estado:"cargando", cargandoTexto:"Analizando…" });
 
-        if (documentoId) {
-          nuevosHistorial.push({
-            documento_id: documentoId,
-            kind: p.kind,
-            file_url: fileUrl,
-            storage_path: nombreArchivo,
-            nota: notaTexto,
-            created_at: new Date().toISOString()
-          });
+        // Analizar y mostrar resultado con chips corregibles
+        if (p.kind === "foto"){
+          analizarFoto(documentoId, card);
+        } else {
+          transcribirAudio(documentoId, card);
         }
-
-        // Fotos → clasificación visual. Audios → transcripción + corrección con contexto real.
-        if (documentoId && p.kind === "foto") {
-          fetch(`${SUPABASE_URL}/functions/v1/clasificar-documento`, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-              "apikey": SUPABASE_ANON_KEY,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ documento_id: documentoId })
-          }).catch(() => {});
-        } else if (documentoId && p.kind === "audio") {
-          fetch(`${SUPABASE_URL}/functions/v1/transcribir-audio`, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-              "apikey": SUPABASE_ANON_KEY,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ documento_id: documentoId })
-          }).catch(() => {});
-        }
-      } catch (err) {
-        fallos++;
-        if (item) {
-          const mini = document.createElement("div");
-          mini.className = "estado-mini error";
-          mini.textContent = "Error";
-          item.appendChild(mini);
-        }
+      } catch(e){
+        actualizarCard(card, { titulo:"Error al subir", estado:"error", texto:"Inténtalo otra vez." });
       }
     }
-
-    if (nuevosHistorial.length > 0) añadirAlHistorial(nuevosHistorial);
-
-    if (fallos === 0){
-      estadoGeneral.textContent = `✅ ${subidas} elemento${subidas > 1 ? "s" : ""} subido${subidas > 1 ? "s" : ""}`;
-      estadoGeneral.className = "ok";
-    } else {
-      estadoGeneral.textContent = `${subidas - fallos} subidos, ${fallos} con error`;
-      estadoGeneral.className = "error";
-    }
-
-    setTimeout(() => {
-      pendientes = [];
-      chatTexto.value = "";
-      estadoGeneral.textContent = "";
-      estadoGeneral.className = "";
-      subiendo = false;
-      render();
-    }, 1800);
+    subiendo = false; btnEnviar.disabled = pendientes.length===0 && chatTexto.value.trim()==="";
   }
+
+  async function analizarFoto(documentoId, card){
+    try {
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/clasificar-documento`, {
+        method:"POST",
+        headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ documento_id: documentoId })
+      });
+      const data = await resp.json();
+      const a = data.analisis;
+      if (!a || a.error){
+        actualizarCard(card, { estado:"ok", texto:"No se pudo clasificar automáticamente — revisable en el panel." });
+        return;
+      }
+      mostrarChipsClasificacion(card, documentoId, a);
+    } catch(e){
+      actualizarCard(card, { estado:"ok", texto:"Subida correctamente. Se clasificará en el panel." });
+    }
+  }
+
+  async function transcribirAudio(documentoId, card){
+    try {
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/transcribir-audio`, {
+        method:"POST",
+        headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ documento_id: documentoId })
+      });
+      const data = await resp.json();
+      if (data.transcripcion){
+        actualizarCard(card, { estado:"ok", texto: data.transcripcion });
+      } else {
+        actualizarCard(card, { estado:"ok", texto:"Audio subido — sin transcripción disponible todavía." });
+      }
+    } catch(e){
+      actualizarCard(card, { estado:"ok", texto:"Audio subido correctamente." });
+    }
+  }
+
+  const ETIQUETA_TIPO = { gasto:"Gasto", ingreso:"Ingreso", albaran:"Albarán", factura:"Factura", averia:"Avería", otro:"Otro" };
+
+  function mostrarChipsClasificacion(card, documentoId, analisis){
+    const sugerido = analisis.tipo_sugerido || "otro";
+    const detalle = [analisis.proveedor_o_cliente, analisis.importe ? analisis.importe + " €" : null].filter(Boolean).join(" · ");
+    actualizarCard(card, { estado:"ok", texto: detalle || "Detectado automáticamente" });
+
+    const chipsWrap = document.createElement("div");
+    chipsWrap.className = "rc-chips";
+    const tipos = ["gasto","albaran","factura","averia","otro"];
+    tipos.forEach(t => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "rc-chip" + (t === sugerido ? " elegido" : "");
+      chip.textContent = ETIQUETA_TIPO[t];
+      chip.onclick = () => {
+        chipsWrap.querySelectorAll(".rc-chip").forEach(c => c.classList.remove("elegido"));
+        chip.classList.add("elegido");
+        confirmarClasificacion(documentoId, t, analisis);
+      };
+      chipsWrap.appendChild(chip);
+    });
+    const chipOk = document.createElement("button");
+    chipOk.type = "button"; chipOk.className = "rc-chip confirmar"; chipOk.textContent = "✓ Correcto";
+    chipOk.onclick = () => { confirmarClasificacion(documentoId, sugerido, analisis); chipsWrap.innerHTML = ""; };
+    chipsWrap.appendChild(chipOk);
+    card.appendChild(chipsWrap);
+  }
+
+  async function confirmarClasificacion(documentoId, tipo, analisis){
+    const etiqueta = ETIQUETA_TIPO[tipo] + (analisis.proveedor_o_cliente ? " — " + analisis.proveedor_o_cliente : "") + (analisis.importe ? " · " + analisis.importe + " €" : "");
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=eq.${documentoId}`, {
+        method:"PATCH",
+        headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ status:"revisar", linked_label: etiqueta })
+      });
+    } catch(e){}
+  }
+
+  function crearCardResultado(p){
+    const card = document.createElement("div");
+    card.className = "resultado-card";
+    const icono = p.kind === "audio" ? ICONO_TIPO.audio : p.kind === "texto" ? ICONO_TIPO.texto : ICONO_TIPO.foto;
+    const thumb = (p.kind === "foto" && p.previewUrl) ? `<img class="rc-thumb" src="${p.previewUrl}" alt="">` : `<div class="rc-thumb">${icono}</div>`;
+    card.innerHTML = `
+      <div class="rc-fila">
+        ${thumb}
+        <div class="rc-cuerpo">
+          <div class="rc-titulo">Enviando…</div>
+        </div>
+        <div class="rc-estado cargando">…</div>
+      </div>`;
+    feed.prepend(card);
+    return card;
+  }
+
+  function actualizarCard(card, {titulo, sub, texto, estado, cargandoTexto}){
+    const cuerpo = card.querySelector(".rc-cuerpo");
+    const estadoEl = card.querySelector(".rc-estado");
+    if (titulo) cuerpo.querySelector(".rc-titulo") ? (cuerpo.querySelector(".rc-titulo").textContent = titulo) : null;
+    if (!cuerpo.querySelector(".rc-titulo") && titulo){ const t=document.createElement("div"); t.className="rc-titulo"; t.textContent=titulo; cuerpo.prepend(t); }
+    if (sub){
+      let s = cuerpo.querySelector(".rc-sub");
+      if (!s){ s = document.createElement("div"); s.className = "rc-sub"; cuerpo.appendChild(s); }
+      s.textContent = sub;
+    }
+    if (texto){
+      let tx = cuerpo.querySelector(".rc-texto");
+      if (!tx){ tx = document.createElement("div"); tx.className = "rc-texto"; cuerpo.appendChild(tx); }
+      tx.textContent = texto;
+    }
+    if (estado){
+      estadoEl.className = "rc-estado " + estado;
+      estadoEl.textContent = estado === "cargando" ? (cargandoTexto || "…") : estado === "ok" ? "Listo" : estado === "enviado" ? "Enviado" : "Error";
+    }
+  }
+
+  function fechaCorta(iso){
+    return new Date(iso).toLocaleString("es-ES", {day:"numeric", month:"short", hour:"2-digit", minute:"2-digit"});
+  }
+
+  // ---------- Historial ----------
+  function leerHistorial(){ try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch(e){ return []; } }
+  function guardarHistorial(lista){ try { localStorage.setItem(LS_KEY, JSON.stringify(lista.slice(0,200))); } catch(e){} }
+  function añadirAlHistorial(entradas){ guardarHistorial([...entradas, ...leerHistorial()]); }
+
+  async function renderHistorial(){
+    const lista = leerHistorial();
+    if (lista.length === 0){ historialLista.style.display="none"; historialVacio.style.display="block"; return; }
+    historialLista.style.display="flex"; historialVacio.style.display="none";
+    historialLista.innerHTML = lista.map(h => {
+      const icono = h.kind === "audio" ? ICONO_TIPO.audio : h.kind === "texto" ? ICONO_TIPO.texto : ICONO_TIPO.foto;
+      const thumb = (h.kind === "foto" && h.file_url) ? `<img class="hist-thumb" src="${h.file_url}" alt="">` : `<div class="hist-thumb">${icono}</div>`;
+      const titulo = h.nota || (h.kind === "audio" ? "Audio" : h.kind === "texto" ? "Mensaje" : "Foto");
+      return `
+      <div class="hist-item" data-doc-id="${h.documento_id}" onclick="abrirDetalleHistorial(${h.documento_id})">
+        ${thumb}
+        <div class="hist-info">
+          <div class="hist-titulo">${titulo}</div>
+          <div class="hist-meta"><span class="hist-pill pendiente" id="hpill-${h.documento_id}">…</span> ${fechaCorta(h.created_at)}</div>
+        </div>
+        <button type="button" class="hist-borrar" onclick="event.stopPropagation();borrarDelHistorial(${h.documento_id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg></button>
+      </div>`;
+    }).join("");
+
+    // Cargar estado real de cada documento (pendiente/revisar/validado)
+    lista.forEach(async h => {
+      try {
+        const resp = await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=eq.${h.documento_id}&select=status`, {
+          headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY }
+        });
+        const data = await resp.json();
+        const status = data?.[0]?.status || "pendiente";
+        const pill = document.getElementById(`hpill-${h.documento_id}`);
+        if (pill){ pill.className = "hist-pill " + status; pill.textContent = status === "pendiente" ? "Sin revisar" : status === "revisar" ? "Revisar" : status === "validado" ? "Validado" : status; }
+      } catch(e){}
+    });
+  }
+
+  async function abrirDetalleHistorial(documentoId){
+    const h = leerHistorial().find(x => x.documento_id === documentoId);
+    if (!h) return;
+    let cuerpo = "";
+    if (h.kind === "audio") cuerpo = `<audio controls src="${h.file_url}"></audio>`;
+    else if (h.kind === "foto") cuerpo = `<img src="${h.file_url}" alt="">`;
+    let extra = "";
+    try {
+      const resp = await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=eq.${documentoId}&select=nota,transcripcion,linked_label,status`, {
+        headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY }
+      });
+      const data = await resp.json();
+      const d = data?.[0];
+      if (d){
+        if (d.transcripcion) extra += `<div class="rc-texto" style="margin-bottom:8px;">${d.transcripcion}</div>`;
+        if (d.nota) extra += `<div class="rc-texto" style="margin-bottom:8px;">"${d.nota}"</div>`;
+        if (d.linked_label) extra += `<div class="rc-sub">${d.linked_label}</div>`;
+      }
+    } catch(e){}
+    detalleContenido.innerHTML = cuerpo + extra;
+    detalle.classList.add("activo");
+  }
+  window.abrirDetalleHistorial = abrirDetalleHistorial;
+  document.getElementById("detalle-cerrar").addEventListener("click", () => detalle.classList.remove("activo"));
+  detalle.addEventListener("click", (e) => { if (e.target === detalle) detalle.classList.remove("activo"); });
+
+  async function borrarDelHistorial(documentoId){
+    if (!confirm("¿Borrar esto? No se puede deshacer.")) return;
+    const lista = leerHistorial();
+    const entrada = lista.find(h => h.documento_id === documentoId);
+    try {
+      if (entrada?.storage_path){
+        await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${entrada.storage_path}`, { method:"DELETE", headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY } });
+      }
+      await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=eq.${documentoId}`, { method:"DELETE", headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY } });
+    } catch(e){}
+    guardarHistorial(lista.filter(h => h.documento_id !== documentoId));
+    renderHistorial();
+  }
+  window.borrarDelHistorial = borrarDelHistorial;
+
+  renderPendientes();
 })();
 </script>
 
