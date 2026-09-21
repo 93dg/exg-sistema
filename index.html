@@ -3270,6 +3270,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="panel-head"><h3>Modelo 303 — IVA trimestral</h3></div>
             <div class="panel-body">
               <div class="econ-line"><span>IVA repercutido (de tus facturas emitidas)</span><span class="v mono" id="c303-repercutido">0,00 €</span></div>
+              <div class="econ-line" style="font-size:12px;color:var(--sub);"><span>· de las cuales, base con Inversión del sujeto pasivo (informativo — recuerda declarar en el modelo 303 casilla 122)</span><span class="v mono" id="c303-isp">0,00 €</span></div>
               <div class="econ-line"><span>IVA soportado (de tus gastos/compras)</span><span class="v mono" id="c303-soportado">0,00 €</span></div>
               <div class="econ-line"><span>RESULTADO — a ingresar / a compensar</span><span class="v mono" id="c303-resultado">0,00 €</span></div>
             </div>
@@ -4023,6 +4024,13 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 
           <div class="field" style="margin-bottom:12px;"><div class="l">Nota</div>
             <textarea class="search-box" style="width:100%;min-height:50px;resize:vertical;" id="nj-note" placeholder="Ej. El cliente quiere que sea sobre esta fecha / está esperando a que pase algo antes de confirmar…"></textarea>
+          </div>
+
+          <div class="field" style="margin-bottom:12px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+              <input type="checkbox" id="nj-isp"> Este trabajo lleva Inversión del sujeto pasivo (IVA)
+            </label>
+            <div style="font-size:11px;color:var(--sub);margin-top:2px;">Al crear una factura para este trabajo, se sugerirá este tratamiento fiscal (nunca se aplica solo).</div>
           </div>
 
           <div class="field" style="margin-bottom:12px;"><div class="l">Adjudicado a</div>
@@ -10301,6 +10309,7 @@ function openNewJobModal(presetDate){
   document.getElementById('nj-beneficiary').value = 'Empresa';
   document.getElementById('nj-state').value = 'pendiente';
   document.getElementById('nj-note').value = '';
+  const njIsp = document.getElementById('nj-isp'); if(njIsp) njIsp.checked = false;
   document.getElementById('nj-date').value = typeof presetDate === 'string' ? presetDate : '';
   document.getElementById('nj-date-tentative').checked = false;
   onJobStateChange();
@@ -10323,6 +10332,7 @@ function submitNewJob(ev){
   const beneficiary = document.getElementById('nj-beneficiary').value;
   const initialState = document.getElementById('nj-state').value;
   const note = document.getElementById('nj-note').value;
+  const isp = document.getElementById('nj-isp')?.checked || false;
   const tasks = njTasks.slice();
   // el trabajo cuenta como "sensible a lluvia" si AL MENOS una de sus tareas lo es (o si no hay tareas definidas, por defecto sí)
   const rainSensitive = tasks.length ? tasks.some(t=>t.rainSensitive) : true;
@@ -10356,7 +10366,8 @@ function submitNewJob(ev){
     const entidad = clientes.find(c=>c.name===client);
     sb.from('trabajos').insert({
       codigo: code, nombre: client, entidad_id: entidad ? entidad.id : null, estado: initialState, prioridad: priority, operario: worker || null,
-      fecha_inicio: scheduledDate || null, presupuesto: price ? Number(price) : null, zona: zone
+      fecha_inicio: scheduledDate || null, presupuesto: price ? Number(price) : null, zona: zone,
+      tratamiento_iva_sugerido: isp ? 'isp' : null
     }).select().single().then(({data, error})=>{
       if(error){ console.error('No se pudo guardar el trabajo en Supabase', error); return; }
       nuevoJob.id = data.id; // así "Crear factura desde este trabajo" funciona sin tener que recargar la página
@@ -10838,7 +10849,14 @@ function togglePreview(){
 function parseDictado(){
   const text = document.getElementById('ie-dictado-text').value.trim();
   if(!text) return;
-  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  // detección determinista: si el texto dictado menciona inversión del sujeto pasivo,
+  // cambia el tratamiento IVA directamente — no hace falta IA para esto
+  if(/inversi[oó]n\s+del?\s+sujeto\s+pasivo|\bISP\b/i.test(text) && document.getElementById('ie-tratamiento-iva')){
+    document.getElementById('ie-tratamiento-iva').value = 'isp';
+    cambiarTratamientoIva();
+    mostrarToast('Detectado "inversión del sujeto pasivo" — tratamiento IVA cambiado.', 'ok');
+  }
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean).filter(l=>!/inversi[oó]n\s+del?\s+sujeto\s+pasivo|\bISP\b/i.test(l));
   let added = 0;
   lines.forEach(line=>{
     // formato esperado: "<cantidad> <concepto> a <precio>"
@@ -10899,6 +10917,7 @@ function calcularCierre(q){
 
   const ivaRepercutido = facturas.reduce((s,f)=>s+f.iva,0);
   const baseIngresos = facturas.reduce((s,f)=>s+f.base,0);
+  const baseIsp = realDocs.filter(d=>d.tratamientoIva==='isp').reduce((s,d)=>s+(d.base||0),0);
 
   const gastos = (q===4) ? GASTOS_DEMO_Q4 : [];
   const gastosConIva = gastos.map(g=>({...g, base:g.total/1.21, iva:g.total-g.total/1.21}));
@@ -10912,6 +10931,8 @@ function calcularCierre(q){
   document.getElementById('c303-repercutido').textContent = ivaRepercutido.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   document.getElementById('c303-soportado').textContent = ivaSoportado.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   document.getElementById('c303-resultado').textContent = resultado303.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  const c303IspEl = document.getElementById('c303-isp');
+  if(c303IspEl) c303IspEl.textContent = baseIsp.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   document.getElementById('c130-ingresos').textContent = baseIngresos.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   document.getElementById('c130-gastos').textContent = baseGastos.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   document.getElementById('c130-neto').textContent = neto130.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
@@ -11152,6 +11173,7 @@ function aiToggleGrabarAudio(){
 }
 async function enviarAsistenteIA(){
   const mensaje = document.getElementById('asistente-ia-input').value.trim();
+  window.__ultimoMensajeAsistente = mensaje;
   if(!mensaje && !aiAdjuntos.length){ mostrarToast('Escribe, dicta o adjunta algo primero.'); return; }
   aiMostrarVista('loading');
   document.getElementById('ai-loading-text').textContent = aiAdjuntos.some(a=>a.esImagen) ? 'Mirando lo que has adjuntado…' : 'Separando lo que me has pedido…';
@@ -11478,6 +11500,14 @@ function aiEjecutarAccionTarea(t){
     if(datos.cliente) contexto.clientName = datos.cliente;
     document.getElementById('tipo-doc-menu-overlay')?.classList.remove('active');
     openNewInvoiceModal(contexto);
+    // detección determinista: si el mensaje dictado al asistente menciona ISP, se aplica
+    // igual que en el dictado de líneas — sin gastar IA para esto
+    if(window.__ultimoMensajeAsistente && /inversi[oó]n\s+del?\s+sujeto\s+pasivo|\bISP\b/i.test(window.__ultimoMensajeAsistente)){
+      setTimeout(()=>{
+        const sel = document.getElementById('ie-tratamiento-iva');
+        if(sel){ sel.value = 'isp'; cambiarTratamientoIva(); }
+      }, 150);
+    }
   } else if(t.tipo==='incidente'){
     if(datos.subtipo==='personal') abrirIncidentePersonal();
     else if(datos.subtipo==='maquina') abrirAveriaMaquina();
