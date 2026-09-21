@@ -4575,8 +4575,13 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <div class="ie-totals">
             <div class="econ-line"><span>Base imponible</span><span class="v mono" id="ie-base">0,00 €</span></div>
             <div class="econ-line" id="ie-iva-row"><span>IVA
+              <select id="ie-tratamiento-iva" style="border:1px solid var(--line);border-radius:3px;padding:2px 4px;font-size:12px;background:var(--paper);color:var(--ink);margin-right:4px;" onchange="cambiarTratamientoIva()">
+                <option value="normal">Normal</option>
+                <option value="isp">Inversión sujeto pasivo</option>
+              </select>
               <input type="number" id="ie-iva-pct" value="21" min="0" max="100" style="width:44px;border:1px solid var(--line);border-radius:3px;padding:2px 4px;font-family:'IBM Plex Mono',monospace;background:var(--paper);color:var(--ink);" onchange="recalcTotals()">%
             </span><span class="v mono" id="ie-iva">0,00 €</span></div>
+            <div id="ie-isp-aviso" style="display:none;font-size:11px;color:var(--sub);padding:2px 0 6px;">Se añadirá la mención legal: "Inversión del sujeto pasivo. Art. 84.Uno.2º.f) de la Ley 37/1992 del IVA."</div>
             <div class="econ-line"><span>TOTAL</span><span class="v mono" id="ie-total">0,00 €</span></div>
           </div>
         </div>
@@ -10603,6 +10608,27 @@ function renderConceptCombo(input, comboId){
   box.style.display = 'block';
 }
 
+// ============ Tratamiento IVA (Normal / Inversión del sujeto pasivo) ============
+// Lógica centralizada — cualquier parte de la app que necesite calcular IVA debe usar esto,
+// nunca reinventar la cuenta. Con ISP: IVA repercutido = 0, Total = Base imponible.
+function calcularIva(base, tratamiento, ivaPct){
+  if(tratamiento === 'isp') return {iva: 0, total: base, ivaPctEfectivo: 0};
+  const iva = base * (ivaPct||0) / 100;
+  return {iva, total: base + iva, ivaPctEfectivo: ivaPct||0};
+}
+function cambiarTratamientoIva(){
+  const tratamiento = document.getElementById('ie-tratamiento-iva').value;
+  const pctInput = document.getElementById('ie-iva-pct');
+  const aviso = document.getElementById('ie-isp-aviso');
+  if(tratamiento === 'isp'){
+    pctInput.style.display = 'none';
+    aviso.style.display = '';
+  } else {
+    pctInput.style.display = '';
+    aviso.style.display = 'none';
+  }
+  recalcTotals();
+}
 function recalcTotals(){
   const t = document.getElementById('ni-doctype').value;
   const hasIva = DOC_TYPES[t].hasIva;
@@ -10614,13 +10640,13 @@ function recalcTotals(){
     tr.querySelector('.line-total').textContent = lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
     base += lineTotal;
   });
+  const tratamientoIva = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
   const ivaPct = hasIva ? (Number(document.getElementById('ie-iva-pct').value) || 0) : 0;
-  const iva = base * ivaPct / 100;
-  const total = base + iva;
+  const {iva, total} = hasIva ? calcularIva(base, tratamientoIva, ivaPct) : {iva:0, total:base};
   document.getElementById('ie-base').textContent = base.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   document.getElementById('ie-iva').textContent = iva.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   document.getElementById('ie-total').textContent = total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  return {base, iva, total};
+  return {base, iva, total, tratamientoIva};
 }
 
 function descargarPDF(){
@@ -10701,15 +10727,25 @@ function descargarPDF(){
 
   if(cfg.hasTotales){
     y += 4; doc.line(120,y,195,y); y += 6;
+    const tratamientoIvaPdf = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
     if(cfg.hasBaseIva){
       doc.text('Base imponible:', 150, y, {align:'right'}); doc.text(base.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
       if(cfg.hasIva){
-        const ivaPct = document.getElementById('ie-iva-pct').value;
-        doc.text(`IVA (${ivaPct}%):`, 150, y, {align:'right'}); doc.text(iva.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
+        if(tratamientoIvaPdf==='isp'){
+          doc.text('IVA (Inv. sujeto pasivo):', 150, y, {align:'right'}); doc.text('0,00 €', 195, y, {align:'right'}); y+=6;
+        } else {
+          const ivaPct = document.getElementById('ie-iva-pct').value;
+          doc.text(`IVA (${ivaPct}%):`, 150, y, {align:'right'}); doc.text(iva.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
+        }
       }
     }
     doc.setFont('helvetica','bold'); doc.setFontSize(11);
     doc.text('TOTAL:', 150, y, {align:'right'}); doc.text(total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
+    if(tratamientoIvaPdf==='isp'){
+      y += 8; doc.setFont('helvetica','italic'); doc.setFontSize(8);
+      doc.text('Inversión del sujeto pasivo. Art. 84.Uno.2º.f) de la Ley 37/1992 del IVA.', 15, y);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    }
   }
 
   if(cfg.hasPayment && payment){
@@ -10791,6 +10827,7 @@ function togglePreview(){
         ${cfg.hasBaseIva && cfg.hasIva ? `<div class="econ-line"><span>IVA</span><span class="v mono">${iva.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>` : ''}
         <div class="econ-line"><span>TOTAL</span><span class="v mono">${total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>
       </div>` : ''}
+      ${(document.getElementById('ie-tratamiento-iva')?.value==='isp') ? `<div style="font-size:11px;margin-top:10px;font-style:italic;">Inversión del sujeto pasivo. Art. 84.Uno.2º.f) de la Ley 37/1992 del IVA.</div>` : ''}
     </div>
   `;
   editPane.style.display = 'none';
@@ -12180,6 +12217,8 @@ function openNewInvoiceModal(contexto){
   document.getElementById('ni-doctype').disabled = false;
   document.getElementById('ie-items-body').innerHTML = '';
   document.getElementById('ie-iva-pct').value = 21;
+  document.getElementById('ie-tratamiento-iva').value = 'normal';
+  cambiarTratamientoIva();
   setClientPickerValue('ni', '');
   document.getElementById('ni-client-fiscal').style.display = 'none';
   document.getElementById('ni-job').value = '';
@@ -12197,7 +12236,35 @@ function openNewInvoiceModal(contexto){
   onDocTypeChange();
   if(contexto.clientName){ setClientPickerValue('ni', contexto.clientName); onClientChange(); }
   if(contexto.jobLabel){ document.getElementById('ni-job').value = contexto.jobLabel; }
+  sugerirTratamientoIva(contexto.clientName, contexto.jobLabel);
   document.getElementById('newinvoice-overlay').classList.add('active');
+}
+// sugiere (nunca aplica sola) el tratamiento ISP si el trabajo o el cliente ya lo tuvieron antes
+async function sugerirTratamientoIva(clientName, jobLabel){
+  if(!sb) return;
+  try{
+    let sugerido = false;
+    if(jobLabel){
+      const jobCode = jobLabel.split(' — ')[0].trim();
+      const trabajo = jobs.find(j=>j.code===jobCode);
+      if(trabajo?.id){
+        const {data} = await sb.from('trabajos').select('tratamiento_iva_sugerido').eq('id', trabajo.id).maybeSingle();
+        if(data?.tratamiento_iva_sugerido==='isp') sugerido = true;
+      }
+    }
+    if(!sugerido && clientName){
+      const entidad = clientes.find(c=>c.name===clientName);
+      if(entidad?.id){
+        const {count} = await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('entidad_id', entidad.id).eq('tratamiento_iva','isp');
+        if(count>0) sugerido = true;
+      }
+    }
+    if(sugerido && document.getElementById('ie-tratamiento-iva').value==='normal'){
+      document.getElementById('ie-tratamiento-iva').value = 'isp';
+      cambiarTratamientoIva();
+      mostrarToast('Este cliente/trabajo ha usado antes Inversión del sujeto pasivo — preseleccionado, revisa si aplica aquí.', 'ok');
+    }
+  }catch(e){ /* la sugerencia nunca debe bloquear la creación de la factura */ }
 }
 /* ---------------- REGISTRAR GASTO (rápido, sin líneas) ---------------- */
 function abrirRegistrarGasto(){
@@ -12506,6 +12573,8 @@ function openDocumentViewer(id){
   document.getElementById('ni-doctype').disabled = true; // no cambiar tipo de un documento ya creado
   document.getElementById('ie-items-body').innerHTML = '';
   document.getElementById('ie-iva-pct').value = doc.ivaPct;
+  document.getElementById('ie-tratamiento-iva').value = doc.tratamientoIva || 'normal';
+  cambiarTratamientoIva();
   setClientPickerValue('ni', doc.client);
   document.getElementById('ni-job').value = doc.job==='—' ? '' : doc.job;
   document.getElementById('ni-date').value = doc.dateRaw;
@@ -12581,6 +12650,7 @@ async function submitNewInvoice(ev, isDraft){
   const titular = document.getElementById('ni-titular').value;
   const concepto = document.getElementById('ni-concepto-transf').value;
   const ivaPct = Number(document.getElementById('ie-iva-pct').value)||0;
+  const tratamientoIva = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
 
   const num = document.getElementById('ni-docnum').value || (cfg.prefix + cfg.seqRef());
   const status = isDraft ? 'Borrador' : (type==='factura' ? 'Pendiente' : type==='albaran' ? 'Validado' : 'Enviado');
@@ -12603,7 +12673,8 @@ async function submitNewInvoice(ev, isDraft){
     trabajo_id: trabajo ? trabajo.id : null,
     importe: total, concepto: conceptoResumen, conceptos,
     contabilidad: 'oficial',
-    iva_pct: ivaPct,
+    iva_pct: tratamientoIva==='isp' ? 0 : ivaPct,
+    tratamiento_iva: tratamientoIva,
   };
   // estado_cobro: se fija solo al crear, o al pasar de borrador a numerado en firme —
   // nunca se pisa un estado de cobro ya elegido a mano al simplemente editar/guardar.
@@ -13118,12 +13189,13 @@ async function cargarDocumentosEconomicosReales(){
       const dateLabel = formatFechaLabel(dRaw);
       const amountLabel = Number(doc.importe||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
       const totalNum = Number(doc.importe||0);
-      const baseNum = totalNum / 1.21;
+      const tratIvaTmp = doc.tratamiento_iva || 'normal';
+      const baseNum = tratIvaTmp==='isp' ? totalNum : totalNum / (1 + (Number(doc.iva_pct!=null?doc.iva_pct:21))/100);
       const ivaNum = totalNum - baseNum;
       const status = doc.estado==='borrador' ? 'Borrador' : doc.tipo==='factura' ? 'Pendiente' : doc.tipo==='albaran' ? 'Validado' : 'Enviado';
       documentosRealesById[doc.id] = {
         ...doc, id: doc.id, type: doc.tipo, num: doc.numero, client: entidad ? entidad.name : '—', job: trabajo ? (trabajo.code+' — '+trabajo.client) : '—',
-        dateRaw: doc.fecha_devengo, dateLabel, amountLabel, status, items, ivaPct: 21, total: totalNum, base: baseNum, iva: ivaNum,
+        dateRaw: doc.fecha_devengo, dateLabel, amountLabel, status, items, ivaPct: doc.iva_pct != null ? doc.iva_pct : 21, tratamientoIva: doc.tratamiento_iva || 'normal', total: totalNum, base: baseNum, iva: ivaNum,
       };
       const estadoPill = estadoDocumentoSelect(doc.tipo, doc.id, doc.estado_cobro, 'pres-');
       const estadoPillStandalone = estadoDocumentoSelect(doc.tipo, doc.id, doc.estado_cobro, 'pres2-');
