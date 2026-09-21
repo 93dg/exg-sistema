@@ -2186,7 +2186,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.55</div>
+        <div class="sub">V2.56</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2697,6 +2697,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <h3>⚠ Posibles clientes duplicados (<span id="dup-clientes-count">0</span>)</h3>
         </div>
         <div class="panel-body" id="dup-clientes-body"></div>
+      </div>
+      <div class="panel" id="panel-identidad-pendiente" style="margin-bottom:12px;display:none;">
+        <div class="panel-head" style="justify-content:space-between;">
+          <h3>🕓 Identidad pendiente de confirmar (<span id="pend-identidad-count">0</span>)</h3>
+        </div>
+        <div class="panel-body" id="pend-identidad-body"></div>
       </div>
       <div class="panel">
         <div class="panel-body" style="padding:0;overflow-x:auto;">
@@ -4819,6 +4825,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     }
     if(btn.dataset.view==='clientes'){
       cargarDuplicadosClientes();
+      cargarIdentidadPendiente();
     }
   });
 });
@@ -9480,13 +9487,59 @@ async function cargarDuplicadosClientes(){
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
         <button class="btn sm primary" onclick='abrirComparacionFusion(${JSON.stringify(d.a)},${JSON.stringify(d.b)})'>Fusionar</button>
+        ${nivel==='conflicto' ? `<button class="btn sm" style="color:var(--orange);" onclick="marcarPendienteResolver('${d.id}', ${JSON.stringify(etiquetas)})">Pendiente de resolver</button>` : ''}
         <button class="btn sm" onclick="mantenerSeparadosDuplicado('${d.id}')">Mantener separados</button>
       </div>
     </div>`;
   }).join('');
 }
-
-// ---- popup de comparación campo a campo ----
+function campoDesdeEtiquetas(etiquetas){
+  const e = (etiquetas||[]).join(' ');
+  if(e.includes('NIF')) return 'nif';
+  if(e.includes('dirección')||e.includes('Dirección')) return 'direccion';
+  if(e.includes('nombre')||e.includes('Nombre')) return 'nombre';
+  if(e.includes('teléfono')||e.includes('Teléfono')) return 'telefono';
+  if(e.includes('email')||e.includes('Email')) return 'email';
+  return 'nif';
+}
+async function marcarPendienteResolver(dupId, etiquetas){
+  const campo = campoDesdeEtiquetas(etiquetas);
+  if(!(await confirmarAccion(`¿Marcar como "Pendiente de resolver" (conflicto en ${campo})? Ambos clientes seguirán funcionando normalmente; el sistema aprovechará documentos futuros para intentar resolverlo solo.`))) return;
+  const {error} = await sb.rpc('abrir_caso_identidad_pendiente', {p_dup_id: dupId, p_campo: campo});
+  if(error){ mostrarToast('Error: '+errText(error)); return; }
+  mostrarToast('Marcado como pendiente de resolver.', 'ok');
+  cargarDuplicadosClientes();
+  cargarIdentidadPendiente();
+}
+async function cargarIdentidadPendiente(){
+  if(!sb) return;
+  const {data} = await sb.from('identidad_pendiente_casos').select('*, a:entidad_a(id,nombre,nif,direccion), b:entidad_b(id,nombre,nif,direccion)').eq('estado','abierto');
+  const lista = (data||[]).filter(x=>x.a && x.b);
+  window.__casosIdentidadPendientePorEntidad = {};
+  lista.forEach(c=>{ window.__casosIdentidadPendientePorEntidad[c.a.id] = c.campo; window.__casosIdentidadPendientePorEntidad[c.b.id] = c.campo; });
+  const panel = document.getElementById('panel-identidad-pendiente');
+  document.getElementById('pend-identidad-count').textContent = lista.length;
+  panel.style.display = lista.length ? '' : 'none';
+  document.getElementById('pend-identidad-body').innerHTML = lista.map(c=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--line);">
+      <div><b>${c.a.nombre}</b> ↔ <b>${c.b.nombre}</b> — conflicto en <b>${c.campo}</b>: "${c.valor_a||'—'}" / "${c.valor_b||'—'}"</div>
+      ${c.aviso_nueva_evidencia ? `
+        <div style="background:var(--concrete);border:1px solid var(--green);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13px;">
+          <b style="color:var(--green);">✓ Nueva información puede resolver este cliente pendiente</b>
+          <div style="margin-top:4px;">La evidencia reciente apunta a: <b>${c.sugerido}</b> (${(c.evidencia||[]).filter(e=>e.valor===c.sugerido).length} documentos lo confirman)</div>
+          <button class="btn sm primary" style="margin-top:6px;" onclick='resolverCasoIdentidadPendiente(${JSON.stringify(c)})'>Ver y confirmar fusión</button>
+        </div>` : `<div style="font-size:12px;color:var(--sub);margin-top:2px;">Esperando más evidencia (${(c.evidencia||[]).length} documento(s) visto(s) hasta ahora). Ambos clientes siguen funcionando con normalidad.</div>`}
+    </div>`).join('');
+}
+async function resolverCasoIdentidadPendiente(caso){
+  await abrirComparacionFusion(caso.a, caso.b);
+  // preselecciona el valor sugerido por la evidencia en el campo en conflicto
+  if(fusionEnCurso && caso.campo){
+    fusionEnCurso.seleccion[caso.campo] = (caso.a[caso.campo]===caso.sugerido) ? 'a' : 'b';
+    renderComparacionFusion();
+  }
+  window.__casoIdentidadPendienteId = caso.id;
+}
 const CAMPOS_FUSION = [['nombre','Nombre'],['nif','NIF/CIF'],['direccion','Dirección'],['cp','CP'],['poblacion','Población'],['provincia','Provincia'],['telefono','Teléfono'],['email','Email']];
 let fusionEnCurso = null; // {a, b, seleccion: {campo: 'a'|'b'}}
 function valorMasFiable(campo, va, vb){
@@ -9504,6 +9557,7 @@ function valorMasFiable(campo, va, vb){
   return String(va).length >= String(vb).length ? 'a' : 'b';
 }
 async function abrirComparacionFusion(a, b){
+  window.__casoIdentidadPendienteId = null;
   // consulta rápida de validez de NIF de ambos, para elegir el más fiable
   const nifs = [a.nif, b.nif].filter(Boolean);
   window.__nifValidoCache = {};
@@ -9545,6 +9599,7 @@ function elegirValorFusion(campo, lado){
 function cerrarComparacionFusion(){
   document.getElementById('fusion-overlay').classList.remove('active');
   fusionEnCurso = null;
+  window.__casoIdentidadPendienteId = null;
 }
 async function confirmarFusionDesdeComparacion(){
   if(!fusionEnCurso || !sb) return;
@@ -9558,9 +9613,14 @@ async function confirmarFusionDesdeComparacion(){
   const duplicado = docsA >= docsB ? b.id : a.id;
   const {error} = await sb.rpc('fusionar_clientes_con_seleccion', {id_principal: principal, id_duplicado: duplicado, selecciones});
   if(error){ mostrarToast('Error al fusionar: '+errText(error)); return; }
+  if(window.__casoIdentidadPendienteId){
+    await sb.from('identidad_pendiente_casos').update({estado:'resuelto', resuelto_at: new Date().toISOString()}).eq('id', window.__casoIdentidadPendienteId);
+    window.__casoIdentidadPendienteId = null;
+  }
   mostrarToast('Clientes fusionados.', 'ok');
   cerrarComparacionFusion();
   cargarDuplicadosClientes();
+  cargarIdentidadPendiente();
   if(typeof cargarDatosReales==='function') cargarDatosReales();
 }
 async function mantenerSeparadosDuplicado(dupId){
@@ -9646,7 +9706,7 @@ function renderClientesTable(){
     const calidadHtml = calidad==='ok' ? `<span class="tag" style="color:var(--green);border-color:var(--green);">OK</span>` : `<span class="tag" style="color:var(--orange);border-color:var(--orange);">Incompleta</span>`;
     const ultimoTxt = c.ultimoTrabajo ? formatFechaCorta(c.ultimoTrabajo) : '—';
     return `
-    <tr onclick="toggleExpandirClienteFila('${c.id}')"><td onclick="event.stopPropagation();"><input type="checkbox" class="clientes-sel-chk" data-id="${c.id||''}" onchange="actualizarSeleccionClientes()"></td><td><b onclick="event.stopPropagation();openClientDrawer('${(c.name||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${c.name}</b></td><td><span class="zone-badge">${c.type}</span></td>
+    <tr onclick="toggleExpandirClienteFila('${c.id}')"><td onclick="event.stopPropagation();"><input type="checkbox" class="clientes-sel-chk" data-id="${c.id||''}" onchange="actualizarSeleccionClientes()"></td><td><b onclick="event.stopPropagation();openClientDrawer('${(c.name||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${c.name}</b>${window.__casosIdentidadPendientePorEntidad?.[c.id] ? `<div style="font-size:11px;color:var(--orange);">🕓 Identidad pendiente de confirmar · Conflicto en ${window.__casosIdentidadPendientePorEntidad[c.id]}</div>` : ''}</td><td><span class="zone-badge">${c.type}</span></td>
     <td><span class="tag" style="color:${PRIO_COLOR[c.prio]||PRIO_COLOR.media};border-color:${PRIO_COLOR[c.prio]||PRIO_COLOR.media};" title="${c.prioManual?'Fijada manualmente':'Automática'}">${(c.prio||'media').charAt(0).toUpperCase()+(c.prio||'media').slice(1)}${c.prioManual?' 📌':''}</span></td>
     <td class="col-clientes-calidad">${calidadHtml}</td>
     <td class="col-clientes-nif">${falta(c.nif)}</td><td class="col-clientes-direccion">${falta(c.direccion)}</td><td class="col-clientes-cp">${falta(c.cp)}</td><td class="col-clientes-poblacion">${falta(c.poblacion)}</td><td class="col-clientes-provincia">${falta(c.provincia)}</td><td class="col-clientes-email">${falta(c.email)}</td><td class="col-clientes-telefono">${falta(c.telefono)}</td>
