@@ -2257,16 +2257,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="kpi"><div class="lbl">Margen mes</div><div class="val green" id="kpi-margen-mes">0,00 €</div></div>
       </div>
 
-      <div class="panel" id="panel-metricas-ia" style="margin-bottom:16px;">
-        <div class="panel-head" style="justify-content:space-between;">
-          <h3>🤖 Uso de IA — reglas primero, IA solo como excepción</h3>
-          <button class="btn sm" onclick="cargarMetricasIA()">↻ Actualizar</button>
-        </div>
-        <div class="panel-body" id="metricas-ia-body">
-          <div class="empty">Cargando métricas…</div>
-        </div>
-      </div>
-
       <div class="panel">
         <div class="doc-toolbar">
           <div class="doc-toolbar-title">
@@ -3940,7 +3930,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     </div>
     <div class="drawer-body">
       <div class="block">
-        <h4>Original</h4>
+        <h4>Original <button class="btn sm" id="e-editar-btn" style="display:none;float:right;" onclick="editarTextoEntrada()">✎ Editar</button></h4>
         <div id="e-preview"><div class="doc-chip" style="padding:30px 8px;">📄 Documento</div></div>
       </div>
       <div class="block" id="e-status-block">
@@ -7994,18 +7984,25 @@ function updateInboxSelectBar(){
 }
 
 async function borrarDocumento(id){
-  if(!sb) return;
+  if(!sb) return {ok:true};
   const d = documentosCache.find(x=>x.id===id);
   if(d && d.storage_path){
     await sb.storage.from('documentos-exg').remove([d.storage_path]);
   }
-  await sb.from('documentos').delete().eq('id', id);
+  // antes esto no comprobaba el error: si Supabase rechazaba el borrado (p.ej. por estar
+  // vinculado a otro registro), la fila se quedaba ahí sin ningún aviso — parecía que "no
+  // dejaba borrar" sin decir nunca por qué
+  const {error} = await sb.from('documentos').delete().eq('id', id);
+  if(error) return {ok:false, error};
+  documentosCache = documentosCache.filter(x=>x.id!==id);
+  return {ok:true};
 }
 
 async function borrarUnDocumento(id, ev){
   if(ev) ev.stopPropagation();
   if(!(await confirmarAccion('¿Eliminar este documento? No se puede deshacer.'))) return;
-  await borrarDocumento(id);
+  const r = await borrarDocumento(id);
+  if(!r.ok){ mostrarToast('No se pudo eliminar: '+errText(r.error)); return; }
   loadInbox();
 }
 window.borrarUnDocumento = borrarUnDocumento;
@@ -8013,9 +8010,12 @@ window.borrarUnDocumento = borrarUnDocumento;
 async function borrarSeleccionInbox(){
   if(inboxSelected.size===0) return;
   if(!(await confirmarAccion(`¿Eliminar ${inboxSelected.size} documento(s)? No se puede deshacer.`))) return;
+  const fallos = [];
   for(const id of Array.from(inboxSelected)){
-    await borrarDocumento(id);
+    const r = await borrarDocumento(id);
+    if(!r.ok) fallos.push(id);
   }
+  if(fallos.length) mostrarToast(`${fallos.length} documento(s) no se pudieron eliminar.`);
   inboxSelectMode = false;
   inboxSelected.clear();
   document.getElementById('inbox-select-toggle').textContent = 'Seleccionar';
@@ -8097,11 +8097,45 @@ function openTriageDrawer(id){
   } else {
     preview.innerHTML = `<div class="doc-chip" style="padding:30px 8px;">${SRC_ICON[d.source]||'📄'} Sin vista previa</div>`;
   }
+  // solo se puede corregir el texto propio de la entrada (nota dictada o transcripción) —
+  // un archivo/foto original no se reescribe desde aquí, se sustituye si hace falta
+  const campoEditable = d.nota ? 'nota' : (d.transcripcion ? 'transcripcion' : null);
+  const btnEditar = document.getElementById('e-editar-btn');
+  btnEditar.style.display = campoEditable ? 'inline-block' : 'none';
+  btnEditar.dataset.campo = campoEditable || '';
   document.getElementById('e-status-current').innerHTML = docPill(d.status||'pendiente') + (d.linked_label ? ` <span class="sub-t" style="margin-left:8px;">${d.linked_label}</span>` : '');
   showTriageMenu();
   document.getElementById('entry-overlay').classList.add('active');
 }
 function closeEntryDrawer(){ document.getElementById('entry-overlay').classList.remove('active'); triageCurrentId = null; }
+
+function editarTextoEntrada(){
+  const d = documentosCache.find(x=>x.id===triageCurrentId);
+  const campo = document.getElementById('e-editar-btn').dataset.campo;
+  if(!d || !campo) return;
+  const preview = document.getElementById('e-preview');
+  const valorActual = d[campo] || '';
+  preview.innerHTML = `<textarea id="e-editar-textarea" class="search-box" style="width:100%;min-height:120px;resize:vertical;">${valorActual.replace(/</g,'&lt;')}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="btn primary sm" onclick="guardarTextoEntrada()">Guardar</button>
+      <button class="btn sm" onclick="openTriageDrawer(${triageCurrentId})">Cancelar</button>
+    </div>`;
+}
+window.editarTextoEntrada = editarTextoEntrada;
+
+async function guardarTextoEntrada(){
+  const d = documentosCache.find(x=>x.id===triageCurrentId);
+  const campo = document.getElementById('e-editar-btn').dataset.campo;
+  const nuevoTexto = document.getElementById('e-editar-textarea').value.trim();
+  if(!d || !campo) return;
+  const {error} = await sb.from('documentos').update({[campo]: nuevoTexto}).eq('id', d.id);
+  if(error){ mostrarToast('Error al guardar: '+errText(error)); return; }
+  d[campo] = nuevoTexto;
+  mostrarToast('Entrada actualizada ✓', 'ok');
+  openTriageDrawer(triageCurrentId);
+  loadInbox();
+}
+window.guardarTextoEntrada = guardarTextoEntrada;
 
 function showTriageMenu(){
   document.getElementById('e-menu-block').style.display = 'block';
