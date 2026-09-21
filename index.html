@@ -24,6 +24,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
+
   --asphalt:#1B1F24;
   --asphalt-2:#262C33;
   --concrete:#EEECE6;
@@ -55,6 +56,14 @@ body[data-theme="dark"]{
 }
 body[data-theme="dark"] .sidebar{background:#0E1013;}
 *{box-sizing:border-box;margin:0;padding:0;}
+/* Mayúsculas centralizadas: red de seguridad visual para texto de datos (clientes,
+   poblaciones, direcciones, conceptos, tipos, estados) en las tablas y desplegables
+   principales — no depende de cómo venga escrito en origen. Los campos de introducción
+   de texto (donde el usuario escribe) quedan fuera para no forzarle a escribir en
+   mayúsculas mientras teclea. */
+#econ-facturas-tbody td, #clientes-tbl td, .pill, .tag, .zone-badge, select option {
+  text-transform: uppercase;
+}
 html{overflow-x:hidden;width:100%;}
 body{
   font-family:'Inter',sans-serif;
@@ -6205,6 +6214,15 @@ function tipoDocEtiqueta(tipo, conIcono){
   return conIcono===false ? nombre : (TIPO_DOC_ICONO[tipo] ? TIPO_DOC_ICONO[tipo]+' '+nombre : nombre);
 }
 let sb = null;
+// normalización centralizada de mayúsculas: todo texto de datos (clientes, poblaciones,
+// direcciones, tipos, conceptos, estados) se muestra en mayúsculas sin depender de cómo
+// venga escrito en origen — un único punto, no cada pantalla por su cuenta.
+function MAY(texto){ return texto == null ? texto : String(texto).toUpperCase(); }
+// etiqueta de tipo documental, siempre en mayúsculas y desde un único sitio — evita que
+// una pantalla muestre "Proforma" y otra "proforma" según de dónde lea el dato
+const TIPO_DOC_LABEL = {factura:'FACTURA', proforma:'PROFORMA', presupuesto:'PRESUPUESTO', albaran:'ALBARÁN', gasto:'GASTO', cobro:'COBRO', impuesto:'IMPUESTO'};
+function etiquetaTipoDoc(tipo){ return TIPO_DOC_LABEL[tipo] || MAY(tipo); }
+
 function safeFetch(input, init){
   // El entorno de vista previa del artifact intercepta fetch() y no puede
   // clonar un objeto Headers real vía postMessage — lo convertimos a objeto plano.
@@ -9855,16 +9873,17 @@ async function cargarEntidadesReales(){
       const existente = clientes.find(c=>c.name===e.nombre);
       if(existente){
         existente.id = e.id;
+        existente.name = MAY(e.nombre) || existente.name;
         existente.type = tipoMap[(e.tipo||'').toLowerCase()] || existente.type;
         existente.nif = e.nif || existente.nif || '';
         existente.email = e.email || existente.email || '';
         existente.telefono = e.telefono || existente.telefono || '';
-        existente.direccion = e.direccion || existente.direccion || '';
-        existente.poblacion = e.poblacion || existente.poblacion || '';
+        existente.direccion = MAY(e.direccion) || existente.direccion || '';
+        existente.poblacion = MAY(e.poblacion) || existente.poblacion || '';
         existente.cp = e.cp || existente.cp || '';
-        existente.provincia = e.provincia || existente.provincia || '';
+        existente.provincia = MAY(e.provincia) || existente.provincia || '';
       } else {
-        clientes.push({id: e.id, name: e.nombre, type: tipoMap[(e.tipo||'').toLowerCase()] || 'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio: e.prioridad||'media', prioManual: !!e.prioridad_manual, prioRazon: e.prioridad_razon||'', nif: e.nif||'', email: e.email||'', telefono: e.telefono||'', direccion: e.direccion||'', poblacion: e.poblacion||'', provincia: e.provincia||'', cp: e.cp||''});
+        clientes.push({id: e.id, name: MAY(e.nombre), type: tipoMap[(e.tipo||'').toLowerCase()] || 'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio: e.prioridad||'media', prioManual: !!e.prioridad_manual, prioRazon: e.prioridad_razon||'', nif: e.nif||'', email: e.email||'', telefono: e.telefono||'', direccion: MAY(e.direccion), poblacion: MAY(e.poblacion), provincia: MAY(e.provincia), cp: e.cp||''});
       }
     });
     renderClientesTable();
@@ -11250,7 +11269,7 @@ function aiRenderTarjeta(){
   // tipo de documento — chips, siempre editable
   if(t.tipo==='documento'){
     if(!t.datos.tipo_doc) t.datos.tipo_doc = 'presupuesto';
-    const opciones = [['factura','Factura'],['presupuesto','Presupuesto'],['albaran','Albarán'],['proforma','Proforma']];
+    const opciones = [['factura',TIPO_DOC_LABEL.factura],['presupuesto',TIPO_DOC_LABEL.presupuesto],['albaran',TIPO_DOC_LABEL.albaran],['proforma',TIPO_DOC_LABEL.proforma]];
     widgetHtml += `<div class="ai-card-block"><div class="ai-card-label">Tipo de documento</div>
       <div class="ai-chip-row">${opciones.map(([v,l])=>`<div class="ai-chip ${t.datos.tipo_doc===v?'sel':''}" onclick="aiSetCampo(${aiTareaActiva},'tipo_doc','${v}')">${l}</div>`).join('')}</div></div>`;
   }
@@ -11393,7 +11412,7 @@ function aiRenderEditorCampo(t, campo){
       </div>`;
   }
   if(campo==='tipo_doc'){
-    const opciones = [['factura','Factura'],['presupuesto','Presupuesto'],['albaran','Albarán'],['proforma','Proforma']];
+    const opciones = [['factura',TIPO_DOC_LABEL.factura],['presupuesto',TIPO_DOC_LABEL.presupuesto],['albaran',TIPO_DOC_LABEL.albaran],['proforma',TIPO_DOC_LABEL.proforma]];
     return `${volver}<div class="ai-card-label">Tipo de documento</div>
       <div class="ai-chip-row">${opciones.map(([v,l])=>`<div class="ai-chip ${t.datos.tipo_doc===v?'sel':''}" onclick="aiSetCampoEditYVolver(${aiTareaActiva},'tipo_doc','${v}')">${l}</div>`).join('')}</div>`;
   }
