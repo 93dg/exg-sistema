@@ -10586,6 +10586,31 @@ function suggestFromConcept(input){
 function conceptSuggestions(){
   return TARIFAS_REALES.map(t=>t.concepto);
 }
+// conocimiento histórico real (materializado en Supabase desde años de facturas/albaranes):
+// solo se ofrece como sugerencia informativa — nunca rellena el precio solo. El usuario decide
+// si lo usa con un clic. Es la capa de "conocimiento histórico" complementaria a TARIFAS_REALES.
+async function sugerirPrecioHistorico(input, rowId){
+  const box = document.getElementById('hist-'+rowId);
+  if(!sb || !box) return;
+  const texto = input.value.trim();
+  if(texto.length < 4){ box.style.display='none'; return; }
+  const clienteNombre = document.getElementById('ni-client')?.value;
+  const cliente = clienteNombre ? clientes.find(c=>c.name===clienteNombre) : null;
+  const {data, error} = await sb.rpc('sugerir_precio_concepto', {p_texto: texto, p_entidad_id: cliente?.id || null});
+  if(error || !data || !data.length){ box.style.display='none'; return; }
+  const s = data[0];
+  const fechaLabel = s.ultima_fecha ? new Date(s.ultima_fecha).toLocaleDateString('es-ES',{month:'short',year:'numeric'}) : '—';
+  const rango = s.precio_min !== s.precio_max ? ` (rango ${Number(s.precio_min).toLocaleString('es-ES')}–${Number(s.precio_max).toLocaleString('es-ES')} €)` : '';
+  box.innerHTML = `💡 Precio habitual: <b>${Number(s.ultimo_precio).toLocaleString('es-ES',{minimumFractionDigits:2})} €</b> — usado ${s.veces} vez${s.veces==1?'':'ces'}, último ${fechaLabel}${rango} · <u>usar</u>`;
+  box.style.display = 'block';
+  box.onclick = () => {
+    const tr = input.closest('tr');
+    const priceInput = tr.querySelector('.ie-price');
+    if(!priceInput.value) priceInput.value = s.ultimo_precio;
+    recalcTotals();
+    box.style.display = 'none';
+  };
+}
 function onMachineChange(select){
   const tr = select.closest('tr');
   const priceInput = tr.querySelector('.ie-price');
@@ -10646,8 +10671,9 @@ function addItemRow(qty, concept, price, machine, unidad, fecha){
     <td><input type="number" class="ie-qty" value="${qty ?? 1}" min="0" step="0.01" oninput="recalcTotals()"></td>
     <td><select class="search-box ie-unidad" style="width:100%;min-width:0;padding:4px;">${UNIDADES.map(u=>`<option value="${u}" ${unidad===u?'selected':''}>${u}</option>`).join('')}</select></td>
     <td style="position:relative;"><input type="text" class="ie-concept" name="concepto-${id}" autocomplete="new-password" placeholder="Ej. M³ de excavación en terreno de consistencia media" value="${concept ?? ''}"
-        oninput="suggestFromConcept(this); renderConceptCombo(this,'${comboId}')" onfocus="renderConceptCombo(this,'${comboId}')" onblur="setTimeout(()=>{const c=document.getElementById('${comboId}'); if(c) c.style.display='none';},150)">
+        oninput="suggestFromConcept(this); renderConceptCombo(this,'${comboId}')" onfocus="renderConceptCombo(this,'${comboId}')" onblur="setTimeout(()=>{const c=document.getElementById('${comboId}'); if(c) c.style.display='none';},150); sugerirPrecioHistorico(this,'${id}')">
       <div id="${comboId}" class="combo-list"></div>
+      <div id="hist-${id}" class="sub-t" style="display:none;margin-top:2px;cursor:pointer;"></div>
     </td>
     <td class="machine-col"><select class="search-box ie-machine" style="width:100%;" onchange="onMachineChange(this)">
       ${MAQUINAS.map(m=>`<option value="${m.id}" ${(machine ? machine===m.id : m.id==='')?'selected':''}>${m.label}</option>`).join('')}
