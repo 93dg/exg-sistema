@@ -447,6 +447,24 @@ table{border-collapse:collapse;width:100%;}
 .ie-modo-preview .ie-edit-only{display:none !important;} /* en vista previa, fuera lo que es solo de edición — que no se coma la pantalla */
 .ie-doc-explain{flex:1;font-size:12px;color:var(--ink-soft);}
 .ie-paper{padding:26px 30px;border:1px solid var(--line);margin:20px;background:var(--paper);}
+@media(max-width:640px){ .ie-paper{padding:14px 12px;margin:10px;} }
+@media(max-width:640px){
+  .invoice-editor{width:100vw !important;max-width:100vw !important;margin:0 !important;border-radius:0 !important;}
+  /* cualquier fila en flex dentro del editor debe poder encogerse de verdad y bajar de
+     línea — sin esto, un solo campo con texto largo (placeholder, opción larga...)
+     mantenía ancha TODA la fila, y como todo cuelga del mismo contenedor, arrastraba
+     también a la tabla de líneas aunque esta ya estuviera en formato tarjeta */
+  .invoice-editor .ie-header, .invoice-editor .ie-client-row, .invoice-editor .ie-footer,
+  .invoice-editor [style*="display:flex"], .invoice-editor [style*="display: flex"]{
+    flex-wrap:wrap !important;
+  }
+  .invoice-editor .field, .invoice-editor input, .invoice-editor select, .invoice-editor .ie-company,
+  .invoice-editor .ie-doc-meta, .invoice-editor .ie-payment, .invoice-editor .ie-totals{
+    min-width:0 !important;flex:1 1 100% !important;
+  }
+  .ie-actions{flex-wrap:wrap !important;margin:0 12px 16px 12px !important;}
+  .ie-actions > *{flex:1 1 45% !important;min-width:0 !important;}
+}
 #ie-paper-edit.hide-fiscal #ie-company-fiscal{display:none;}
 #ie-paper-edit.hide-precios .col-precio{display:none;}
 #ie-paper-edit.hide-bank #ie-bank-fields{display:none;}
@@ -478,6 +496,35 @@ table{border-collapse:collapse;width:100%;}
 .ie-items input:hover, .ie-items input:focus{border-color:var(--line);background:var(--concrete);outline:none;}
 .ie-items .line-total{font-family:'IBM Plex Mono',monospace;text-align:right;padding-right:8px;}
 .ie-items .del-row{color:var(--red);cursor:pointer;text-align:center;}
+.ie-items .del-row-label{display:none;}
+/* ============ EDITOR DE LÍNEAS EN MÓVIL — tarjetas apiladas, no tabla comprimida ============ */
+/* Cada línea (fecha/cantidad/unidad/concepto/precio/importe) pasa a ser un bloque vertical
+   completo, con su etiqueta, en vez de una fila de tabla estrecha con columnas cortadas.
+   Es la MISMA tabla y los MISMOS datos — solo cambia cómo se presentan en pantallas estrechas. */
+@media(max-width:640px){
+  .ie-items, .ie-items thead, .ie-items tbody, .ie-items tr, .ie-items td{display:block;width:100%;}
+  .ie-items thead{position:absolute;left:-9999px;top:-9999px;} /* cabecera de columnas no aporta nada en formato tarjeta */
+  .ie-items tbody tr{
+    border:1px solid var(--line);border-radius:var(--radius,10px);padding:12px;margin-bottom:12px;
+    background:var(--paper);box-shadow:0 1px 4px rgba(0,0,0,0.06);
+  }
+  .ie-items tbody td{
+    padding:6px 0;border-bottom:none;display:flex;flex-direction:column;gap:3px;
+  }
+  .ie-items tbody td[data-label]::before{
+    content:attr(data-label);font-size:11px;text-transform:uppercase;letter-spacing:0.03em;
+    color:var(--ink-soft);font-weight:600;
+  }
+  .ie-items tbody td input, .ie-items tbody td select{
+    width:100%;font-size:16px;padding:9px 8px;border:1px solid var(--line);background:var(--concrete);
+  } /* 16px evita el zoom automático de iOS al tocar un campo */
+  .ie-items .line-total{text-align:left;padding-right:0;font-size:17px;font-weight:700;}
+  .ie-items .del-row{
+    display:flex !important;align-items:center;justify-content:center;text-align:center;
+    margin-top:8px;padding:10px !important;border:1px solid var(--red);border-radius:8px;font-weight:600;
+  }
+  .ie-items .del-row-label{display:inline;}
+}
 .ie-footer{display:flex;justify-content:space-between;gap:24px;margin-top:20px;padding-top:16px;border-top:1px solid var(--line);}
 .ie-payment{flex:1;}
 .ie-totals{width:260px;}
@@ -516,7 +563,7 @@ table{border-collapse:collapse;width:100%;}
   }
   .field-grid{grid-template-columns:1fr !important;}
   .panel-body{overflow-x:auto;max-width:100%;}
-  table{min-width:600px;}
+  table:not(.ie-items){min-width:600px;}
   .drawer{width:100vw;max-width:100vw;}
   .explorer-grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr)) !important;}
   #editor-mode-btn, #actualizar-fijo-btn{display:none;}
@@ -2197,7 +2244,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.95</div>
+        <div class="sub">V2.96</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6203,7 +6250,9 @@ async function cargarAveriasReales(){
     renderBreakdownsTable();
   }catch(err){ console.error('No se pudieron cargar las averías', err); }
 }
-cargarAveriasReales();
+// cargarAveriasReales() se llama más abajo, después de que 'sb' esté inicializado —
+// aquí arriba 'sb' todavía no existe (se declara más adelante en este mismo script) y
+// llamarla en este punto lanzaba "Cannot access 'sb' before initialization" en cada carga
 
 async function abrirAveria(){
  try{
@@ -10362,6 +10411,7 @@ async function cargarEntidadesReales(){
   }catch(err){ console.error('No se pudieron cargar las entidades reales', err); }
 }
 cargarEntidadesReales();
+cargarAveriasReales();
 
 /* Facturas reales — se cargan desde Supabase (tabla documentos_economicos) */
 const facturasReales = [];
@@ -11134,17 +11184,17 @@ function addItemRow(qty, concept, price, machine, unidad, fecha){
   tr.id = id;
   const comboId = 'combo-'+id;
   tr.innerHTML = `
-    <td><input type="date" class="ie-linea-fecha search-box mono" style="width:100%;padding:4px;" value="${fecha ?? ''}"></td>
-    <td><input type="number" class="ie-qty" value="${qty ?? 1}" min="0" step="0.01" oninput="recalcTotals()"></td>
-    <td><select class="search-box ie-unidad" style="width:100%;min-width:0;padding:4px;">${UNIDADES.map(u=>`<option value="${u}" ${unidad===u?'selected':''}>${u}</option>`).join('')}</select></td>
-    <td style="position:relative;"><input type="text" class="ie-concept" name="concepto-${id}" autocomplete="new-password" placeholder="Ej. M³ de excavación en terreno de consistencia media" value="${concept ?? ''}"
+    <td data-label="Fecha"><input type="date" class="ie-linea-fecha search-box mono" style="width:100%;padding:4px;" value="${fecha ?? ''}"></td>
+    <td data-label="Cantidad / horas"><input type="number" class="ie-qty" value="${qty ?? 1}" min="0" step="0.01" oninput="recalcTotals()"></td>
+    <td data-label="Unidad"><select class="search-box ie-unidad" style="width:100%;min-width:0;padding:4px;">${UNIDADES.map(u=>`<option value="${u}" ${unidad===u?'selected':''}>${u}</option>`).join('')}</select></td>
+    <td data-label="Concepto" style="position:relative;"><input type="text" class="ie-concept" name="concepto-${id}" autocomplete="new-password" placeholder="Ej. M³ de excavación en terreno de consistencia media" value="${concept ?? ''}"
         oninput="suggestFromConcept(this); renderConceptCombo(this,'${comboId}')" onfocus="renderConceptCombo(this,'${comboId}')" onblur="setTimeout(()=>{const c=document.getElementById('${comboId}'); if(c) c.style.display='none';},150); sugerirPrecioHistorico(this,'${id}')">
       <div id="${comboId}" class="combo-list"></div>
       <div id="hist-${id}" class="sub-t" style="display:none;margin-top:2px;cursor:pointer;"></div>
     </td>
-    <td class="col-precio"><input type="number" class="ie-price" value="${price ?? ''}" min="0" step="0.01" placeholder="0,00" oninput="recalcTotals()"></td>
-    <td class="line-total mono col-total">0,00 €</td>
-    <td class="del-row" onclick="document.getElementById('${id}').remove(); recalcTotals();">✕</td>
+    <td data-label="Precio" class="col-precio"><input type="number" class="ie-price" value="${price ?? ''}" min="0" step="0.01" placeholder="0,00" oninput="recalcTotals()"></td>
+    <td data-label="Importe" class="line-total mono col-total">0,00 €</td>
+    <td class="del-row" onclick="document.getElementById('${id}').remove(); recalcTotals();">✕<span class="del-row-label"> Quitar esta línea</span></td>
   `;
   tbody.appendChild(tr);
   recalcTotals();
@@ -11252,7 +11302,7 @@ function descargarPDF(){
   doc.text(cfg.title, 195, 18, {align:'right'});
   doc.setTextColor(0,0,0); doc.setFont('helvetica','normal'); doc.setFontSize(10);
   doc.text(`Nº: ${num}`, 195, 26, {align:'right'});
-  doc.text(`Fecha: ${dateRaw||'—'}`, 195, 32, {align:'right'});
+  doc.text(`Fecha: ${dateRaw ? formatFechaCorta(dateRaw) : '—'}`, 195, 32, {align:'right'});
 
   y = 50;
   doc.setDrawColor(27,31,36); doc.setLineWidth(0.5); doc.line(15,y,195,y);
@@ -11381,7 +11431,7 @@ function togglePreview(){
       <div class="ie-doc-meta">
         <div class="ie-doc-title">${cfg.title}</div>
         <div style="font-size:13px;"><b>Nº:</b> ${num}</div>
-        <div style="font-size:13px;"><b>Fecha:</b> ${dateRaw||'—'}</div>
+        <div style="font-size:13px;"><b>Fecha:</b> ${dateRaw ? formatFechaCorta(dateRaw) : '—'}</div>
       </div>
     </div>
     <div style="margin-bottom:16px;font-size:13px;">
@@ -11668,7 +11718,7 @@ function aiRenderHistorialLista(){
   cont.innerHTML = filtradas.map(l=>{
     const tareas = l.campos_extraidos?.tareas || [];
     const resultados = l.tareas_resultado || [];
-    const fecha = new Date(l.creado_at).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const fecha = formatFechaHoraCorta(l.creado_at);
     const conIA = Number(l.coste_estimado||0) > 0;
     const titulo = tareas.length===1 ? (tareas[0].titulo||'Petición') : (tareas.length ? `Petición con ${tareas.length} tareas` : 'Petición');
     const resumenTareas = tareas.length ? tareas.map(t=>t.titulo).join(' · ') : (l.estado==='error' ? 'No se pudo interpretar' : '—');
@@ -11714,7 +11764,7 @@ function aiAbrirDetalleHistorial(id){
   if(!l) return;
   const tareas = l.campos_extraidos?.tareas || [];
   const resultados = l.tareas_resultado || [];
-  const fecha = new Date(l.creado_at).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const fecha = formatFechaHoraCorta(l.creado_at);
   document.getElementById('hd-titulo').textContent = tareas.length===1 ? (tareas[0].titulo||'Petición') : `Petición con ${tareas.length} tareas`;
   document.getElementById('hd-fecha').textContent = fecha;
 
