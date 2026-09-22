@@ -75,7 +75,11 @@ Deno.serve(async (req) => {
       } else pendientes.push({ campo: "cliente", estado: res.estado, propuesta: res.nombre || r.cliente.nombre || null, motivo: res.motivo || null });
     }
     // tipo documental: nunca automático
-    if (r.tipo && r.tipo !== doc.tipo) discrepancias.push({ campo: "tipo", actual: doc.tipo, motor: r.tipo });
+    if (r.tipo && r.tipo !== doc.tipo) {
+      // si el documento parece de otro tipo, NO se rellena nada: número/fecha/cliente serían de otro documento
+      discrepancias.push({ campo: "tipo", actual: doc.tipo, motor: r.tipo });
+      for (const k of Object.keys(cambios)) { pendientes.push({ campo: k, motor: k === "conceptos" ? `${cambios[k].length} líneas` : cambios[k], motivo: "tipo documental en duda" }); delete cambios[k]; }
+    }
 
     let calidad: any = null;
     if (!simular) {

@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.4";
+export const VERSION_MOTOR = "motor-exg-2.5";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -411,13 +411,14 @@ export function leerTexto(texto: string, anioEsperado?: string) {
       if (r && fechaValida(r)) { fecha = r; break; }
     }
   }
-  let numero: string | null = null;
+  let numero: string | null = null, etiquetaNumero: string | null = null;
   for (const l of lineas.slice(0, limite + 3)) {
     const m = norm(l).match(/(?:N\.?\s*[º°O1]?\.?\s*(?:DE\s*)?(?:FACTURA|PRESUPUESTO)|(?:FACTURA|PRESUPUESTO)\s*(?:N[º°O]?\.?)?)\s*[:.]?\s*([A-Z]{0,4}[-\/]?\d{1,6}[A-Z]?([-\/]\d{1,4})?)\b/);
-    if (m) { numero = m[1]; break; }
+    if (m) { numero = m[1]; etiquetaNumero = /PRESUPUESTO/.test(norm(l)) ? "presupuesto" : "factura"; break; }
   }
   const cliente = detectarCliente(filas, Math.max(limite + 1, 40), { textoLibre: true });
-  const tipo = detectarTipo(lineas.slice(0, limite), null);
+  // el número de un "PRESUPUESTO n" delata el tipo real del documento
+  const tipo = detectarTipo(lineas.slice(0, limite), null) || (etiquetaNumero === "presupuesto" ? "presupuesto" : null);
   return { filas, limite, numero, fecha, cliente, tipo };
 }
 
