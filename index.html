@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.69</div>
+        <div class="sub">V2.70</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8333,8 +8333,19 @@ async function guardarTextoEntrada(){
   const campo = document.getElementById('e-editar-btn').dataset.campo;
   const nuevoTexto = document.getElementById('e-editar-textarea').value.trim();
   if(!d || !campo) return;
+  const textoOriginal = d[campo];
   const {error} = await sb.from('documentos').update({[campo]: nuevoTexto}).eq('id', d.id);
   if(error){ mostrarToast('Error al guardar: '+errText(error)); return; }
+  // corregir una palabra/frase es una decisión que enseña: la transcripción/dictado
+  // original tenía un fallo conocido y ya sabemos cuál es el texto correcto real
+  if(sb && textoOriginal && textoOriginal.trim() !== nuevoTexto && textoOriginal.trim().length > 5){
+    sb.rpc('registrar_aprendizaje', {
+      p_tipo: 'correccion', p_ambito: 'contextual', p_modulo_origen: 'entradas',
+      p_modulos_aplicables: ['entradas'],
+      p_contenido: {texto_original: textoOriginal.slice(0,300), texto_corregido: nuevoTexto.slice(0,300)},
+      p_confianza: 'media',
+    });
+  }
   d[campo] = nuevoTexto;
   mostrarToast('Entrada actualizada ✓', 'ok');
   openTriageDrawer(triageCurrentId);
@@ -8397,22 +8408,33 @@ async function confirmTriageAction(key, cfg){
   // Entradas es una de las principales fuentes de aprendizaje del motor común: cada vez
   // que confirmo una vinculación a trabajo, el texto original queda como conocimiento
   // reutilizable — la próxima entrada parecida se resuelve sola, sin gastar IA.
-  if(key==='vincular_trabajo' && values.ref) aprenderDeConfirmacionEntrada(d, values.ref);
+  if(key==='vincular_trabajo' && values.ref) aprenderDeConfirmacionEntrada(d, values.ref, 'trabajo');
+  if(key==='gasto' && values.ref) aprenderDeConfirmacionEntrada(d, values.ref, 'categoria_gasto');
+  if(key==='otra_categoria' && values.categoria) aprenderDeConfirmacionEntrada(d, values.categoria, 'categoria');
+  if(key==='descartar') aprenderDeConfirmacionEntrada(d, 'descartar', 'destino_confirmado');
   closeEntryDrawer();
   loadInbox();
 }
-async function aprenderDeConfirmacionEntrada(d, referenciaElegida){
+async function aprenderDeConfirmacionEntrada(d, referenciaElegida, tipoDestino){
   if(!sb) return;
   const texto = d?.nota || d?.transcripcion;
   if(!texto || texto.trim().length < 6) return;
-  // si ya había una coincidencia exacta conocida no hace falta aprender nada nuevo — solo
-  // se guarda cuando el texto es genuinamente distinto de lo ya sabido
+  const clave = tipoDestino || 'destino_confirmado';
+  // CASO AISLADO → PATRÓN REPETIDO → REGLA FIABLE: si ya había una sugerencia aprendida
+  // para un texto parecido, confirmarla la refuerza (sube de confianza); si el usuario
+  // elige algo DISTINTO a lo que se había sugerido, esa regla vieja pierde confianza — así
+  // el motor no sigue ofreciendo con la misma seguridad algo que ya ha fallado
   const {data: yaSabido} = await sb.rpc('buscar_conocimiento', {p_modulo:'entradas', p_texto: texto, p_tipo:'clasificador_entrada'});
-  if(yaSabido && yaSabido.length) { await sb.rpc('marcar_conocimiento_usado', {p_id: yaSabido[0].id}); return; }
+  if(yaSabido && yaSabido.length){
+    const sugerido = yaSabido[0].contenido?.trabajo_confirmado ?? yaSabido[0].contenido?.[clave];
+    if(sugerido === referenciaElegida){ await sb.rpc('confirmar_conocimiento', {p_id: yaSabido[0].id}); }
+    else { await sb.rpc('desconfirmar_conocimiento', {p_id: yaSabido[0].id}); }
+    return;
+  }
   await sb.rpc('registrar_aprendizaje', {
     p_tipo: 'clasificador_entrada', p_ambito: 'contextual', p_modulo_origen: 'entradas',
     p_modulos_aplicables: ['entradas','asistente'],
-    p_contenido: {texto_original: texto.slice(0,300), trabajo_confirmado: referenciaElegida},
+    p_contenido: {texto_original: texto.slice(0,300), trabajo_confirmado: referenciaElegida, tipo_destino: clave},
     p_confianza: 'media',
   });
 }
