@@ -2196,7 +2196,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.85</div>
+        <div class="sub">V2.86</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11769,7 +11769,15 @@ async function aiCargarArchivosPeticion(iaLlamadaId){
   if(!sb){ cont.innerHTML = '<div class="sub-t">—</div>'; return; }
   const {data, error} = await sb.from('peticion_archivos').select('*').eq('ia_llamada_id', iaLlamadaId).order('orden');
   if(!document.getElementById('hd-archivos')) return; // el detalle se cerró mientras cargaba
-  if(error || !data || !data.length){ document.getElementById('hd-archivos').innerHTML = '<div class="sub-t">Esta petición no tenía archivos adjuntos.</div>'; return; }
+  const botonAnadir = `<div style="margin-top:6px;">
+    <label class="btn sm" style="cursor:pointer;">📎 Añadir archivos a esta petición
+      <input type="file" multiple accept="image/*,application/pdf" style="display:none;" onchange="aiAnadirArchivosAPeticion('${iaLlamadaId}', this.files)">
+    </label>
+  </div>`;
+  if(error || !data || !data.length){
+    document.getElementById('hd-archivos').innerHTML = `<div class="sub-t">⚠ No hay ningún archivo original guardado para esta petición — si mencionaba fotos o documentos, no se conservaron (peticiones de antes de que esto empezara a guardarse). Puedes añadirlos ahora si los tienes a mano.</div>${botonAnadir}`;
+    return;
+  }
   document.getElementById('hd-archivos').innerHTML = data.map(a=>{
     const url = sb.storage.from(DOC_BUCKET).getPublicUrl(a.storage_path).data.publicUrl;
     const esImagen = /^image\//.test(a.media_type||'');
@@ -11781,7 +11789,29 @@ async function aiCargarArchivosPeticion(iaLlamadaId){
       </div>
       <a class="btn sm" href="${url}" target="_blank" rel="noopener">Ver</a>
     </div>`;
-  }).join('');
+  }).join('') + botonAnadir;
+}
+// añadir archivos a una petición que ya existe — para casos como este (peticiones sin
+// archivo guardado) o simplemente para completar después lo que faltó adjuntar
+async function aiAnadirArchivosAPeticion(iaLlamadaId, files){
+  if(!files || !files.length) return;
+  const cont = document.getElementById('hd-archivos');
+  if(cont) cont.insertAdjacentHTML('beforeend', '<div class="sub-t">Subiendo…</div>');
+  // el orden continúa a partir de los que ya hubiera, para no mezclar el orden si se
+  // completan documentos en varias veces
+  const {data: existentes} = await sb.from('peticion_archivos').select('orden').eq('ia_llamada_id', iaLlamadaId).order('orden',{ascending:false}).limit(1);
+  let orden = (existentes?.[0]?.orden ?? -1) + 1;
+  for(const file of Array.from(files)){
+    try{
+      const {storage_path, hash} = await subirArchivoAsistente(file);
+      await sb.from('peticion_archivos').insert({
+        ia_llamada_id: iaLlamadaId, storage_path, nombre_original: file.name,
+        media_type: file.type || 'application/octet-stream', tamano_bytes: file.size,
+        hash, orden: orden++, origen: 'anadido_despues',
+      });
+    }catch(e){ console.error('No se pudo añadir el archivo', e); }
+  }
+  aiCargarArchivosPeticion(iaLlamadaId);
 }
 function cerrarHistorialDetalle(){ document.getElementById('ai-historial-detalle-overlay').classList.remove('active'); }
 function aiIrATrabajoPorId(id){
@@ -11806,10 +11836,18 @@ function aiContinuarDesdeHistorial(id){
   const releerRow = document.getElementById('ai-continuacion-releer');
   const chk = document.getElementById('ai-releer-archivos-chk');
   if(chk) chk.checked = false;
+  document.getElementById('ai-sin-archivos-aviso')?.remove();
   if(sb){
     sb.from('peticion_archivos').select('*').eq('ia_llamada_id', id).order('orden').then(({data})=>{
       window.__aiContextoContinuacion.archivos = data || [];
-      if(releerRow) releerRow.style.display = (data && data.length) ? '' : 'none';
+      const hayArchivos = data && data.length;
+      if(releerRow) releerRow.style.display = hayArchivos ? '' : 'none';
+      // aviso explícito y visible, no silencioso — si el usuario menciona una foto/archivo
+      // y no hay ninguno guardado para esta petición, tiene que saberlo, no que el sistema
+      // actúe como si tuviera algo que en realidad no existe
+      if(!hayArchivos && releerRow){
+        releerRow.insertAdjacentHTML('afterend', `<div id="ai-sin-archivos-aviso" class="sub-t" style="margin:2px 0 8px;color:#D8AA3D;">⚠ Esta petición no tiene ningún archivo original guardado — si le pides algo sobre "la foto"/"el documento", no hay nada que releer. Puedes añadir el archivo desde el historial de esta petición.</div>`);
+      }
     });
   } else if(releerRow) releerRow.style.display = 'none';
 }
@@ -11928,6 +11966,13 @@ async function enviarAsistenteIA(){
   // en vez de partir de cero, y el resultado va directo al editor ya corregido.
   const contexto = window.__aiContextoContinuacion;
   if(contexto?.tarea?.tipo === 'documento' && !aiAdjuntos.length){
+    const mencionaArchivo = /\bfoto|imagen|documento|archivo|proforma\s*n[ºo°]?\s*\d|adjunt/i.test(mensaje);
+    const releerMarcado = document.getElementById('ai-releer-archivos-chk')?.checked;
+    if(mencionaArchivo && !contexto.archivos?.length){
+      mostrarToast('Aviso: no hay ningún archivo guardado para esta petición — voy a trabajar solo con el texto y los datos ya extraídos, no puedo releer nada.');
+    } else if(mencionaArchivo && contexto.archivos?.length && !releerMarcado){
+      mostrarToast('Aviso: esta petición sí tiene archivos guardados, pero no has marcado "Volver a leer los archivos originales" — voy a responder sin volver a mirarlos.');
+    }
     window.__aiContextoContinuacion = null;
     document.getElementById('ai-continuacion-releer').style.display = 'none';
     aiMostrarVista('loading');
