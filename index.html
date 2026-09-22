@@ -271,6 +271,7 @@ table{border-collapse:collapse;width:100%;}
 }
 .overlay.active{display:flex;}
 #tipo-doc-menu-overlay, #wizard-doc-overlay, #newjob-overlay, #picker-overlay, #form-picker-overlay, #newclient-overlay, #metodo-doc-overlay, #metodo-foto-overlay, #metodo-texto-overlay, #newinvoice-overlay{z-index:5150;}
+#confirmar-overlay, #modal3-overlay{z-index:5200;} /* tienen que poder abrirse POR ENCIMA del editor de documentos (5150), que es desde donde más se usan */
 #ai-historial-detalle-overlay{z-index:5400;} /* tiene que estar por delante del propio panel del asistente (5300), si no se abre "por detrás" y parece que no hace nada */
 .drawer{
   background:var(--paper);width:600px;max-width:92vw;max-height:90vh;overflow-y:auto;
@@ -2255,7 +2256,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.02</div>
+        <div class="sub">V3.03</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4409,6 +4410,22 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
   </div>
 </div>
 
+<!-- ================= MODAL DE 3 OPCIONES (sustituye a los confirm() del navegador cuando hay
+     que elegir entre tres acciones — cambios de cliente, cambios sin guardar, etc.) ================= -->
+<div class="overlay" id="modal3-overlay" onclick="if(event.target===this) cerrarModal3(null)">
+  <div class="drawer" style="max-width:420px;">
+    <div class="drawer-body" style="padding-top:24px;">
+      <div id="modal3-titulo" style="font-weight:700;font-size:15.5px;margin-bottom:8px;"></div>
+      <div id="modal3-texto" style="font-size:13.5px;margin-bottom:20px;line-height:1.55;white-space:pre-line;color:var(--ink-soft);"></div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn" style="width:100%;" id="modal3-btn1"></button>
+        <button class="btn" style="width:100%;" id="modal3-btn2"></button>
+        <button class="btn" style="width:100%;background:none;color:var(--ink-soft);" id="modal3-btn3"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ================= SELECTOR GENÉRICO (sustituye a los prompt() de listas) ================= -->
 <div class="overlay" id="picker-overlay" onclick="if(event.target===this) cerrarPicker(null)">
   <div class="drawer" style="max-width:360px;">
@@ -5514,7 +5531,7 @@ async function duplicarDocumento(id){
   delete copia.id; delete copia.created_at; delete copia.reprocesado_at; delete copia.estado_calidad; delete copia.info_faltante;
   copia.numero = ['factura','presupuesto','proforma'].includes(copia.tipo) ? proximoNumero(copia.tipo) : null;
   copia.fecha_devengo = new Date().toISOString().slice(0,10);
-  copia.estado_cobro = copia.tipo==='factura' ? 'borrador' : copia.estado_cobro;
+  copia.estado_cobro = 'pendiente_enviar'; // 'borrador' no es válido en estado_cobro — esa es la columna 'estado'
   copia.estado_albaran = copia.tipo==='albaran' ? 'en_proceso' : copia.estado_albaran;
   copia.enviado_gestor = false; copia.enviado_gestor_fecha = null;
   const {data: nuevo, error} = await sb.from('documentos_economicos').insert(copia).select().single();
@@ -5530,7 +5547,7 @@ async function rectificarFactura(id){
   delete rect.id; delete rect.created_at; delete rect.reprocesado_at; delete rect.estado_calidad;
   rect.numero = proximoNumero('factura');
   rect.fecha_devengo = new Date().toISOString().slice(0,10);
-  rect.estado_cobro = 'borrador';
+  rect.estado_cobro = 'pendiente_enviar'; // 'borrador' no es válido en estado_cobro
   rect.enviado_gestor = false; rect.enviado_gestor_fecha = null;
   rect.info_faltante = `Factura rectificativa de la nº ${original.numero||'—'} (id original: ${id})`;
   const {data: nueva, error} = await sb.from('documentos_economicos').insert(rect).select().single();
@@ -5545,7 +5562,7 @@ async function convertirAlbaranEnFactura(id){
   const nueva = {
     tipo:'factura', estado:'borrador', numero: proximoNumero('factura'), fecha_devengo: new Date().toISOString().slice(0,10),
     entidad_id: original.entidad_id, conceptos: original.conceptos, importe: original.importe, iva_pct: original.iva_pct,
-    contabilidad: original.contabilidad, archivo_path: original.archivo_path, estado_cobro:'borrador',
+    contabilidad: original.contabilidad, archivo_path: original.archivo_path, estado_cobro:'pendiente_enviar',
     info_faltante: `Creada al convertir el albarán nº ${original.numero||'—'} en factura.`,
   };
   const {data: doc, error} = await sb.from('documentos_economicos').insert(nueva).select().single();
@@ -5561,7 +5578,7 @@ async function crearFacturaDesdeDocumento(id){
   const nueva = {
     tipo:'factura', estado:'borrador', numero: proximoNumero('factura'), fecha_devengo: new Date().toISOString().slice(0,10),
     entidad_id: original.entidad_id, conceptos: original.conceptos, importe: original.importe, iva_pct: original.iva_pct,
-    contabilidad: original.contabilidad, estado_cobro:'borrador',
+    contabilidad: original.contabilidad, estado_cobro:'pendiente_enviar',
     info_faltante: `Creada a partir de${original.tipo==='proforma'?' la proforma':' el presupuesto'} nº ${original.numero||'—'}.`,
   };
   const {data: doc, error} = await sb.from('documentos_economicos').insert(nueva).select().single();
@@ -6206,6 +6223,36 @@ function cerrarConfirmar(valor){
   document.getElementById('confirmar-overlay').classList.remove('active');
   if(confirmarResolve) confirmarResolve(valor);
   confirmarResolve = null;
+}
+
+// modal de 3 opciones — sustituye a confirm() cuando hace falta elegir entre tres acciones
+// (no solo sí/no). opciones: hasta 3 objetos {label, valor, primary?}, en el orden en que
+// se muestran los botones de arriba a abajo. Devuelve el 'valor' del botón pulsado, o null
+// si se cierra tocando fuera sin elegir nada.
+let modal3Resolve = null;
+function mostrarModal3({titulo, texto, opciones}){
+  return new Promise(resolve=>{
+    modal3Resolve = resolve;
+    document.getElementById('modal3-titulo').textContent = titulo || '';
+    document.getElementById('modal3-texto').textContent = texto || '';
+    const ids = ['modal3-btn1','modal3-btn2','modal3-btn3'];
+    ids.forEach((id,i)=>{
+      const btn = document.getElementById(id);
+      const opt = (opciones||[])[i];
+      if(!opt){ btn.style.display = 'none'; return; }
+      btn.style.display = '';
+      btn.textContent = opt.label;
+      btn.className = 'btn' + (opt.primary ? ' primary' : '');
+      if(!opt.primary) btn.style.background = i===2 ? 'none' : '';
+      btn.onclick = ()=>cerrarModal3(opt.valor);
+    });
+    document.getElementById('modal3-overlay').classList.add('active');
+  });
+}
+function cerrarModal3(valor){
+  document.getElementById('modal3-overlay').classList.remove('active');
+  if(modal3Resolve) modal3Resolve(valor);
+  modal3Resolve = null;
 }
 
 function toggleTema(){
@@ -13734,13 +13781,20 @@ async function guardarGasto(){
 function closeNewInvoiceModal(){ document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); document.getElementById('ie-dictado').classList.remove('open'); document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview'); window.__newInvoiceDirty = false; }
 // aviso de cambios sin guardar — solo se llama desde los cierres iniciados por el usuario
 // (botón ✕ y clic fuera), nunca desde el cierre automático tras guardar con éxito
-function intentarCerrarNewInvoiceModal(){
+async function intentarCerrarNewInvoiceModal(){
   if(!window.__newInvoiceDirty){ closeNewInvoiceModal(); return; }
-  const salir = confirm('HAY CAMBIOS SIN GUARDAR en este documento.\n\nAceptar = salir (se preguntará si guardar como borrador)\nCancelar = seguir editando');
-  if(!salir) return;
-  const guardar = confirm('¿Guardar estos cambios como BORRADOR antes de salir?\n\nAceptar = guardar borrador\nCancelar = descartar los cambios');
-  if(guardar){ submitNewInvoice(null, true); }
-  else { closeNewInvoiceModal(); }
+  const eleccion = await mostrarModal3({
+    titulo: 'Hay cambios sin guardar',
+    texto: 'Este documento tiene modificaciones que todavía no se han guardado.',
+    opciones: [
+      {label:'GUARDAR BORRADOR', valor:'guardar', primary:true},
+      {label:'DESCARTAR CAMBIOS', valor:'descartar'},
+      {label:'SEGUIR EDITANDO', valor:'seguir'},
+    ],
+  });
+  if(eleccion==='guardar'){ await submitNewInvoice(null, true); }
+  else if(eleccion==='descartar'){ closeNewInvoiceModal(); }
+  // 'seguir', null o tocar fuera → no se hace nada, el documento sigue abierto tal cual
 }
 // marca la edición como "con cambios" en cuanto se toca cualquier campo del formulario —
 // una sola vez, delegado, para no tener que enganchar el aviso campo por campo
@@ -14009,6 +14063,19 @@ function openDocumentViewer(id){
   else { btnOriginal.style.display = 'none'; }
   document.getElementById('ni-otras-acciones').innerHTML = accionesDocumento(doc).filter(x=>x.t!=='Editar').map(x=>`<button type="button" class="btn sm" onclick="${x.fn}">${x.t}</button>`).join('');
   onClientChange();
+  // los datos de cliente propios de ESTE documento (si los hay) pisan lo que acaba de
+  // rellenar onClientChange() desde la ficha maestra — así "usar solo en este documento"
+  // se ve de verdad al reabrir, en vez de volver a mostrar siempre la ficha del cliente
+  if(doc.cliente_datos_doc){
+    const cd = doc.cliente_datos_doc;
+    if(cd.nif) document.getElementById('ni-client-nif').value = cd.nif;
+    if(cd.direccion) document.getElementById('ni-client-addr').value = cd.direccion;
+    if(cd.cp) document.getElementById('ni-client-cp').value = cd.cp;
+    if(cd.poblacion) document.getElementById('ni-client-poblacion').value = cd.poblacion;
+    if(cd.provincia) document.getElementById('ni-client-provincia').value = cd.provincia;
+    if(cd.telefono) document.getElementById('ni-client-telefono').value = cd.telefono;
+    if(cd.email) document.getElementById('ni-client-email').value = cd.email;
+  }
   doc.items.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, undefined, i.fecha));
   document.getElementById('ni-docnum').value = doc.num;
   document.getElementById('ni-suggest').textContent = doc.status==='Borrador' ? '(borrador sin numerar en firme)' : '';
@@ -14107,14 +14174,27 @@ async function submitNewInvoice(ev, isDraft){
       if(actual.toUpperCase() !== nuevo.toUpperCase()) diferencias.push({campo, actual, nuevo});
     }
     if(diferencias.length){
-      const lista = diferencias.map(d=>`${etiquetas[d.campo]}: "${d.actual}" → "${d.nuevo}"`).join('\n');
-      const actualizarFicha = confirm(`Estos datos de ${client} no coinciden con la ficha del cliente:\n\n${lista}\n\nAceptar = ACTUALIZAR FICHA DEL CLIENTE (se corrige para siempre)\nCancelar = usar solo en este documento (la ficha del cliente no cambia)`);
-      if(actualizarFicha) diferencias.forEach(d=>{ patchEntidad[d.campo] = d.nuevo; });
+      const lista = diferencias.map(d=>`${etiquetas[d.campo]}:\n  "${d.actual}" → "${d.nuevo}"`).join('\n\n');
+      const eleccion = await mostrarModal3({
+        titulo: `Datos de ${client} distintos a la ficha`,
+        texto: lista,
+        opciones: [
+          {label:'ACTUALIZAR FICHA DEL CLIENTE', valor:'actualizar', primary:true},
+          {label:'USAR SOLO EN ESTE DOCUMENTO', valor:'solo_doc'},
+          {label:'CANCELAR', valor:'cancelar'},
+        ],
+      });
+      if(eleccion==='cancelar' || eleccion===null) return false;
+      if(eleccion==='actualizar') diferencias.forEach(d=>{ patchEntidad[d.campo] = d.nuevo; });
     }
     if(Object.keys(patchEntidad).length){
       await sb.from('entidades').update(patchEntidad).eq('id', entidad.id);
       Object.assign(entidad, patchEntidad); // refleja el cambio también en memoria, sin esperar a recargar
     }
+    // el documento SIEMPRE guarda su propia copia de estos datos, independientemente de si
+    // también se actualizó la ficha maestra — así "usar solo en este documento" persiste de
+    // verdad (antes no se guardaba en ningún sitio y se perdía al reabrir)
+    var clienteDatosDoc = camposEditor;
   }
 
   const conceptos = items.map(it=>({
@@ -14128,6 +14208,7 @@ async function submitNewInvoice(ev, isDraft){
     fecha_devengo: dateRaw || null,
     entidad_id: entidad ? entidad.id : null,
     trabajo_id: trabajo ? trabajo.id : null,
+    cliente_datos_doc: typeof clienteDatosDoc !== 'undefined' ? clienteDatosDoc : null,
     importe: total, concepto: conceptoResumen, conceptos,
     contabilidad: 'oficial',
     iva_pct: tratamientoIva==='isp' ? 0 : ivaPct,
@@ -14135,9 +14216,13 @@ async function submitNewInvoice(ev, isDraft){
   };
   // estado_cobro: se fija solo al crear, o al pasar de borrador a numerado en firme —
   // nunca se pisa un estado de cobro ya elegido a mano al simplemente editar/guardar.
+  // OJO: 'borrador' NUNCA es un valor válido aquí — esa es la columna 'estado' de arriba.
+  // estado_cobro solo admite pendiente_enviar/pendiente_cobrar/cobrado/parcial según el
+  // check de la base de datos; un documento recién creado, sea borrador o no, todavía no
+  // se ha enviado ni cobrado, así que su estado_cobro de partida es siempre el mismo.
   const estadoCobroPrevio = editingDocId ? documentosRealesById[editingDocId]?.estado_cobro : null;
-  if(!editingDocId || !estadoCobroPrevio || estadoCobroPrevio==='borrador'){
-    payload.estado_cobro = isDraft ? 'borrador' : 'pendiente_enviar';
+  if(!editingDocId || !estadoCobroPrevio){
+    payload.estado_cobro = 'pendiente_enviar';
   }
   if(convirtiendoDesde){
     if(convirtiendoDesde.origenTipo==='albaran') payload.origen_albaran_ids = [convirtiendoDesde.origenId];
