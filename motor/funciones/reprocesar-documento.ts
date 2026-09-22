@@ -1,11 +1,26 @@
-// reprocesar-documento v15 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
+// reprocesar-documento v17 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
 // Solo reglas. Rellena campos VACÍOS; nunca sobrescribe un dato válido: si el motor ve otra cosa
 // lo devuelve como discrepancia (CONFLICTO) para revisión. 0 IA en esta versión.
+// v17: es el paso central del CIRCUITO DE CALIDAD:
+//   DETECTAR (verificar_calidad) → REPROCESAR con el motor actual → COMPARAR → CORREGIR si es seguro
+//   → REVALIDAR → estado final: validado (OK) | corregido_automatico | revision_necesaria/error (REVISAR) | conflicto
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import WordExtractor from "npm:word-extractor@1.0.4";
 import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/5d846d0e5809425b82f99fabca034c62e97d7ba9/motor/extractor.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
+const codigos = (info: any) => (String(info || "").match(/\[control-calidad: ([^\]]+)\]/)?.[1] || "").split(", ").filter(Boolean);
+async function cerrarCircuito(sb: any, doc: any, antes: string[], salida: any) {
+  // REVALIDAR con las reglas de calidad y decidir el estado final
+  const { data: cal } = await sb.rpc("verificar_calidad", { p_anio: null, p_id: doc.id });
+  const { data: tras } = await sb.from("documentos_economicos").select("estado_calidad, info_faltante").eq("id", doc.id).single();
+  let estado = tras?.estado_calidad;
+  if ((salida.discrepancias || []).length) estado = "conflicto";
+  else if ((estado === "validado" || estado === "corregido_automatico") && (salida.aplicados || []).length) estado = "corregido_automatico";
+  if (estado !== tras?.estado_calidad) await sb.from("documentos_economicos").update({ estado_calidad: estado }).eq("id", doc.id);
+  await sb.from("circuito_calidad_log").insert({ documento_id: doc.id, motor: VERSION_MOTOR, fallos_antes: antes, resultado: salida.resultado, aplicados: salida.aplicados || [], discrepancias: salida.discrepancias || [], pendientes: salida.pendientes || [], fallos_despues: codigos(tras?.info_faltante), estado_final: estado });
+  return { calidad: cal, estado_final: estado };
+}
 const json = (o: any, status = 200) => new Response(JSON.stringify(o), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
 export async function extraer(sb: any, path: string) {
@@ -38,12 +53,18 @@ Deno.serve(async (req) => {
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: doc } = await sb.from("documentos_economicos").select("*, entidad:entidades(id,nombre,nif)").eq("id", documento_id).single();
     if (!doc) return json({ ok: false, resultado: "error", error: "Documento no encontrado" });
-    if (!doc.archivo_path) return json({ ok: true, resultado: "sin_archivo", documento_id });
+    const antes = codigos(doc.info_faltante);
+    if (!doc.archivo_path) {
+      const fin = simular ? {} : await cerrarCircuito(sb, doc, antes, { resultado: "sin_archivo" });
+      return json({ ok: true, resultado: "sin_archivo", documento_id, ...fin });
+    }
 
     const x: any = await extraer(sb, doc.archivo_path);
     if (x.error) {
-      if (!simular) await sb.from("documentos_economicos").update({ reprocesado_at: new Date().toISOString() }).eq("id", documento_id);
-      return json({ ok: true, documento_id, resultado: x.error === "inaccesible" ? "inaccesible" : "necesita_ia", detalle: x.detalle, motor: VERSION_MOTOR });
+      const resultado = x.error === "inaccesible" ? "inaccesible" : "necesita_ia";
+      let fin: any = {};
+      if (!simular) { await sb.from("documentos_economicos").update({ reprocesado_at: new Date().toISOString() }).eq("id", documento_id); fin = await cerrarCircuito(sb, doc, antes, { resultado }); }
+      return json({ ok: true, documento_id, resultado, detalle: x.detalle, motor: VERSION_MOTOR, ...fin });
     }
     const r = x.r;
     const cambios: any = {}, discrepancias: any[] = [], pendientes: any[] = [];
@@ -81,14 +102,13 @@ Deno.serve(async (req) => {
       for (const k of Object.keys(cambios)) { pendientes.push({ campo: k, motor: k === "conceptos" ? `${cambios[k].length} líneas` : cambios[k], motivo: "tipo documental en duda" }); delete cambios[k]; }
     }
 
-    let calidad: any = null;
-    if (!simular) {
-      cambios.reprocesado_at = new Date().toISOString();
-      await sb.from("documentos_economicos").update(cambios).eq("id", documento_id);
-      calidad = (await sb.rpc("verificar_calidad", { p_anio: null, p_id: documento_id })).data;
-    }
-    const aplicados = Object.keys(cambios).filter((k) => k !== "reprocesado_at");
+    const aplicados = Object.keys(cambios);
     const resultado = discrepancias.length ? "conflicto" : aplicados.length ? (aplicados.includes("conceptos") ? "lineas_recuperadas" : "mejorado") : pendientes.length ? "revision_manual" : "sin_cambios";
-    return json({ ok: true, documento_id, motor: VERSION_MOTOR, simulado: simular, resultado, aplicados, cambios: simular ? cambios : undefined, discrepancias, pendientes, calidad, cliente_asignado: !!cambios.entidad_id, conflictos: discrepancias.length });
+    let fin: any = {};
+    if (!simular) {
+      await sb.from("documentos_economicos").update({ ...cambios, reprocesado_at: new Date().toISOString() }).eq("id", documento_id);
+      fin = await cerrarCircuito(sb, doc, antes, { resultado, aplicados, discrepancias, pendientes });
+    }
+    return json({ ok: true, documento_id, motor: VERSION_MOTOR, simulado: simular, resultado, aplicados, cambios: simular ? cambios : undefined, discrepancias, pendientes, ...fin, cliente_asignado: !!cambios.entidad_id, conflictos: discrepancias.length });
   } catch (e) { return json({ error: String(e) }, 500); }
 });
