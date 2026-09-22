@@ -2244,7 +2244,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.96</div>
+        <div class="sub">V2.97</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11280,48 +11280,54 @@ function descargarPDF(){
   let y = 20;
   const logoEl = document.querySelector('.ie-logo');
   const logoSrc = logoEl?.src;
-  if(logoSrc){
-    try{
-      const logoW = 18;
-      const ratio = (logoEl.naturalWidth && logoEl.naturalHeight) ? (logoEl.naturalHeight/logoEl.naturalWidth) : 1;
-      doc.addImage(logoSrc, 'PNG', 15, 14, logoW, logoW*ratio);
-    }catch(e){}
+  // cabecera reutilizable — se repite en cada página nueva del PDF (cliente, obra, tipo de
+  // documento y fila de columnas), para que cualquier página sea comprensible por sí sola
+  function dibujarCabeceraPDF(){
+    let yc = 20;
+    if(logoSrc){
+      try{
+        const logoW = 18;
+        const ratio = (logoEl.naturalWidth && logoEl.naturalHeight) ? (logoEl.naturalHeight/logoEl.naturalWidth) : 1;
+        doc.addImage(logoSrc, 'PNG', 15, 14, logoW, logoW*ratio);
+      }catch(e){}
+    }
+    const xTexto = logoSrc ? 38 : 15;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    doc.text('RAFAEL GÓMEZ MARTÍNEZ', xTexto, yc);
+    if(cfg.hasFiscalHeader){
+      let yf = yc;
+      yf += 5; doc.text('NIF 75706590C', xTexto, yf);
+      yf += 4.5; doc.text('Calle Industria s/n', xTexto, yf);
+      yf += 4.5; doc.text('14290 Fuente Obejuna (Córdoba)', xTexto, yf);
+      yf += 4.5; doc.text('exgomez.m@gmail.com', xTexto, yf);
+    }
+    doc.setFont('helvetica','bold'); doc.setFontSize(10);
+    doc.setTextColor(90,90,90);
+    doc.text(cfg.title, 195, 18, {align:'right'});
+    doc.setTextColor(0,0,0); doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.text(`Nº: ${num}`, 195, 26, {align:'right'});
+    doc.text(`Fecha: ${dateRaw ? formatFechaCorta(dateRaw) : '—'}`, 195, 32, {align:'right'});
+    yc = 50;
+    doc.setDrawColor(27,31,36); doc.setLineWidth(0.5); doc.line(15,yc,195,yc);
+    yc += 8;
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.text('Cliente:', 15, yc);
+    doc.setFont('helvetica','normal');
+    doc.text(client + (nif ? '   NIF/CIF: '+nif : ''), 32, yc);
+    if(addr){ yc += 5; doc.setFontSize(9); doc.text(addr, 15, yc); }
+    if(job && job !== '—'){ yc += 5; doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.text('Obra:', 15, yc); doc.setFont('helvetica','normal'); doc.text(job.split(' — ').pop(), 28, yc); }
+    yc += 10;
+    doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    if(hayFechas) doc.text('Fecha', 15, yc);
+    doc.text('Cant.', hayFechas ? 40 : 15, yc); doc.text('Concepto', xConcepto + (hayFechas?0:20), yc);
+    if(cfg.hasPrecios){ doc.text('Precio', 150, yc, {align:'right'}); }
+    doc.text('Total', 195, yc, {align:'right'});
+    yc += 2; doc.line(15,yc,195,yc); yc += 5;
+    doc.setFont('helvetica','normal');
+    return yc;
   }
-  const xTexto = logoSrc ? 38 : 15;
-  doc.setFont('helvetica','normal'); doc.setFontSize(9);
-  doc.text('RAFAEL GÓMEZ MARTÍNEZ', xTexto, y);
-  if(cfg.hasFiscalHeader){
-    y += 5; doc.text('NIF 75706590C', xTexto, y);
-    y += 4.5; doc.text('Calle Industria s/n', xTexto, y);
-    y += 4.5; doc.text('14290 Fuente Obejuna (Córdoba)', xTexto, y);
-    y += 4.5; doc.text('exgomez.m@gmail.com', xTexto, y);
-  }
-
-  doc.setFont('helvetica','bold'); doc.setFontSize(10);
-  doc.setTextColor(90,90,90);
-  doc.text(cfg.title, 195, 18, {align:'right'});
-  doc.setTextColor(0,0,0); doc.setFont('helvetica','normal'); doc.setFontSize(10);
-  doc.text(`Nº: ${num}`, 195, 26, {align:'right'});
-  doc.text(`Fecha: ${dateRaw ? formatFechaCorta(dateRaw) : '—'}`, 195, 32, {align:'right'});
-
-  y = 50;
-  doc.setDrawColor(27,31,36); doc.setLineWidth(0.5); doc.line(15,y,195,y);
-  y += 8;
-  doc.setFont('helvetica','bold'); doc.text('Cliente:', 15, y);
-  doc.setFont('helvetica','normal');
-  doc.text(client + (nif ? '   NIF/CIF: '+nif : ''), 32, y);
-  if(addr){ y += 5; doc.setFontSize(9); doc.text(addr, 15, y); }
-
-  y += 10;
-  doc.setFont('helvetica','bold'); doc.setFontSize(9);
   const hayFechas = items.some(it=>it.fecha);
   const xConcepto = hayFechas ? 55 : 15;
-  if(hayFechas) doc.text('Fecha', 15, y);
-  doc.text('Cant.', hayFechas ? 40 : 15, y); doc.text('Concepto', xConcepto + (hayFechas?0:20), y);
-  if(cfg.hasPrecios){ doc.text('Precio', 150, y, {align:'right'}); }
-  doc.text('Total', 195, y, {align:'right'});
-  y += 2; doc.line(15,y,195,y); y += 5;
-  doc.setFont('helvetica','normal');
+  y = dibujarCabeceraPDF();
   items.forEach(it=>{
     const lineTotal = (Number(it.qty)||0)*it.price;
     // descripciones largas (habitual en partes de trabajo reales) se parten en varias
@@ -11334,7 +11340,7 @@ function descargarPDF(){
     const anchoConcepto = (cfg.hasPrecios ? 82 : 132) + (hayFechas ? 0 : 20);
     const lineasConcepto = doc.splitTextToSize(it.concept||'—', anchoConcepto);
     const altoFila = Math.max(7, lineasConcepto.length * 4.6 + 2.6);
-    if(y + altoFila > 280){ doc.addPage(); y = 20; } // salto de página si no cabe
+    if(y + altoFila > 275){ doc.addPage(); y = dibujarCabeceraPDF(); } // salto de página con cabecera repetida, no una hoja en blanco
     if(hayFechas) doc.text(it.fecha || '—', 15, y);
     doc.text(String(it.qty), hayFechas ? 40 : 15, y);
     doc.text(lineasConcepto, xConcepto + (hayFechas?0:20), y);
@@ -11346,7 +11352,7 @@ function descargarPDF(){
   });
 
   if(cfg.hasTotales){
-    if(y > 265){ doc.addPage(); y = 20; }
+    if(y > 265){ doc.addPage(); y = dibujarCabeceraPDF(); }
     y += 4; doc.line(120,y,195,y); y += 6;
     const tratamientoIvaPdf = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
     if(cfg.hasBaseIva){
@@ -11380,6 +11386,15 @@ function descargarPDF(){
     }
   }
 
+  // numeración real de página, en todas las páginas del documento — se añade al final,
+  // cuando ya se sabe cuántas páginas tiene en total
+  const totalPaginas = doc.internal.getNumberOfPages();
+  for(let p=1; p<=totalPaginas; p++){
+    doc.setPage(p);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
+    doc.text(`Página ${p}/${totalPaginas}`, 195, 290, {align:'right'});
+    doc.setTextColor(0,0,0);
+  }
   doc.save(`${num || 'documento'}.pdf`);
 }
 
@@ -13459,6 +13474,7 @@ function normalizarDatosDocumentoParaEditor(datos){
     cliente: datos.cliente || null,
     cliente_nif: datos.cliente_nif || null,
     cliente_direccion: datos.cliente_direccion || null,
+    obra: datos.obra || null,
     fecha: datos.fecha || null,
     numero: datos.numero || null,
     iva_pct: datos.iva_pct ?? null,
@@ -13484,9 +13500,18 @@ function abrirEditorConDatosIA(datos){
     // nada guardado, para no pisar un dato bueno con uno leído de una foto
     if(datos.cliente_nif){ const nif = document.getElementById('ni-client-nif'); if(nif && !nif.value) nif.value = datos.cliente_nif; }
     if(datos.cliente_direccion){ const dir = document.getElementById('ni-client-addr'); if(dir && !dir.value) dir.value = datos.cliente_direccion; }
+    // obra/trabajo mencionado en el documento leído — se preserva en el campo de trabajo
+    // asociado como texto libre, aunque no coincida con un trabajo ya dado de alta
+    if(datos.obra){ const job = document.getElementById('ni-job'); if(job && !job.value) job.value = datos.obra; }
     if(Array.isArray(datos.conceptos) && datos.conceptos.length){
       document.getElementById('ie-items-body').innerHTML = '';
-      datos.conceptos.forEach(c=> addItemRow(c.cantidad ?? 1, c.descripcion || '', c.precio_unitario ?? '', '', c.unidad || undefined, c.fecha || undefined));
+      // orden cronológico por si acaso — defensa adicional aunque el extractor ya debe
+      // devolverlas ordenadas; las líneas sin fecha se quedan al final, en su orden original
+      const conFecha = datos.conceptos.map((c,i)=>({c,i})).filter(x=>x.c.fecha);
+      const sinFecha = datos.conceptos.map((c,i)=>({c,i})).filter(x=>!x.c.fecha);
+      conFecha.sort((a,b)=> a.c.fecha < b.c.fecha ? -1 : a.c.fecha > b.c.fecha ? 1 : a.i - b.i);
+      const ordenados = [...conFecha, ...sinFecha].map(x=>x.c);
+      ordenados.forEach(c=> addItemRow(c.cantidad ?? 1, c.descripcion || '', c.precio_unitario ?? '', '', c.unidad || undefined, c.fecha || undefined));
     }
     recalcTotals();
     if(datos.notas) mostrarToast('IA: '+datos.notas);
