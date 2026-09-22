@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.9";
+export const VERSION_MOTOR = "motor-exg-2.10";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -465,7 +465,7 @@ export function direccionNorm(t: any) {
     .replace(/\bN\s*[º°O]?\s*(?=\d)/g, " ").replace(/[^A-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 }
 function direccionesCompatibles(a: any, b: any) { const x = direccionNorm(a), y = direccionNorm(b); return !x || !y || x === y || x.startsWith(y) || y.startsWith(x); }
-export async function resolverCliente(sb: any, cand: { nombre: string | null; nif: string | null; direccion?: string | null; preferidoId?: string | null; bloque?: string[] }, cache?: any) {
+export async function resolverCliente(sb: any, cand: { nombre: string | null; nif: string | null; direccion?: string | null; preferidoId?: string | null; bloque?: string[]; archivo?: string | null }, cache?: any) {
   const nifC = cand.nif && !esDatoEmisor(cand.nif) ? cand.nif.replace(/[^A-Z0-9]/gi, "").toUpperCase() : null;
   const claseC = cand.nombre ? clasificarTexto(cand.nombre) : "vacio";
   // "dudoso" (p.ej. una sola palabra: CARIMSA, URBINA) solo vale si viene respaldado por un NIF
@@ -526,8 +526,12 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
     if (!CLASES_ENTIDAD.includes(claseC) && !(nifC && /^[A-HJ-NP-SUVW]/.test(nifC))) return { estado: "revisar", motivo: "nombre sin forma clara de entidad" };
     // CAR#2: alta automática solo con evidencia fuerte (forma de entidad + NIF oficial válido y libre)
     const nifLibre = nifC && !ents.some((e: any) => (e.nif || "").replace(/[^A-Z0-9]/gi, "").toUpperCase() === nifC);
-    const altaSegura = CLASES_ENTIDAD.includes(claseC) && !!nifC && nifValido(nifC) && nifLibre;
-    return { estado: "nuevo", nombre: nombreOk, nif: nifC, alta_segura: altaSegura, motivo: altaSegura ? "NIF oficial válido y sin ficha" : (nifC ? (nifValido(nifC) ? "NIF ya en otra ficha" : "NIF no supera el control") : "sin NIF") };
+    // CAR#5: DNI sin letra (8 cifras) solo vale si el nombre del archivo corrobora el nombre del cliente
+    const tokensArchivo = norm(String(cand.archivo || "").split("/").pop()).replace(/[^A-Z]/g, " ").split(" ").filter((w) => w.length >= 4);
+    const corroboraArchivo = nombreNorm(nombreOk).split(" ").filter((w) => w.length >= 4).some((w) => tokensArchivo.includes(w));
+    const nifAceptable = !!nifC && (nifValido(nifC) || (/^\d{8}$/.test(nifC) && claseC === "persona" && corroboraArchivo));
+    const altaSegura = CLASES_ENTIDAD.includes(claseC) && nifAceptable && nifLibre;
+    return { estado: "nuevo", nombre: nombreOk, nif: nifC, alta_segura: altaSegura, motivo: altaSegura ? (nifValido(nifC) ? "NIF oficial válido y sin ficha" : "DNI sin letra corroborado por el nombre del archivo") : (nifC ? (nifAceptable ? "NIF ya en otra ficha" : "NIF no supera el control") : "sin NIF") };
   }
   return { estado: "no_resuelto", motivo: `NIF ${nifC} sin ficha y sin nombre válido` };
 }
