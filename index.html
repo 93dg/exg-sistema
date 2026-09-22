@@ -2196,7 +2196,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.83</div>
+        <div class="sub">V2.84</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12314,18 +12314,13 @@ function aiEjecutarAccionTarea(t){
       if(datos.importe) document.getElementById('gasto-importe').value = datos.importe;
     }, 80);
   } else if(t.tipo==='documento'){
-    const contexto = { tipo: datos.tipo_doc || 'presupuesto' };
-    if(datos.cliente) contexto.clientName = datos.cliente;
     document.getElementById('tipo-doc-menu-overlay')?.classList.remove('active');
-    openNewInvoiceModal(contexto);
-    // detección determinista: si el mensaje dictado al asistente menciona ISP, se aplica
-    // igual que en el dictado de líneas — sin gastar IA para esto
-    if(window.__ultimoMensajeAsistente && /inversi[oó]n\s+del?\s+sujeto\s+pasivo|\bISP\b/i.test(window.__ultimoMensajeAsistente)){
-      setTimeout(()=>{
-        const sel = document.getElementById('ie-tratamiento-iva');
-        if(sel){ sel.value = 'isp'; cambiarTratamientoIva(); }
-      }, 150);
-    }
+    // REVISAR = enseñar exactamente lo que se va a crear, no un formulario vacío. Se
+    // reutiliza TODO lo que ya se extrajo (líneas, fecha, IVA, ISP...), venga en el formato
+    // que venga — nunca se tira la extracción para volver a preguntar desde cero.
+    metodoDocContexto = { tipo: datos.tipo_doc || 'presupuesto' };
+    abrirEditorConDatosIA(normalizarDatosDocumentoParaEditor(datos));
+    return; // abrirEditorConDatosIA ya gestiona móvil/escritorio, líneas, fecha e ISP
   } else if(t.tipo==='incidente'){
     if(datos.subtipo==='personal') abrirIncidentePersonal();
     else if(datos.subtipo==='maquina') abrirAveriaMaquina();
@@ -13248,10 +13243,35 @@ async function reenlazarArchivosExistentes(iaLlamadaId, archivosExistentes, orig
     }catch(e){ console.error('No se pudo reenlazar archivo existente', e); }
   }
 }
+// convierte cualquier forma en la que hayan llegado los datos extraídos (chat general
+// o modo dedicado "crear_documento") a la forma única que espera abrirEditorConDatosIA —
+// así REVISAR nunca depende de por qué camino se interpretó la petición
+function normalizarDatosDocumentoParaEditor(datos){
+  datos = datos || {};
+  let conceptos = Array.isArray(datos.conceptos) ? datos.conceptos : null;
+  if(!conceptos && Array.isArray(datos.detalle_proformas)){
+    // forma del asistente general al unificar varias proformas: solo subtotales por
+    // documento, sin líneas de detalle — se listan como una línea por proforma original,
+    // nunca se pierden ni se sustituyen por un formulario en blanco
+    conceptos = datos.detalle_proformas.map(d=>({
+      descripcion: `Proforma nº ${d.num}`, cantidad: 1, precio_unitario: d.subtotal, importe: d.subtotal,
+    }));
+  }
+  return {
+    cliente: datos.cliente || null,
+    fecha: datos.fecha || null,
+    numero: datos.numero || null,
+    iva_pct: datos.iva_pct ?? null,
+    conceptos: conceptos || [],
+    notas: datos.notas || datos.nota_fiscal || null,
+    isp: datos.sujeto_pasivo===true || /sujeto pasivo/i.test(datos.nota_fiscal||''),
+  };
+}
 function abrirEditorConDatosIA(datos){
   const contexto = {...(metodoDocContexto||{})};
   if(datos.cliente) contexto.clientName = datos.cliente;
   const esMovil = window.matchMedia('(max-width: 768px)').matches;
+  const isp = datos.isp || (window.__ultimoMensajeAsistente && /inversi[oó]n\s+del?\s+sujeto\s+pasivo|\bISP\b/i.test(window.__ultimoMensajeAsistente));
   openNewInvoiceModal(contexto);
   setTimeout(()=>{
     if(esMovil && typeof wiz === 'object' && wiz){
@@ -13270,6 +13290,7 @@ function abrirEditorConDatosIA(datos){
     if(datos.fecha){ const f = document.getElementById('ni-date'); if(f) f.value = datos.fecha; }
     if(datos.numero){ const n = document.getElementById('ni-docnum'); if(n) n.value = datos.numero; }
     if(datos.iva_pct != null){ const iv = document.getElementById('ie-iva-pct'); if(iv) iv.value = datos.iva_pct; }
+    if(isp){ const sel = document.getElementById('ie-tratamiento-iva'); if(sel){ sel.value = 'isp'; cambiarTratamientoIva(); } }
     if(Array.isArray(datos.conceptos) && datos.conceptos.length){
       document.getElementById('ie-items-body').innerHTML = '';
       datos.conceptos.forEach(c=> addItemRow(c.cantidad ?? 1, c.descripcion || '', c.precio_unitario ?? '', '', undefined, undefined));
