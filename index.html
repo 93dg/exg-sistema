@@ -2196,7 +2196,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.84</div>
+        <div class="sub">V2.85</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13270,23 +13270,12 @@ function normalizarDatosDocumentoParaEditor(datos){
 function abrirEditorConDatosIA(datos){
   const contexto = {...(metodoDocContexto||{})};
   if(datos.cliente) contexto.clientName = datos.cliente;
-  const esMovil = window.matchMedia('(max-width: 768px)').matches;
   const isp = datos.isp || (window.__ultimoMensajeAsistente && /inversi[oó]n\s+del?\s+sujeto\s+pasivo|\bISP\b/i.test(window.__ultimoMensajeAsistente));
-  openNewInvoiceModal(contexto);
+  // REVISAR/foto-archivo/texto-dictado/continuar deben llegar SIEMPRE al mismo editor real
+  // con formato — nunca al asistente simplificado de pasos, que está pensado para rellenar
+  // a mano desde cero, no para revisar algo que el motor ya preparó con varias líneas
+  openNewInvoiceModal(contexto, true);
   setTimeout(()=>{
-    if(esMovil && typeof wiz === 'object' && wiz){
-      if(datos.fecha) wiz.fecha = datos.fecha;
-      if(Array.isArray(datos.conceptos) && datos.conceptos.length){
-        wiz.conceptos = datos.conceptos.map(c=>({descripcion: c.descripcion||'', desc: c.descripcion||'', cantidad: c.cantidad ?? 1, precio: c.precio_unitario ?? 0}));
-      }
-      // ya tenemos todo lo que la IA pudo sacar: se salta directo a revisión, sin
-      // obligar a repasar cliente/trabajo/conceptos paso a paso si ya están rellenos
-      wiz.i = wiz.pasos.indexOf('revision');
-      if(wiz.i < 0) wiz.i = wiz.pasos.length - 1;
-      wizRender();
-      if(datos.notas) mostrarToast('IA: '+datos.notas);
-      return;
-    }
     if(datos.fecha){ const f = document.getElementById('ni-date'); if(f) f.value = datos.fecha; }
     if(datos.numero){ const n = document.getElementById('ni-docnum'); if(n) n.value = datos.numero; }
     if(datos.iva_pct != null){ const iv = document.getElementById('ie-iva-pct'); if(iv) iv.value = datos.iva_pct; }
@@ -13299,9 +13288,9 @@ function abrirEditorConDatosIA(datos){
     if(datos.notas) mostrarToast('IA: '+datos.notas);
   }, 250); // el editor tarda un instante en montar sus campos
 }
-function openNewInvoiceModal(contexto){
+function openNewInvoiceModal(contexto, forzarEditorCompleto){
   contexto = contexto || {};
-  if(window.matchMedia('(max-width: 768px)').matches){
+  if(window.matchMedia('(max-width: 768px)').matches && !forzarEditorCompleto){
     openInvoiceWizard(contexto);
     return;
   }
@@ -13477,7 +13466,7 @@ function wizRender(){
   nextBtn.onclick = wizNext;
   // regla global: todo paso que no sea realmente imprescindible debe poder omitirse —
   // cliente y conceptos SÍ bloquean (hacen falta para guardar), trabajo no
-  document.getElementById('wiz-omitir-row').style.display = (paso==='trabajo') ? '' : 'none';
+  document.getElementById('wiz-omitir-row').style.display = (paso==='trabajo' || paso==='conceptos') ? '' : 'none';
 
   if(paso==='tipo'){
     document.getElementById('wiz-title').textContent = '¿Qué documento es?';
@@ -13528,16 +13517,18 @@ function wizRender(){
   } else if(paso==='revision'){
     document.getElementById('wiz-title').textContent = 'Revisar y guardar';
     const total = wiz.conceptos.reduce((s,c)=>s+c.cantidad*c.precio,0);
+    const sinConceptos = !wiz.conceptos.length;
     body.innerHTML = `
       <div class="field"><div class="l">Documento</div><div class="v">${DOC_TYPES[wiz.tipo].title}</div></div>
       <div class="field"><div class="l">Cliente</div><div class="v">${wiz.clientName||'—'}</div></div>
       <div class="field"><div class="l">Trabajo</div><div class="v">${wiz.jobLabel||'— sin asociar —'}</div></div>
       <div class="field"><div class="l">Fecha</div><div class="v">${wiz.fecha}</div></div>
+      ${sinConceptos ? `<div class="sub-t" style="color:#D8AA3D;margin:10px 0;">⚠ Falta añadir conceptos — puedes guardar como borrador y completarlos después, pero para emitir hace falta al menos una línea.</div>` : ''}
       <div style="margin:14px 0;">${wiz.conceptos.map(c=>`<div class="task-row"><span style="flex:1;">${c.desc} (${c.cantidad} × ${c.precio}€)</span><b>${(c.cantidad*c.precio).toLocaleString('es-ES',{minimumFractionDigits:2})} €</b></div>`).join('')}</div>
       <div class="field"><div class="l">Total</div><div class="v" style="font-size:20px;font-weight:800;">${total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
       <div class="state-row" style="margin-top:16px;gap:8px;">
         <button class="btn" style="flex:1;" onclick="wizGuardar(true)">Guardar borrador</button>
-        <button class="btn primary" style="flex:1;" onclick="wizGuardar(false)">Emitir</button>
+        <button class="btn primary" style="flex:1;" ${sinConceptos?'disabled title="Añade al menos una línea para emitir"':''} onclick="wizGuardar(false)">Emitir</button>
       </div>`;
     nextBtn.style.display = 'none';
     document.getElementById('wiz-back-btn').style.display = '';
@@ -13590,7 +13581,9 @@ function wizAddConcepto(){
 function wizNext(){
   const paso = wiz.pasos[wiz.i];
   if(paso==='cliente' && !wiz.clientName.trim()){ mostrarToast('Falta el cliente.'); return; }
-  if(paso==='conceptos' && !wiz.conceptos.length){ mostrarToast('Añade al menos una línea.'); return; }
+  // CONCEPTOS ya no bloquea el avance — poder visualizar/preparar el documento es distinto
+  // de poder confirmarlo/emitirlo; si faltan líneas, queda marcado como pendiente en la
+  // revisión, pero no impide siquiera llegar a ver el documento
   if(paso==='datos') wiz.fecha = document.getElementById('wiz-fecha-input').value || wiz.fecha;
   wiz.i++;
   wizRender();
