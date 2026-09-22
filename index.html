@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.77</div>
+        <div class="sub">V2.78</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4373,9 +4373,12 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     </div>
     <div style="display:flex;align-items:center;gap:2px;">
       <button id="ai-panel-propuestas-btn" onclick="abrirAiPropuestas()" title="Propuestas de mejora">💡</button>
-      <button id="ai-panel-historial-btn" onclick="abrirAiHistorial()" title="Historial de peticiones">🕐</button>
       <button id="ai-panel-close" onclick="cerrarAsistenteIA()">✕</button>
     </div>
+  </div>
+  <div class="client-tabs" id="ai-panel-tabs" style="margin:0 20px 8px;">
+    <div class="client-tab active" data-ai-tab="chat" onclick="aiCambiarPestana('chat')">Chat</div>
+    <div class="client-tab" data-ai-tab="historial" onclick="aiCambiarPestana('historial')">Historial</div>
   </div>
 
   <div id="ai-panel-body">
@@ -4434,10 +4437,28 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     </div>
 
     <div class="ai-view" id="ai-view-historial" style="display:none;">
+      <div id="ai-historial-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+        <div class="chip-filter active" data-hf="todas">Todas</div>
+        <div class="chip-filter" data-hf="hoy">Hoy</div>
+        <div class="chip-filter" data-hf="con_ia">Con IA</div>
+        <div class="chip-filter" data-hf="sin_ia">Sin IA</div>
+        <div class="chip-filter" data-hf="con_aprendizaje">Con aprendizaje</div>
+        <div class="chip-filter" data-hf="errores">Errores</div>
+      </div>
       <div id="ai-historial-list"></div>
-      <button style="margin-top:16px;" onclick="reiniciarAsistenteIA()">Volver</button>
     </div>
 
+  </div>
+</div>
+
+<!-- Detalle de una petición del historial — expediente completo -->
+<div class="overlay" id="ai-historial-detalle-overlay" onclick="if(event.target===this) cerrarHistorialDetalle()">
+  <div class="drawer" style="max-width:480px;">
+    <div class="drawer-head">
+      <div><h2 id="hd-titulo">Petición</h2><div class="sub-t" id="hd-fecha"></div></div>
+      <button class="close-x" onclick="cerrarHistorialDetalle()">✕</button>
+    </div>
+    <div class="drawer-body" id="hd-body"></div>
   </div>
 </div>
 
@@ -10835,6 +10856,7 @@ function submitNewJob(ev){
     }).select().single().then(({data, error})=>{
       if(error){ console.error('No se pudo guardar el trabajo en Supabase', error); return; }
       nuevoJob.id = data.id; // así "Crear factura desde este trabajo" funciona sin tener que recargar la página
+      aiRegistrarResultadoSiPendiente('trabajo', 'trabajos', data.id, `${code} — ${client}`);
     });
   }
   renderJobFilters();
@@ -11557,24 +11579,153 @@ function aiMostrarVista(nombre){
 }
 // historial de peticiones al asistente — qué se le pidió, qué entendió, qué se propuso
 // hacer y cuándo. Responde al reporte "no sé dónde coño lo ha puesto ni cómo lo ha hecho".
+let aiHistorialCache = [];
+let aiHistorialFiltroActivo = 'todas';
+function aiCambiarPestana(tab){
+  document.querySelectorAll('#ai-panel-tabs .client-tab').forEach(el=>el.classList.toggle('active', el.dataset.aiTab===tab));
+  if(tab==='historial'){ abrirAiHistorial(); }
+  else { aiMostrarVista(aiTareas.length ? 'tasks' : 'input'); }
+}
 async function abrirAiHistorial(){
   aiMostrarVista('historial');
   const cont = document.getElementById('ai-historial-list');
   if(!sb){ cont.innerHTML = '<div class="empty">Supabase no está conectado.</div>'; return; }
   cont.innerHTML = '<div class="empty">Cargando…</div>';
-  const {data, error} = await sb.from('ia_llamadas').select('*').eq('proceso','asistente-ia').order('creado_at',{ascending:false}).limit(30);
-  if(error || !data || !data.length){ cont.innerHTML = '<div class="empty">Todavía no le has pedido nada al asistente.</div>'; return; }
-  cont.innerHTML = data.map(l=>{
+  const {data, error} = await sb.from('ia_llamadas').select('*').eq('proceso','asistente-ia').order('creado_at',{ascending:false}).limit(60);
+  if(error){ cont.innerHTML = '<div class="empty">Error al cargar.</div>'; return; }
+  aiHistorialCache = data||[];
+  aiRenderHistorialLista();
+}
+function aiRenderHistorialLista(){
+  const cont = document.getElementById('ai-historial-list');
+  const hoy = new Date().toISOString().slice(0,10);
+  const filtradas = aiHistorialCache.filter(l=>{
     const tareas = l.campos_extraidos?.tareas || [];
-    const fecha = new Date(l.creado_at).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    const listaTareas = tareas.length
-      ? tareas.map(t=>`<div style="padding:4px 0;border-top:1px solid var(--line);"><b>${svgEsc(t.titulo||'')}</b><div class="sub-t">${svgEsc(t.propuesta||t.entendido||'')}</div></div>`).join('')
-      : '<div class="sub-t">No se pudo interpretar.</div>';
-    return `<div style="border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;">
-      <div style="font-size:11px;color:var(--ink-soft);">${fecha}${l.coste_estimado ? ' · '+Number(l.coste_estimado).toLocaleString('es-ES',{minimumFractionDigits:4})+' €' : ' · sin coste (reutilizado)'}</div>
-      ${listaTareas}
+    const aprendio = tareas.length && l.convertido_en_regla;
+    if(aiHistorialFiltroActivo==='hoy') return (l.creado_at||'').slice(0,10)===hoy;
+    if(aiHistorialFiltroActivo==='con_ia') return Number(l.coste_estimado||0) > 0;
+    if(aiHistorialFiltroActivo==='sin_ia') return !l.coste_estimado || Number(l.coste_estimado)===0;
+    if(aiHistorialFiltroActivo==='con_aprendizaje') return !!aprendio;
+    if(aiHistorialFiltroActivo==='errores') return l.estado==='error';
+    return true;
+  });
+  if(!filtradas.length){ cont.innerHTML = '<div class="empty">Nada con este filtro.</div>'; return; }
+  cont.innerHTML = filtradas.map(l=>{
+    const tareas = l.campos_extraidos?.tareas || [];
+    const resultados = l.tareas_resultado || [];
+    const fecha = new Date(l.creado_at).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const conIA = Number(l.coste_estimado||0) > 0;
+    const titulo = tareas.length===1 ? (tareas[0].titulo||'Petición') : (tareas.length ? `Petición con ${tareas.length} tareas` : 'Petición');
+    const resumenTareas = tareas.length ? tareas.map(t=>t.titulo).join(' · ') : (l.estado==='error' ? 'No se pudo interpretar' : '—');
+    const aprendio = l.convertido_en_regla;
+    const estadoPill = l.estado==='error' ? `<span class="pill anulado">Error</span>` : `<span class="pill cobrado">Completada</span>`;
+    return `<div style="border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;cursor:pointer;" onclick="aiAbrirDetalleHistorial('${l.id}')">
+      <div style="font-weight:700;font-size:13.5px;margin-bottom:2px;">${svgEsc(titulo)}</div>
+      <div class="sub-t" style="font-size:11px;margin-bottom:4px;">${fecha}</div>
+      <div class="sub-t" style="font-size:12.5px;margin-bottom:6px;">${svgEsc(resumenTareas)}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        ${estadoPill}
+        <span class="pill ${conIA?'pendiente_enviar':'cobrado'}">${conIA ? Number(l.coste_estimado).toLocaleString('es-ES',{minimumFractionDigits:4})+' € IA' : 'Sin IA'}</span>
+        ${resultados.length ? `<span class="pill cobrado">${resultados.length} resultado${resultados.length===1?'':'s'}</span>` : ''}
+        ${aprendio ? `<span class="pill adjudicado">🧠 Aprendió</span>` : ''}
+      </div>
     </div>`;
   }).join('');
+}
+document.addEventListener('click', ev=>{
+  const chip = ev.target.closest('#ai-historial-filtros .chip-filter');
+  if(!chip) return;
+  document.querySelectorAll('#ai-historial-filtros .chip-filter').forEach(c=>c.classList.remove('active'));
+  chip.classList.add('active');
+  aiHistorialFiltroActivo = chip.dataset.hf;
+  aiRenderHistorialLista();
+});
+
+// expediente completo de una petición — todas las secciones pedidas
+function aiAbrirDetalleHistorial(id){
+  const l = aiHistorialCache.find(x=>x.id===id);
+  if(!l) return;
+  const tareas = l.campos_extraidos?.tareas || [];
+  const resultados = l.tareas_resultado || [];
+  const fecha = new Date(l.creado_at).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  document.getElementById('hd-titulo').textContent = tareas.length===1 ? (tareas[0].titulo||'Petición') : `Petición con ${tareas.length} tareas`;
+  document.getElementById('hd-fecha').textContent = fecha;
+
+  const seccion = (titulo, html) => `<div style="margin-bottom:16px;"><div style="font-weight:700;font-size:12px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;">${titulo}</div>${html}</div>`;
+
+  // 1. petición original
+  const peticionHtml = `<div class="ai-card-text">${svgEsc(l.mensaje_usuario || '(sin texto — solo imágenes)')}${l.num_imagenes ? `<div class="sub-t" style="margin-top:4px;">📎 ${l.num_imagenes} archivo${l.num_imagenes===1?'':'s'} adjunto${l.num_imagenes===1?'':'s'}</div>` : ''}</div>`;
+
+  // 2+3+4+5. por cada tarea: entendido, cómo resolvió, propuesta, resultado real
+  const conIA = Number(l.coste_estimado||0) > 0;
+  const comoResolvio = conIA
+    ? `IA externa (Claude) — ${svgEsc(l.motivo||'no había atajo determinista para este caso')}`
+    : (l.estado==='aplicado' && !conIA ? 'Sin IA — resuelto con reglas / conocimiento ya aprendido' : '—');
+
+  const tareasHtml = tareas.length ? tareas.map((t,idx)=>{
+    const res = resultados.find(r=>r.tarea_index===idx);
+    let botonResultado = '';
+    if(res){
+      const accion = {
+        documento: `openDocumentViewer('${res.objeto_id}')`,
+        gasto: `openDocumentViewer('${res.objeto_id}')`,
+        trabajo: `aiIrATrabajoPorId('${res.objeto_id}')`,
+      }[res.objeto_tipo] || null;
+      const etiqueta = {documento:'VER DOCUMENTO', gasto:'VER GASTO', trabajo:'IR AL TRABAJO'}[res.objeto_tipo] || 'VER';
+      botonResultado = accion ? `<button class="btn sm primary" style="margin-top:6px;" onclick="cerrarHistorialDetalle();${accion}">${etiqueta} — ${svgEsc(res.objeto_label)}</button>` : `<div class="sub-t">${svgEsc(res.objeto_label)}</div>`;
+    } else {
+      botonResultado = `<div class="sub-t">${t.estado==='confirmada' ? 'Confirmada, pendiente de guardar en su formulario' : (t.estado==='descartada' ? 'Descartada' : 'Sin confirmar todavía')}</div>`;
+    }
+    return `<div style="border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:4px;">${AI_ICONOS[t.tipo]||'📝'} ${svgEsc(t.titulo||'')}</div>
+      <div class="sub-t" style="margin-bottom:4px;"><b>Entendido:</b> ${svgEsc(t.entendido||'—')}</div>
+      <div class="sub-t" style="margin-bottom:4px;"><b>Datos extraídos:</b> ${svgEsc(Object.entries(t.datos||{}).filter(([k,v])=>v!=null).map(([k,v])=>k+': '+v).join(', ') || '—')}</div>
+      <div class="sub-t" style="margin-bottom:6px;"><b>Propuesta:</b> ${svgEsc(t.propuesta||'—')}</div>
+      ${botonResultado}
+    </div>`;
+  }).join('') : '<div class="sub-t">No se pudo separar en tareas.</div>';
+
+  // 6+7. aprendizaje
+  let aprendizajeHtml = '<div class="sub-t">Esta petición no generó ningún aprendizaje nuevo.</div>';
+  if(l.convertido_en_regla){
+    aprendizajeHtml = `<div class="ai-card-block"><div class="ai-card-text">Esta petición se convirtió en una regla reutilizable del núcleo de conocimiento.</div>
+      <button class="btn sm" style="margin-top:6px;" onclick="cerrarHistorialDetalle();cerrarAsistenteIA();document.querySelector('[data-view=\'conocimiento\']')?.click();">VER EN CONOCIMIENTO</button></div>`;
+  }
+
+  // 8. IA y coste
+  const iaHtml = `<div class="sub-t">
+    <b>¿Usó IA?</b> ${conIA ? 'Sí' : 'No'}<br>
+    ${conIA ? `<b>Coste:</b> ${Number(l.coste_estimado).toLocaleString('es-ES',{minimumFractionDigits:4})} €<br>` : ''}
+    ${l.motivo ? `<b>Motivo:</b> ${svgEsc(l.motivo)}<br>` : ''}
+    ${l.convertido_en_regla ? '<b>Generó aprendizaje reutilizable:</b> sí' : ''}
+  </div>`;
+
+  document.getElementById('hd-body').innerHTML =
+    seccion('1 · Petición original', peticionHtml) +
+    seccion('2-5 · Tareas, interpretación y resultado', tareasHtml) +
+    seccion('6-7 · Aprendizaje generado', aprendizajeHtml) +
+    seccion('8 · Uso de IA y coste', iaHtml) +
+    `<button class="btn primary" style="width:100%;margin-top:4px;" onclick="aiContinuarDesdeHistorial('${l.id}')">CONTINUAR — volver al chat con este contexto</button>`;
+
+  document.getElementById('ai-historial-detalle-overlay').classList.add('active');
+}
+function cerrarHistorialDetalle(){ document.getElementById('ai-historial-detalle-overlay').classList.remove('active'); }
+function aiIrATrabajoPorId(id){
+  const j = jobs.find(x=>x.id===id);
+  document.querySelector('[data-view="trabajos"]')?.click();
+  if(j) setTimeout(()=>openJobDrawer(j.code), 150);
+}
+// vuelve a CHAT manteniendo el contexto de esta petición (cliente/trabajo/documento
+// relacionados), para poder seguir la conversación sin explicarlo todo otra vez
+function aiContinuarDesdeHistorial(id){
+  const l = aiHistorialCache.find(x=>x.id===id);
+  cerrarHistorialDetalle();
+  const tareas = l?.campos_extraidos?.tareas || [];
+  const resumen = tareas.map(t=>t.titulo).join(', ');
+  aiCambiarPestana('chat');
+  const input = document.getElementById('asistente-ia-input');
+  if(input){ input.value = ''; input.placeholder = `Sobre: ${resumen} — escribe qué quieres cambiar o añadir…`; input.focus(); }
+  window.__aiContextoContinuacion = tareas;
 }
 function abrirAsistenteIA(){
   document.getElementById('ai-panel-backdrop').classList.add('active');
@@ -11703,9 +11854,11 @@ async function enviarAsistenteIA(){
       mostrarToast('Error: '+(data.error||'algo ha fallado.'));
       return;
     }
-    aiTareas = (data.tareas||[]).map(t=>({
+    aiTareas = (data.tareas||[]).map((t,idx)=>({
       ...t,
       estado: t.falta ? 'pendiente' : 'lista',
+      _ia_llamada_id: data._ia_llamada_id || null,
+      _tarea_index: idx,
     }));
     aiAdjuntos = []; aiRenderAdjuntos();
     if(!aiTareas.length){
@@ -12037,6 +12190,9 @@ function aiConfirmarTarea(i){
   if(t.estado==='pendiente') return;
   t.estado = 'confirmada';
   aiRegistrarLog(t);
+  // deja marcado a qué petición pertenece esta tarea, para que cuando el usuario guarde
+  // de verdad (factura/trabajo/gasto) el historial sepa qué objeto real se creó
+  if(t._ia_llamada_id != null) aiPendingResultLink = {ia_llamada_id: t._ia_llamada_id, tarea_index: t._tarea_index, tipo: t.tipo};
   cerrarAsistenteIA();
   aiEjecutarAccionTarea(t);
   const siguiente = aiTareas.findIndex(x=>x.estado!=='confirmada' && x.estado!=='descartada');
@@ -12050,6 +12206,18 @@ function aiConfirmarTarea(i){
     aiTareaActiva = siguiente;
     aiRenderTareas();
   }
+}
+// se marca al confirmar una tarea (arriba) y se consume desde el punto de guardado real
+// de cada tipo de objeto — así el historial conoce el resultado final, no solo la propuesta
+let aiPendingResultLink = null;
+async function aiRegistrarResultadoSiPendiente(objetoTipo, objetoTabla, objetoId, objetoLabel){
+  if(!sb || !aiPendingResultLink || aiPendingResultLink.tipo !== objetoTipo) return;
+  const link = aiPendingResultLink;
+  aiPendingResultLink = null;
+  await sb.rpc('registrar_resultado_tarea_asistente', {
+    p_ia_llamada_id: link.ia_llamada_id, p_tarea_index: link.tarea_index,
+    p_objeto_tipo: objetoTipo, p_objeto_tabla: objetoTabla, p_objeto_id: objetoId, p_objeto_label: objetoLabel,
+  });
 }
 function aiDescartarTarea(i){
   aiTareas[i].estado = 'descartada';
@@ -13019,6 +13187,7 @@ async function guardarGasto(){
     const dRaw = new Date(fecha);
     const dateLabel = isNaN(dRaw) ? fecha : formatFechaLabel(dRaw);
     documentosRealesById[data.id] = {...payload, id:data.id, type:'gasto', client: proveedorNombre||'—', dateRaw:fecha, dateLabel, amountLabel: importe.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', total: importe, status:'Pagado', num:'—'};
+    aiRegistrarResultadoSiPendiente('gasto', 'documentos_economicos', data.id, `Gasto — ${concepto} · ${importe.toLocaleString('es-ES',{minimumFractionDigits:2})} €`);
     const row = document.createElement('tr');
     row.dataset.contabilidad = contabilidad;
     row.dataset.recurrencia = recurrencia || '';
@@ -13400,6 +13569,10 @@ async function submitNewInvoice(ev, isDraft){
   }catch(err){ mostrarToast('Error de red al guardar: '+errText(err)); return false; }
 
   documentosRealesById[savedId] = {...payload, id: savedId, type, iban, titular, payment, concepto_transferencia: concepto, ivaPct, items, num, client, job, dateRaw, dateLabel, amountLabel, status, base, iva, total};
+  if(!editingDocId){
+    const labelTipo = {factura:'Factura',albaran:'Albarán',proforma:'Proforma',presupuesto:'Presupuesto'}[type]||'Documento';
+    aiRegistrarResultadoSiPendiente('documento', 'documentos_economicos', savedId, `${labelTipo}${num?' '+num:''} — ${client}`);
+  }
 
   const estadoCobroActual = payload.estado_cobro || estadoCobroPrevio || 'pendiente_enviar';
   const estadoPill = estadoDocumentoSelect(type, savedId, estadoCobroActual, 'nuevo-');
