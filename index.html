@@ -2259,7 +2259,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.13</div>
+        <div class="sub">V3.14</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5144,8 +5144,10 @@ function renderFacturasKPIs(){
     if(tr.style.display==='none') return;
     const tds = tr.querySelectorAll('td');
     if(tds.length < 11) return;
-    const total = parseFloat(tds[8].textContent.replace(/[^\d,.-]/g,'').replace(',','.'))||0;
-    const cob = parseFloat(tds[9].textContent.replace(/[^\d,.-]/g,'').replace(',','.'))||0;
+    // valores NUMÉRICOS internos de la fila (data-total / data-cobrado); el texto "4.888,00 €"
+    // es solo para mostrar y nunca se vuelve a convertir en número
+    const total = Number(tr.dataset.total)||0;
+    const cob = Number(tr.dataset.cobrado)||0;
     facturado += total;
     cobrado += cob;
     if(tds[10].textContent.toLowerCase().includes('vencid')) vencidas++;
@@ -5740,7 +5742,9 @@ function ordenarTabla(tbodyId, colIndex, tipo){
   tbody.dataset.ordDir = dir;
   filas.sort((a,b)=>{
     let va, vb;
-    if(tipo==='num'){
+    if(tipo==='num' && (a.children[colIndex]?.dataset.num != null || b.children[colIndex]?.dataset.num != null)){
+      va = Number(a.children[colIndex]?.dataset.num)||0; vb = Number(b.children[colIndex]?.dataset.num)||0;
+    } else if(tipo==='num'){
       va = Number((a.children[colIndex]?.textContent||'').replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3})/g,'').replace(',','.')) || 0;
       vb = Number((b.children[colIndex]?.textContent||'').replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3})/g,'').replace(',','.')) || 0;
     } else if(tipo==='fecha' || (colIndex===3 && a.dataset.fechaIso)){ // columna Fecha: usar la fecha ISO real, no el texto "7 jun"
@@ -13104,15 +13108,17 @@ const CALIDAD_DETALLE = {
   precio: {titulo:'Líneas con detalle incompleto', explicacion:'Algunas líneas de este documento sí tienen horas/cantidad y precio unitario, y otras no — dentro del mismo documento, lo que indica que el original sí las trae y a alguna línea no se le extrajo bien.', corregible:true},
 };
 function calidadCorta(doc){
+  // estados finales del circuito de calidad: OK · CORREGIDO · REVISAR · CONFLICTO (+ EN CURSO mientras pasa)
   const estado = doc.estado_calidad;
-  if(estado==='corregido_automatico') return {texto:'Corregido', color:'var(--orange)', codigos:[]};
-  if(!estado || estado==='validado') return {texto:'OK', color:'var(--green,#6FA37C)', codigos:[]};
   const m = (doc.info_faltante||'').match(/\[control-calidad: ([^\]]+)\]/);
   const codigos = m ? m[1].split(', ').map(s=>s.trim()).filter(Boolean) : [];
-  if(!codigos.length) return {texto:'OK', color:'var(--green,#6FA37C)', codigos:[]};
+  if(estado==='pendiente' || estado==='en_circuito') return {texto:'En curso', color:'var(--ink-soft,#999)', codigos};
+  if(estado==='conflicto') return {texto:'Conflicto', color:'#9B6BD3', codigos, conflicto:true};
+  if(estado==='corregido_automatico') return {texto:'Corregido', color:'var(--orange)', codigos:[]};
+  if(!estado || estado==='validado' || !codigos.length) return {texto:'OK', color:'var(--green,#6FA37C)', codigos:[]};
   const color = estado==='error' ? 'var(--red,#C4685A)' : '#D8AA3D';
-  if(codigos.length===1) return {texto: (codigos[0]==='total'&&estado==='error') ? 'Error' : (CALIDAD_CODIGOS[codigos[0]]||codigos[0]), color, codigos};
-  return {texto: codigos.length+' fallos', color, codigos};
+  if(codigos.length===1) return {texto:'Revisar · '+(CALIDAD_CODIGOS[codigos[0]]||codigos[0]), color, codigos};
+  return {texto:'Revisar · '+codigos.length, color, codigos};
 }
 function calidadColumnaHtml(doc){
   const c = calidadCorta(doc);
@@ -13122,7 +13128,14 @@ function abrirCalidadDetalle(docId){
   const doc = documentosRealesById[docId];
   if(!doc) return;
   const c = calidadCorta(doc);
-  const bloques = c.codigos.length ? c.codigos.map(cod=>{
+  if(c.conflicto && sb){
+    // un CONFLICTO no es un fallo: el motor actual ve datos distintos a los guardados; se enseñan los dos
+    sb.from('circuito_calidad_log').select('discrepancias, creado').eq('documento_id', docId).order('creado',{ascending:false}).limit(1).maybeSingle().then(({data})=>{
+      const lista = (data?.discrepancias||[]).map(d=>`<div class="ai-card-block"><div class="ai-card-label">${String(d.campo).toUpperCase()}</div><div class="ai-card-text">Guardado: <b>${d.actual??'—'}</b><br>El documento original dice: <b>${d.motor??'—'}</b>${d.evidencia?'<br><span style="opacity:.7">'+d.evidencia+'</span>':''}</div></div>`).join('');
+      const cont = document.getElementById('calidad-conflicto-detalle'); if(cont) cont.innerHTML = lista || 'Sin detalle registrado.';
+    });
+  }
+  const bloques = c.conflicto ? '<div id="calidad-conflicto-detalle">Cargando…</div>' : c.codigos.length ? c.codigos.map(cod=>{
     const d = CALIDAD_DETALLE[cod] || {titulo:cod, explicacion:'', corregible:false};
     return `<div class="ai-card-block"><div class="ai-card-label">${d.titulo}</div><div class="ai-card-text">${d.explicacion}</div></div>`;
   }).join('') : `<div class="ai-card-block"><div class="ai-card-label">Sin problemas</div><div class="ai-card-text">Este documento está validado.</div></div>`;
@@ -14522,12 +14535,13 @@ async function submitNewInvoice(ev, isDraft){
     row.dataset.anio = dateRaw ? dateRaw.slice(0,4) : '';
     row.dataset.trimestre = dateRaw ? String(Math.floor((Number(dateRaw.slice(5,7))-1)/3)+1) : '';
     row.dataset.total = total;
+    row.dataset.cobrado = 0;
     const fechaCorta = formatFechaCorta(dateRaw);
     const baseCreada = ivaPct ? total / (1 + ivaPct/100) : total;
     const ivaCreada = total - baseCreada;
     const baseLabelCreada = baseCreada.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
     const ivaLabelCreada = ivaCreada.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-    row.innerHTML = `<td class="mono">${fechaCorta}</td><td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td class="num">${baseLabelCreada}</td><td class="num">${ivaLabelCreada}</td><td class="num">${ivaPct}%</td><td class="num">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td><td class="celda-gestor-${savedId}"><button class="btn sm" onclick="event.stopPropagation();toggleEnviadoGestor('${savedId}')">Marcar enviada</button></td><td>—</td>`;
+    row.innerHTML = `<td class="mono">${fechaCorta}</td><td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td class="num">${baseLabelCreada}</td><td class="num">${ivaLabelCreada}</td><td class="num">${ivaPct}%</td><td class="num" data-num="${total}">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td><td class="celda-gestor-${savedId}"><button class="btn sm" onclick="event.stopPropagation();toggleEnviadoGestor('${savedId}')">Marcar enviada</button></td><td>—</td>`;
     document.getElementById('econ-facturas-tbody').prepend(row);
     documentosRealesById[savedId].origen_albaran_ids = payload.origen_albaran_ids || [];
     renderControlDocs();
@@ -14535,7 +14549,7 @@ async function submitNewInvoice(ev, isDraft){
     document.querySelector('[data-view="facturas"]').click();
 
   } else if(type==='proforma' || type==='presupuesto'){
-    const rowHtml = `<td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td>${dateLabel}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td>`;
+    const rowHtml = `<td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td>${dateLabel}</td><td class="num" data-num="${total}">${amountLabel}</td><td>${estadoPill}</td>`;
     const row1 = document.createElement('tr'); row1.id = 'docrow-'+savedId; row1.onclick = () => openDocumentViewer(savedId); row1.innerHTML = rowHtml;
     document.getElementById('econ-presupuestos-tbody').prepend(row1);
     const row2 = document.createElement('tr'); row2.onclick = () => openDocumentViewer(savedId); row2.innerHTML = rowHtml; row2.dataset.tipo = type;
@@ -14709,6 +14723,9 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   if(error){ mostrarToast('Error: '+errText(error), 'err'); return; }
   if(documentosRealesById[id]){ Object.assign(documentosRealesById[id], payload); }
   if(payload.cobrado_importe != null){
+    const filaDoc = document.getElementById('docrow-'+id); if(filaDoc) filaDoc.dataset.cobrado = Number(payload.cobrado_importe)||0;
+    const celdaNum = document.querySelector('.celda-cobrado-'+id); if(celdaNum) celdaNum.dataset.num = Number(payload.cobrado_importe)||0;
+    renderFacturasKPIs();
     const celdaCobrado = document.querySelector('.celda-cobrado-'+id);
     if(celdaCobrado) celdaCobrado.textContent = Number(payload.cobrado_importe).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   }
@@ -14737,6 +14754,9 @@ function editarCobrado(id){
     const {error} = await sb.from('documentos_economicos').update({cobrado_importe: valor}).eq('id', id);
     if(error){ mostrarToast('Error: '+errText(error), 'err'); return; }
     if(doc) doc.cobrado_importe = valor;
+    const filaDoc = document.getElementById('docrow-'+id); if(filaDoc) filaDoc.dataset.cobrado = valor;
+    celda.dataset.num = valor;
+    renderFacturasKPIs();
     celda.textContent = valor.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
     celda.onclick = (ev)=>{ ev.stopPropagation(); editarCobrado(id); };
   };
@@ -15011,6 +15031,7 @@ async function cargarDocumentosEconomicosReales(){
         row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : '';
         row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : '';
         row.dataset.total = totalNum;
+        row.dataset.cobrado = doc.cobrado_importe != null ? Number(doc.cobrado_importe) : 0;
         row.dataset.contabilidad = doc.contabilidad || 'oficial';
         const gestorPill = gestorPillHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha);
         const archivoUrlReal = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
@@ -15025,7 +15046,7 @@ async function cargarDocumentosEconomicosReales(){
         const ivaLabel = ivaNum2.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
         const cobradoNum = doc.cobrado_importe != null ? Number(doc.cobrado_importe) : 0;
         const cobradoLabel = cobradoNum.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num">${baseLabel}</td><td class="num">${ivaLabel}</td><td class="num">${ivaPctDoc}%</td><td class="num">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-')}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
+        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num" data-num="${baseNum2}">${baseLabel}</td><td class="num" data-num="${ivaNum2}">${ivaLabel}</td><td class="num" data-num="${ivaPctDoc}">${ivaPctDoc}%</td><td class="num" data-num="${totalNum}">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" data-num="${cobradoNum}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-')}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
         const clienteHtmlP = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '<span class="pill mantenimiento">Falta cliente</span>';
@@ -15033,7 +15054,7 @@ async function cargarDocumentosEconomicosReales(){
         const fechaCortaP = formatFechaCorta(doc.fecha_devengo);
         const archivoUrlRealP = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
         const archivoHtmlP = archivoUrlRealP ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${archivoUrlRealP}')">📎 Ver</a>` : '—';
-        const baseRowHtml = `<td class="mono">${fechaCortaP}</td><td class="mono">${doc.numero||'—'}</td><td>${tipoDocEtiqueta(doc.tipo)}</td><td>${clienteHtmlP}</td><td class="mono">${trabajoHtmlP}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td><td>${archivoHtmlP}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td>`;
+        const baseRowHtml = `<td class="mono">${fechaCortaP}</td><td class="mono">${doc.numero||'—'}</td><td>${tipoDocEtiqueta(doc.tipo)}</td><td>${clienteHtmlP}</td><td class="mono">${trabajoHtmlP}</td><td class="num" data-num="${totalNum}">${amountLabel}</td><td>${estadoPill}</td><td>${archivoHtmlP}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td>`;
         const row = document.createElement('tr'); row.id = 'docrow-'+doc.id; row.onclick = () => toggleExpandirDocFila(doc.id, 9); row.innerHTML = baseRowHtml;
         row.dataset.contabilidad = doc.contabilidad || 'oficial'; row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum; row.dataset.tipo = doc.tipo;
         document.getElementById('econ-presupuestos-tbody')?.appendChild(row);
@@ -15050,7 +15071,7 @@ async function cargarDocumentosEconomicosReales(){
         const recurrenciaHtml = doc.recurrencia ? `<span class="pill planificado">${doc.recurrencia}</span>` : '—';
         const justHtml = doc.estado_justificante==='completo' ? '<span class="pill adjudicado">✓ Justificado</span>' : '<span class="pill noadjudicado">Pendiente justificante</span>';
         const clienteHtmlG = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '—';
-        row.innerHTML = `<td>${dateLabel}</td><td>${doc.concepto||'—'}</td><td>${clienteHtmlG}</td><td>${doc.categoria||'—'}</td><td>${recurrenciaHtml}</td><td class="num">${amountLabel}</td><td>${justHtml}</td>`;
+        row.innerHTML = `<td>${dateLabel}</td><td>${doc.concepto||'—'}</td><td>${clienteHtmlG}</td><td>${doc.categoria||'—'}</td><td>${recurrenciaHtml}</td><td class="num" data-num="${totalNum}">${amountLabel}</td><td>${justHtml}</td>`;
         document.getElementById('econ-gastos-tbody')?.appendChild(row);
       } else if(doc.tipo==='albaran'){
         const clienteHtmlA = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '<span class="pill mantenimiento">Falta cliente</span>';
@@ -15062,7 +15083,7 @@ async function cargarDocumentosEconomicosReales(){
         row.id = 'albrow-'+doc.id;
         row.onclick = () => toggleExpandirDocFila(doc.id, 10);
         row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum;
-        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="alb-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('alb-sel-chk','alb-borrar-sel-btn','alb-sel-count')"></td><td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlA}</td><td class="mono">${trabajoHtmlA}</td><td class="num">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('albaran', doc.id, doc.estado_cobro, 'alb-')}</td><td>${archivoHtmlA}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
+        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="alb-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('alb-sel-chk','alb-borrar-sel-btn','alb-sel-count')"></td><td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlA}</td><td class="mono">${trabajoHtmlA}</td><td class="num" data-num="${totalNum}">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('albaran', doc.id, doc.estado_cobro, 'alb-')}</td><td>${archivoHtmlA}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
         document.getElementById('albaranes-tbody-standalone')?.appendChild(row);
       }
     });
