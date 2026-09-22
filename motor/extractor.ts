@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.1";
+export const VERSION_MOTOR = "motor-exg-2.2";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -66,13 +66,14 @@ export function clasificarTexto(t: any): Clase {
   if (/^[\d.,\s€%-]+$/.test(n)) return "importe";
   if (/\d{1,2}\/\d{1,2}\/\d{2,4}|\bHASTA\b|\bPENDIENTES?\b|\bRELACION DE\b|\bRESUMEN\b|\bLISTADO\b/.test(n)) return "titulo";
   if (/^(PER|PFEA|PROFEA|FINCA|CAMINO|CTRA\.?|CARRETERA|ARROYO|PARAJE|VEREDA|CANADA|VIA VERDE|CORTIJO)\b/.test(n)) return "obra";
-  if (/^(C\/|CL\/|CL\.|C\.\s|CALLE\b|AVDA?\.?\s|AVENIDA|PLAZA\b|PL\.|PZA|PASEO|BARRIADA|URB\.|URBANIZACION|POLIGONO|POL\.|PLG\.?\s|P\.?\s?I\.?\s|APARTADO|APDO)/.test(n) || /\b(S\/N|N[º°O]\s?\d+)\b/.test(n)) return "direccion";
+  if (/^(C\/|CL\/|CL\.|C\.\s|CALLE\b|AVDA?\.?\s|AVENIDA|PLAZA\b|PL\.|PZA|PASEO|BARRIADA|URB\.|URBANIZACION|POLIGONO|POLG\.?\s|POL\.|PLG\.?\s|P\.?\s?I\.?\s|INDUSTRIAL\s|APARTADO|APDO)/.test(n) || /\b(S\/N|N[º°O]\s?\d+)\b/.test(n)) return "direccion";
   if (new RegExp(`\\((${PROVINCIAS}|[A-Z ]{3,20})\\)\\s*,?\\s*(\\d{5})?$`).test(n) || /,?\s*\d{5}$/.test(n) && n.split(" ").length <= 6 || new RegExp(`^(${PROVINCIAS}|${OTRAS_CAPITALES})$`).test(n)) return "poblacion";
   if (/^\d{5}\b/.test(n) || new RegExp(`^[A-Z\\- .]+\\(\\s*(${PROVINCIAS})\\s*\\)$`).test(n) || /^(FUENTE[ -]?OBEJUNA|FT\.? OBEJUNA|CORDOBA|POZOBLANCO|PENARROYA[ -]PUEBLONUEVO|BELMEZ|LA GRANJUELA|VALSEQUILLO|AZUAGA|HINOJOSA DEL DUQUE)$/.test(n)) return "poblacion";
   if (RE_ORGANISMO.test(n)) return "organismo";
   if (RE_EMPRESA.test(n)) return "empresa";
   if (/\d/.test(n)) return /\b\d{1,4}\s*[A-Z]?\s*$/.test(n) ? "direccion" : "dudoso_con_numero";
   const palabras = n.replace(/[.,]/g, " ").split(/\s+/).filter(Boolean);
+  if (/\b(POR|CON|PARA|SIN|TODO|TODOS|MEDIOS|MECANICOS|PUERTA|PRINCIPAL|TRABAJOS?|MAQUINAS?|MAQUINARIA|HORAS|METROS|CAMION|RETRO|CARGA|LIMPIEZA|ARREGLO|REPARACION|MATERIAL(ES)?|ESCOMBROS?|TIERRA|ZAHORRA|HORMIGON|NAVE|PARCELA|SOLAR|TEATRO|COLEGIOS?|PARQUE|CEMENTERIO|PISCINA|DEPURADORA|EDIFICIO|VIVIENDA|CASA|CORRAL|PALOMAS)\b/.test(n)) return "dudoso";
   if (/^[A-ZÑª. ]+$/.test(n) && palabras.length >= 2 && palabras.length <= 6 && palabras.every((p) => p.length >= 1)) return "persona";
   return "dudoso";
 }
@@ -155,7 +156,7 @@ export function detectarTipo(textosCabecera: string[], valorNumero?: any): strin
    4) Etiqueta explícita "Cliente/Nombre/Sr." con valor-entidad tiene prioridad.
    5) Sin evidencia suficiente → null (NO RESUELTO → revisión). Nunca se inventa. */
 type Celda = { r: number; c: number; v: any; t: string; cl: Clase };
-export function detectarCliente(filas: any[][], limiteFila: number) {
+export function detectarCliente(filas: any[][], limiteFila: number, opciones: { textoLibre?: boolean } = {}) {
   const celdas: Celda[] = [];
   const lim = Math.min(limiteFila, filas.length);
   for (let r = 0; r < lim; r++) for (let c = 0; c < (filas[r] || []).length; c++) {
@@ -204,7 +205,8 @@ export function detectarCliente(filas: any[][], limiteFila: number) {
   let ancla: Celda | null = nifsCliente[0] || null;
   if (ancla) nif = extraerNif(ancla.t);
   if (via === "etiqueta_cliente") nif = nifEtiqueta;
-  if (!ancla) ancla = utiles.find((x) => (x.cl === "poblacion" || x.cl === "direccion") && !filasEmisor.has(x.r)) || null;
+  // en texto libre (cartas, .doc) una dirección cualquiera no es ancla fiable: solo NIF, etiqueta u organismo
+  if (!ancla && !opciones.textoLibre) ancla = utiles.find((x) => (x.cl === "poblacion" || x.cl === "direccion") && !filasEmisor.has(x.r)) || null;
   // 3) subir desde el ancla
   if (!nombre && ancla) {
     const candidatos = utiles.filter((x) => x.r <= ancla!.r && x.r >= ancla!.r - 6 && CLASES_ENTIDAD.includes(x.cl) && !esDatoEmisor(x.t))
@@ -230,7 +232,9 @@ export function detectarCliente(filas: any[][], limiteFila: number) {
     if (org) { nombre = org.t; via = "organismo"; }
   }
   if (nombre) nombre = nombre.replace(/^[-–·.,:;\s]+/, "").replace(/\s+/g, " ").trim();
-  return { nombre, nif, direccion, poblacion, via, filas_emisor: [...filasEmisor] };
+  // textos del bloque del destinatario (para contrastar identidad con NIF sin depender de una sola línea)
+  const bloque = ancla ? utiles.filter((x) => x.r <= ancla!.r && x.r >= ancla!.r - 6 && !["importe", "fecha", "vacio"].includes(x.cl)).map((x) => x.t) : [];
+  return { nombre, nif, direccion, poblacion, via, bloque, filas_emisor: [...filasEmisor] };
 }
 
 /* ---------------- NÚMERO ---------------- */
@@ -333,7 +337,7 @@ export function leerTexto(texto: string, anioEsperado?: string) {
     const m = norm(l).match(/(?:N\.?\s*[º°O1]?\.?\s*(?:DE\s*)?(?:FACTURA|PRESUPUESTO)|(?:FACTURA|PRESUPUESTO)\s*(?:N[º°O]?\.?)?)\s*[:.]?\s*([A-Z]{0,4}[-\/]?\d{1,6}[A-Z]?([-\/]\d{1,4})?)\b/);
     if (m) { numero = m[1]; break; }
   }
-  const cliente = detectarCliente(filas, Math.max(limite + 1, 40));
+  const cliente = detectarCliente(filas, Math.max(limite + 1, 40), { textoLibre: true });
   const tipo = detectarTipo(lineas.slice(0, limite), null);
   return { filas, limite, numero, fecha, cliente, tipo };
 }
@@ -343,13 +347,16 @@ export function leerTexto(texto: string, anioEsperado?: string) {
    Solo se permite ficha NUEVA si el candidato tiene forma de entidad.
    Nunca se vincula a una ficha cuyo propio nombre no es una entidad (fichas basura). */
 export function nombreNorm(t: any) { return norm(t).replace(/[.,]/g, " ").replace(/\s+/g, " ").trim(); }
-function parecidos(a: string, b: string): boolean {
-  const ta = nombreNorm(a).split(" ").filter((w) => w.length > 2 && !/^(S ?L|S ?A|DEL?|LA|LOS|LAS|Y)$/.test(w));
-  const tb = new Set(nombreNorm(b).split(" "));
-  const comunes = ta.filter((w) => tb.has(w) || [...tb].some((x) => x.length > 3 && (x.startsWith(w.slice(0, 4)) || w.startsWith(x.slice(0, 4)))));
-  return ta.length === 0 || comunes.length / ta.length >= 0.5;
+const EQUIV: any = { EXCM: "EXCMO", EXMO: "EXCMO", EXM: "EXCMO", EXCMO: "EXCMO", FTE: "FUENTE", FT: "FUENTE", AYTO: "AYUNTAMIENTO" };
+function tokens(t: string) { return nombreNorm(t).split(" ").map((w) => EQUIV[w] || w).filter((w) => w.length > 2 && !/^(SL|SA|SLU|SAL|SCP|SCA|DEL|LAS|LOS|DE)$/.test(w)); }
+export function parecidos(a: string, b: string): boolean {
+  const ta = tokens(a), tb = tokens(b);
+  if (!ta.length || !tb.length) return false;
+  const cerca = (x: string, y: string) => x === y || (x.length >= 4 && y.length >= 4 && (x.startsWith(y.slice(0, 4)) || y.startsWith(x.slice(0, 4)))) || (x.length >= 5 && y.length >= 5 && lev(x, y) <= 2);
+  const comunes = ta.filter((x) => tb.some((y) => cerca(x, y)));
+  return comunes.length / Math.min(ta.length, tb.length) >= 0.5;
 }
-export async function resolverCliente(sb: any, cand: { nombre: string | null; nif: string | null; direccion?: string | null; preferidoId?: string | null }, cache?: any) {
+export async function resolverCliente(sb: any, cand: { nombre: string | null; nif: string | null; direccion?: string | null; preferidoId?: string | null; bloque?: string[] }, cache?: any) {
   const nifC = cand.nif && !esDatoEmisor(cand.nif) ? cand.nif.replace(/[^A-Z0-9]/gi, "").toUpperCase() : null;
   const claseC = cand.nombre ? clasificarTexto(cand.nombre) : "vacio";
   // "dudoso" (p.ej. una sola palabra: CARIMSA, URBINA) solo vale si viene respaldado por un NIF
@@ -362,7 +369,8 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
     const porNif = validas.filter((e: any) => (e.nif || "").replace(/[^A-Z0-9]/gi, "").toUpperCase() === nifC);
     if (porNif.length === 1) {
       // el NIF manda, pero si el nombre del documento no se parece en nada a la ficha de ese NIF, hay contradicción
-      if (cand.nombre && CLASES_ENTIDAD.includes(clasificarTexto(cand.nombre)) && !parecidos(cand.nombre, porNif[0].nombre))
+      const textosBloque = [cand.nombre, ...(cand.bloque || [])].filter(Boolean);
+      if (cand.nombre && CLASES_ENTIDAD.includes(clasificarTexto(cand.nombre)) && !textosBloque.some((t) => parecidos(t, porNif[0].nombre)))
         return { estado: "conflicto", motivo: `NIF de ${porNif[0].nombre} pero nombre ${cand.nombre}`, ids: [porNif[0].id] };
       return { estado: "existente", id: porNif[0].id, nombre: porNif[0].nombre, evidencia: "nif" };
     }
