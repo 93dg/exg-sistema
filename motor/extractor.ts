@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.2";
+export const VERSION_MOTOR = "motor-exg-2.3";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -69,6 +69,9 @@ export function clasificarTexto(t: any): Clase {
   if (/^(C\/|CL\/|CL\.|C\.\s|CALLE\b|AVDA?\.?\s|AVENIDA|PLAZA\b|PL\.|PZA|PASEO|BARRIADA|URB\.|URBANIZACION|POLIGONO|POLG\.?\s|POL\.|PLG\.?\s|P\.?\s?I\.?\s|INDUSTRIAL\s|APARTADO|APDO)/.test(n) || /\b(S\/N|N[º°O]\s?\d+)\b/.test(n)) return "direccion";
   if (new RegExp(`\\((${PROVINCIAS}|[A-Z ]{3,20})\\)\\s*,?\\s*(\\d{5})?$`).test(n) || /,?\s*\d{5}$/.test(n) && n.split(" ").length <= 6 || new RegExp(`^(${PROVINCIAS}|${OTRAS_CAPITALES})$`).test(n)) return "poblacion";
   if (/^\d{5}\b/.test(n) || new RegExp(`^[A-Z\\- .]+\\(\\s*(${PROVINCIAS})\\s*\\)$`).test(n) || /^(FUENTE[ -]?OBEJUNA|FT\.? OBEJUNA|CORDOBA|POZOBLANCO|PENARROYA[ -]PUEBLONUEVO|BELMEZ|LA GRANJUELA|VALSEQUILLO|AZUAGA|HINOJOSA DEL DUQUE)$/.test(n)) return "poblacion";
+  // municipios "X DE <provincia>" y aldeas/parajes de la zona: son lugares, no clientes
+  if (new RegExp(`^[A-Z ]+\\s(DE|DEL)\\s(${PROVINCIAS})$`).test(n) && !RE_ORGANISMO.test(n) && !RE_EMPRESA.test(n)) return "poblacion";
+  if (/^(LOS |LAS |EL |LA )?(OJUELOS|CARDENCHOSA|CORONADA|CUENCA|ARGALLON|PICONCILLO|POSADILLA|MORENOS?|CANADA DEL GAMO|PORVENIR|NAVALCUERVO|ALCORNOCAL|GRANJUELA|PIEDRAS BLANCAS|PANCHEZ|ALTOS|BAJOS|HOYO|ALDEAS?)\b/.test(n) && n.split(" ").length <= 4) return "obra";
   if (RE_ORGANISMO.test(n)) return "organismo";
   if (RE_EMPRESA.test(n)) return "empresa";
   if (/\d/.test(n)) return /\b\d{1,4}\s*[A-Z]?\s*$/.test(n) ? "direccion" : "dudoso_con_numero";
