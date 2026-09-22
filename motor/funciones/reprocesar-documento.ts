@@ -1,4 +1,4 @@
-// reprocesar-documento v17 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
+// reprocesar-documento v18 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
 // Solo reglas. Rellena campos VACÍOS; nunca sobrescribe un dato válido: si el motor ve otra cosa
 // lo devuelve como discrepancia (CONFLICTO) para revisión. 0 IA en esta versión.
 // v17: es el paso central del CIRCUITO DE CALIDAD:
@@ -15,10 +15,20 @@ async function cerrarCircuito(sb: any, doc: any, antes: string[], salida: any) {
   const { data: cal } = await sb.rpc("verificar_calidad", { p_anio: null, p_id: doc.id });
   const { data: tras } = await sb.from("documentos_economicos").select("estado_calidad, info_faltante").eq("id", doc.id).single();
   let estado = tras?.estado_calidad;
+  // lo que el motor dejó PENDIENTE (p.ej. cliente sin ficha fiable) es un fallo real aunque la regla SQL no lo vea:
+  // se añade a los códigos y el documento queda en REVISAR, nunca en OK
+  const extra = (salida.pendientes || []).map((p: any) => ({ entidad_id: "cliente", cliente: "cliente", fecha: "fecha", fecha_devengo: "fecha", numero: "numero", conceptos: "lineas" } as any)[p.campo] || p.campo);
+  let cods = codigos(tras?.info_faltante);
+  if (extra.length) {
+    cods = [...new Set([...cods, ...extra])];
+    const info = String(tras?.info_faltante || "").replace(/\s*\[control-calidad:[^\]]*\]/g, "") + ` [control-calidad: ${cods.join(", ")}]`;
+    await sb.from("documentos_economicos").update({ info_faltante: info }).eq("id", doc.id);
+    if (estado === "validado" || estado === "corregido_automatico") estado = "revision_necesaria";
+  }
   if ((salida.discrepancias || []).length) estado = "conflicto";
   else if ((estado === "validado" || estado === "corregido_automatico") && (salida.aplicados || []).length) estado = "corregido_automatico";
   if (estado !== tras?.estado_calidad) await sb.from("documentos_economicos").update({ estado_calidad: estado }).eq("id", doc.id);
-  await sb.from("circuito_calidad_log").insert({ documento_id: doc.id, motor: VERSION_MOTOR, fallos_antes: antes, resultado: salida.resultado, aplicados: salida.aplicados || [], discrepancias: salida.discrepancias || [], pendientes: salida.pendientes || [], fallos_despues: codigos(tras?.info_faltante), estado_final: estado });
+  await sb.from("circuito_calidad_log").insert({ documento_id: doc.id, motor: VERSION_MOTOR, fallos_antes: antes, resultado: salida.resultado, aplicados: salida.aplicados || [], discrepancias: salida.discrepancias || [], pendientes: salida.pendientes || [], fallos_despues: cods, estado_final: estado });
   return { calidad: cal, estado_final: estado };
 }
 const json = (o: any, status = 200) => new Response(JSON.stringify(o), { status, headers: { ...cors, "Content-Type": "application/json" } });
