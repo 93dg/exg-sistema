@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.76</div>
+        <div class="sub">V2.77</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4487,6 +4487,54 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
   </div>
 </div>
 
+<!-- ================= MÉTODO DE CREACIÓN: FOTO/ARCHIVO · TEXTO/DICTADO · OMITIR ================= -->
+<div class="overlay" id="metodo-doc-overlay" onclick="if(event.target===this) cerrarMetodoDoc()">
+  <div class="drawer" style="max-width:340px;">
+    <div class="drawer-head">
+      <div><h2>Nueva <span id="metodo-doc-tipo-label">factura</span></h2><div style="color:var(--ink-soft);font-size:12.5px;margin-top:3px;">¿Cómo quieres empezar?</div></div>
+      <button class="close-x" onclick="cerrarMetodoDoc()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <button class="btn primary" style="width:100%;margin-bottom:10px;text-align:left;padding:14px;" onclick="abrirMetodoFoto()">📷 Desde foto / archivo<div style="font-weight:400;font-size:12px;color:var(--ink-soft);margin-top:2px;">Sube o fotografía el documento — la IA lo lee y te lo deja listo para revisar</div></button>
+      <button class="btn" style="width:100%;margin-bottom:14px;text-align:left;padding:14px;" onclick="abrirMetodoTexto()">🎤 Desde texto / dictado<div style="font-weight:400;font-size:12px;color:var(--ink-soft);margin-top:2px;">Escribe o dicta lo que necesitas — lo prepara y lo deja listo para revisar</div></button>
+      <div style="text-align:center;"><span class="sub-t" style="cursor:pointer;text-decoration:underline;" onclick="omitirMetodoDoc()">Omitir — abrir el editor vacío</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Foto/archivo: subir varios ficheros + instrucción opcional -->
+<div class="overlay" id="metodo-foto-overlay" onclick="if(event.target===this) cerrarMetodoFoto()">
+  <div class="drawer" style="max-width:360px;">
+    <div class="drawer-head">
+      <div><h2>📷 Desde foto / archivo</h2></div>
+      <button class="close-x" onclick="cerrarMetodoFoto()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <input type="file" id="metodo-foto-input" accept="image/*,application/pdf" multiple capture="environment" style="width:100%;margin-bottom:10px;">
+      <div id="metodo-foto-lista" class="sub-t" style="margin-bottom:10px;"></div>
+      <textarea class="search-box" id="metodo-foto-instrucciones" style="width:100%;min-height:60px;resize:vertical;margin-bottom:12px;" placeholder="Instrucciones opcionales — ej. «estas tres proformas son del mismo trabajo, unifícalas en una»"></textarea>
+      <button class="btn primary" style="width:100%;" id="metodo-foto-btn" onclick="procesarMetodoFoto()">Procesar</button>
+      <div id="metodo-foto-status" class="sub-t" style="margin-top:8px;text-align:center;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Texto/dictado: prompt libre -->
+<div class="overlay" id="metodo-texto-overlay" onclick="if(event.target===this) cerrarMetodoTexto()">
+  <div class="drawer" style="max-width:360px;">
+    <div class="drawer-head">
+      <div><h2>🎤 Desde texto / dictado</h2></div>
+      <button class="close-x" onclick="cerrarMetodoTexto()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <textarea class="search-box" id="metodo-texto-input" style="width:100%;min-height:90px;resize:vertical;margin-bottom:10px;" placeholder="Ej. «Factura para Rafael Ventura, 3 horas de mixta a 30€, hoy»"></textarea>
+      <button class="btn sm" id="metodo-texto-mic" style="margin-bottom:12px;" onclick="toggleDictadoMetodoTexto()">🎙️ Dictar</button>
+      <button class="btn primary" style="width:100%;" id="metodo-texto-btn" onclick="procesarMetodoTexto()">Procesar</button>
+      <div id="metodo-texto-status" class="sub-t" style="margin-top:8px;text-align:center;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ================= MENÚ AL PINCHAR UN DÍA DEL CALENDARIO ================= -->
 <div class="overlay" id="dia-menu-overlay" onclick="if(event.target===this) cerrarMenuDia()">
   <div class="drawer" style="max-width:340px;">
@@ -4509,6 +4557,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       <button class="close-x" onclick="closeInvoiceWizard()">✕</button>
     </div>
     <div class="drawer-body" id="wiz-step-body"></div>
+    <div id="wiz-omitir-row" style="text-align:center;padding:0 20px 6px;display:none;"><span class="sub-t" style="cursor:pointer;text-decoration:underline;" onclick="wizOmitirPaso()">Omitir — se puede completar después</span></div>
     <div class="state-row" style="padding:16px 20px;gap:8px;">
       <button class="btn" id="wiz-back-btn" onclick="wizBack()">Atrás</button>
       <button class="btn primary" id="wiz-next-btn" style="flex:1;" onclick="wizNext()">Siguiente</button>
@@ -12693,9 +12742,159 @@ function abrirMenuTipoDoc(){
 }
 function elegirTipoDoc(tipo){
   document.getElementById('tipo-doc-menu-overlay').classList.remove('active');
+  abrirMetodoDoc({tipo});
+}
+// contexto pendiente mientras se elige el método (foto/texto/omitir) — se completa con lo
+// que devuelva la IA antes de abrir el editor real
+let metodoDocContexto = null;
+function abrirMetodoDoc(contexto){
+  metodoDocContexto = contexto;
+  const label = {factura:'factura', albaran:'albarán', presupuesto:'presupuesto', proforma:'proforma'}[contexto.tipo] || 'documento';
+  document.getElementById('metodo-doc-tipo-label').textContent = label;
+  document.getElementById('metodo-doc-overlay').classList.add('active');
+}
+function cerrarMetodoDoc(){ document.getElementById('metodo-doc-overlay').classList.remove('active'); }
+function omitirMetodoDoc(){
+  cerrarMetodoDoc();
+  try{ openNewInvoiceModal(metodoDocContexto || {}); }catch(e){ mostrarToast('Error al abrir documento: '+e.message); console.error(e); }
+}
+
+// ---- Desde foto/archivo ----
+function abrirMetodoFoto(){
+  cerrarMetodoDoc();
+  document.getElementById('metodo-foto-input').value = '';
+  document.getElementById('metodo-foto-lista').textContent = '';
+  document.getElementById('metodo-foto-instrucciones').value = '';
+  document.getElementById('metodo-foto-status').textContent = '';
+  document.getElementById('metodo-foto-overlay').classList.add('active');
+}
+function cerrarMetodoFoto(){ document.getElementById('metodo-foto-overlay').classList.remove('active'); }
+document.addEventListener('change', ev=>{
+  if(ev.target?.id !== 'metodo-foto-input') return;
+  const files = Array.from(ev.target.files||[]);
+  document.getElementById('metodo-foto-lista').textContent = files.length ? `${files.length} archivo${files.length===1?'':'s'} seleccionado${files.length===1?'':'s'}: ${files.map(f=>f.name).join(', ')}` : '';
+});
+async function procesarMetodoFoto(){
+  const files = Array.from(document.getElementById('metodo-foto-input').files||[]);
+  if(!files.length){ mostrarToast('Elige al menos una foto o archivo.'); return; }
+  const instrucciones = document.getElementById('metodo-foto-instrucciones').value.trim();
+  const btn = document.getElementById('metodo-foto-btn');
+  const statusEl = document.getElementById('metodo-foto-status');
+  btn.disabled = true;
+  statusEl.textContent = 'Leyendo…';
   try{
-    openNewInvoiceModal({tipo});
-  }catch(e){ mostrarToast('Error al abrir documento: '+e.message); console.error(e); }
+    const imagenes = await Promise.all(files.map(f=>new Promise((res,rej)=>{
+      const r = new FileReader();
+      r.onload = ()=>res({data: r.result.split(',')[1], media_type: f.type || 'application/octet-stream'});
+      r.onerror = rej;
+      r.readAsDataURL(f);
+    })));
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/asistente-ia', {
+      method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY},
+      body: JSON.stringify({modo:'crear_documento', mensaje: instrucciones || null, imagenes}),
+    });
+    const data = await resp.json();
+    if(!resp.ok || data.error){ statusEl.textContent = 'Error: '+(data.error||'algo ha fallado.'); btn.disabled=false; return; }
+    cerrarMetodoFoto();
+    abrirEditorConDatosIA(data);
+  }catch(err){
+    statusEl.textContent = 'Error de red: '+err.message;
+    btn.disabled = false;
+  }
+}
+
+// ---- Desde texto/dictado ----
+let metodoTextoDictadoActivo = false, metodoTextoReconocedor = null;
+function abrirMetodoTexto(){
+  cerrarMetodoDoc();
+  document.getElementById('metodo-texto-input').value = '';
+  document.getElementById('metodo-texto-status').textContent = '';
+  document.getElementById('metodo-texto-overlay').classList.add('active');
+}
+function cerrarMetodoTexto(){
+  if(metodoTextoDictadoActivo && metodoTextoReconocedor){ try{metodoTextoReconocedor.stop();}catch(e){} }
+  document.getElementById('metodo-texto-overlay').classList.remove('active');
+}
+function toggleDictadoMetodoTexto(){
+  const micBtn = document.getElementById('metodo-texto-mic');
+  const Reconocedor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!Reconocedor){ mostrarToast('Este navegador no permite dictar por voz. Escribe el texto a mano.'); return; }
+  if(metodoTextoDictadoActivo){
+    if(metodoTextoReconocedor) metodoTextoReconocedor.stop();
+    metodoTextoDictadoActivo = false;
+    micBtn.textContent = '🎙️ Dictar';
+    return;
+  }
+  metodoTextoReconocedor = new Reconocedor();
+  metodoTextoReconocedor.lang = 'es-ES';
+  metodoTextoReconocedor.continuous = true;
+  metodoTextoReconocedor.interimResults = false;
+  metodoTextoReconocedor.onresult = (event)=>{
+    const ta = document.getElementById('metodo-texto-input');
+    let nuevo = '';
+    for(let i=event.resultIndex;i<event.results.length;i++) nuevo += event.results[i][0].transcript;
+    ta.value = (ta.value ? ta.value+' ' : '') + nuevo;
+  };
+  metodoTextoReconocedor.onend = ()=>{ metodoTextoDictadoActivo=false; micBtn.textContent='🎙️ Dictar'; };
+  metodoTextoReconocedor.start();
+  metodoTextoDictadoActivo = true;
+  micBtn.textContent = '⏹ Detener';
+}
+async function procesarMetodoTexto(){
+  const texto = document.getElementById('metodo-texto-input').value.trim();
+  if(!texto){ mostrarToast('Escribe o dicta algo primero.'); return; }
+  const btn = document.getElementById('metodo-texto-btn');
+  const statusEl = document.getElementById('metodo-texto-status');
+  btn.disabled = true;
+  statusEl.textContent = 'Interpretando…';
+  try{
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/asistente-ia', {
+      method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY},
+      body: JSON.stringify({modo:'crear_documento', mensaje: texto}),
+    });
+    const data = await resp.json();
+    if(!resp.ok || data.error){ statusEl.textContent = 'Error: '+(data.error||'algo ha fallado.'); btn.disabled=false; return; }
+    cerrarMetodoTexto();
+    abrirEditorConDatosIA(data);
+  }catch(err){
+    statusEl.textContent = 'Error de red: '+err.message;
+    btn.disabled = false;
+  }
+}
+
+// abre el editor normal de siempre, ya relleno con lo que ha extraído la IA — nunca se
+// guarda solo, el usuario revisa y confirma como con cualquier documento. En móvil el
+// "editor normal" es el asistente por pasos (wiz), así que se rellena ahí y se salta
+// directo a la revisión en vez de repetir cliente/trabajo/conceptos paso a paso.
+function abrirEditorConDatosIA(datos){
+  const contexto = {...(metodoDocContexto||{})};
+  if(datos.cliente) contexto.clientName = datos.cliente;
+  const esMovil = window.matchMedia('(max-width: 768px)').matches;
+  openNewInvoiceModal(contexto);
+  setTimeout(()=>{
+    if(esMovil && typeof wiz === 'object' && wiz){
+      if(datos.fecha) wiz.fecha = datos.fecha;
+      if(Array.isArray(datos.conceptos) && datos.conceptos.length){
+        wiz.conceptos = datos.conceptos.map(c=>({descripcion: c.descripcion||'', desc: c.descripcion||'', cantidad: c.cantidad ?? 1, precio: c.precio_unitario ?? 0}));
+      }
+      // ya tenemos todo lo que la IA pudo sacar: se salta directo a revisión, sin
+      // obligar a repasar cliente/trabajo/conceptos paso a paso si ya están rellenos
+      wiz.i = wiz.pasos.indexOf('revision');
+      if(wiz.i < 0) wiz.i = wiz.pasos.length - 1;
+      wizRender();
+      if(datos.notas) mostrarToast('IA: '+datos.notas);
+      return;
+    }
+    if(datos.fecha){ const f = document.getElementById('ni-date'); if(f) f.value = datos.fecha; }
+    if(datos.numero){ const n = document.getElementById('ni-docnum'); if(n) n.value = datos.numero; }
+    if(datos.iva_pct != null){ const iv = document.getElementById('ie-iva-pct'); if(iv) iv.value = datos.iva_pct; }
+    if(Array.isArray(datos.conceptos) && datos.conceptos.length){
+      document.getElementById('ie-items-body').innerHTML = '';
+      datos.conceptos.forEach(c=> addItemRow(c.cantidad ?? 1, c.descripcion || '', c.precio_unitario ?? '', '', undefined, undefined));
+    }
+    recalcTotals();
+    if(datos.notas) mostrarToast('IA: '+datos.notas);
+  }, 250); // el editor tarda un instante en montar sus campos
 }
 function openNewInvoiceModal(contexto){
   contexto = contexto || {};
@@ -12871,6 +13070,9 @@ function wizRender(){
   const nextBtn = document.getElementById('wiz-next-btn');
   nextBtn.textContent = 'Siguiente';
   nextBtn.onclick = wizNext;
+  // regla global: todo paso que no sea realmente imprescindible debe poder omitirse —
+  // cliente y conceptos SÍ bloquean (hacen falta para guardar), trabajo no
+  document.getElementById('wiz-omitir-row').style.display = (paso==='trabajo') ? '' : 'none';
 
   if(paso==='tipo'){
     document.getElementById('wiz-title').textContent = '¿Qué documento es?';
@@ -12985,6 +13187,14 @@ function wizNext(){
   if(paso==='cliente' && !wiz.clientName.trim()){ mostrarToast('Falta el cliente.'); return; }
   if(paso==='conceptos' && !wiz.conceptos.length){ mostrarToast('Añade al menos una línea.'); return; }
   if(paso==='datos') wiz.fecha = document.getElementById('wiz-fecha-input').value || wiz.fecha;
+  wiz.i++;
+  wizRender();
+}
+// deja el paso actual vacío a propósito y avanza — solo disponible en pasos que no son
+// imprescindibles para guardar (hoy: "trabajo")
+function wizOmitirPaso(){
+  const paso = wiz.pasos[wiz.i];
+  if(paso==='trabajo') wiz.jobLabel = '';
   wiz.i++;
   wizRender();
 }
