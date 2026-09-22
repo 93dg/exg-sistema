@@ -1,4 +1,4 @@
-// reprocesar-documento v19 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
+// reprocesar-documento v20 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
 // Solo reglas. Rellena campos VACÍOS; nunca sobrescribe un dato válido: si el motor ve otra cosa
 // lo devuelve como discrepancia (CONFLICTO) para revisión. 0 IA en esta versión.
 // v17: es el paso central del CIRCUITO DE CALIDAD:
@@ -6,7 +6,7 @@
 //   → REVALIDAR → estado final: validado (OK) | corregido_automatico | revision_necesaria/error (REVISAR) | conflicto
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import WordExtractor from "npm:word-extractor@1.0.4";
-import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/402809b4d598f463f496ec63f781db3448062b38/motor/extractor.ts";
+import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/fc7de7a7431c03b8e8ed1c38f75444b6fc78732d/motor/extractor.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const codigos = (info: any) => (String(info || "").match(/\[control-calidad: ([^\]]+)\]/)?.[1] || "").split(", ").filter(Boolean);
@@ -103,9 +103,10 @@ Deno.serve(async (req) => {
         cambios.entidad_id = res.id;
         if (res.enriquecer_nif && !simular) await sb.rpc("consolidar_cliente_dato", { p_entidad_id: res.id, p_campo: "nif", p_valor: res.enriquecer_nif, p_origen: "motor:" + VERSION_MOTOR });
       }
-      else if (res.estado === "nuevo" && crear_clientes === true && !simular) {
+      else if (res.estado === "nuevo" && (res.alta_segura || crear_clientes === true)) {
+        if (simular) { cambios.entidad_id = `(nueva ficha: ${res.nombre} · ${res.nif})`; } else {
         const { data: nueva } = await sb.from("entidades").insert({ nombre: String(res.nombre).toUpperCase(), tipo: "cliente", nif: res.nif || null, direccion: r.cliente.direccion ? String(r.cliente.direccion).toUpperCase() : null, poblacion: r.cliente.poblacion ? String(r.cliente.poblacion).toUpperCase() : null }).select("id").single();
-        if (nueva) cambios.entidad_id = nueva.id;
+        if (nueva) cambios.entidad_id = nueva.id; }
       } else pendientes.push({ campo: "cliente", estado: res.estado, propuesta: res.nombre || r.cliente.nombre || null, motivo: res.motivo || null });
     }
     // tipo documental: nunca automático
