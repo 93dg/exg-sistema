@@ -2197,7 +2197,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.92</div>
+        <div class="sub">V2.93</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4675,6 +4675,13 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <div class="ie-client-row" id="ni-client-fiscal" style="display:none;">
           <div class="field" style="flex:1;"><div class="l">NIF / CIF del cliente</div><input class="search-box" style="width:100%;" id="ni-client-nif"></div>
           <div class="field" style="flex:2;"><div class="l">Dirección del cliente</div><input class="search-box" style="width:100%;" id="ni-client-addr"></div>
+        </div>
+        <div class="ie-client-row" id="ni-client-fiscal-2" style="display:none;gap:10px;flex-wrap:wrap;">
+          <div class="field" style="flex:1;min-width:100px;"><div class="l">Código postal</div><input class="search-box" style="width:100%;" id="ni-client-cp"></div>
+          <div class="field" style="flex:2;min-width:140px;"><div class="l">Población</div><input class="search-box" style="width:100%;" id="ni-client-poblacion"></div>
+          <div class="field" style="flex:2;min-width:140px;"><div class="l">Provincia</div><input class="search-box" style="width:100%;" id="ni-client-provincia"></div>
+          <div class="field" style="flex:2;min-width:140px;"><div class="l">Teléfono (opcional)</div><input class="search-box" style="width:100%;" id="ni-client-telefono"></div>
+          <div class="field" style="flex:3;min-width:180px;"><div class="l">Email (opcional)</div><input class="search-box" style="width:100%;" id="ni-client-email"></div>
         </div>
 
         <table class="ie-items">
@@ -10636,10 +10643,20 @@ function onClientChange(){
   const sel = document.getElementById('ni-client');
   if(sel.value==='__new__'){ openNewClientModal('ni-client'); return; }
   const name = sel.value;
-  const data = clientFiscalData[name];
+  // los datos reales del cliente ya están cargados en memoria (cargarEntidadesReales) —
+  // antes esto miraba solo un caché aparte que solo se rellenaba al crear un cliente NUEVO,
+  // así que para cualquier cliente ya existente todo esto salía siempre vacío
+  const entidad = clientes.find(c=>c.name===name) || {};
+  const data = clientFiscalData[name]; // compatibilidad con clientes creados en esta sesión
   document.getElementById('ni-client-fiscal').style.display = name ? 'flex' : 'none';
-  document.getElementById('ni-client-nif').value = data ? data.nif : '';
-  document.getElementById('ni-client-addr').value = data ? data.addr : '';
+  document.getElementById('ni-client-fiscal-2').style.display = name ? 'flex' : 'none';
+  document.getElementById('ni-client-nif').value = entidad.nif || (data ? data.nif : '') || '';
+  document.getElementById('ni-client-addr').value = entidad.direccion || (data ? data.addr : '') || '';
+  document.getElementById('ni-client-cp').value = entidad.cp || '';
+  document.getElementById('ni-client-poblacion').value = entidad.poblacion || '';
+  document.getElementById('ni-client-provincia').value = entidad.provincia || '';
+  document.getElementById('ni-client-telefono').value = entidad.telefono || '';
+  document.getElementById('ni-client-email').value = entidad.email || '';
 }
 
 function openNewClientModal(targetSelectId){
@@ -13892,16 +13909,29 @@ async function submitNewInvoice(ev, isDraft){
   const jobCode = job !== '—' ? job.split(' — ')[0].trim() : null;
   const trabajo = jobCode ? jobs.find(j=>j.code===jobCode) : null;
 
-  // si has escrito NIF/dirección aquí y la ficha del cliente no los tenía guardados,
-  // se actualizan también en el cliente — nunca se pisa un dato ya bueno con uno distinto
+  // si has escrito NIF/dirección/población/etc. aquí y la ficha del cliente no los tenía
+  // guardados, se actualizan también en el cliente — nunca se pisa un dato ya bueno
   if(entidad?.id){
     const nifEditor = document.getElementById('ni-client-nif').value.trim();
     const addrEditor = document.getElementById('ni-client-addr').value.trim();
-    const {data: entidadActual} = await sb.from('entidades').select('nif,direccion').eq('id', entidad.id).maybeSingle();
+    const cpEditor = document.getElementById('ni-client-cp').value.trim();
+    const poblacionEditor = document.getElementById('ni-client-poblacion').value.trim();
+    const provinciaEditor = document.getElementById('ni-client-provincia').value.trim();
+    const telefonoEditor = document.getElementById('ni-client-telefono').value.trim();
+    const emailEditor = document.getElementById('ni-client-email').value.trim();
+    const {data: entidadActual} = await sb.from('entidades').select('nif,direccion,cp,poblacion,provincia,telefono,email').eq('id', entidad.id).maybeSingle();
     const patchEntidad = {};
     if(nifEditor && !entidadActual?.nif) patchEntidad.nif = nifEditor.toUpperCase();
     if(addrEditor && !entidadActual?.direccion) patchEntidad.direccion = addrEditor.toUpperCase();
-    if(Object.keys(patchEntidad).length) await sb.from('entidades').update(patchEntidad).eq('id', entidad.id);
+    if(cpEditor && !entidadActual?.cp) patchEntidad.cp = cpEditor;
+    if(poblacionEditor && !entidadActual?.poblacion) patchEntidad.poblacion = poblacionEditor.toUpperCase();
+    if(provinciaEditor && !entidadActual?.provincia) patchEntidad.provincia = provinciaEditor.toUpperCase();
+    if(telefonoEditor && !entidadActual?.telefono) patchEntidad.telefono = telefonoEditor;
+    if(emailEditor && !entidadActual?.email) patchEntidad.email = emailEditor;
+    if(Object.keys(patchEntidad).length){
+      await sb.from('entidades').update(patchEntidad).eq('id', entidad.id);
+      Object.assign(entidad, patchEntidad); // refleja el cambio también en memoria, sin esperar a recargar
+    }
   }
 
   const conceptos = items.map(it=>({
