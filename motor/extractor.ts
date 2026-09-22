@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.3";
+export const VERSION_MOTOR = "motor-exg-2.4";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -264,6 +264,81 @@ function numeroDesdeRejilla(filas: any[][], limiteFila: number) {
   return { numero, valorBruto };
 }
 
+
+/* ---------------- LÍNEAS, IVA Y TOTALES (hoja) ---------------- */
+export function esLineaResumen(t: any) { return /^(SUBTOTAL|TOTAL|I\.?V\.?A\.?|BASE IMPONIBLE|IMPUESTO)/i.test(String(t || "").trim()); }
+export function lineasYTotales(filas: any[][], wb?: any) {
+  let filaCab = -1, colHoras = -1, colConcepto = -1, colPrecio = -1, colTotal = -1, colCantidad = -1;
+  for (let r = 0; r < filas.length && filaCab < 0; r++) {
+    const fila = filas[r] || [];
+    const esCab = fila.some((v: any) => typeof v === "string" && (/^Concepto\b/i.test(v.trim()) || /Descripci[óo]n/i.test(v) || /^Lote\s*\d*$/i.test(v.trim())));
+    if (!esCab) continue;
+    filaCab = r;
+    fila.forEach((v: any, c: number) => {
+      if (typeof v !== "string") return; const t = v.trim();
+      if (/^Horas?$/i.test(t)) colHoras = c;
+      else if (/^(Cant\.?(idad)?|m[²³23]?|ml|ud\.?|uds\.?|unidades)$/i.test(t) && colCantidad < 0) colCantidad = c;
+      else if (/^Concepto\b/i.test(t) || /Descripci[óo]n/i.test(t) || /^Lote\s*\d*$/i.test(t)) colConcepto = c;
+      else if (/^Precio(\s*unitario)?$/i.test(t)) colPrecio = c;
+      else if (/^(TOTAL|IMPORTE)$/i.test(t)) colTotal = c;
+      else if (colTotal < 0 && colPrecio >= 0 && c > colPrecio && /^CANTIDAD$/i.test(t)) colTotal = c;
+    });
+  }
+  const conceptos: any[] = [];
+  if (filaCab >= 0 && colConcepto >= 0) {
+    let blancos = 0;
+    for (let r = filaCab + 1; r < filas.length; r++) {
+      const f = filas[r] || [];
+      const horas = colHoras >= 0 ? f[colHoras] : null, cant = colCantidad >= 0 ? f[colCantidad] : null;
+      const precio = colPrecio >= 0 ? f[colPrecio] : null, tot = colTotal >= 0 ? f[colTotal] : null;
+      const texto = typeof f[colConcepto] === "string" ? f[colConcepto].trim() : "";
+      if (texto && esLineaResumen(texto)) break;
+      if (!f.some((v: any) => v !== "")) { if (++blancos >= 5) break; continue; }
+      blancos = 0;
+      if (typeof horas === "number" || typeof cant === "number" || typeof tot === "number") {
+        const o: any = { descripcion: texto || null, horas: typeof horas === "number" ? horas : null, precio_unitario: typeof precio === "number" ? precio : null, importe: typeof tot === "number" ? tot : null };
+        if (typeof cant === "number") o.cantidad = cant; else if (typeof horas === "number") o.cantidad = horas;
+        else if (o.precio_unitario != null && o.importe != null && Math.abs(o.precio_unitario - o.importe) < 0.01) o.cantidad = 1;
+        conceptos.push(o);
+      } else if (texto && conceptos.length) conceptos[conceptos.length - 1].descripcion = ((conceptos[conceptos.length - 1].descripcion || "") + " " + texto).trim();
+    }
+  }
+  let importe: number | null = null, ivaPct: number | null = null, hayIva = false, tratamiento: "normal" | "isp" = "normal";
+  for (const f of filas) for (const v of f) if (typeof v === "string") {
+    if (/I\.?V\.?A\.?/i.test(v)) hayIva = true;
+    if (ivaPct == null) { const m = v.match(/I\.?V\.?A\.?\s*(\d{1,2}(?:[.,]\d+)?)\s*%/i); if (m) ivaPct = Number(m[1].replace(",", ".")); }
+    if (/inversi[oó]n\s+del\s+sujeto\s+pasivo|art\.?\s*84\.?\s*uno\.?\s*2/i.test(v)) tratamiento = "isp";
+  }
+  const tpl = wb?.Sheets?.["TemplateInformation"];
+  if (tpl) {
+    const ft: any[][] = XLSX.utils.sheet_to_json(tpl, { header: 1, raw: true, defval: "" });
+    const campos = ft.find((f) => f[0] === "Nombre del campo:"), valores = ft.find((f) => f[0] === "Hace referencia a:");
+    if (campos && valores) { const iT = campos.indexOf("Total de la factura"); if (iT > 0 && typeof valores[iT] === "number" && valores[iT] > 0) importe = valores[iT]; }
+  }
+  let subPie: number | null = null, totPie: number | null = null;
+  for (const f of filas) for (let c = 0; c < f.length; c++) {
+    const v = f[c]; if (typeof v !== "string") continue; const t = v.trim();
+    const num = () => f.slice(c + 1).find((x: any) => typeof x === "number");
+    if (subPie == null && /^(SUBTOTAL|BASE(\s+IMPONIBLE)?)\b/i.test(t)) subPie = num() ?? null;
+    if (totPie == null && /^TOTAL\b/i.test(t) && !/SUBTOTAL/i.test(t)) totPie = num() ?? null;
+  }
+  let conflictoIvaTotal = false;
+  if (totPie != null) {
+    importe = totPie;
+    if (ivaPct == null && subPie != null && totPie > subPie) { ivaPct = Math.round(((totPie - subPie) / subPie) * 10000) / 100; hayIva = true; }
+    if (subPie != null) { const esp = ivaPct != null ? subPie * (1 + ivaPct / 100) : subPie; if (Math.abs(esp - totPie) > Math.max(totPie * 0.02, 1)) conflictoIvaTotal = true; }
+  } else if (subPie != null && ivaPct != null) importe = subPie * (1 + ivaPct / 100);
+  const subLineas = conceptos.reduce((a, c) => a + (c.importe || 0), 0);
+  let sinIva = false;
+  if (tratamiento === "isp") { ivaPct = 0; if (!importe && conceptos.length) importe = subLineas; }
+  else if (!importe && conceptos.length) { importe = ivaPct != null ? subLineas * (1 + ivaPct / 100) : subLineas; if (ivaPct == null) sinIva = true; }
+  else if (ivaPct == null && !hayIva) sinIva = true;
+  else if (ivaPct == null && importe != null && subLineas > 0) sinIva = Math.abs(importe - subLineas) < 0.02;
+  const esperado = ivaPct != null && !sinIva ? subLineas * (1 + ivaPct / 100) : subLineas;
+  const cuadra = conceptos.length > 0 && importe != null && Math.abs(esperado - importe) <= Math.max(importe * 0.02, 1) && !conflictoIvaTotal;
+  return { conceptos, importe, iva_pct: ivaPct, sin_iva: sinIva, tratamiento_iva: tratamiento, conflicto_iva_total: conflictoIvaTotal, matematica_cuadra: cuadra };
+}
+
 /* ---------------- HOJA DE CÁLCULO (plantilla de factura) ---------------- */
 export function leerHoja(wb: any, anioEsperado?: string) {
   // hoja "Factura…" y, si no existe, la primera hoja que tenga forma de documento (Fecha + Nº/Factura/Concepto arriba)
@@ -315,7 +390,8 @@ export function leerHoja(wb: any, anioEsperado?: string) {
   const cliente = detectarCliente(filas, limite + 1);
   const textosCab = filas.slice(0, limite).flat().filter((v: any) => typeof v === "string");
   const tipo = detectarTipo(textosCab, valorBruto);
-  return { hoja: nombreHoja, filas, limite, numero, fecha, cliente, tipo };
+  const totales = lineasYTotales(filas, wb);
+  return { hoja: nombreHoja, filas, limite, numero, fecha, cliente, tipo, ...totales };
 }
 
 /* ---------------- TEXTO LIBRE (.doc / .rtf / texto de PDF) ---------------- */
@@ -407,4 +483,32 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
     return { estado: "nuevo", nombre: nombreOk, nif: nifC };
   }
   return { estado: "no_resuelto", motivo: `NIF ${nifC} sin ficha y sin nombre válido` };
+}
+
+/* ---------------- decodificación de RTF (solo formato, sin reglas) ---------------- */
+export function textoDeRTF(rtf: string): string {
+  let t = rtf.replace(/\{\\(fonttbl|colortbl|stylesheet|info|pict|object|filetbl|listtable|revtbl|generator|\*[^}]*)[^{}]*(\{[^{}]*\}[^{}]*)*\}/g, " ");
+  t = t.replace(/\\par[d]?\b/g, "\n").replace(/\\line\b/g, "\n").replace(/\\tab\b/g, "\t");
+  t = t.replace(/\\u(-?\d+)\??/g, (_m, n) => String.fromCharCode(((parseInt(n, 10) % 65536) + 65536) % 65536));
+  t = t.replace(/\\'([0-9a-fA-F]{2})/g, (_m, h) => String.fromCharCode(parseInt(h, 16)));
+  t = t.replace(/\\[a-zA-Z]+-?\d*\s?/g, " ").replace(/[{}]/g, "");
+  return t.replace(/[ \t]+/g, " ").replace(/\n{2,}/g, "\n").trim();
+}
+
+/* ---------------- normalización de líneas para guardar ---------------- */
+export function lineasParaGuardar(conceptos: any[]) {
+  return (conceptos || []).filter((c) => c && (c.descripcion || "").trim() && !esLineaResumen(c.descripcion)).map((c) => {
+    const o: any = { descripcion: String(c.descripcion).trim(), importe: Number(c.importe) || 0 };
+    if (c.cantidad != null) o.cantidad = Number(c.cantidad);
+    if (c.horas != null) o.horas = Number(c.horas);
+    if (c.precio_unitario != null) o.precio_unitario = Number(c.precio_unitario);
+    if (o.cantidad == null && o.precio_unitario != null && Math.abs(o.precio_unitario - o.importe) < 0.01) o.cantidad = 1;
+    return o;
+  });
+}
+
+/* ---------------- valor de un campo actual: ¿es un cliente válido? ---------------- */
+export function fichaEsValida(nombre: any, nif: any): boolean {
+  const cl = clasificarTexto(nombre);
+  return CLASES_ENTIDAD.includes(cl) || (cl === "dudoso" && !!nif);
 }
