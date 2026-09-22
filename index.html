@@ -270,7 +270,7 @@ table{border-collapse:collapse;width:100%;}
   align-items:center;justify-content:center;z-index:3000;padding:20px;
 }
 .overlay.active{display:flex;}
-#tipo-doc-menu-overlay, #wizard-doc-overlay, #newjob-overlay, #picker-overlay, #form-picker-overlay, #newclient-overlay, #metodo-doc-overlay, #metodo-foto-overlay, #metodo-texto-overlay{z-index:5000;}
+#tipo-doc-menu-overlay, #wizard-doc-overlay, #newjob-overlay, #picker-overlay, #form-picker-overlay, #newclient-overlay, #metodo-doc-overlay, #metodo-foto-overlay, #metodo-texto-overlay, #newinvoice-overlay{z-index:5000;}
 #ai-historial-detalle-overlay{z-index:5400;} /* tiene que estar por delante del propio panel del asistente (5300), si no se abre "por detrás" y parece que no hace nada */
 .drawer{
   background:var(--paper);width:600px;max-width:92vw;max-height:90vh;overflow-y:auto;
@@ -2196,7 +2196,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.89</div>
+        <div class="sub">V2.90</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13368,6 +13368,8 @@ function normalizarDatosDocumentoParaEditor(datos){
   }
   return {
     cliente: datos.cliente || null,
+    cliente_nif: datos.cliente_nif || null,
+    cliente_direccion: datos.cliente_direccion || null,
     fecha: datos.fecha || null,
     numero: datos.numero || null,
     iva_pct: datos.iva_pct ?? null,
@@ -13389,9 +13391,13 @@ function abrirEditorConDatosIA(datos){
     if(datos.numero){ const n = document.getElementById('ni-docnum'); if(n) n.value = datos.numero; }
     if(datos.iva_pct != null){ const iv = document.getElementById('ie-iva-pct'); if(iv) iv.value = datos.iva_pct; }
     if(isp){ const sel = document.getElementById('ie-tratamiento-iva'); if(sel){ sel.value = 'isp'; cambiarTratamientoIva(); } }
+    // NIF/dirección del propio documento leído — solo si el cliente ya existente no tenía
+    // nada guardado, para no pisar un dato bueno con uno leído de una foto
+    if(datos.cliente_nif){ const nif = document.getElementById('ni-client-nif'); if(nif && !nif.value) nif.value = datos.cliente_nif; }
+    if(datos.cliente_direccion){ const dir = document.getElementById('ni-client-addr'); if(dir && !dir.value) dir.value = datos.cliente_direccion; }
     if(Array.isArray(datos.conceptos) && datos.conceptos.length){
       document.getElementById('ie-items-body').innerHTML = '';
-      datos.conceptos.forEach(c=> addItemRow(c.cantidad ?? 1, c.descripcion || '', c.precio_unitario ?? '', '', undefined, undefined));
+      datos.conceptos.forEach(c=> addItemRow(c.cantidad ?? 1, c.descripcion || '', c.precio_unitario ?? '', '', c.unidad || undefined, undefined));
     }
     recalcTotals();
     if(datos.notas) mostrarToast('IA: '+datos.notas);
