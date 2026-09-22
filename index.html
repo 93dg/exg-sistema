@@ -2244,7 +2244,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.97</div>
+        <div class="sub">V2.98</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11327,20 +11327,31 @@ function descargarPDF(){
   }
   const hayFechas = items.some(it=>it.fecha);
   const xConcepto = hayFechas ? 55 : 15;
-  y = dibujarCabeceraPDF();
-  items.forEach(it=>{
-    const lineTotal = (Number(it.qty)||0)*it.price;
-    // descripciones largas (habitual en partes de trabajo reales) se parten en varias
-    // líneas de verdad, no se recorta a la primera y se descarta el resto — antes esto
-    // perdía contenido en silencio y además apretaba las filas hasta solaparse visualmente
-    // el ancho del concepto deja un margen real antes de la columna de precio — antes
-    // llegaba justo hasta el borde (55+95=150, el mismo punto donde empieza Precio), sin
-    // ningún hueco, así que una línea que ocupara el ancho completo quedaba pegada al
-    // precio y a veces se leía como si el número estuviera dentro de la frase
+  const yInicio = dibujarCabeceraPDF();
+  y = yInicio;
+  // reparto equilibrado entre páginas: primero se calcula cuánto ocupa cada línea y el
+  // total, para decidir cuántas páginas hacen falta y repartir las líneas a partes iguales
+  // — así no queda una última página casi vacía mientras las demás van muy cargadas
+  const capacidadPagina = 275 - yInicio;
+  const filasCalculadas = items.map(it=>{
     const anchoConcepto = (cfg.hasPrecios ? 82 : 132) + (hayFechas ? 0 : 20);
     const lineasConcepto = doc.splitTextToSize(it.concept||'—', anchoConcepto);
-    const altoFila = Math.max(7, lineasConcepto.length * 4.6 + 2.6);
-    if(y + altoFila > 275){ doc.addPage(); y = dibujarCabeceraPDF(); } // salto de página con cabecera repetida, no una hoja en blanco
+    return {it, lineasConcepto, alto: Math.max(7, lineasConcepto.length * 4.6 + 2.6)};
+  });
+  const alturaTotal = filasCalculadas.reduce((s,f)=>s+f.alto, 0);
+  const numPaginasPrevistas = Math.max(1, Math.ceil(alturaTotal / capacidadPagina));
+  const objetivoPorPagina = alturaTotal / numPaginasPrevistas;
+  let altoAcumuladoPagina = 0;
+  filasCalculadas.forEach((f, idx)=>{
+    const it = f.it, lineasConcepto = f.lineasConcepto, altoFila = f.alto;
+    const quedanLineas = idx < filasCalculadas.length - 1;
+    // salto de página: si no cabe físicamente, o si ya se superó el objetivo equilibrado
+    // de esta página y aún queda contenido real detrás (para no cortar cerca del final)
+    if((y + altoFila > 275) || (quedanLineas && altoAcumuladoPagina > 0 && altoAcumuladoPagina + altoFila > objetivoPorPagina + 6)){
+      doc.addPage(); y = dibujarCabeceraPDF(); altoAcumuladoPagina = 0;
+    }
+    altoAcumuladoPagina += altoFila;
+    const lineTotal = (Number(it.qty)||0)*it.price;
     if(hayFechas) doc.text(it.fecha || '—', 15, y);
     doc.text(String(it.qty), hayFechas ? 40 : 15, y);
     doc.text(lineasConcepto, xConcepto + (hayFechas?0:20), y);
