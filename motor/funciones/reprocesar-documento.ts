@@ -3,7 +3,7 @@
 // lo devuelve como discrepancia (CONFLICTO) para revisión. 0 IA en esta versión.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import WordExtractor from "npm:word-extractor@1.0.4";
-import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/bf9603cbe9800e446afba4b96ca7582805d58632/motor/extractor.ts";
+import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/5d846d0e5809425b82f99fabca034c62e97d7ba9/motor/extractor.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const json = (o: any, status = 200) => new Response(JSON.stringify(o), { status, headers: { ...cors, "Content-Type": "application/json" } });
