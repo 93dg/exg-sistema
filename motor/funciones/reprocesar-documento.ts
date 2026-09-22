@@ -1,4 +1,4 @@
-// reprocesar-documento v20 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
+// reprocesar-documento v21 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
 // Solo reglas. Rellena campos VACÍOS; nunca sobrescribe un dato válido: si el motor ve otra cosa
 // lo devuelve como discrepancia (CONFLICTO) para revisión. 0 IA en esta versión.
 // v17: es el paso central del CIRCUITO DE CALIDAD:
@@ -6,7 +6,7 @@
 //   → REVALIDAR → estado final: validado (OK) | corregido_automatico | revision_necesaria/error (REVISAR) | conflicto
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import WordExtractor from "npm:word-extractor@1.0.4";
-import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/09cdf2845b8d25f01fecfb857b45b2a430b4fe39/motor/extractor.ts";
+import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/320042f42611bfa021f192293bf5c3452f4de914/motor/extractor.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const codigos = (info: any) => (String(info || "").match(/\[control-calidad: ([^\]]+)\]/)?.[1] || "").split(", ").filter(Boolean);
@@ -102,6 +102,11 @@ Deno.serve(async (req) => {
       if (res.estado === "existente") {
         cambios.entidad_id = res.id;
         if (res.enriquecer_nif && !simular) await sb.rpc("consolidar_cliente_dato", { p_entidad_id: res.id, p_campo: "nif", p_valor: res.enriquecer_nif, p_origen: "motor:" + VERSION_MOTOR });
+        // fichas duplicadas: se registran para fusión revisada, nunca se fusionan solas
+        if (res.duplicados?.length && !simular) for (const otro of res.duplicados) {
+          const { data: ya } = await sb.from("duplicados_clientes_pendientes").select("id").or(`and(entidad_a.eq.${res.id},entidad_b.eq.${otro}),and(entidad_a.eq.${otro},entidad_b.eq.${res.id})`).limit(1);
+          if (!ya?.length) await sb.from("duplicados_clientes_pendientes").insert({ entidad_a: res.id, entidad_b: otro, puntuacion: 95, motivos: { nivel: "muy_probable", etiquetas: ["Mismo nombre", "Dirección compatible", "Sin NIF contradictorio"], origen: VERSION_MOTOR }, estado: "pendiente_resolver" });
+        }
       }
       else if (res.estado === "nuevo" && (res.alta_segura || crear_clientes === true)) {
         if (simular) { cambios.entidad_id = `(nueva ficha: ${res.nombre} · ${res.nif})`; } else {
