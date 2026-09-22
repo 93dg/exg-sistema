@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.70</div>
+        <div class="sub">V2.71</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5808,8 +5808,22 @@ function renderConocimientoTabla(){
   tbody.innerHTML = filas.length ? filas.map(c=>{
     const contenidoTxt = Object.entries(c.contenido||{}).filter(([k,v])=>v!=null && v!=='').map(([k,v])=>`<b>${k}:</b> ${typeof v==='object'?JSON.stringify(v):v}`).join(' · ');
     const activoTgl = c.id ? `<span class="pill ${c.activo?'cobrado':'anulado'}" style="cursor:pointer;" onclick="toggleConocimientoActivo('${c.id}',${!c.activo})">${c.activo?'Activo':'Desactivado'}</span>` : `<span class="sub-t">—</span>`;
-    return `<tr><td class="mono">${c.tipo}</td><td style="max-width:420px;font-size:12px;">${contenidoTxt||'—'}</td><td>${c.modulo_origen||'—'}</td><td>${c.ambito==='global'?'Global':'Contextual'}</td><td><span class="pill ${c.confianza==='alta'?'cobrado':c.confianza==='media'?'pendiente_enviar':'anulado'}">${c.confianza}</span></td><td>${c.veces_reutilizado||0} veces</td><td>${activoTgl}</td><td></td></tr>`;
+    return `<tr><td class="mono">${c.tipo}</td><td style="max-width:420px;font-size:12px;">${contenidoTxt||'—'}</td><td>${c.modulo_origen||'—'}</td><td>${c.ambito==='global'?'Global':'Contextual'}</td><td><span class="pill ${c.confianza==='alta'?'cobrado':c.confianza==='media'?'pendiente_enviar':'anulado'}">${c.confianza}</span></td><td>${c.veces_reutilizado||0} veces</td><td>${activoTgl}</td><td><span class="btn sm" style="cursor:pointer;" onclick="editarConocimientoUI('${c.id}')">✎ Editar</span></td></tr>`;
   }).join('') : '<tr><td colspan="8" class="empty">Sin resultados</td></tr>';
+}
+async function editarConocimientoUI(id){
+  const item = conocimientoMotorCache.find(c=>c.id===id);
+  if(!item) return;
+  const r = await pedirCampos('Editar conocimiento aprendido', [
+    {id:'contenido', label:'Contenido (JSON)', tipo:'textarea', valor: JSON.stringify(item.contenido, null, 1)},
+  ]);
+  if(!r) return;
+  let parsed;
+  try{ parsed = JSON.parse(r.contenido); }catch(e){ mostrarToast('JSON inválido, no se ha guardado.'); return; }
+  const {error} = await sb.rpc('editar_conocimiento', {p_id: id, p_contenido: parsed});
+  if(error){ mostrarToast(error.message.includes('tabla antigua') ? 'Esto viene de una tabla antigua (alias/plantilla/correo) — edítalo desde su propia pantalla.' : 'Error: '+error.message); return; }
+  mostrarToast('Regla actualizada.');
+  cargarConocimientoMotor();
 }
 document.addEventListener('click', ev=>{
   const chip = ev.target.closest('#conocimiento-filter .chip-filter');
