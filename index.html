@@ -2259,7 +2259,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.10</div>
+        <div class="sub">V3.11</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4696,6 +4696,14 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       <button class="close-x" onclick="intentarCerrarNewInvoiceModal()">✕</button>
     </div>
 
+    <div class="ie-actions ie-actions-top">
+      <button type="button" class="btn" id="ni-draft" onclick="submitNewInvoice(event, true)">Guardar como borrador</button>
+      <button type="button" class="btn dark" onclick="descargarPDF()">⬇ Descargar PDF</button>
+      <button type="button" class="btn primary" id="ni-convert-btn" style="display:none;" onclick="convertirDocumento()">Convertir en albarán</button>
+      <button type="button" class="btn" id="ni-deshacer-btn" style="display:none;color:var(--red);" onclick="deshacerConversion()">↺ Deshacer — volver a albarán</button>
+      <button type="button" class="btn primary ie-submit" id="ni-submit" onclick="submitNewInvoice(event, false)">Crear factura</button>
+    </div>
+
     <div class="ie-dictado ie-edit-only" id="ie-dictado">
       <h4>Rellenar desde texto o imagen</h4>
       <textarea id="ie-dictado-text" class="search-box" style="width:100%;min-height:60px;resize:vertical;" placeholder="Pega o escribe, por ejemplo:&#10;3 m³ de excavación a 30&#10;490 m² de desbroce a 2,50"></textarea>
@@ -4817,13 +4825,6 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 
       <div class="ie-paper" id="ie-preview-pane" style="display:none;"></div>
 
-      <div class="ie-actions">
-        <button type="button" class="btn" id="ni-draft" onclick="submitNewInvoice(event, true)">Guardar como borrador</button>
-        <button type="button" class="btn dark" onclick="descargarPDF()">⬇ Descargar PDF</button>
-        <button type="button" class="btn primary" id="ni-convert-btn" style="display:none;" onclick="convertirDocumento()">Convertir en albarán</button>
-        <button type="button" class="btn" id="ni-deshacer-btn" style="display:none;color:var(--red);" onclick="deshacerConversion()">↺ Deshacer — volver a albarán</button>
-        <button type="submit" class="btn primary ie-submit" id="ni-submit">Crear factura</button>
-      </div>
     </form>
   </div>
 </div>
@@ -11506,6 +11507,12 @@ function recalcTotals(){
 }
 
 function descargarPDF(){
+  generarPDFDocumento('descargar');
+}
+function imprimirPDF(){
+  generarPDFDocumento('imprimir');
+}
+function generarPDFDocumento(accion){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'mm', format:'a4'});
   const type = document.getElementById('ni-doctype').value;
@@ -11662,7 +11669,17 @@ function descargarPDF(){
     doc.text(`Página ${p}/${totalPaginas}`, 195, 290, {align:'right'});
     doc.setTextColor(0,0,0);
   }
-  doc.save(`${num || 'documento'}.pdf`);
+  if(accion==='imprimir'){
+    // el mismo PDF real que se descarga, pero enviado directamente a imprimir — abre el PDF
+    // en una pestaña nueva y dispara el diálogo de impresión del propio lector de PDF,
+    // en vez de una vista HTML aparte que podía verse distinta al documento real
+    doc.autoPrint();
+    const url = doc.output('bloburl');
+    const ventana = window.open(url, '_blank');
+    if(!ventana){ mostrarToast('El navegador ha bloqueado la ventana — permite ventanas emergentes para imprimir.'); }
+  } else {
+    doc.save(`${num || 'documento'}.pdf`);
+  }
 }
 
 function togglePreview(){
@@ -14773,10 +14790,7 @@ function enviarDocumentoAlCliente(id){
 }
 function imprimirDocumento(id){
   openDocumentViewer(id);
-  setTimeout(()=>{
-    togglePreview();
-    setTimeout(()=>window.print(), 200);
-  }, 250);
+  setTimeout(()=> imprimirPDF(), 300);
 }
 function enviarAlGestorDoc(id){
   const doc = documentosRealesById[id];
