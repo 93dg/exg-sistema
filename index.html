@@ -444,6 +444,7 @@ table{border-collapse:collapse;width:100%;}
 
 .invoice-editor{background:var(--paper);width:760px;max-width:94vw;max-height:92vh;overflow-y:auto;border-radius:var(--radius);box-shadow:0 12px 40px rgba(0,0,0,0.25);margin:3vh auto;}
 .ie-topbar{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper);z-index:2;flex-wrap:wrap;}
+.ie-modo-preview .ie-edit-only{display:none !important;} /* en vista previa, fuera lo que es solo de edición — que no se coma la pantalla */
 .ie-doc-explain{flex:1;font-size:12px;color:var(--ink-soft);}
 .ie-paper{padding:26px 30px;border:1px solid var(--line);margin:20px;background:var(--paper);}
 #ie-paper-edit.hide-fiscal #ie-company-fiscal{display:none;}
@@ -2196,7 +2197,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.91</div>
+        <div class="sub">V2.92</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4604,20 +4605,20 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 <div class="overlay" id="newinvoice-overlay" onclick="if(event.target===this) closeNewInvoiceModal()">
   <div class="invoice-editor">
     <div class="ie-topbar">
-      <select class="search-box" id="ni-doctype" style="font-weight:600;" onchange="onDocTypeChange()">
+      <select class="search-box ie-edit-only" id="ni-doctype" style="font-weight:600;" onchange="onDocTypeChange()">
         <option value="factura">Factura</option>
         <option value="proforma">Proforma</option>
         <option value="presupuesto">Presupuesto</option>
         <option value="albaran">Albarán</option>
       </select>
-      <span class="ie-doc-explain" id="ni-explain"></span>
-      <button type="button" class="btn sm" onclick="document.getElementById('ie-dictado').classList.toggle('open')">📝 Rellenar desde texto o foto</button>
-      <button type="button" id="ni-ver-original" onclick="abrirVisorArchivoOriginal()" class="btn sm" style="display:none;">📎 Ver archivo original</button>
-      <span id="ni-otras-acciones" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
+      <span class="ie-doc-explain ie-edit-only" id="ni-explain"></span>
+      <button type="button" class="btn sm ie-edit-only" onclick="document.getElementById('ie-dictado').classList.toggle('open')">📝 Rellenar desde texto o foto</button>
+      <button type="button" id="ni-ver-original" onclick="abrirVisorArchivoOriginal()" class="btn sm ie-edit-only" style="display:none;">📎 Ver archivo original</button>
+      <span id="ni-otras-acciones" class="ie-edit-only" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
       <button class="close-x" onclick="closeNewInvoiceModal()">✕</button>
     </div>
 
-    <div class="ie-dictado" id="ie-dictado">
+    <div class="ie-dictado ie-edit-only" id="ie-dictado">
       <h4>Rellenar desde texto o imagen</h4>
       <textarea id="ie-dictado-text" class="search-box" style="width:100%;min-height:60px;resize:vertical;" placeholder="Pega o escribe, por ejemplo:&#10;3 m³ de excavación a 30&#10;490 m² de desbroce a 2,50"></textarea>
       <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
@@ -11240,11 +11241,16 @@ function descargarPDF(){
   doc.setDrawColor(27,31,36); doc.setLineWidth(0.5); doc.line(15,y,195,y);
   y += 8;
   doc.setFont('helvetica','bold'); doc.text('Cliente:', 15, y);
-  doc.setFont('helvetica','normal'); doc.text(client, 32, y);
+  doc.setFont('helvetica','normal');
+  doc.text(client + (nif ? '   NIF/CIF: '+nif : ''), 32, y);
+  if(addr){ y += 5; doc.setFontSize(9); doc.text(addr, 15, y); }
 
   y += 10;
   doc.setFont('helvetica','bold'); doc.setFontSize(9);
-  doc.text('Fecha', 15, y); doc.text('Cant.', 40, y); doc.text('Concepto', 55, y);
+  const hayFechas = items.some(it=>it.fecha);
+  const xConcepto = hayFechas ? 55 : 15;
+  if(hayFechas) doc.text('Fecha', 15, y);
+  doc.text('Cant.', hayFechas ? 40 : 15, y); doc.text('Concepto', xConcepto + (hayFechas?0:20), y);
   if(cfg.hasPrecios){ doc.text('Precio', 150, y, {align:'right'}); }
   doc.text('Total', 195, y, {align:'right'});
   y += 2; doc.line(15,y,195,y); y += 5;
@@ -11254,12 +11260,13 @@ function descargarPDF(){
     // descripciones largas (habitual en partes de trabajo reales) se parten en varias
     // líneas de verdad, no se recorta a la primera y se descarta el resto — antes esto
     // perdía contenido en silencio y además apretaba las filas hasta solaparse visualmente
-    const lineasConcepto = doc.splitTextToSize(it.concept||'—', cfg.hasPrecios ? 95 : 145);
+    const anchoConcepto = (cfg.hasPrecios ? 95 : 145) + (hayFechas ? 0 : 40);
+    const lineasConcepto = doc.splitTextToSize(it.concept||'—', anchoConcepto);
     const altoFila = Math.max(6, lineasConcepto.length * 4.2 + 1.8);
     if(y + altoFila > 280){ doc.addPage(); y = 20; } // salto de página si no cabe
-    doc.text(it.fecha || '—', 15, y);
-    doc.text(String(it.qty), 40, y);
-    doc.text(lineasConcepto, 55, y);
+    if(hayFechas) doc.text(it.fecha || '—', 15, y);
+    doc.text(String(it.qty), hayFechas ? 40 : 15, y);
+    doc.text(lineasConcepto, xConcepto + (hayFechas?0:20), y);
     if(cfg.hasPrecios){
       doc.text(it.price.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 150, y, {align:'right'});
     }
@@ -11309,13 +11316,16 @@ function togglePreview(){
   const editPane = document.getElementById('ie-paper-edit');
   const previewPane = document.getElementById('ie-preview-pane');
   const btn = document.getElementById('ni-preview-btn');
+  const contenedor = document.querySelector('.invoice-editor');
   const isPreview = previewPane.style.display !== 'none';
   if(isPreview){
     previewPane.style.display = 'none';
     editPane.style.display = 'block';
     btn.textContent = 'Vista previa de impresión';
+    contenedor?.classList.remove('ie-modo-preview');
     return;
   }
+  contenedor?.classList.add('ie-modo-preview');
   const type = document.getElementById('ni-doctype').value;
   const cfg = DOC_TYPES[type];
   const client = document.getElementById('ni-client').value || '—';
@@ -11354,11 +11364,12 @@ function togglePreview(){
       </div>
     </div>
     <div style="margin-bottom:16px;font-size:13px;">
-      <b>Cliente:</b> ${client}
+      <b>Cliente:</b> ${client}${nif ? ` — NIF/CIF: ${nif}` : ''}${addr ? `<br>${addr}` : ''}
     </div>
-    <table class="ie-items">
-      <thead><tr><th>Fecha</th><th>Cant.</th><th>Concepto</th>${cfg.hasPrecios ? '<th style="text-align:right;">Precio</th>' : ''}<th style="text-align:right;">Total</th></tr></thead>
-      <tbody>${items.map(i=>`<tr><td class="mono">${i.fecha ? formatFechaCorta(i.fecha) : '—'}</td><td>${i.qty}</td><td>${i.concept||'—'}</td>${cfg.hasPrecios ? `<td style="text-align:right;" class="mono">${i.price.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>` : ''}<td style="text-align:right;" class="mono">${i.total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td></tr>`).join('')}</tbody>
+    <table class="ie-items" style="table-layout:fixed;">
+      <colgroup>${items.some(i=>i.fecha)?'<col style="width:14%;">':''}<col style="width:8%;"><col style="width:${cfg.hasPrecios?'50%':'64%'};">${cfg.hasPrecios?'<col style="width:14%;">':''}<col style="width:14%;"></colgroup>
+      <thead><tr>${items.some(i=>i.fecha)?'<th>Fecha</th>':''}<th>Cant.</th><th>Concepto</th>${cfg.hasPrecios ? '<th style="text-align:right;">Precio</th>' : ''}<th style="text-align:right;">Total</th></tr></thead>
+      <tbody>${items.map(i=>`<tr>${items.some(x=>x.fecha)?`<td class="mono">${i.fecha ? formatFechaCorta(i.fecha) : '—'}</td>`:''}<td>${i.qty}</td><td style="overflow-wrap:break-word;word-break:break-word;">${i.concept||'—'}</td>${cfg.hasPrecios ? `<td style="text-align:right;white-space:nowrap;" class="mono">${i.price.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>` : ''}<td style="text-align:right;white-space:nowrap;" class="mono">${i.total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td></tr>`).join('')}</tbody>
     </table>
     <div class="ie-footer">
       <div class="ie-payment" style="font-size:13px;">
@@ -13417,6 +13428,7 @@ function openNewInvoiceModal(contexto, forzarEditorCompleto){
     return;
   }
   editingDocId = null;
+  document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview');
   document.getElementById('ni-doctype').value = contexto.tipo || 'factura';
   document.getElementById('ni-doctype').disabled = false;
   document.getElementById('ie-items-body').innerHTML = '';
@@ -13546,7 +13558,7 @@ async function guardarGasto(){
     cerrarRegistrarGasto();
   }catch(err){ statusEl.textContent = 'Error de red: '+errText(err); statusEl.style.color = 'var(--red)'; }
 }
-function closeNewInvoiceModal(){ document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); document.getElementById('ie-dictado').classList.remove('open'); }
+function closeNewInvoiceModal(){ document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); document.getElementById('ie-dictado').classList.remove('open'); document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview'); }
 
 /* ---------------- ASISTENTE MÓVIL — mismo motor, mismo guardado real, solo cambia cómo se pide ---------------- */
 let wiz = null; // estado del asistente actual
@@ -13879,6 +13891,18 @@ async function submitNewInvoice(ev, isDraft){
   const entidad = clientes.find(c=>c.name===client);
   const jobCode = job !== '—' ? job.split(' — ')[0].trim() : null;
   const trabajo = jobCode ? jobs.find(j=>j.code===jobCode) : null;
+
+  // si has escrito NIF/dirección aquí y la ficha del cliente no los tenía guardados,
+  // se actualizan también en el cliente — nunca se pisa un dato ya bueno con uno distinto
+  if(entidad?.id){
+    const nifEditor = document.getElementById('ni-client-nif').value.trim();
+    const addrEditor = document.getElementById('ni-client-addr').value.trim();
+    const {data: entidadActual} = await sb.from('entidades').select('nif,direccion').eq('id', entidad.id).maybeSingle();
+    const patchEntidad = {};
+    if(nifEditor && !entidadActual?.nif) patchEntidad.nif = nifEditor.toUpperCase();
+    if(addrEditor && !entidadActual?.direccion) patchEntidad.direccion = addrEditor.toUpperCase();
+    if(Object.keys(patchEntidad).length) await sb.from('entidades').update(patchEntidad).eq('id', entidad.id);
+  }
 
   const conceptos = items.map(it=>({
     descripcion: it.concept, cantidad: Number(it.qty)||1, unidad: it.unidad||'ud', precio_unitario: it.price,
