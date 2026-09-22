@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.8";
+export const VERSION_MOTOR = "motor-exg-2.9";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -459,6 +459,12 @@ export function parecidos(a: string, b: string): boolean {
   const comunes = ta.filter((x) => tb.some((y) => cerca(x, y)));
   return comunes.length / Math.min(ta.length, tb.length) >= 0.5;
 }
+// CAR#4: dirección normalizada ("CL/ NUEVA N1" ≡ "CALLE NUEVA, 1")
+export function direccionNorm(t: any) {
+  return norm(t).replace(/\b\d{5}\b.*$/, "").replace(/^(C\/\.?|CL\/?\.?|CALLE|AVDA?\.?|AVENIDA|PLAZA|PL\.|PZA\.?|CTRA\.?|CARRETERA|PASEO)\s*/, "")
+    .replace(/\bN\s*[º°O]?\s*(?=\d)/g, " ").replace(/[^A-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+}
+function direccionesCompatibles(a: any, b: any) { const x = direccionNorm(a), y = direccionNorm(b); return !x || !y || x === y || x.startsWith(y) || y.startsWith(x); }
 export async function resolverCliente(sb: any, cand: { nombre: string | null; nif: string | null; direccion?: string | null; preferidoId?: string | null; bloque?: string[] }, cache?: any) {
   const nifC = cand.nif && !esDatoEmisor(cand.nif) ? cand.nif.replace(/[^A-Z0-9]/gi, "").toUpperCase() : null;
   const claseC = cand.nombre ? clasificarTexto(cand.nombre) : "vacio";
@@ -489,6 +495,19 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
       // CAR#1: si el NIF del documento solo vivía en una ficha basura y la ficha buena no lo tiene, se le traslada
       if (porNombre.length === 1) return { estado: "existente", id: porNombre[0].id, nombre: porNombre[0].nombre, evidencia: "nombre", enriquecer_nif: nifC && !porNombre[0].nif ? nifC : null };
       if (cand.preferidoId && porNombre.some((e: any) => e.id === cand.preferidoId)) return { estado: "existente", id: cand.preferidoId, evidencia: "nombre (ficha actual)" };
+      // CAR#4: fichas duplicadas del mismo cliente (mismo nombre, NIF no contradictorio, dirección compatible)
+      const nifs = [...new Set(porNombre.map((e: any) => (e.nif || "").replace(/[^A-Z0-9]/gi, "").toUpperCase()).filter(Boolean))];
+      const dirsOk = porNombre.every((e: any) => porNombre.every((f: any) => direccionesCompatibles(e.direccion, f.direccion)));
+      if (nifs.length <= 1 && (!nifC || !nifs.length || nifs[0] === nifC) && dirsOk) {
+        if (!cache?.docsPorEntidad) {
+          const { data } = await sb.from("documentos_economicos").select("entidad_id").not("entidad_id", "is", null).range(0, 9999);
+          const m: any = {}; for (const r of data || []) m[r.entidad_id] = (m[r.entidad_id] || 0) + 1;
+          if (cache) cache.docsPorEntidad = m; else (cand as any)._docs = m;
+        }
+        const docs = cache?.docsPorEntidad || (cand as any)._docs || {};
+        const principal = [...porNombre].sort((a: any, b: any) => (docs[b.id] || 0) - (docs[a.id] || 0) || (b.nif ? 1 : 0) - (a.nif ? 1 : 0) || String(a.id).localeCompare(String(b.id)))[0];
+        return { estado: "existente", id: principal.id, nombre: principal.nombre, evidencia: "nombre (fichas duplicadas del mismo cliente)", duplicados: porNombre.filter((e: any) => e.id !== principal.id).map((e: any) => e.id) };
+      }
       return { estado: "revisar", motivo: `nombre en ${porNombre.length} fichas`, ids: porNombre.map((e: any) => e.id) };
     }
     const alias = (cache?.alias || (await sb.from("aprendizaje_nombres_clientes").select("variante,canonico")).data || []);
