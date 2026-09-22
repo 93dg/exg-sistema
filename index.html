@@ -2196,7 +2196,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.80</div>
+        <div class="sub">V2.81</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11620,7 +11620,19 @@ function aiRenderHistorialLista(){
     const titulo = tareas.length===1 ? (tareas[0].titulo||'Petición') : (tareas.length ? `Petición con ${tareas.length} tareas` : 'Petición');
     const resumenTareas = tareas.length ? tareas.map(t=>t.titulo).join(' · ') : (l.estado==='error' ? 'No se pudo interpretar' : '—');
     const aprendio = l.convertido_en_regla;
-    const estadoPill = l.estado==='error' ? `<span class="pill anulado">Error</span>` : `<span class="pill cobrado">Completada</span>`;
+    // ENTENDIDO ≠ COMPLETADO. PROPUESTO ≠ COMPLETADO. Solo cuenta como completada si hay
+    // al menos un resultado real y persistido (tareas_resultado), nunca porque la IA
+    // haya respondido bien — eso solo significa que se interpretó, no que se ejecutó.
+    // "consulta" y "nota" no crean ningún objeto persistente por naturaleza (una consulta
+    // solo navega a una vista), así que no cuentan en el denominador de pendientes.
+    const tareasConResultadoEsperable = tareas.filter(t=>['documento','trabajo','gasto','incidente'].includes(t.tipo)).length;
+    let estadoPill;
+    if(l.estado==='error') estadoPill = `<span class="pill anulado">Error</span>`;
+    else if(!tareas.length) estadoPill = `<span class="pill anulado">No interpretada</span>`;
+    else if(!tareasConResultadoEsperable) estadoPill = `<span class="pill cobrado">Completada</span>`;
+    else if(resultados.length >= tareasConResultadoEsperable) estadoPill = `<span class="pill cobrado">Completada</span>`;
+    else if(resultados.length > 0) estadoPill = `<span class="pill pendiente_enviar">Parcial — ${resultados.length}/${tareasConResultadoEsperable}</span>`;
+    else estadoPill = `<span class="pill anulado">Pendiente de confirmación</span>`;
     return `<div style="border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;cursor:pointer;" onclick="aiAbrirDetalleHistorial('${l.id}')">
       <div style="font-weight:700;font-size:13.5px;margin-bottom:2px;">${svgEsc(titulo)}</div>
       <div class="sub-t" style="font-size:11px;margin-bottom:4px;">${fecha}</div>
@@ -11628,7 +11640,7 @@ function aiRenderHistorialLista(){
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
         ${estadoPill}
         <span class="pill ${conIA?'pendiente_enviar':'cobrado'}">${conIA ? Number(l.coste_estimado).toLocaleString('es-ES',{minimumFractionDigits:4})+' € IA' : 'Sin IA'}</span>
-        ${resultados.length ? `<span class="pill cobrado">${resultados.length} resultado${resultados.length===1?'':'s'}</span>` : ''}
+        <span class="pill ${resultados.length?'cobrado':'anulado'}">${resultados.length} resultado${resultados.length===1?'':'s'}</span>
         ${aprendio ? `<span class="pill adjudicado">🧠 Aprendió</span>` : ''}
       </div>
     </div>`;
@@ -11664,9 +11676,29 @@ function aiAbrirDetalleHistorial(id){
     ? `IA externa (Claude) — ${svgEsc(l.motivo||'no había atajo determinista para este caso')}`
     : (l.estado==='aplicado' && !conIA ? 'Sin IA — resuelto con reglas / conocimiento ya aprendido' : '—');
 
+  // formatea "datos extraídos" de forma humana — nunca [object Object]. Casos especiales
+  // conocidos (ej. detalle_proformas) se listan con viñetas; el resto, clave: valor.
+  function formatearDatoHumano(k, v){
+    if(Array.isArray(v)){
+      if(k==='detalle_proformas' || k==='conceptos'){
+        return `<b>${k==='conceptos'?'Conceptos':'Proformas originales'}:</b><ul style="margin:2px 0 0 18px;padding:0;">${v.map(item=>{
+          if(item && typeof item==='object'){
+            if('num' in item) return `<li>Proforma nº ${item.num}${item.subtotal!=null?' — '+Number(item.subtotal).toLocaleString('es-ES',{minimumFractionDigits:2})+' €':''}</li>`;
+            return `<li>${svgEsc(item.descripcion||'')}${item.cantidad!=null?' · '+item.cantidad:''}${item.precio_unitario!=null?' · '+item.precio_unitario+' €/ud':''}</li>`;
+          }
+          return `<li>${svgEsc(String(item))}</li>`;
+        }).join('')}</ul>`;
+      }
+      return `<b>${k}:</b> ${v.map(x=>typeof x==='object'?JSON.stringify(x):x).join(', ')}`;
+    }
+    if(v && typeof v==='object') return `<b>${k}:</b> ${Object.entries(v).map(([k2,v2])=>k2+': '+v2).join(', ')}`;
+    return `<b>${k}:</b> ${v}`;
+  }
+
   const tareasHtml = tareas.length ? tareas.map((t,idx)=>{
     const res = resultados.find(r=>r.tarea_index===idx);
-    let botonResultado = '';
+    const datosFormateados = Object.entries(t.datos||{}).filter(([k,v])=>v!=null && v!=='').map(([k,v])=>formatearDatoHumano(k,v)).join('<br>') || '—';
+    let resultadoFinalHtml;
     if(res){
       const accion = {
         documento: `openDocumentViewer('${res.objeto_id}')`,
@@ -11675,16 +11707,26 @@ function aiAbrirDetalleHistorial(id){
         incidente: `openBreakdownDrawer('${res.objeto_id}')`,
       }[res.objeto_tipo] || null;
       const etiqueta = {documento:'VER DOCUMENTO', gasto:'VER GASTO', trabajo:'IR AL TRABAJO', incidente:'VER INCIDENCIA'}[res.objeto_tipo] || 'VER';
-      botonResultado = accion ? `<button class="btn sm primary" style="margin-top:6px;" onclick="cerrarHistorialDetalle();${accion}">${etiqueta} — ${svgEsc(res.objeto_label)}</button>` : `<div class="sub-t">${svgEsc(res.objeto_label)}</div>`;
+      resultadoFinalHtml = `<div style="background:rgba(111,163,124,0.12);border:1px solid var(--green,#6FA37C);border-radius:8px;padding:8px 10px;margin-top:6px;">
+        <div style="font-weight:700;font-size:12px;color:var(--green,#6FA37C);margin-bottom:2px;">✓ RESULTADO REAL — CREADO</div>
+        <div class="sub-t">${svgEsc(res.objeto_label)}</div>
+        ${accion ? `<button class="btn sm primary" style="margin-top:6px;" onclick="cerrarHistorialDetalle();${accion}">${etiqueta}</button>` : ''}
+      </div>`;
+    } else if(['documento','trabajo','gasto','incidente'].includes(t.tipo)){
+      resultadoFinalHtml = `<div style="background:rgba(216,170,61,0.12);border:1px solid #D8AA3D;border-radius:8px;padding:8px 10px;margin-top:6px;">
+        <div style="font-weight:700;font-size:12px;color:#D8AA3D;margin-bottom:2px;">⏳ PENDIENTE DE CONFIRMACIÓN — nada creado todavía</div>
+        <div class="sub-t">Esto es solo lo que el asistente entendió y propuso. No existe ningún ${t.tipo} guardado en la base de datos.</div>
+        <button class="btn sm primary" style="margin-top:6px;" onclick="aiRevisarYConfirmar('${l.id}', ${idx})">REVISAR Y CONFIRMAR</button>
+      </div>`;
     } else {
-      botonResultado = `<div class="sub-t">${t.estado==='confirmada' ? 'Confirmada, pendiente de guardar en su formulario' : (t.estado==='descartada' ? 'Descartada' : 'Sin confirmar todavía')}</div>`;
+      resultadoFinalHtml = `<div class="sub-t" style="margin-top:4px;">Consulta/nota — no genera un objeto que guardar.</div>`;
     }
     return `<div style="border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;">
       <div style="font-weight:700;font-size:13px;margin-bottom:4px;">${AI_ICONOS[t.tipo]||'📝'} ${svgEsc(t.titulo||'')}</div>
       <div class="sub-t" style="margin-bottom:4px;"><b>Entendido:</b> ${svgEsc(t.entendido||'—')}</div>
-      <div class="sub-t" style="margin-bottom:4px;"><b>Datos extraídos:</b> ${svgEsc(Object.entries(t.datos||{}).filter(([k,v])=>v!=null).map(([k,v])=>k+': '+v).join(', ') || '—')}</div>
+      <div class="sub-t" style="margin-bottom:4px;">${datosFormateados}</div>
       <div class="sub-t" style="margin-bottom:6px;"><b>Propuesta:</b> ${svgEsc(t.propuesta||'—')}</div>
-      ${botonResultado}
+      ${resultadoFinalHtml}
     </div>`;
   }).join('') : '<div class="sub-t">No se pudo separar en tareas.</div>';
 
@@ -11719,7 +11761,10 @@ function aiIrATrabajoPorId(id){
   if(j) setTimeout(()=>openJobDrawer(j.code), 150);
 }
 // vuelve a CHAT manteniendo el contexto de esta petición (cliente/trabajo/documento
-// relacionados), para poder seguir la conversación sin explicarlo todo otra vez
+// relacionados), para poder seguir la conversación sin explicarlo todo otra vez. Guarda la
+// tarea completa (no solo el título) para poder pasarla de verdad como contexto al
+// siguiente mensaje — así "cambia el precio de la mixta a 65€" se aplica sobre ESTA
+// propuesta, no sobre una nueva desde cero.
 function aiContinuarDesdeHistorial(id){
   const l = aiHistorialCache.find(x=>x.id===id);
   cerrarHistorialDetalle();
@@ -11728,7 +11773,12 @@ function aiContinuarDesdeHistorial(id){
   aiCambiarPestana('chat');
   const input = document.getElementById('asistente-ia-input');
   if(input){ input.value = ''; input.placeholder = `Sobre: ${resumen} — escribe qué quieres cambiar o añadir…`; input.focus(); }
-  window.__aiContextoContinuacion = tareas;
+  window.__aiContextoContinuacion = {ia_llamada_id: id, tarea: tareas[0] || null};
+  if(!l?.num_imagenes){
+    mostrarToast('Aviso: esta petición no tenía archivos guardados (o si los tenía, no se conservan) — solo se recupera el texto y los datos ya extraídos.');
+  } else {
+    mostrarToast('Aviso: las fotos originales no se guardan tras procesarlas — solo se recupera el texto y los datos ya extraídos de esa vez.');
+  }
 }
 function abrirAsistenteIA(){
   document.getElementById('ai-panel-backdrop').classList.add('active');
@@ -11839,6 +11889,31 @@ async function enviarAsistenteIA(){
   const mensaje = document.getElementById('asistente-ia-input').value.trim();
   window.__ultimoMensajeAsistente = mensaje;
   if(!mensaje && !aiAdjuntos.length){ mostrarToast('Escribe, dicta o adjunta algo primero.'); return; }
+  // si venimos de "Continuar" desde el historial sobre una propuesta de documento, esto
+  // no es una petición nueva — es una corrección sobre lo ya extraído. Se manda por el modo
+  // dedicado de documentos, con los datos anteriores como contexto para que los modifique
+  // en vez de partir de cero, y el resultado va directo al editor ya corregido.
+  const contexto = window.__aiContextoContinuacion;
+  if(contexto?.tarea?.tipo === 'documento' && !aiAdjuntos.length){
+    window.__aiContextoContinuacion = null;
+    aiMostrarVista('loading');
+    document.getElementById('ai-loading-text').textContent = 'Aplicando el cambio…';
+    try{
+      const datosAnteriores = JSON.stringify(contexto.tarea.datos||{});
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/asistente-ia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer '+SUPABASE_ANON_KEY },
+        body: JSON.stringify({ modo:'crear_documento', mensaje: `Ya había preparado esto antes: ${datosAnteriores}. Ahora el usuario pide este cambio sobre lo mismo: "${mensaje}". Aplica el cambio y devuelve el documento completo actualizado.` }),
+      });
+      const data = await resp.json();
+      cerrarAsistenteIA();
+      if(!resp.ok || data.error){ mostrarToast('Error: '+(data.error||'algo ha fallado.')); return; }
+      metodoDocContexto = {tipo: contexto.tarea.datos?.tipo_doc || 'proforma'};
+      abrirEditorConDatosIA(data);
+    }catch(err){ mostrarToast('Error de red: '+err.message); }
+    return;
+  }
+  window.__aiContextoContinuacion = null;
   aiMostrarVista('loading');
   document.getElementById('ai-loading-text').textContent = aiAdjuntos.some(a=>a.esImagen) ? 'Mirando lo que has adjuntado…' : 'Separando lo que me has pedido…';
   try{
@@ -12152,6 +12227,19 @@ function aiFiltrarClientes(i){
   const filtrados = (q ? base.filter(c=>c.name.toLowerCase().includes(q)) : base).slice(0,6);
   const cont = document.getElementById('ai-cliente-lista-'+i);
   if(cont) cont.innerHTML = filtrados.map(c=>`<div class="ai-chip" onclick="aiSetCampo(${i},'cliente','${c.name.replace(/'/g,"\\'")}')">${c.name}</div>`).join('') || '<div style="font-size:12px;color:var(--ink-faint);padding:6px 0;">Sin resultados</div>';
+}
+// "REVISAR Y CONFIRMAR" desde el historial — reabre el formulario real relleno con lo que
+// se guardó de esa tarea, y deja marcado el enlace para que SI esta vez se guarda de
+// verdad, el historial quede correctamente vinculado al resultado real (cierra el hueco
+// que hacía que "Proforma unificada Anabel Camacho" apareciera completada sin existir)
+function aiRevisarYConfirmar(iaLlamadaId, tareaIndex){
+  const l = aiHistorialCache.find(x=>x.id===iaLlamadaId);
+  const t = l?.campos_extraidos?.tareas?.[tareaIndex];
+  if(!t) return;
+  cerrarHistorialDetalle();
+  cerrarAsistenteIA();
+  aiPendingResultLink = {ia_llamada_id: iaLlamadaId, tarea_index: tareaIndex, tipo: t.tipo};
+  aiEjecutarAccionTarea(t);
 }
 function aiEjecutarAccionTarea(t){
   const datos = t.datos || {};
