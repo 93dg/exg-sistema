@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.12";
+export const VERSION_MOTOR = "motor-exg-2.13";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -547,8 +547,9 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
     const tokensArchivo = norm(String(cand.archivo || "").split("/").pop()).replace(/[^A-Z]/g, " ").split(" ").filter((w) => w.length >= 4);
     const corroboraArchivo = nombreNorm(nombreOk).split(" ").filter((w) => w.length >= 4).some((w) => tokensArchivo.includes(w));
     const nifAceptable = !!nifC && (nifValido(nifC) || (/^\d{8}$/.test(nifC) && claseC === "persona" && corroboraArchivo));
-    const altaSegura = CLASES_ENTIDAD.includes(claseC) && nifAceptable && nifLibre;
-    return { estado: "nuevo", nombre: nombreOk, nif: nifC, alta_segura: altaSegura, motivo: altaSegura ? (nifValido(nifC) ? "NIF oficial válido y sin ficha" : "DNI sin letra corroborado por el nombre del archivo") : (nifC ? (nifAceptable ? "NIF ya en otra ficha" : "NIF no supera el control") : "sin NIF") };
+    // Decisión de Daniel: sin NIF, si el nombre del ARCHIVO confirma el nombre del cliente, se da de alta
+    const altaSegura = CLASES_ENTIDAD.includes(claseC) && ((nifAceptable && nifLibre) || (!nifC && corroboraArchivo));
+    return { estado: "nuevo", nombre: nombreOk, nif: nifC, alta_segura: altaSegura, motivo: altaSegura ? (!nifC ? "sin NIF, confirmado por el nombre del archivo" : nifValido(nifC) ? "NIF oficial válido y sin ficha" : "DNI sin letra corroborado por el nombre del archivo") : (nifC ? (nifAceptable ? "NIF ya en otra ficha" : "NIF no supera el control") : "sin NIF") };
   }
   return { estado: "no_resuelto", motivo: `NIF ${nifC} sin ficha y sin nombre válido` };
 }
