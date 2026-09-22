@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.6";
+export const VERSION_MOTOR = "motor-exg-2.7";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -44,6 +44,24 @@ export function extraerNif(t: any): string | null {
   const limpio = m[1].replace(/[^A-Z0-9]/g, "");
   if (limpio.length < 8 || limpio.length > 9) return null;
   return limpio;
+}
+
+/* ---------------- CAR#2: validación oficial de NIF / NIE / CIF (dígito o letra de control) ---------------- */
+export function nifValido(nif: any): boolean {
+  const n = String(nif || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const LETRAS = "TRWAGMYFPDXBNJZSQVHLCKE";
+  if (/^\d{8}[A-Z]$/.test(n)) return LETRAS[Number(n.slice(0, 8)) % 23] === n[8];
+  if (/^[XYZ]\d{7}[A-Z]$/.test(n)) return LETRAS[Number("XYZ".indexOf(n[0]) + n.slice(1, 8)) % 23] === n[8];
+  const m = n.match(/^([ABCDEFGHJNPQRSUVW])(\d{7})([0-9A-J])$/);
+  if (!m) return false;
+  const d = m[2].split("").map(Number);
+  let suma = 0;
+  d.forEach((x, i) => { if (i % 2 === 1) suma += x; else { const y = x * 2; suma += Math.floor(y / 10) + (y % 10); } });
+  const control = (10 - (suma % 10)) % 10;
+  const letra = "JABCDEFGHI"[control];
+  if (/[PQRSNW]/.test(m[1])) return m[3] === letra;          // organismos: letra
+  if (/[ABEH]/.test(m[1])) return m[3] === String(control);   // sociedades: número
+  return m[3] === String(control) || m[3] === letra;
 }
 
 /* ---------------- CLASIFICADOR DE TEXTO ----------------
@@ -484,7 +502,10 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
       if (mejor && mejor.puntuacion >= 60) return { estado: "revisar", motivo: `parecido a ${mejor.nombre} (${mejor.puntuacion})`, ids: [mejor.id] };
     } catch (_) { /* sin similitud disponible */ }
     if (!CLASES_ENTIDAD.includes(claseC) && !(nifC && /^[A-HJ-NP-SUVW]/.test(nifC))) return { estado: "revisar", motivo: "nombre sin forma clara de entidad" };
-    return { estado: "nuevo", nombre: nombreOk, nif: nifC };
+    // CAR#2: alta automática solo con evidencia fuerte (forma de entidad + NIF oficial válido y libre)
+    const nifLibre = nifC && !ents.some((e: any) => (e.nif || "").replace(/[^A-Z0-9]/gi, "").toUpperCase() === nifC);
+    const altaSegura = CLASES_ENTIDAD.includes(claseC) && !!nifC && nifValido(nifC) && nifLibre;
+    return { estado: "nuevo", nombre: nombreOk, nif: nifC, alta_segura: altaSegura, motivo: altaSegura ? "NIF oficial válido y sin ficha" : (nifC ? (nifValido(nifC) ? "NIF ya en otra ficha" : "NIF no supera el control") : "sin NIF") };
   }
   return { estado: "no_resuelto", motivo: `NIF ${nifC} sin ficha y sin nombre válido` };
 }
