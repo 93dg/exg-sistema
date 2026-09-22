@@ -6,7 +6,7 @@
 //   → REVALIDAR → estado final: validado (OK) | corregido_automatico | revision_necesaria/error (REVISAR) | conflicto
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import WordExtractor from "npm:word-extractor@1.0.4";
-import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/320042f42611bfa021f192293bf5c3452f4de914/motor/extractor.ts";
+import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/4db025d28983627a57d0732bf7dd84e43d482129/motor/extractor.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const codigos = (info: any) => (String(info || "").match(/\[control-calidad: ([^\]]+)\]/)?.[1] || "").split(", ").filter(Boolean);
@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
     else if (doc.fecha_devengo && r.fecha && doc.fecha_devengo !== r.fecha) discrepancias.push({ campo: "fecha", actual: doc.fecha_devengo, motor: r.fecha });
     // cliente
     const actualValido = doc.entidad && fichaEsValida(doc.entidad.nombre, doc.entidad.nif);
-    const res: any = await resolverCliente(sb, { nombre: r.cliente.nombre, nif: r.cliente.nif, direccion: r.cliente.direccion, preferidoId: doc.entidad_id, bloque: r.cliente.bloque });
+    const res: any = await resolverCliente(sb, { nombre: r.cliente.nombre, nif: r.cliente.nif, direccion: r.cliente.direccion, preferidoId: doc.entidad_id, bloque: r.cliente.bloque, archivo: doc.archivo_path });
     if (actualValido) {
       if (res.estado === "existente" && res.id !== doc.entidad_id) discrepancias.push({ campo: "cliente", actual: doc.entidad.nombre, motor: res.nombre, evidencia: res.evidencia });
       else if (res.estado === "nuevo") discrepancias.push({ campo: "cliente", actual: doc.entidad.nombre, motor: res.nombre, evidencia: "cliente distinto sin ficha" });

@@ -3,7 +3,7 @@
 // fichas con nombres que no son entidad; documento nace "pendiente" y pasa por verificar_calidad.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import WordExtractor from "npm:word-extractor@1.0.4";
-import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/320042f42611bfa021f192293bf5c3452f4de914/motor/extractor.ts";
+import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/4db025d28983627a57d0732bf7dd84e43d482129/motor/extractor.ts";
 
 const BUCKET = "documentos-exg";
 
@@ -46,7 +46,7 @@ async function procesarAnio(admin: any, anio: string, limite: number, crearClien
     const conceptos = lineasParaGuardar(r?.conceptos || []);
     let entidadId: string | null = null, notaCliente = "";
     if (r) {
-      const c: any = await resolverCliente(admin, { nombre: r.cliente.nombre, nif: r.cliente.nif, direccion: r.cliente.direccion, bloque: r.cliente.bloque }, cache);
+      const c: any = await resolverCliente(admin, { nombre: r.cliente.nombre, nif: r.cliente.nif, direccion: r.cliente.direccion, bloque: r.cliente.bloque, archivo: f.ruta_exacta }, cache);
       if (c.estado === "existente") entidadId = c.id;
       else if (c.estado === "nuevo" && crearClientes) {
         const { data: n } = await admin.from("entidades").insert({ nombre: String(c.nombre).toUpperCase(), tipo: "cliente", nif: c.nif || null, direccion: r.cliente.direccion ? String(r.cliente.direccion).toUpperCase() : null, poblacion: r.cliente.poblacion ? String(r.cliente.poblacion).toUpperCase() : null }).select("id").single();
