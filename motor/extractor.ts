@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.7";
+export const VERSION_MOTOR = "motor-exg-2.8";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -41,14 +41,17 @@ export function extraerNif(t: any): string | null {
   const n = norm(t).replace(/^(D\.?\s?N\.?\s?I\.?|N\.?\s?I\.?\s?F\.?|C\.?\s?I\.?\s?F\.?)\s*[:.]?\s*/, "");
   const m = n.match(RE_NIF);
   if (!m) return null;
-  const limpio = m[1].replace(/[^A-Z0-9]/g, "");
+  let limpio = m[1].replace(/[^A-Z0-9]/g, "");
+  // CAR#3: DNI antiguo escrito sin el cero inicial ("8.704.517-Y" → 08704517Y)
+  if (/^\d{7}[A-Z]$/.test(limpio)) limpio = "0" + limpio;
   if (limpio.length < 8 || limpio.length > 9) return null;
   return limpio;
 }
 
 /* ---------------- CAR#2: validación oficial de NIF / NIE / CIF (dígito o letra de control) ---------------- */
 export function nifValido(nif: any): boolean {
-  const n = String(nif || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  let n = String(nif || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (/^\d{7}[A-Z]$/.test(n)) n = "0" + n;
   const LETRAS = "TRWAGMYFPDXBNJZSQVHLCKE";
   if (/^\d{8}[A-Z]$/.test(n)) return LETRAS[Number(n.slice(0, 8)) % 23] === n[8];
   if (/^[XYZ]\d{7}[A-Z]$/.test(n)) return LETRAS[Number("XYZ".indexOf(n[0]) + n.slice(1, 8)) % 23] === n[8];
