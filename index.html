@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.73</div>
+        <div class="sub">V2.74</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2474,7 +2474,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="view" id="view-entradas">
       <div class="topbar">
         <div><h1>Entradas</h1><div class="desc">Bandeja universal — WhatsApp, llamadas, fotos, documentos</div></div>
-        <div class="quickactions"><button class="btn" onclick="document.getElementById('inbox-file-input').click()">+ Añadir documento</button>
+        <div class="quickactions"><button class="btn" id="procesar-entradas-btn" onclick="ejecutarProcesadoLoteEntradas()">🧠 Procesar pendientes</button><button class="btn" onclick="document.getElementById('inbox-file-input').click()">+ Añadir documento</button>
           <input type="file" id="inbox-file-input" style="display:none;" multiple onchange="subirDocumentoATriage(this.files)"></div>
       </div>
       <div class="client-tabs" id="entradas-subtabs">
@@ -8112,6 +8112,59 @@ async function subirDocumentoATriage(fileList){
   loadInbox();
 }
 
+// ============ ORQUESTADOR DE LOTES PARA ENTRADAS (punto 2: nunca tiradas masivas de IA)
+// ============
+// UNA LLAMADA IA -> APRENDER -> REINTENTAR TODO LO PENDIENTE SIN IA. Nunca N entradas -> N
+// llamadas IA. Recorre las pendientes en pasadas: primero intenta TODAS sin gastar IA
+// (reglas + lo ya aprendido); solo si alguna se queda sin resolver, usa IA sobre UNA, y
+// vuelve a intentar el resto sin IA antes de tocar otra vez la IA.
+async function ejecutarProcesadoLoteEntradas(){
+  if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
+  const btn = document.getElementById('procesar-entradas-btn');
+  const {data: pendientes, error} = await sb.from('documentos').select('*').eq('status','pendiente');
+  if(error){ mostrarToast('Error: '+error.message); return; }
+  if(!pendientes || !pendientes.length){ mostrarToast('No hay entradas pendientes.'); return; }
+  btn.disabled = true;
+  const textoOriginal = btn.textContent;
+  let restantes = pendientes.filter(d => d.nota || d.transcripcion);
+  let resueltasSinIA = 0, resueltasConIA = 0;
+  let vueltas = 0;
+  while(restantes.length && vueltas < 50){
+    vueltas++;
+    btn.textContent = `Procesando… (${restantes.length} pendientes)`;
+    const siguenSinResolver = [];
+    for(const d of restantes){
+      const texto = d.nota || d.transcripcion;
+      const {data: interp} = await sb.rpc('interpretar_entrada_texto', {p_texto: texto});
+      const sugerencia = interp?.trabajo?.nombre ? '💡 '+interp.trabajo.nombre : (interp?.cliente?.nombre ? '💡 '+interp.cliente.nombre : null);
+      if(sugerencia){
+        await sb.from('documentos').update({linked_label: sugerencia}).eq('id', d.id);
+        resueltasSinIA++;
+      } else {
+        siguenSinResolver.push(d);
+      }
+    }
+    if(!siguenSinResolver.length) break;
+    const siguiente = siguenSinResolver[0];
+    try{
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/asistente-ia', {
+        method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY},
+        body: JSON.stringify({mensaje: siguiente.nota || siguiente.transcripcion}),
+      });
+      const data = await resp.json();
+      const tarea = data?.tareas?.[0];
+      if(tarea){
+        await sb.from('documentos').update({linked_label: '🤖 '+(tarea.entendido||tarea.titulo||'Interpretado')}).eq('id', siguiente.id);
+        resueltasConIA++;
+      }
+    }catch(e){ /* si falla la IA, esa entrada se deja pendiente y se sigue con el resto */ }
+    restantes = siguenSinResolver.slice(1);
+  }
+  btn.disabled = false;
+  btn.textContent = textoOriginal;
+  mostrarToast(`Procesado: ${resueltasSinIA} sin IA, ${resueltasConIA} con 1 llamada IA cada una.`);
+  loadInbox();
+}
 async function loadInbox(){
   const list = document.getElementById('inbox-list');
   if(!sb){
