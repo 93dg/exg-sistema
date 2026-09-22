@@ -2259,7 +2259,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.12</div>
+        <div class="sub">V3.13</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2280,10 +2280,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="clientes"><span class="ico">◈</span><span class="label"> Clientes</span></button>
       <button data-view="ayuntamiento"><span class="ico">⌂</span><span class="label"> Ayuntamiento</span></button>
       <button data-view="empresa" class="admin-only"><span class="ico">🏢</span><span class="label"> Empresa</span></button>
-      <button data-view="facturas"><span class="ico">🧾</span><span class="label"> Facturas</span></button>
-      <button data-view="presupuestos"><span class="ico">📋</span><span class="label"> Presupuestos</span></button>
       <button data-view="proyectos"><span class="ico">✎</span><span class="label"> Proyectos</span></button>
+      <button data-view="presupuestos"><span class="ico">📋</span><span class="label"> Presupuestos</span></button>
+      <button data-view="proformas"><span class="ico">📑</span><span class="label"> Proformas</span></button>
       <button data-view="albaranes"><span class="ico">📄</span><span class="label"> Albaranes</span></button>
+      <button data-view="facturas"><span class="ico">🧾</span><span class="label"> Facturas</span></button>
       <button data-view="gastospro"><span class="ico">💸</span><span class="label"> Gastos</span></button>
       <button data-view="tarifas"><span class="ico">💶</span><span class="label"> Tarifas</span></button>
       <button data-view="economia"><span class="ico">€</span><span class="label"> Economía</span></button>
@@ -2336,7 +2337,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="dd-filter-panel">
               <label><input type="checkbox" checked data-tipo="factura" onchange="renderControlDocs()"> Factura</label>
               <label><input type="checkbox" checked data-tipo="albaran" onchange="renderControlDocs()"> Albarán</label>
-              <label><input type="checkbox" checked data-tipo="presupuesto,proforma" onchange="renderControlDocs()"> Presupuesto</label>
+              <label><input type="checkbox" checked data-tipo="presupuesto" onchange="renderControlDocs()"> Presupuesto</label>
+              <label><input type="checkbox" checked data-tipo="proforma" onchange="renderControlDocs()"> Proforma</label>
             </div>
           </div>
           <div class="dd-filter" id="dd-estado">
@@ -2942,14 +2944,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <!-- ================= PRESUPUESTOS ================= -->
     <div class="view" id="view-presupuestos">
       <div class="topbar">
-        <div><h1>Presupuestos</h1><div class="desc">Todos los presupuestos — conectado con Economía</div></div>
+        <div><h1 id="presprof-titulo">Presupuestos</h1><div class="desc" id="presprof-desc">Todos los presupuestos — conectado con Economía</div></div>
         <div class="quickactions"></div>
       </div>
       <div class="kpi-strip" id="presupuestos-kpi-strip" style="margin-bottom:16px;"></div>
       <div class="panel">
         <div class="panel-head" style="flex-direction:column;align-items:stretch;gap:10px;">
           <div style="display:flex;align-items:center;justify-content:space-between;">
-            <h3>Presupuestos</h3>
+            <h3 id="presprof-h3">Presupuestos</h3>
             <span style="display:flex;align-items:center;gap:10px;">
               <button class="btn" style="color:var(--red);display:none;" id="pres-borrar-sel-btn" onclick="borrarDocumentosSeleccionados('pres-sel-chk')">🗑 Borrar seleccionados (<span id="pres-sel-count">0</span>)</button>
               <button class="btn" id="pres-enviarcliente-sel-btn" style="display:none;" onclick="enviarSeleccionadasAlCliente('pres-sel-chk')">✉ Enviar al cliente</button>
@@ -2986,7 +2988,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
                 </div>
               </div>
             </div>
-            <div class="dd-filter" id="dd-pres-tipo">
+            <div class="dd-filter" id="dd-pres-tipo" style="display:none;">
               <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-pres-tipo')">Tipo<span class="dd-caret">▾</span></button>
               <div class="dd-filter-panel">
                 <div class="filters" id="pres-filtro-tipo-chips" style="margin:0;">
@@ -4899,9 +4901,18 @@ function aplicarUIConfig(){
   // orden del menú lateral
   if(UI_CONFIG.orden_menu && UI_CONFIG.orden_menu.length){
     const nav = document.getElementById('nav');
+    // vecino anterior original de cada botón (antes de reordenar) — para colocar
+    // secciones nuevas que aún no existen en el orden guardado junto a su hermana
+    const anteriorOriginal = {};
+    Array.from(nav.querySelectorAll('[data-view]')).forEach((b,i,arr)=>{ anteriorOriginal[b.dataset.view] = i>0 ? arr[i-1].dataset.view : null; });
     UI_CONFIG.orden_menu.forEach(viewKey=>{
       const btn = nav.querySelector(`[data-view="${viewKey}"]`);
       if(btn) nav.appendChild(btn);
+    });
+    Object.keys(anteriorOriginal).filter(v=>!UI_CONFIG.orden_menu.includes(v)).forEach(v=>{
+      const btn = nav.querySelector(`[data-view="${v}"]`);
+      const prev = anteriorOriginal[v] ? nav.querySelector(`[data-view="${anteriorOriginal[v]}"]`) : null;
+      if(btn && prev) prev.after(btn);
     });
   }
   // bloques borrados de forma permanente — se calcula el id igual haya entrado o no en modo editor
@@ -5043,7 +5054,8 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-    document.getElementById('view-'+btn.dataset.view).classList.add('active');
+    document.getElementById('view-'+(VISTA_ALIAS[btn.dataset.view]||btn.dataset.view)).classList.add('active');
+    if(btn.dataset.view==='presupuestos' || btn.dataset.view==='proformas') setModoPresProf(btn.dataset.view==='proformas' ? 'proforma' : 'presupuesto');
     document.getElementById('app').classList.remove('mobile-nav-open');
     localStorage.setItem('vista_activa', btn.dataset.view);
     aiRegistrarEvento('navegacion', btn.dataset.view);
@@ -5337,11 +5349,31 @@ function renderAlbaranesKPIs(){
     <div class="kpi"><div class="lbl">En proceso</div><div class="val orange">${enProceso}</div></div>
   `;
 }
+/* ============ PRESUPUESTOS / PROFORMAS — un solo motor, dos secciones ============
+   Misma vista, tabla, filtros, ordenación, selección, calidad, editor y PDF. La sección
+   solo fija qué tipo documental se muestra. Cualquier mejora de la tabla vale para las dos. */
+var VISTA_ALIAS = {proformas:'presupuestos'};
+var VISTA_HERMANAS = {presupuestos:['proformas']};
+var presModo = 'presupuesto';
+function setModoPresProf(modo){
+  presModo = modo==='proforma' ? 'proforma' : 'presupuesto';
+  const esPf = presModo==='proforma';
+  const t = document.getElementById('presprof-titulo'); if(t) t.textContent = esPf ? 'Proformas' : 'Presupuestos';
+  const d = document.getElementById('presprof-desc'); if(d) d.textContent = esPf ? 'Todas las proformas — conectado con Economía' : 'Todos los presupuestos — conectado con Economía';
+  const h = document.getElementById('presprof-h3'); if(h) h.textContent = esPf ? 'Proformas' : 'Presupuestos';
+  const todo = document.getElementById('pres-sel-todo'); if(todo) todo.checked = false;
+  document.querySelectorAll('.pres-sel-chk').forEach(c=>c.checked=false);
+  poblarFiltroAniosChipsGenerico('presupuestos-tbody-standalone','pres-filtro-anio-chips','pres');
+  filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
+  actualizarContadorPresupuestosStandalone();
+  renderPresupuestosKPIs();
+}
 function renderPresupuestosKPIs(){
   const strip = document.getElementById('presupuestos-kpi-strip');
   if(!strip) return;
   let total=0, enviados=0, borradores=0;
   document.querySelectorAll('#presupuestos-tbody-standalone tr').forEach(tr=>{
+    if(tr.dataset.tipo!==presModo) return;
     total += parseFloat((tr.dataset.total)||'0')||0;
     // igual que en Albaranes: leer la píldora de estado real, no un índice de columna
     // fijo (el índice cambia si se añade/quita una columna, y llevaba tiempo apuntando
@@ -5352,7 +5384,7 @@ function renderPresupuestosKPIs(){
     else enviados++;
   });
   strip.innerHTML = `
-    <div class="kpi"><div class="lbl">Total presupuestado</div><div class="val">${total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div></div>
+    <div class="kpi"><div class="lbl">${presModo==='proforma'?'Total en proformas':'Total presupuestado'}</div><div class="val">${total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div></div>
     <div class="kpi"><div class="lbl">Enviados</div><div class="val">${enviados}</div></div>
     <div class="kpi"><div class="lbl">Borradores</div><div class="val orange">${borradores}</div></div>
   `;
@@ -5390,7 +5422,7 @@ function filtrarPorAnioTrim(tbodyId, prefijo){
   tbody.querySelectorAll('tr').forEach(tr=>{
     const okAnio = aniosSel.size===0 || aniosSel.has(tr.dataset.anio);
     const okTrim = trimsSel.size===0 || trimsSel.has(tr.dataset.trimestre);
-    const okTipo = tiposSel.size===0 || tiposSel.has(tr.dataset.tipo);
+    const okTipo = prefijo==='pres' ? tr.dataset.tipo===presModo : (tiposSel.size===0 || tiposSel.has(tr.dataset.tipo));
     let okEstado = true;
     if(estadosSel.size){
       const pillEl = tr.querySelector('.pill, select');
@@ -5398,14 +5430,18 @@ function filtrarPorAnioTrim(tbodyId, prefijo){
       okEstado = estadoActual ? estadosSel.has(estadoActual) : true;
     }
     tr.style.display = (okAnio && okTrim && okEstado && okTipo) ? '' : 'none';
+    // una fila que se oculta nunca puede quedarse seleccionada (evita borrar/enviar documentos que no se ven)
+    if(tr.style.display==='none'){ const chk = tr.querySelector('input[type="checkbox"]'); if(chk) chk.checked = false; }
   });
+  const chkEj = tbody.querySelector('input[type="checkbox"][class$="-sel-chk"]');
+  if(chkEj){ const cls = Array.from(chkEj.classList).find(c=>c.endsWith('-sel-chk')); actualizarSeleccionDoc(cls, cls.replace('-chk','-borrar-sel-btn'), cls.replace('-chk','-sel-count')); }
 }
 function poblarFiltroAniosChipsGenerico(tbodyId, contenedorId, prefijo){
   const tbody = document.getElementById(tbodyId);
   const contenedor = document.getElementById(contenedorId);
   if(!tbody || !contenedor) return;
   const activos = new Set(Array.from(contenedor.querySelectorAll('.chip-filter.active')).map(c=>c.dataset.anio).filter(Boolean));
-  const anios = [...new Set(Array.from(tbody.querySelectorAll('tr')).map(tr=>tr.dataset.anio).filter(Boolean))].sort().reverse();
+  const anios = [...new Set(Array.from(tbody.querySelectorAll('tr')).filter(tr=>prefijo!=='pres' || tr.dataset.tipo===presModo).map(tr=>tr.dataset.anio).filter(Boolean))].sort().reverse();
   const soloTodos = activos.size===0;
   contenedor.innerHTML = `<div class="chip-filter ${soloTodos?'active':''}" data-anio="">Todos los años</div>` +
     anios.map(a=>`<div class="chip-filter ${activos.has(a)?'active':''}" data-anio="${a}">${a}</div>`).join('');
@@ -5507,7 +5543,7 @@ function accionesDocumento(doc){
     a.push(enviarCliente, imprimir);
   } else if(doc.type==='presupuesto' || doc.type==='proforma'){
     a.push(editar, duplicar, eliminar, {t:'Crear factura', fn:`avanzarFaseDocumento('${doc.id}','factura')`});
-    if(doc.type==='presupuesto') a.push({t:'Crear albarán', fn:`avanzarFaseDocumento('${doc.id}','albaran')`});
+    if(doc.type==='presupuesto') a.push({t:'Crear proforma', fn:`avanzarFaseDocumento('${doc.id}','proforma')`}, {t:'Crear albarán', fn:`avanzarFaseDocumento('${doc.id}','albaran')`});
     a.push(...volver, enviarCliente, imprimir);
   } else if(doc.type==='albaran'){
     // desde un albarán, lo habitual es primero la proforma (para que el cliente confirme
@@ -6690,7 +6726,7 @@ async function checkSession(){
         const permitidas = permisos[userLocal] || SECCIONES_CEDIBLES.map(s=>s.key); // por defecto, todo permitido salvo admin-only
         SECCIONES_CEDIBLES.forEach(s=>{
           if(!permitidas.includes(s.key)){
-            document.querySelectorAll(`[data-view="${s.key}"]`).forEach(el=>el.style.display='none');
+            [s.key, ...(VISTA_HERMANAS[s.key]||[])].forEach(k=>document.querySelectorAll(`[data-view="${k}"]`).forEach(el=>el.style.display='none'));
           }
         });
       }
@@ -6710,7 +6746,7 @@ const SECCIONES_CEDIBLES = [
   {key:'clientes', label:'Clientes'},
   {key:'ayuntamiento', label:'Ayuntamiento'},
   {key:'facturas', label:'Facturas'},
-  {key:'presupuestos', label:'Presupuestos'},
+  {key:'presupuestos', label:'Presupuestos y proformas'},
   {key:'albaranes', label:'Albaranes'},
   {key:'tarifas', label:'Tarifas'},
   {key:'economia', label:'Economía'},
@@ -10024,7 +10060,7 @@ async function registrarRetraso(code){
 /* Clientes — se cargan de verdad desde Supabase (tabla entidades) */
 const clientes = [];
 function toggleSeleccionarTodoDoc(master, claseChk){
-  document.querySelectorAll('.'+claseChk).forEach(chk=>chk.checked = master.checked);
+  document.querySelectorAll('.'+claseChk).forEach(chk=>{ const tr = chk.closest('tr'); chk.checked = master.checked && !(tr && tr.style.display==='none'); });
   actualizarSeleccionDoc(claseChk, claseChk.replace('-chk','-borrar-sel-btn'), claseChk.replace('-chk','-sel-count'));
 }
 function actualizarSeleccionDoc(claseChk, btnId, countId){
@@ -13092,7 +13128,7 @@ function abrirCalidadDetalle(docId){
   }).join('') : `<div class="ai-card-block"><div class="ai-card-label">Sin problemas</div><div class="ai-card-text">Este documento está validado.</div></div>`;
   const puedeReprocesar = doc.archivo_path && c.codigos.some(cod=>CALIDAD_DETALLE[cod]?.corregible);
   mostrarModalGenerico('Calidad de este documento', `
-    <div style="margin-bottom:10px;font-size:13px;color:var(--ink-soft);">${doc.type==='factura'?'Factura':doc.type==='albaran'?'Albarán':'Presupuesto'} ${doc.num||doc.numero||''} — ${doc.client||'sin cliente'}</div>
+    <div style="margin-bottom:10px;font-size:13px;color:var(--ink-soft);">${tipoDocEtiqueta(doc.type)} ${doc.num||doc.numero||''} — ${doc.client||'sin cliente'}</div>
     ${bloques}
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
       ${puedeReprocesar ? `<button class="ai-btn primary" onclick="reprocesarUnDocumento('${docId}')">🔁 Reprocesar este documento</button>` : ''}
@@ -14502,10 +14538,10 @@ async function submitNewInvoice(ev, isDraft){
     const rowHtml = `<td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td>${dateLabel}</td><td class="num">${amountLabel}</td><td>${estadoPill}</td>`;
     const row1 = document.createElement('tr'); row1.id = 'docrow-'+savedId; row1.onclick = () => openDocumentViewer(savedId); row1.innerHTML = rowHtml;
     document.getElementById('econ-presupuestos-tbody').prepend(row1);
-    const row2 = document.createElement('tr'); row2.onclick = () => openDocumentViewer(savedId); row2.innerHTML = rowHtml;
+    const row2 = document.createElement('tr'); row2.onclick = () => openDocumentViewer(savedId); row2.innerHTML = rowHtml; row2.dataset.tipo = type;
     document.getElementById('presupuestos-tbody-standalone').prepend(row2);
     actualizarContadorPresupuestosStandalone();
-    document.querySelector('[data-view="presupuestos"]').click();
+    document.querySelector(`[data-view="${type==='proforma'?'proformas':'presupuestos'}"]`).click();
 
   } else if(type==='albaran'){
     const row = document.createElement('div');
@@ -14541,7 +14577,7 @@ async function submitNewInvoice(ev, isDraft){
 
 function actualizarContadorPresupuestosStandalone(){
   const el = document.getElementById('presupuestos-standalone-count');
-  if(el) el.textContent = document.getElementById('presupuestos-tbody-standalone').children.length;
+  if(el) el.textContent = Array.from(document.getElementById('presupuestos-tbody-standalone').children).filter(tr=>tr.dataset.tipo===presModo).length;
 }
 function toggleDocDD(name){
   document.querySelectorAll('.dd-filter').forEach(f=>{ if(f.id!=='dd-'+name) f.classList.remove('open'); });
