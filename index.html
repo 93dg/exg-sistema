@@ -2256,7 +2256,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.04</div>
+        <div class="sub">V3.05</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4851,7 +4851,18 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </div>
       <div class="field"><div class="l">NIF / CIF (opcional)</div><input class="search-box" style="width:100%;" id="nc-nif"></div>
       <div class="field"><div class="l">Dirección (opcional)</div><input class="search-box" style="width:100%;" id="nc-addr"></div>
-      <div class="field"><div class="l">Zona</div><input class="search-box" style="width:100%;" id="nc-zone" value="Fuente Obejuna"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div class="field" style="flex:1;min-width:100px;"><div class="l">Código postal (opcional)</div><input class="search-box" style="width:100%;" id="nc-cp"></div>
+        <div class="field" style="flex:2;min-width:140px;"><div class="l">Población (opcional)</div><input class="search-box" style="width:100%;" id="nc-poblacion"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div class="field" style="flex:1;min-width:140px;"><div class="l">Provincia (opcional)</div><input class="search-box" style="width:100%;" id="nc-provincia"></div>
+        <div class="field" style="flex:1;min-width:140px;"><div class="l">Zona</div><input class="search-box" style="width:100%;" id="nc-zone" value="Fuente Obejuna"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div class="field" style="flex:1;min-width:140px;"><div class="l">Teléfono (opcional)</div><input class="search-box" style="width:100%;" id="nc-telefono"></div>
+        <div class="field" style="flex:2;min-width:180px;"><div class="l">Email (opcional)</div><input class="search-box" style="width:100%;" id="nc-email"></div>
+      </div>
       <button class="btn primary" style="width:100%;" onclick="submitNewClient()">Crear cliente</button>
     </div>
   </div>
@@ -10737,13 +10748,14 @@ function clientesOrdenadosPorUso(){
   });
 }
 function renderClientPickerOptions(prefix){
-  const q = (document.getElementById(prefix+'-client-search')?.value || '').toLowerCase().trim();
+  const qRaw = (document.getElementById(prefix+'-client-search')?.value || '').trim();
+  const q = qRaw.toLowerCase();
   const cont = document.getElementById(prefix+'-client-options');
   if(!cont) return;
   const base = clientesOrdenadosPorUso();
   const filtrados = q ? base.filter(c=>c.name.toLowerCase().includes(q)) : base;
   const filas = filtrados.slice(0, 60).map(c=>`<div class="cp-option" onclick="selectClientPickerOption('${prefix}','${c.name.replace(/'/g,"\\'")}')">${c.name}</div>`).join('');
-  const nuevoHtml = `<div class="cp-option cp-new" onclick="openNewClientModal('${prefix}-client'); document.getElementById('${prefix}-client-picker')?.classList.remove('open');">+ Nuevo cliente${q ? ` "${q}"` : ''}</div>`;
+  const nuevoHtml = `<div class="cp-option cp-new" onclick="openNewClientModal('${prefix}-client', '${qRaw.replace(/'/g,"\\'")}'); document.getElementById('${prefix}-client-picker')?.classList.remove('open');">+ Nuevo cliente${q ? ` "${q}"` : ''}</div>`;
   cont.innerHTML = nuevoHtml + (filas || '<div class="cp-option-empty">Sin resultados</div>');
 }
 function setClientPickerValue(prefix, name){
@@ -10838,11 +10850,16 @@ async function actualizarClienteDesdeEditor(){
   mostrarToast('Ficha del cliente actualizada.');
 }
 
-function openNewClientModal(targetSelectId){
+function openNewClientModal(targetSelectId, nombreInicial){
   clientTargetSelect = targetSelectId;
-  document.getElementById('nc-name').value = '';
+  document.getElementById('nc-name').value = nombreInicial || '';
   document.getElementById('nc-nif').value = '';
   document.getElementById('nc-addr').value = '';
+  document.getElementById('nc-cp').value = '';
+  document.getElementById('nc-poblacion').value = '';
+  document.getElementById('nc-provincia').value = '';
+  document.getElementById('nc-telefono').value = '';
+  document.getElementById('nc-email').value = '';
   document.getElementById('nc-type').value = 'Particular';
   document.querySelectorAll('#nc-type-chips .chip-filter').forEach(c=>c.classList.toggle('active', c.dataset.val==='Particular'));
   document.getElementById('nc-sugerencias').innerHTML = '';
@@ -10864,16 +10881,33 @@ function submitNewClient(){
   const type = document.getElementById('nc-type').value;
   const nif = document.getElementById('nc-nif').value.trim();
   const addr = document.getElementById('nc-addr').value.trim();
+  const cp = document.getElementById('nc-cp').value.trim();
+  const poblacion = document.getElementById('nc-poblacion').value.trim();
+  const provincia = document.getElementById('nc-provincia').value.trim();
+  const telefono = document.getElementById('nc-telefono').value.trim();
+  const email = document.getElementById('nc-email').value.trim();
   const zone = document.getElementById('nc-zone').value.trim() || 'Fuente Obejuna';
-  const nuevoCliente = {name, type, zone, tarifa:type, fact:'0,00 €', pend:'—', prio:'Media'};
+  const nuevoCliente = {name, type, zone, tarifa:type, fact:'0,00 €', pend:'—', prio:'Media', cp, poblacion, provincia, telefono, email};
   clientes.push(nuevoCliente);
   if(nif || addr) clientFiscalData[name] = {nif, addr};
   if(sb){
+    // datos adicionales (CP/población/provincia/teléfono/email) — buscarOCrearClienteApp
+    // solo admite tipo/nif/dirección, así que estos se guardan en un segundo paso, una vez
+    // se conoce el id real del cliente (nuevo o ya existente si coincidía con una sugerencia)
+    const extra = {};
+    if(cp) extra.cp = cp;
+    if(poblacion) extra.poblacion = poblacion.toUpperCase();
+    if(provincia) extra.provincia = provincia.toUpperCase();
+    if(telefono) extra.telefono = telefono;
+    if(email) extra.email = email;
+    const guardarExtra = (id)=>{ if(id && Object.keys(extra).length) sb.from('entidades').update(extra).eq('id', id); };
     if(window.__clienteSugeridoSeleccionado){
       nuevoCliente.id = window.__clienteSugeridoSeleccionado;
+      guardarExtra(nuevoCliente.id);
     } else {
       buscarOCrearClienteApp(name, {tipo: type.toLowerCase(), nif: nif||null, direccion: addr||null}).then(id=>{
         if(id) nuevoCliente.id = id;
+        guardarExtra(id);
       });
     }
   }
@@ -14110,7 +14144,7 @@ function openDocumentViewer(id){
   document.getElementById('ie-tratamiento-iva').value = doc.tratamientoIva || 'normal';
   cambiarTratamientoIva();
   setClientPickerValue('ni', doc.client);
-  document.getElementById('ni-job').value = doc.job==='—' ? '' : doc.job;
+  document.getElementById('ni-job').value = (doc.job && doc.job!=='—') ? doc.job : (doc.obra_texto || '');
   document.getElementById('ni-date').value = doc.dateRaw;
   document.getElementById('ni-payment').value = doc.payment;
   document.getElementById('ni-iban').value = doc.iban;
@@ -14202,7 +14236,11 @@ async function submitNewInvoice(ev, isDraft){
   const status = isDraft ? 'Borrador' : (type==='factura' ? 'Pendiente' : type==='albaran' ? 'Validado' : 'Enviado');
   const estado = isDraft ? 'borrador' : 'emitido';
 
-  const entidad = clientes.find(c=>c.name===client);
+  // coincidencia exacta primero; si falla, defensa adicional sin distinguir mayúsculas ni
+  // espacios sobrantes — un cliente sugerido por la IA (u otra fuente) que venga con una
+  // capitalización distinta no debe acabar guardándose sin cliente por un simple ===
+  const entidad = clientes.find(c=>c.name===client)
+    || clientes.find(c=>c.name.trim().toLowerCase()===client.trim().toLowerCase());
   const jobCode = job !== '—' ? job.split(' — ')[0].trim() : null;
   const trabajo = jobCode ? jobs.find(j=>j.code===jobCode) : null;
 
@@ -14266,6 +14304,10 @@ async function submitNewInvoice(ev, isDraft){
     fecha_devengo: dateRaw || null,
     entidad_id: entidad ? entidad.id : null,
     trabajo_id: trabajo ? trabajo.id : null,
+    // si el texto de "obra/trabajo" no coincide con ningún trabajo real dado de alta, se
+    // guarda igualmente como texto libre — antes se perdía sin más al no encajar en ningún
+    // trabajo_id, aunque el usuario lo hubiera escrito o lo hubiera sugerido el asistente
+    obra_texto: (!trabajo && job && job !== '—') ? job : null,
     cliente_datos_doc: typeof clienteDatosDoc !== 'undefined' ? clienteDatosDoc : null,
     importe: total, concepto: conceptoResumen, conceptos,
     contabilidad: 'oficial',
