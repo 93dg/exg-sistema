@@ -2196,7 +2196,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.86</div>
+        <div class="sub">V2.87</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11789,7 +11789,49 @@ async function aiCargarArchivosPeticion(iaLlamadaId){
       </div>
       <a class="btn sm" href="${url}" target="_blank" rel="noopener">Ver</a>
     </div>`;
-  }).join('') + botonAnadir;
+  }).join('') + botonAnadir + `<button class="btn sm primary" style="margin-top:8px;width:100%;" onclick="aiVolverAAnalizar('${iaLlamadaId}')">🔄 Volver a analizar con estos archivos</button>
+  <div id="hd-reanalisis-status" class="sub-t" style="margin-top:6px;"></div>`;
+}
+// analiza (o vuelve a analizar) una petición usando los archivos ya vinculados a ella —
+// necesario tanto si se acaban de añadir ahora como si se quiere reintentar la lectura.
+// Actualiza la MISMA petición (no crea una nueva) y deja el resultado listo para REVISAR.
+async function aiVolverAAnalizar(iaLlamadaId){
+  const statusEl = document.getElementById('hd-reanalisis-status');
+  const {data: archivos, error: errArch} = await sb.from('peticion_archivos').select('*').eq('ia_llamada_id', iaLlamadaId).order('orden');
+  if(errArch || !archivos || !archivos.length){ if(statusEl) statusEl.textContent = 'No hay archivos que analizar.'; return; }
+  const l = aiHistorialCache.find(x=>x.id===iaLlamadaId);
+  if(statusEl){ statusEl.textContent = 'Leyendo los archivos…'; statusEl.style.color = 'var(--ink-soft)'; }
+  try{
+    const imagenes = [];
+    for(const a of archivos){
+      if(!/^image\//.test(a.media_type||'')) continue; // PDFs no se releen aquí todavía
+      const url = sb.storage.from(DOC_BUCKET).getPublicUrl(a.storage_path).data.publicUrl;
+      const blob = await (await fetch(url)).blob();
+      const b64 = await new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.readAsDataURL(blob); });
+      imagenes.push({data: b64, media_type: a.media_type});
+    }
+    if(!imagenes.length){ if(statusEl) statusEl.textContent = 'Ninguno de los archivos guardados es una imagen legible por ahora (solo imágenes, no PDF).'; return; }
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/asistente-ia', {
+      method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY},
+      body: JSON.stringify({modo:'crear_documento', mensaje: l?.mensaje_usuario || null, imagenes, forzar_ia: true}),
+    });
+    const data = await resp.json();
+    if(!resp.ok || data.error){ if(statusEl){ statusEl.textContent = 'Error: '+(data.error||'algo ha fallado.'); statusEl.style.color = 'var(--red)'; } return; }
+    // esto actualiza la MISMA petición del historial, no crea una nueva — la próxima vez
+    // que se abra su detalle, ya se verá lo recién analizado
+    const nuevaTarea = {
+      tipo: 'documento', titulo: l?.campos_extraidos?.tareas?.[0]?.titulo || 'Documento reanalizado',
+      entendido: 'Reanalizado a partir de los archivos guardados.',
+      datos: {tipo_doc: data.tipo_doc || l?.campos_extraidos?.tareas?.[0]?.datos?.tipo_doc || 'proforma', cliente: data.cliente, fecha: data.fecha, numero: data.numero, iva_pct: data.iva_pct, sujeto_pasivo: !!data.notas?.match(/sujeto pasivo/i), conceptos: data.conceptos, notas: data.notas},
+      propuesta: data.notas || 'Documento reanalizado con las líneas reales de los archivos.',
+      falta: data.cliente ? null : 'cliente',
+    };
+    await sb.from('ia_llamadas').update({campos_extraidos: {tareas:[nuevaTarea]}, coste_estimado: (Number(l?.coste_estimado||0))}).eq('id', iaLlamadaId);
+    if(statusEl){ statusEl.textContent = `✓ Reanalizado: ${data.conceptos?.length||0} línea(s) encontradas.`; statusEl.style.color = 'var(--green,#6FA37C)'; }
+    // refresca la caché local y reabre el detalle ya actualizado
+    await abrirAiHistorial();
+    aiAbrirDetalleHistorial(iaLlamadaId);
+  }catch(err){ if(statusEl){ statusEl.textContent = 'Error de red: '+err.message; statusEl.style.color = 'var(--red)'; } }
 }
 // añadir archivos a una petición que ya existe — para casos como este (peticiones sin
 // archivo guardado) o simplemente para completar después lo que faltó adjuntar
