@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.71</div>
+        <div class="sub">V2.72</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8247,6 +8247,9 @@ const TRIAGE_ACTIONS = {
   vincular_trabajo:  {label:'Vincular a trabajo existente', fields:[
     {id:'ref', label:'Trabajo', type:'select', options:()=>jobs.map(j=>j.code+' — '+j.client)}
   ]},
+  vincular_maquina:  {label:'Vincular a máquina/vehículo (incidencia de flota)', fields:[
+    {id:'ref', label:'Máquina / vehículo', type:'select', options:()=>fleet.map(f=>f.name)}
+  ]},
   pendiente_cobro:   {label:'Marcar pendiente de cobro', fields:[
     {id:'ref', label:'Cliente / trabajo', type:'text'},
     {id:'amount', label:'Importe (€)', type:'number'}
@@ -8408,6 +8411,7 @@ async function confirmTriageAction(key, cfg){
   switch(key){
     case 'vincular_factura': linked_label = '→ Factura '+values.ref; break;
     case 'vincular_trabajo': linked_label = '→ '+values.ref; break;
+    case 'vincular_maquina': linked_label = '🔧 → '+values.ref; break;
     case 'pendiente_cobro': linked_label = 'Pendiente de cobro — '+(values.ref||'sin cliente')+(values.amount?' · '+values.amount+' €':''); break;
     case 'gasto': linked_label = 'Gasto — '+(values.ref||'Otros')+(values.amount?' · '+values.amount+' €':''); break;
     case 'editar_estado': linked_label = values.ref+' → '+values.estado; break;
@@ -8423,6 +8427,7 @@ async function confirmTriageAction(key, cfg){
   // que confirmo una vinculación a trabajo, el texto original queda como conocimiento
   // reutilizable — la próxima entrada parecida se resuelve sola, sin gastar IA.
   if(key==='vincular_trabajo' && values.ref) aprenderDeConfirmacionEntrada(d, values.ref, 'trabajo');
+  if(key==='vincular_maquina' && values.ref) aprenderDeConfirmacionEntrada(d, values.ref, 'alias_maquina');
   if(key==='gasto' && values.ref) aprenderDeConfirmacionEntrada(d, values.ref, 'categoria_gasto');
   if(key==='otra_categoria' && values.categoria) aprenderDeConfirmacionEntrada(d, values.categoria, 'categoria');
   if(key==='descartar') aprenderDeConfirmacionEntrada(d, 'descartar', 'destino_confirmado');
@@ -8434,21 +8439,29 @@ async function aprenderDeConfirmacionEntrada(d, referenciaElegida, tipoDestino){
   const texto = d?.nota || d?.transcripcion;
   if(!texto || texto.trim().length < 6) return;
   const clave = tipoDestino || 'destino_confirmado';
+  const esAliasMaquina = tipoDestino === 'alias_maquina';
+  const tipoRegistro = esAliasMaquina ? 'alias_maquina' : 'clasificador_entrada';
+  // un alias de máquina/vehículo es conocimiento GLOBAL — igual que un alias de cliente,
+  // útil para cualquier módulo (Entradas, Digitalización, Trabajos, Asistente), no solo
+  // para volver a interpretar textos parecidos en Entradas
+  const modulosAplicables = esAliasMaquina ? ['entradas','asistente','digitalizacion','trabajos'] : ['entradas','asistente'];
   // CASO AISLADO → PATRÓN REPETIDO → REGLA FIABLE: si ya había una sugerencia aprendida
   // para un texto parecido, confirmarla la refuerza (sube de confianza); si el usuario
   // elige algo DISTINTO a lo que se había sugerido, esa regla vieja pierde confianza — así
   // el motor no sigue ofreciendo con la misma seguridad algo que ya ha fallado
-  const {data: yaSabido} = await sb.rpc('buscar_conocimiento', {p_modulo:'entradas', p_texto: texto, p_tipo:'clasificador_entrada'});
+  const {data: yaSabido} = await sb.rpc('buscar_conocimiento', {p_modulo:'entradas', p_texto: texto, p_tipo: tipoRegistro});
   if(yaSabido && yaSabido.length){
-    const sugerido = yaSabido[0].contenido?.trabajo_confirmado ?? yaSabido[0].contenido?.[clave];
+    const sugerido = yaSabido[0].contenido?.trabajo_confirmado ?? yaSabido[0].contenido?.maquina_confirmada ?? yaSabido[0].contenido?.[clave];
     if(sugerido === referenciaElegida){ await sb.rpc('confirmar_conocimiento', {p_id: yaSabido[0].id}); }
     else { await sb.rpc('desconfirmar_conocimiento', {p_id: yaSabido[0].id}); }
     return;
   }
   await sb.rpc('registrar_aprendizaje', {
-    p_tipo: 'clasificador_entrada', p_ambito: 'contextual', p_modulo_origen: 'entradas',
-    p_modulos_aplicables: ['entradas','asistente'],
-    p_contenido: {texto_original: texto.slice(0,300), trabajo_confirmado: referenciaElegida, tipo_destino: clave},
+    p_tipo: tipoRegistro, p_ambito: esAliasMaquina ? 'global' : 'contextual', p_modulo_origen: 'entradas',
+    p_modulos_aplicables: modulosAplicables,
+    p_contenido: esAliasMaquina
+      ? {texto_original: texto.slice(0,300), maquina_confirmada: referenciaElegida}
+      : {texto_original: texto.slice(0,300), trabajo_confirmado: referenciaElegida, tipo_destino: clave},
     p_confianza: 'media',
   });
 }
