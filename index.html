@@ -2259,7 +2259,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.09</div>
+        <div class="sub">V3.10</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -10801,7 +10801,7 @@ function onClientChange(){
   // "Actualizar cliente" compara contra esto para saber si de verdad ha cambiado algo
   window.__valoresClienteOriginales = name ? leerCamposClienteActuales() : null;
   const btnActualizar = document.getElementById('ni-client-update-btn');
-  if(btnActualizar) btnActualizar.style.display = (name && entidad.id) ? '' : 'none';
+  if(btnActualizar) btnActualizar.style.display = name ? '' : 'none'; // se ve aunque el cliente aún no tenga ficha real — al pulsarlo se crea si hace falta
   marcarCambioCliente();
 }
 function leerCamposClienteActuales(){
@@ -10838,9 +10838,9 @@ function marcarCambioCliente(){
 // valor y se sustituyen directamente si cambian.
 async function actualizarClienteDesdeEditor(){
   const nombre = document.getElementById('ni-client').value;
-  const entidad = clientes.find(c=>c.name===nombre);
-  if(!entidad?.id){ mostrarToast('Elige primero un cliente.'); return; }
+  if(!nombre){ mostrarToast('Elige primero un cliente.'); return; }
   if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
+  let entidad = clientes.find(c=>c.name===nombre);
   const nuevo = {
     nif: document.getElementById('ni-client-nif').value.trim().toUpperCase(),
     direccion: document.getElementById('ni-client-addr').value.trim().toUpperCase(),
@@ -10850,6 +10850,21 @@ async function actualizarClienteDesdeEditor(){
     telefono: document.getElementById('ni-client-telefono').value.trim(),
     email: document.getElementById('ni-client-email').value.trim(),
   };
+  // el cliente puede existir solo como nombre suelto en el documento (nunca se llegó a dar
+  // de alta como ficha real, ej. viene de una sugerencia del asistente) — en ese caso, este
+  // mismo botón la crea ahora con lo que haya escrito, en vez de no poder hacer nada
+  if(!entidad?.id){
+    const idNuevo = await buscarOCrearClienteApp(nombre, {nif: nuevo.nif||null, direccion: nuevo.direccion||null});
+    if(!idNuevo){ mostrarToast('No se pudo crear la ficha del cliente.'); return; }
+    if(entidad) entidad.id = idNuevo;
+    else { entidad = {id: idNuevo, name: nombre, type:'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'}; clientes.push(entidad); }
+    await sb.from('entidades').update(nuevo).eq('id', idNuevo);
+    Object.assign(entidad, nuevo);
+    window.__valoresClienteOriginales = leerCamposClienteActuales();
+    marcarCambioCliente();
+    mostrarToast('Ficha del cliente creada y guardada.');
+    return;
+  }
   const {data: actual} = await sb.from('entidades').select('nif,direccion,cp,poblacion,provincia,telefono,email').eq('id', entidad.id).maybeSingle();
   const patch = {};
   for(const campo of ['nif','cp','poblacion','provincia','telefono','email']){
