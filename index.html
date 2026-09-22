@@ -2196,7 +2196,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.87</div>
+        <div class="sub">V2.88</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4458,6 +4458,14 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 </div>
 
 <!-- Detalle de una petición del historial — expediente completo -->
+<!-- Visor de imágenes dentro de la propia web — para no abrir pestañas nuevas al ver
+     miniaturas/adjuntos. Pensado para reutilizarse en cualquier sitio de la app que
+     muestre fotos/documentos. -->
+<div class="overlay" id="img-lightbox-overlay" style="z-index:5500;background:rgba(10,9,7,0.9);" onclick="cerrarImagenGrande()">
+  <img id="img-lightbox-img" style="max-width:94vw;max-height:90vh;object-fit:contain;border-radius:6px;">
+  <button class="close-x" style="position:fixed;top:16px;right:16px;" onclick="cerrarImagenGrande()">✕</button>
+</div>
+
 <div class="overlay" id="ai-historial-detalle-overlay" onclick="if(event.target===this) cerrarHistorialDetalle()">
   <div class="drawer" style="max-width:480px;">
     <div class="drawer-head">
@@ -6901,7 +6909,7 @@ function abrirDetalleReporte(id){
   const {seccion} = parsearReporte(m);
   document.getElementById('reporte-detalle-seccion').textContent = seccion;
   document.getElementById('reporte-detalle-texto').value = m.texto || '';
-  document.getElementById('reporte-detalle-captura').innerHTML = m.captura_url ? `<a href="${m.captura_url}" target="_blank">📷 Ver captura</a>` : '';
+  document.getElementById('reporte-detalle-captura').innerHTML = m.captura_url ? `<button class="btn sm" onclick="verImagenGrande('${m.captura_url}')">📷 Ver captura</button>` : '';
   document.getElementById('reporte-detalle-status').textContent = '';
   document.getElementById('reporte-detalle-overlay').classList.add('active');
 }
@@ -11763,6 +11771,11 @@ function aiAbrirDetalleHistorial(id){
   document.getElementById('ai-historial-detalle-overlay').classList.add('active');
   aiCargarArchivosPeticion(l.id);
 }
+function verImagenGrande(url){
+  document.getElementById('img-lightbox-img').src = url;
+  document.getElementById('img-lightbox-overlay').classList.add('active');
+}
+function cerrarImagenGrande(){ document.getElementById('img-lightbox-overlay').classList.remove('active'); }
 async function aiCargarArchivosPeticion(iaLlamadaId){
   const cont = document.getElementById('hd-archivos');
   if(!cont) return;
@@ -11782,15 +11795,24 @@ async function aiCargarArchivosPeticion(iaLlamadaId){
     const url = sb.storage.from(DOC_BUCKET).getPublicUrl(a.storage_path).data.publicUrl;
     const esImagen = /^image\//.test(a.media_type||'');
     return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin-bottom:6px;">
-      ${esImagen ? `<img src="${url}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;flex-shrink:0;">` : `<span style="font-size:20px;">📄</span>`}
+      ${esImagen ? `<img src="${url}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;flex-shrink:0;cursor:pointer;" onclick="verImagenGrande('${url}')">` : `<span style="font-size:20px;">📄</span>`}
       <div style="flex:1;min-width:0;">
         <div style="font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${svgEsc(a.nombre_original||'archivo')}</div>
         <div class="sub-t" style="font-size:11px;">${a.tamano_bytes ? (a.tamano_bytes/1024).toFixed(0)+' KB' : ''}</div>
       </div>
-      <a class="btn sm" href="${url}" target="_blank" rel="noopener">Ver</a>
+      ${esImagen ? `<button class="btn sm" onclick="verImagenGrande('${url}')">Ver</button>` : `<a class="btn sm" href="${url}" target="_blank" rel="noopener">Abrir</a>`}
+      <button class="btn sm" style="color:var(--red);" title="Quitar este archivo" onclick="aiQuitarArchivoPeticion('${a.id}', '${iaLlamadaId}')">🗑</button>
     </div>`;
   }).join('') + botonAnadir + `<button class="btn sm primary" style="margin-top:8px;width:100%;" onclick="aiVolverAAnalizar('${iaLlamadaId}')">🔄 Volver a analizar con estos archivos</button>
   <div id="hd-reanalisis-status" class="sub-t" style="margin-top:6px;"></div>`;
+}
+// quitar un archivo por si se ha añadido por error — borra el vínculo con la petición; el
+// objeto en Storage se deja (podría estar reutilizado por otra petición vía hash), solo se
+// desvincula de ESTA
+async function aiQuitarArchivoPeticion(archivoId, iaLlamadaId){
+  const {error} = await sb.from('peticion_archivos').delete().eq('id', archivoId);
+  if(error){ mostrarToast('Error al quitar: '+error.message); return; }
+  aiCargarArchivosPeticion(iaLlamadaId);
 }
 // analiza (o vuelve a analizar) una petición usando los archivos ya vinculados a ella —
 // necesario tanto si se acaban de añadir ahora como si se quiere reintentar la lectura.
