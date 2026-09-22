@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.68</div>
+        <div class="sub">V2.69</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8394,8 +8394,27 @@ async function confirmTriageAction(key, cfg){
   if(!sb){ mostrarToast('Conecta Supabase (SUPABASE_URL / SUPABASE_ANON_KEY) para guardar este cambio.'); return; }
   const {error} = await sb.from('documentos').update(payload).eq('id', triageCurrentId);
   if(error){ mostrarToast('Error al guardar: '+error.message); return; }
+  // Entradas es una de las principales fuentes de aprendizaje del motor común: cada vez
+  // que confirmo una vinculación a trabajo, el texto original queda como conocimiento
+  // reutilizable — la próxima entrada parecida se resuelve sola, sin gastar IA.
+  if(key==='vincular_trabajo' && values.ref) aprenderDeConfirmacionEntrada(d, values.ref);
   closeEntryDrawer();
   loadInbox();
+}
+async function aprenderDeConfirmacionEntrada(d, referenciaElegida){
+  if(!sb) return;
+  const texto = d?.nota || d?.transcripcion;
+  if(!texto || texto.trim().length < 6) return;
+  // si ya había una coincidencia exacta conocida no hace falta aprender nada nuevo — solo
+  // se guarda cuando el texto es genuinamente distinto de lo ya sabido
+  const {data: yaSabido} = await sb.rpc('buscar_conocimiento', {p_modulo:'entradas', p_texto: texto, p_tipo:'clasificador_entrada'});
+  if(yaSabido && yaSabido.length) { await sb.rpc('marcar_conocimiento_usado', {p_id: yaSabido[0].id}); return; }
+  await sb.rpc('registrar_aprendizaje', {
+    p_tipo: 'clasificador_entrada', p_ambito: 'contextual', p_modulo_origen: 'entradas',
+    p_modulos_aplicables: ['entradas','asistente'],
+    p_contenido: {texto_original: texto.slice(0,300), trabajo_confirmado: referenciaElegida},
+    p_confianza: 'media',
+  });
 }
 
 /* ---------------- EXPLORADOR DE ARCHIVOS (Supabase Storage) ---------------- */
