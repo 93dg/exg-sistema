@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.72</div>
+        <div class="sub">V2.73</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4057,7 +4057,8 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           </div>
 
           <div class="field" style="margin-bottom:12px;"><div class="l">Nota</div>
-            <textarea class="search-box" style="width:100%;min-height:50px;resize:vertical;" id="nj-note" placeholder="Ej. El cliente quiere que sea sobre esta fecha / está esperando a que pase algo antes de confirmar…"></textarea>
+            <textarea class="search-box" style="width:100%;min-height:50px;resize:vertical;" id="nj-note" placeholder="Ej. El cliente quiere que sea sobre esta fecha / está esperando a que pase algo antes de confirmar…" onblur="sugerirMaquinaPorNota()"></textarea>
+            <div id="nj-sugerencia-maquina" style="display:none;margin-top:4px;font-size:12px;color:var(--ink-soft);cursor:pointer;"></div>
           </div>
 
           <div class="field" style="margin-bottom:12px;">
@@ -10579,6 +10580,25 @@ function getSelectedAccessories(){
 }
 function getSelectedMachines(){
   return Array.from(document.querySelectorAll('#nj-machine-grid input:checked')).map(c=>c.value);
+}
+// Trabajos consulta el núcleo común de conocimiento: si la nota del trabajo menciona algo
+// que ya se ha aprendido como alias de una máquina/vehículo concreta (aprendido, por
+// ejemplo, desde Entradas), lo sugiere aquí — mismo conocimiento, cualquier módulo.
+async function sugerirMaquinaPorNota(){
+  const cont = document.getElementById('nj-sugerencia-maquina');
+  const texto = document.getElementById('nj-note')?.value?.trim();
+  if(!sb || !cont || !texto || texto.length < 6){ if(cont) cont.style.display='none'; return; }
+  const {data} = await sb.rpc('buscar_conocimiento', {p_modulo:'trabajos', p_texto: texto, p_tipo:'alias_maquina'});
+  const mejor = (data||[])[0];
+  const maquina = mejor?.contenido?.maquina_confirmada;
+  if(!maquina){ cont.style.display='none'; return; }
+  cont.innerHTML = `🔧 ¿Es sobre <b>${maquina}</b>? <u>marcarla</u>`;
+  cont.style.display = 'block';
+  cont.onclick = () => {
+    const chk = Array.from(document.querySelectorAll('#nj-machine-grid input')).find(c=>c.value===maquina);
+    if(chk){ chk.checked = true; sb.rpc('marcar_conocimiento_usado', {p_id: mejor.id}); }
+    cont.style.display = 'none';
+  };
 }
 
 let njTasks = []; // cada tarea: {text, rainSensitive}
