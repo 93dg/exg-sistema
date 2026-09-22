@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.67</div>
+        <div class="sub">V2.68</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2227,6 +2227,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="grp-label" data-view="__label_cuenta">Cuenta</div>
       <button data-view="sistema" class="admin-only"><span class="ico">◉</span><span class="label"> Sistema</span></button>
       <button data-view="reportes" class="admin-only"><span class="ico">🐞</span><span class="label"> Reportes</span></button>
+      <button data-view="conocimiento" class="admin-only"><span class="ico">🧠</span><span class="label"> Conocimiento</span></button>
       <button data-view="historico" class="admin-only"><span class="ico">📜</span><span class="label"> Histórico</span></button>
       <button data-view="config" class="admin-only"><span class="ico">⚙</span><span class="label"> Configuración</span></button>
     </div>
@@ -3629,6 +3630,36 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         </div>
 
         <!-- ================= REPORTES ================= -->
+    <div class="view" id="view-conocimiento">
+      <div class="topbar">
+        <div><h1>Conocimiento del motor</h1><div class="desc">Todo lo que el sistema ha aprendido — alias, plantillas, patrones y reglas — y las métricas de cuánto se resuelve sin IA</div></div>
+        <div class="quickactions"><button class="btn" onclick="cargarConocimientoMotor()">↻ Actualizar</button></div>
+      </div>
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-head"><h3>📊 Autonomía — % resuelto sin IA</h3></div>
+        <div class="panel-body" id="conocimiento-metricas-body"><div class="empty">Cargando…</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Reglas y patrones aprendidos</h3>
+          <div class="filters" id="conocimiento-filter" style="margin:0;">
+            <div class="chip-filter active" data-ctipo="">Todos</div>
+            <div class="chip-filter" data-ctipo="alias_cliente">Alias de clientes</div>
+            <div class="chip-filter" data-ctipo="plantilla_documento">Plantillas</div>
+            <div class="chip-filter" data-ctipo="patron_correo">Correo</div>
+            <div class="chip-filter" data-ctipo="regla_extractor">Reglas de extracción</div>
+            <div class="chip-filter" data-ctipo="clasificador_entrada">Clasificador de entradas</div>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0;">
+          <table class="tbl">
+            <thead><tr><th>Tipo</th><th>Contenido</th><th>Origen</th><th>Ámbito</th><th>Confianza</th><th>Usado</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="conocimiento-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div class="view" id="view-reportes">
       <div class="topbar">
         <div><h1>Reportes</h1><div class="desc">Lo que has ido reportando desde la web, con captura y estado</div></div>
@@ -4836,6 +4867,9 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
       cargarPropuestasReportes();
       cargarConflictosCliente();
     }
+    if(btn.dataset.view==='conocimiento'){
+      cargarConocimientoMotor();
+    }
     if(btn.dataset.view==='proyectos'){
       cargarProyectos();
     }
@@ -5734,6 +5768,66 @@ function renderGraficoFacturacion(){
   }
 }
 // ============ Métricas de uso de IA — filosofía "reglas primero, IA como excepción" ============
+let conocimientoMotorCache = [];
+async function cargarConocimientoMotor(){
+  if(!sb) return;
+  const body = document.getElementById('conocimiento-metricas-body');
+  const tbody = document.getElementById('conocimiento-tbody');
+  if(!body || !tbody) return;
+  body.innerHTML = '<div class="empty">Cargando…</div>';
+  const [{data: metricas}, {data: conocimiento}] = await Promise.all([
+    sb.rpc('metricas_autonomia_ia'),
+    sb.from('conocimiento_unificado').select('*').order('created_at',{ascending:false}).limit(500),
+  ]);
+  // % resuelto sin IA se calcula contra el total de documentos/entradas procesados, no solo
+  // contra las llamadas IA — una llamada IA no tiene "% sin IA" por sí sola, así que se
+  // muestra junto al total de documentos digitalizados como referencia real del sistema
+  const {count: totalDocs} = await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('metodo_extraccion','reglas');
+  const totalIA = (metricas||[]).reduce((s,m)=>s+Number(m.total_ia),0);
+  const costeTotal = (metricas||[]).reduce((s,m)=>s+Number(m.coste_total),0);
+  const patronesTotal = (metricas||[]).reduce((s,m)=>s+Number(m.patrones_aprendidos),0);
+  const totalReal = (totalDocs||0) + totalIA;
+  const pctSinIA = totalReal ? Math.round(((totalReal-totalIA)/totalReal)*100) : 100;
+  body.innerHTML = `
+    <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px;">
+      <div><div style="font-size:28px;font-weight:800;color:var(--green);">${pctSinIA}%</div><div class="sub-t">resuelto sin IA (${totalReal.toLocaleString('es-ES')} casos)</div></div>
+      <div><div style="font-size:28px;font-weight:800;">${totalIA}</div><div class="sub-t">llamadas IA totales</div></div>
+      <div><div style="font-size:28px;font-weight:800;">${costeTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:4})} €</div><div class="sub-t">coste acumulado</div></div>
+      <div><div style="font-size:28px;font-weight:800;">${patronesTotal}</div><div class="sub-t">llamadas que se convirtieron en regla</div></div>
+    </div>
+    <table class="tbl"><thead><tr><th>Proceso</th><th class="num">Llamadas IA</th><th class="num">Coste</th><th class="num">Coste medio</th><th class="num">Convertidas en regla</th></tr></thead>
+    <tbody>${(metricas||[]).map(m=>`<tr><td>${m.proceso}</td><td class="num">${m.total_ia}</td><td class="num">${Number(m.coste_total).toLocaleString('es-ES',{minimumFractionDigits:4})} €</td><td class="num">${Number(m.coste_medio).toLocaleString('es-ES',{minimumFractionDigits:4})} €</td><td class="num">${m.patrones_aprendidos}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Sin llamadas IA registradas</td></tr>'}</tbody></table>`;
+  conocimientoMotorCache = conocimiento || [];
+  renderConocimientoTabla();
+}
+function renderConocimientoTabla(){
+  const tbody = document.getElementById('conocimiento-tbody');
+  if(!tbody) return;
+  const filtro = document.querySelector('#conocimiento-filter .chip-filter.active')?.dataset.ctipo || '';
+  const filas = conocimientoMotorCache.filter(c=>!filtro || c.tipo===filtro);
+  tbody.innerHTML = filas.length ? filas.map(c=>{
+    const contenidoTxt = Object.entries(c.contenido||{}).filter(([k,v])=>v!=null && v!=='').map(([k,v])=>`<b>${k}:</b> ${typeof v==='object'?JSON.stringify(v):v}`).join(' · ');
+    const activoTgl = c.id ? `<span class="pill ${c.activo?'cobrado':'anulado'}" style="cursor:pointer;" onclick="toggleConocimientoActivo('${c.id}',${!c.activo})">${c.activo?'Activo':'Desactivado'}</span>` : `<span class="sub-t">—</span>`;
+    return `<tr><td class="mono">${c.tipo}</td><td style="max-width:420px;font-size:12px;">${contenidoTxt||'—'}</td><td>${c.modulo_origen||'—'}</td><td>${c.ambito==='global'?'Global':'Contextual'}</td><td><span class="pill ${c.confianza==='alta'?'cobrado':c.confianza==='media'?'pendiente_enviar':'anulado'}">${c.confianza}</span></td><td>${c.veces_reutilizado||0} veces</td><td>${activoTgl}</td><td></td></tr>`;
+  }).join('') : '<tr><td colspan="8" class="empty">Sin resultados</td></tr>';
+}
+document.addEventListener('click', ev=>{
+  const chip = ev.target.closest('#conocimiento-filter .chip-filter');
+  if(!chip) return;
+  document.querySelectorAll('#conocimiento-filter .chip-filter').forEach(c=>c.classList.remove('active'));
+  chip.classList.add('active');
+  renderConocimientoTabla();
+});
+async function toggleConocimientoActivo(id, nuevoValor){
+  if(!sb) return;
+  // solo las filas que viven en conocimiento_motor (lo aprendido de ahora en adelante) se
+  // pueden desactivar desde aquí — los alias/plantillas antiguos siguen en sus tablas
+  // originales, que ya tienen su propia gestión en Clientes/Digitalización
+  const {error} = await sb.from('conocimiento_motor').update({activo: nuevoValor}).eq('id', id);
+  if(error){ mostrarToast('Esta entrada viene de una tabla antigua y no se gestiona desde aquí todavía.'); return; }
+  mostrarToast(nuevoValor?'Reactivada.':'Desactivada — ya no se usará para resolver casos.');
+  cargarConocimientoMotor();
+}
 async function cargarMetricasIA(){
   const body = document.getElementById('metricas-ia-body');
   if(!body || !sb) return;
