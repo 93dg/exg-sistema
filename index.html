@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.64</div>
+        <div class="sub">V2.65</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5261,19 +5261,28 @@ function accionesDocumento(doc){
   const eliminar = {t:'Eliminar', fn:`borrarUnDocumento('${doc.id}')`};
   const enviarCliente = {t:'Enviar al cliente', fn:`enviarDocumentoAlCliente('${doc.id}')`};
   const imprimir = {t:'Imprimir', fn:`imprimirDocumento('${doc.id}')`};
+  // "Volver a [fase anterior]" solo aparece si de verdad existe una fase anterior en este
+  // expediente — nunca se muestra una acción que no tiene sentido para este documento
+  const volver = doc.documento_anterior_id ? [{t:'← Volver a '+tipoDocEtiqueta(documentosRealesById[doc.documento_anterior_id]?.tipo||'anterior'), fn:`volverAFaseAnterior('${doc.id}')`}] : [];
   if(doc.type==='factura'){
     const estado = doc.estado_cobro || 'pendiente_enviar';
     if(doc.enviado_gestor || ['pendiente_cobrar','parcial','cobrado'].includes(estado)){
       if(estado==='pendiente_cobrar' && !doc.enviado_gestor) a.push(editar);
       a.push({t:'Rectificar', fn:`rectificarFactura('${doc.id}')`}, duplicar);
     } else {
-      a.push(editar, duplicar, eliminar);
+      // factura borrador/no emitida SÍ puede volver atrás — una ya emitida, nunca (lo
+      // bloquea retroceder_fase en el propio motor, pero el botón ni se ofrece aquí)
+      a.push(editar, duplicar, ...volver, eliminar);
     }
     a.push(enviarCliente, imprimir);
   } else if(doc.type==='presupuesto' || doc.type==='proforma'){
-    a.push(editar, duplicar, eliminar, {t:'Crear factura', fn:`crearFacturaDesdeDocumento('${doc.id}')`}, {t:'Crear albarán', fn:`crearAlbaranDesdeDocumento('${doc.id}')`}, enviarCliente, imprimir);
+    a.push(editar, duplicar, eliminar, {t:'Crear factura', fn:`avanzarFaseDocumento('${doc.id}','factura')`});
+    if(doc.type==='presupuesto') a.push({t:'Crear albarán', fn:`avanzarFaseDocumento('${doc.id}','albaran')`});
+    a.push(...volver, enviarCliente, imprimir);
   } else if(doc.type==='albaran'){
-    a.push(editar, duplicar, eliminar, {t:'Convertir en factura', fn:`convertirAlbaranEnFactura('${doc.id}')`}, enviarCliente, imprimir);
+    // desde un albarán, lo habitual es primero la proforma (para que el cliente confirme
+    // el importe) y solo después la factura — pero ambas quedan disponibles directamente
+    a.push(editar, duplicar, eliminar, {t:'Crear proforma', fn:`avanzarFaseDocumento('${doc.id}','proforma')`}, {t:'Crear factura', fn:`avanzarFaseDocumento('${doc.id}','factura')`}, ...volver, enviarCliente, imprimir);
   } else {
     a.push(editar, eliminar);
   }
@@ -5281,6 +5290,26 @@ function accionesDocumento(doc){
 }
 function accionesDocumentoHtml(doc){
   return accionesDocumento(doc).map(x=>`<button class="btn sm" onclick="event.stopPropagation();${x.fn}">${x.t}</button>`).join(' ');
+}
+async function avanzarFaseDocumento(id, tipoDestino){
+  if(!sb) return;
+  const {data: nuevoId, error} = await sb.rpc('avanzar_fase', {p_documento_origen_id: id, p_tipo_destino: tipoDestino, p_campos_extra: {}});
+  if(error){ mostrarToast('Error: '+errText(error)); return; }
+  // el número lo asigna la app, no el motor — avanzar_fase deja el campo vacío a propósito
+  await sb.from('documentos_economicos').update({numero: ['factura','presupuesto','proforma'].includes(tipoDestino) ? proximoNumero(tipoDestino) : null}).eq('id', nuevoId);
+  mostrarToast(`${tipoDocEtiqueta(tipoDestino)} creada — pasa a ser la fase activa del expediente.`);
+  await cargarDocumentosEconomicosReales();
+  openDocumentViewer(nuevoId);
+}
+async function volverAFaseAnterior(id){
+  const doc = documentosRealesById[id];
+  if(!doc || !doc.documento_anterior_id || !sb) return;
+  if(!(await confirmarAccion(`¿Volver a ${tipoDocEtiqueta(documentosRealesById[doc.documento_anterior_id]?.tipo || '')}? Este documento (${tipoDocEtiqueta(doc.type)}) quedará en el historial del expediente, no se borra.`))) return;
+  const {error} = await sb.rpc('retroceder_fase', {p_expediente_id: doc.expediente_id, p_documento_destino_id: doc.documento_anterior_id});
+  if(error){ mostrarToast('Error: '+errText(error)); return; }
+  mostrarToast('Fase anterior reactivada.');
+  await cargarDocumentosEconomicosReales();
+  openDocumentViewer(doc.documento_anterior_id);
 }
 async function duplicarDocumento(id){
   const doc = documentosRealesById[id];
