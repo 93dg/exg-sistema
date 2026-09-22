@@ -2196,7 +2196,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.81</div>
+        <div class="sub">V2.82</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4389,6 +4389,11 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       <div id="ai-attach-preview"></div>
       <div id="ai-input-row">
         <textarea id="asistente-ia-input" placeholder="Ej. Hazme una factura a José López, apunta 80 € de gasoil y mira los trabajos urgentes…"></textarea>
+      </div>
+      <div id="ai-continuacion-releer" style="display:none;margin:4px 0 8px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-soft);cursor:pointer;">
+          <input type="checkbox" id="ai-releer-archivos-chk"> 🔁 Volver a leer los archivos originales antes de aplicar el cambio (gasta IA otra vez)
+        </label>
       </div>
       <div id="ai-input-toolbar">
         <div class="ai-tool-wrap">
@@ -11747,12 +11752,34 @@ function aiAbrirDetalleHistorial(id){
 
   document.getElementById('hd-body').innerHTML =
     seccion('1 · Petición original', peticionHtml) +
+    seccion('Archivos originales', '<div id="hd-archivos"><div class="sub-t">Cargando…</div></div>') +
     seccion('2-5 · Tareas, interpretación y resultado', tareasHtml) +
     seccion('6-7 · Aprendizaje generado', aprendizajeHtml) +
     seccion('8 · Uso de IA y coste', iaHtml) +
     `<button class="btn primary" style="width:100%;margin-top:4px;" onclick="aiContinuarDesdeHistorial('${l.id}')">CONTINUAR — volver al chat con este contexto</button>`;
 
   document.getElementById('ai-historial-detalle-overlay').classList.add('active');
+  aiCargarArchivosPeticion(l.id);
+}
+async function aiCargarArchivosPeticion(iaLlamadaId){
+  const cont = document.getElementById('hd-archivos');
+  if(!cont) return;
+  if(!sb){ cont.innerHTML = '<div class="sub-t">—</div>'; return; }
+  const {data, error} = await sb.from('peticion_archivos').select('*').eq('ia_llamada_id', iaLlamadaId).order('orden');
+  if(!document.getElementById('hd-archivos')) return; // el detalle se cerró mientras cargaba
+  if(error || !data || !data.length){ document.getElementById('hd-archivos').innerHTML = '<div class="sub-t">Esta petición no tenía archivos adjuntos.</div>'; return; }
+  document.getElementById('hd-archivos').innerHTML = data.map(a=>{
+    const url = sb.storage.from(DOC_BUCKET).getPublicUrl(a.storage_path).data.publicUrl;
+    const esImagen = /^image\//.test(a.media_type||'');
+    return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin-bottom:6px;">
+      ${esImagen ? `<img src="${url}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;flex-shrink:0;">` : `<span style="font-size:20px;">📄</span>`}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${svgEsc(a.nombre_original||'archivo')}</div>
+        <div class="sub-t" style="font-size:11px;">${a.tamano_bytes ? (a.tamano_bytes/1024).toFixed(0)+' KB' : ''}</div>
+      </div>
+      <a class="btn sm" href="${url}" target="_blank" rel="noopener">Ver</a>
+    </div>`;
+  }).join('');
 }
 function cerrarHistorialDetalle(){ document.getElementById('ai-historial-detalle-overlay').classList.remove('active'); }
 function aiIrATrabajoPorId(id){
@@ -11773,12 +11800,16 @@ function aiContinuarDesdeHistorial(id){
   aiCambiarPestana('chat');
   const input = document.getElementById('asistente-ia-input');
   if(input){ input.value = ''; input.placeholder = `Sobre: ${resumen} — escribe qué quieres cambiar o añadir…`; input.focus(); }
-  window.__aiContextoContinuacion = {ia_llamada_id: id, tarea: tareas[0] || null};
-  if(!l?.num_imagenes){
-    mostrarToast('Aviso: esta petición no tenía archivos guardados (o si los tenía, no se conservan) — solo se recupera el texto y los datos ya extraídos.');
-  } else {
-    mostrarToast('Aviso: las fotos originales no se guardan tras procesarlas — solo se recupera el texto y los datos ya extraídos de esa vez.');
-  }
+  window.__aiContextoContinuacion = {ia_llamada_id: id, tarea: tareas[0] || null, archivos: []};
+  const releerRow = document.getElementById('ai-continuacion-releer');
+  const chk = document.getElementById('ai-releer-archivos-chk');
+  if(chk) chk.checked = false;
+  if(sb){
+    sb.from('peticion_archivos').select('*').eq('ia_llamada_id', id).order('orden').then(({data})=>{
+      window.__aiContextoContinuacion.archivos = data || [];
+      if(releerRow) releerRow.style.display = (data && data.length) ? '' : 'none';
+    });
+  } else if(releerRow) releerRow.style.display = 'none';
 }
 function abrirAsistenteIA(){
   document.getElementById('ai-panel-backdrop').classList.add('active');
@@ -11896,18 +11927,35 @@ async function enviarAsistenteIA(){
   const contexto = window.__aiContextoContinuacion;
   if(contexto?.tarea?.tipo === 'documento' && !aiAdjuntos.length){
     window.__aiContextoContinuacion = null;
+    document.getElementById('ai-continuacion-releer').style.display = 'none';
     aiMostrarVista('loading');
     document.getElementById('ai-loading-text').textContent = 'Aplicando el cambio…';
     try{
       const datosAnteriores = JSON.stringify(contexto.tarea.datos||{});
+      const releer = document.getElementById('ai-releer-archivos-chk')?.checked && contexto.archivos?.length;
+      let imagenesReleidas = [];
+      if(releer){
+        document.getElementById('ai-loading-text').textContent = 'Releyendo los archivos originales…';
+        imagenesReleidas = await Promise.all(contexto.archivos.filter(a=>/^image\//.test(a.media_type||'')).map(async a=>{
+          const url = sb.storage.from(DOC_BUCKET).getPublicUrl(a.storage_path).data.publicUrl;
+          const blob = await (await fetch(url)).blob();
+          const b64 = await new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.readAsDataURL(blob); });
+          return {data: b64, media_type: a.media_type};
+        }));
+      }
       const resp = await fetch(SUPABASE_URL + '/functions/v1/asistente-ia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer '+SUPABASE_ANON_KEY },
-        body: JSON.stringify({ modo:'crear_documento', mensaje: `Ya había preparado esto antes: ${datosAnteriores}. Ahora el usuario pide este cambio sobre lo mismo: "${mensaje}". Aplica el cambio y devuelve el documento completo actualizado.` }),
+        body: JSON.stringify({ modo:'crear_documento', mensaje: `Ya había preparado esto antes: ${datosAnteriores}. Ahora el usuario pide este cambio sobre lo mismo: "${mensaje}". Aplica el cambio y devuelve el documento completo actualizado.`, imagenes: imagenesReleidas }),
       });
       const data = await resp.json();
       cerrarAsistenteIA();
       if(!resp.ok || data.error){ mostrarToast('Error: '+(data.error||'algo ha fallado.')); return; }
+      if(data._ia_llamada_id && imagenesReleidas.length){
+        // se releyó de verdad — deja constancia de qué archivos se volvieron a consultar,
+        // no solo el texto, para que la trazabilidad quede completa también en este caso
+        reenlazarArchivosExistentes(data._ia_llamada_id, contexto.archivos.filter(a=>/^image\//.test(a.media_type||'')), 'releido_al_continuar');
+      }
       metodoDocContexto = {tipo: contexto.tarea.datos?.tipo_doc || 'proforma'};
       abrirEditorConDatosIA(data);
     }catch(err){ mostrarToast('Error de red: '+err.message); }
@@ -11938,6 +11986,9 @@ async function enviarAsistenteIA(){
       _ia_llamada_id: data._ia_llamada_id || null,
       _tarea_index: idx,
     }));
+    if(data._ia_llamada_id && aiAdjuntos.length){
+      vincularArchivosAPeticion(data._ia_llamada_id, aiAdjuntos.filter(a=>a.esImagen).map(a=>dataUrlAFile(a.dataUrl, a.nombre, a.tipo)), 'chat');
+    }
     aiAdjuntos = []; aiRenderAdjuntos();
     if(!aiTareas.length){
       aiMostrarVista('input');
@@ -13054,6 +13105,7 @@ async function procesarMetodoFoto(){
     });
     const data = await resp.json();
     if(!resp.ok || data.error){ statusEl.textContent = 'Error: '+(data.error||'algo ha fallado.'); btn.disabled=false; return; }
+    if(data._ia_llamada_id) vincularArchivosAPeticion(data._ia_llamada_id, files, 'foto_archivo');
     cerrarMetodoFoto();
     abrirEditorConDatosIA(data);
   }catch(err){
@@ -13125,6 +13177,64 @@ async function procesarMetodoTexto(){
 // guarda solo, el usuario revisa y confirma como con cualquier documento. En móvil el
 // "editor normal" es el asistente por pasos (wiz), así que se rellena ahí y se salta
 // directo a la revisión en vez de repetir cliente/trabajo/conceptos paso a paso.
+// ============ ARCHIVOS ORIGINALES DE UNA PETICIÓN AL ASISTENTE ============
+// se guardan en Storage ANTES de procesarlos — así el historial puede releer el archivo
+// real después, no solo el resumen de texto que dejó la IA la primera vez. Deduplicación
+// real por hash: si el mismo archivo ya se subió antes, se reutiliza la ruta, nunca se
+// vuelve a subir la misma imagen dos veces.
+function dataUrlAFile(dataUrl, nombre, tipo){
+  const bstr = atob(dataUrl.split(',')[1]);
+  let n = bstr.length;
+  const u8 = new Uint8Array(n);
+  while(n--) u8[n] = bstr.charCodeAt(n);
+  return new File([u8], nombre, {type: tipo});
+}
+async function sha256DeArchivo(file){
+  const buf = await file.arrayBuffer();
+  const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function subirArchivoAsistente(file){
+  const hash = await sha256DeArchivo(file);
+  if(sb){
+    const {data: existente} = await sb.rpc('buscar_archivo_por_hash', {p_hash: hash});
+    if(existente) return {storage_path: existente, hash, reutilizado: true};
+  }
+  const path = `asistente-adjuntos/${Date.now()}_${file.name.replace(/[^\w.\-]/g,'_')}`;
+  if(sb){ await sb.storage.from(DOC_BUCKET).upload(path, file, {upsert:false}); }
+  return {storage_path: path, hash, reutilizado: false};
+}
+// llamar SIEMPRE tras obtener el _ia_llamada_id de una respuesta del asistente — vincula
+// los archivos ya subidos (o reutilizados) a esa petición concreta, en orden
+async function vincularArchivosAPeticion(iaLlamadaId, files, origen){
+  if(!sb || !iaLlamadaId || !files || !files.length) return;
+  let orden = 0;
+  for(const file of files){
+    try{
+      const {storage_path, hash} = await subirArchivoAsistente(file);
+      await sb.from('peticion_archivos').insert({
+        ia_llamada_id: iaLlamadaId, storage_path, nombre_original: file.name,
+        media_type: file.type || 'application/octet-stream', tamano_bytes: file.size,
+        hash, orden: orden++, origen: origen || 'subida',
+      });
+    }catch(e){ console.error('No se pudo vincular archivo a la petición', e); }
+  }
+}
+// caso distinto: reutilizar archivos que YA están en Storage (releídos al continuar una
+// petición anterior) — solo enlaza la misma ruta a la nueva petición, sin volver a subir
+// ni hashear nada, porque el archivo ya es exactamente el mismo
+async function reenlazarArchivosExistentes(iaLlamadaId, archivosExistentes, origen){
+  if(!sb || !iaLlamadaId || !archivosExistentes || !archivosExistentes.length) return;
+  let orden = 0;
+  for(const a of archivosExistentes){
+    try{
+      await sb.from('peticion_archivos').insert({
+        ia_llamada_id: iaLlamadaId, storage_path: a.storage_path, nombre_original: a.nombre_original,
+        media_type: a.media_type, tamano_bytes: a.tamano_bytes, hash: a.hash, orden: orden++, origen: origen || 'reutilizado',
+      });
+    }catch(e){ console.error('No se pudo reenlazar archivo existente', e); }
+  }
+}
 function abrirEditorConDatosIA(datos){
   const contexto = {...(metodoDocContexto||{})};
   if(datos.cliente) contexto.clientName = datos.cliente;
