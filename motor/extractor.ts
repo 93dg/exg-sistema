@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.10";
+export const VERSION_MOTOR = "motor-exg-2.11";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -161,15 +161,19 @@ function valorFecha(v: any, anioEsperado?: string): string | null {
 /* ---------------- tipo documental ----------------
    Solo cuentan los TÍTULOS de la cabecera (zona antes de la tabla de conceptos) y el
    valor del campo número. Una palabra dentro de una línea de concepto NO cambia el tipo. */
-export function detectarTipo(textosCabecera: string[], valorNumero?: any): string | null {
+export function detectarTipo(textosCabecera: string[], valorNumero?: any, archivo?: string | null): string | null {
   const vn = norm(valorNumero);
+  const deArchivo = () => { const f = norm(String(archivo || "").split("/").pop()); return /\bALBAR/.test(f) ? "albaran" : /PRO-?FORMA/.test(f) ? "proforma" : /^PRES(UP)?/.test(f) ? "presupuesto" : null; };
   if (/PRO\s*-?\s*FORMA/.test(vn)) return "proforma";
   const cab = textosCabecera.map(norm).filter((t) => t && t.length <= 40);
   if (cab.some((t) => /^(FACTURA\s+)?PRO\s*-?\s*FORMA\b/.test(t))) return "proforma";
   if (cab.some((t) => /^ALBAR[AÁ]N\b/.test(t))) return "albaran";
   if (cab.some((t) => /^PRESUPUESTO\b/.test(t) && !/N[º°O]?\s*DE\s*PRESUPUESTO/.test(t))) return "presupuesto";
-  if (cab.some((t) => /^(FACTURA\b|N\.?\s*[º°O1]?\.?\s*(DE\s*)?FACTURA)/.test(t))) return "factura";
-  return null;
+  // CAR#A1: la etiqueta "Nº Factura" de la plantilla con el campo VACÍO no demuestra que sea factura;
+  // sin título real, manda el nombre del archivo
+  if (cab.some((t) => /^FACTURA\b/.test(t))) return "factura";
+  if (cab.some((t) => /^N\.?\s*[º°O1]?\.?\s*(DE\s*)?FACTURA/.test(t)) && vn && /\d/.test(vn)) return deArchivo() || "factura";
+  return deArchivo();
 }
 
 /* ---------------- CLIENTE: anclado al bloque del destinatario ----------------
@@ -361,7 +365,7 @@ export function lineasYTotales(filas: any[][], wb?: any) {
 }
 
 /* ---------------- HOJA DE CÁLCULO (plantilla de factura) ---------------- */
-export function leerHoja(wb: any, anioEsperado?: string) {
+export function leerHoja(wb: any, anioEsperado?: string, opciones?: { archivo?: string }) {
   // hoja "Factura…" y, si no existe, la primera hoja que tenga forma de documento (Fecha + Nº/Factura/Concepto arriba)
   let nombreHoja = wb.SheetNames.find((n: string) => /^factura/i.test(n)) || null;
   if (!nombreHoja) nombreHoja = wb.SheetNames.find((n: string) => {
@@ -410,7 +414,7 @@ export function leerHoja(wb: any, anioEsperado?: string) {
   const numero = numeroRej || numeroTpl;
   const cliente = detectarCliente(filas, limite + 1);
   const textosCab = filas.slice(0, limite).flat().filter((v: any) => typeof v === "string");
-  const tipo = detectarTipo(textosCab, valorBruto);
+  const tipo = detectarTipo(textosCab, numero || valorBruto, opciones?.archivo);
   const totales = lineasYTotales(filas, wb);
   return { hoja: nombreHoja, filas, limite, numero, fecha, cliente, tipo, ...totales };
 }
@@ -465,7 +469,7 @@ export function direccionNorm(t: any) {
     .replace(/\bN\s*[º°O]?\s*(?=\d)/g, " ").replace(/[^A-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 }
 function direccionesCompatibles(a: any, b: any) { const x = direccionNorm(a), y = direccionNorm(b); return !x || !y || x === y || x.startsWith(y) || y.startsWith(x); }
-export async function resolverCliente(sb: any, cand: { nombre: string | null; nif: string | null; direccion?: string | null; preferidoId?: string | null; bloque?: string[]; archivo?: string | null }, cache?: any) {
+export async function resolverCliente(sb: any, cand: { nombre: string | null; nif: string | null; direccion?: string | null; preferidoId?: string | null; bloque?: string[]; archivo?: string | null; poblacion?: string | null }, cache?: any) {
   const nifC = cand.nif && !esDatoEmisor(cand.nif) ? cand.nif.replace(/[^A-Z0-9]/gi, "").toUpperCase() : null;
   const claseC = cand.nombre ? clasificarTexto(cand.nombre) : "vacio";
   // "dudoso" (p.ej. una sola palabra: CARIMSA, URBINA) solo vale si viene respaldado por un NIF
@@ -509,6 +513,16 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
         return { estado: "existente", id: principal.id, nombre: principal.nombre, evidencia: "nombre (fichas duplicadas del mismo cliente)", duplicados: porNombre.filter((e: any) => e.id !== principal.id).map((e: any) => e.id) };
       }
       return { estado: "revisar", motivo: `nombre en ${porNombre.length} fichas`, ids: porNombre.map((e: any) => e.id) };
+    }
+    // CAR#A1: nombre abreviado = comienzo de UNA sola ficha ("JOSE CAMACHO" → "JOSE CAMACHO MURILLO"),
+    // solo con corroboración (archivo o población)
+    const porPrefijo = validas.filter((e: any) => nombreNorm(e.nombre).startsWith(nn + " ") && nn.split(" ").length >= 2);
+    if (porPrefijo.length === 1) {
+      const e = porPrefijo[0];
+      const fich = norm(String(cand.archivo || "").split("/").pop()).replace(/[^A-Z]/g, " ");
+      const corrobora = nn.split(" ").filter((w) => w.length >= 4).some((w) => fich.split(" ").includes(w)) || (cand.poblacion && e.poblacion && norm(cand.poblacion).includes(norm(e.poblacion).split(" ")[0]));
+      if (corrobora) return { estado: "existente", id: e.id, nombre: e.nombre, evidencia: "nombre abreviado corroborado" };
+      return { estado: "revisar", motivo: `puede ser ${e.nombre}`, ids: [e.id] };
     }
     const alias = (cache?.alias || (await sb.from("aprendizaje_nombres_clientes").select("variante,canonico")).data || []);
     if (cache && !cache.alias) cache.alias = alias;
