@@ -524,6 +524,17 @@ table{border-collapse:collapse;width:100%;}
     margin-top:8px;padding:10px !important;border:1px solid var(--red);border-radius:8px;font-weight:600;
   }
   .ie-items .del-row-label{display:inline;}
+  .ie-items .ie-linea-resumen-td{display:none;} /* solo se ve cuando la tarjeta está plegada, ver abajo */
+  .ie-items tbody tr.colapsada{padding:10px 12px;cursor:pointer;}
+  .ie-items tbody tr.colapsada > td:not(.ie-linea-resumen-td){display:none;}
+  .ie-items tbody tr.colapsada .del-row{display:none !important;} /* el borrado normal tenía !important y ganaba siempre al plegado */
+  .ie-items tbody tr.colapsada .ie-linea-resumen-td{
+    display:flex !important;flex-direction:row !important;align-items:center;gap:8px;padding:0;
+  }
+  .ie-items .ie-resumen-fecha{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);flex-shrink:0;}
+  .ie-items .ie-resumen-concepto{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ie-items .ie-resumen-total{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;flex-shrink:0;}
+  .ie-items .ie-resumen-chevron{color:var(--ink-soft);flex-shrink:0;}
 }
 .ie-footer{display:flex;justify-content:space-between;gap:24px;margin-top:20px;padding-top:16px;border-top:1px solid var(--line);}
 .ie-payment{flex:1;}
@@ -2244,7 +2255,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.99</div>
+        <div class="sub">V3.00</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4731,6 +4742,10 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <div class="field" style="flex:3;min-width:180px;"><div class="l">Email (opcional)</div><input class="search-box" style="width:100%;" id="ni-client-email"></div>
         </div>
 
+        <div class="ie-items-toolbar" style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+          <button type="button" class="btn sm" onclick="ordenarLineasPorFecha()">📅 Ordenar por fecha</button>
+          <button type="button" class="btn sm" id="ie-toggle-colapsar-btn" onclick="toggleColapsarTodasLasLineas()">▾ Plegar todas</button>
+        </div>
         <table class="ie-items">
           <thead><tr><th style="width:100px;">Fecha</th><th style="width:70px;">Cant.</th><th style="width:70px;">Ud.</th><th>Concepto de trabajo</th><th class="col-precio" style="width:110px;">Precio</th><th class="col-total" style="width:110px;">Total</th><th style="width:30px;"></th></tr></thead>
           <tbody id="ie-items-body"></tbody>
@@ -4779,7 +4794,6 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 
       <div class="ie-actions">
         <button type="button" class="btn" id="ni-draft" onclick="submitNewInvoice(event, true)">Guardar como borrador</button>
-        <button type="button" class="btn dark" id="ni-preview-btn" onclick="togglePreview()">Vista previa de impresión</button>
         <button type="button" class="btn dark" onclick="descargarPDF()">⬇ Descargar PDF</button>
         <button type="button" class="btn primary" id="ni-convert-btn" style="display:none;" onclick="convertirDocumento()">Convertir en albarán</button>
         <button type="button" class="btn" id="ni-deshacer-btn" style="display:none;color:var(--red);" onclick="deshacerConversion()">↺ Deshacer — volver a albarán</button>
@@ -11184,11 +11198,12 @@ function addItemRow(qty, concept, price, machine, unidad, fecha){
   tr.id = id;
   const comboId = 'combo-'+id;
   tr.innerHTML = `
-    <td data-label="Fecha"><input type="date" class="ie-linea-fecha search-box mono" style="width:100%;padding:4px;" value="${fecha ?? ''}"></td>
+    <td class="ie-linea-resumen-td" onclick="document.getElementById('${id}').classList.remove('colapsada')"></td>
+    <td data-label="Fecha"><input type="date" class="ie-linea-fecha search-box mono" style="width:100%;padding:4px;" value="${fecha ?? ''}" oninput="actualizarResumenLinea('${id}')"></td>
     <td data-label="Cantidad / horas"><input type="number" class="ie-qty" value="${qty ?? 1}" min="0" step="0.01" oninput="recalcTotals()"></td>
     <td data-label="Unidad"><select class="search-box ie-unidad" style="width:100%;min-width:0;padding:4px;">${UNIDADES.map(u=>`<option value="${u}" ${unidad===u?'selected':''}>${u}</option>`).join('')}</select></td>
     <td data-label="Concepto" style="position:relative;"><input type="text" class="ie-concept" name="concepto-${id}" autocomplete="new-password" placeholder="Ej. M³ de excavación en terreno de consistencia media" value="${concept ?? ''}"
-        oninput="suggestFromConcept(this); renderConceptCombo(this,'${comboId}')" onfocus="renderConceptCombo(this,'${comboId}')" onblur="setTimeout(()=>{const c=document.getElementById('${comboId}'); if(c) c.style.display='none';},150); sugerirPrecioHistorico(this,'${id}')">
+        oninput="suggestFromConcept(this); renderConceptCombo(this,'${comboId}'); actualizarResumenLinea('${id}')" onfocus="renderConceptCombo(this,'${comboId}')" onblur="setTimeout(()=>{const c=document.getElementById('${comboId}'); if(c) c.style.display='none';},150); sugerirPrecioHistorico(this,'${id}')">
       <div id="${comboId}" class="combo-list"></div>
       <div id="hist-${id}" class="sub-t" style="display:none;margin-top:2px;cursor:pointer;"></div>
     </td>
@@ -11198,8 +11213,44 @@ function addItemRow(qty, concept, price, machine, unidad, fecha){
   `;
   tbody.appendChild(tr);
   recalcTotals();
+  actualizarResumenLinea(id);
 }
 
+// resumen de una línea (fecha · concepto breve · importe), visible solo cuando la línea
+// está plegada en móvil — para poder identificarla sin tener que desplegarla
+function actualizarResumenLinea(id){
+  const tr = document.getElementById(id);
+  if(!tr) return;
+  const fecha = tr.querySelector('.ie-linea-fecha')?.value;
+  const concepto = tr.querySelector('.ie-concept')?.value || '(sin concepto)';
+  const total = tr.querySelector('.line-total')?.textContent || '';
+  const resumenTd = tr.querySelector('.ie-linea-resumen-td');
+  if(resumenTd) resumenTd.innerHTML = `<span class="ie-resumen-fecha">${fecha ? formatFechaCorta(fecha) : '—'}</span><span class="ie-resumen-concepto">${concepto}</span><span class="ie-resumen-total">${total}</span><span class="ie-resumen-chevron">▾</span>`;
+}
+// pliega o despliega TODAS las líneas a la vez — pensado para móvil, cuando hay muchas
+// líneas y hace falta bajar mucho para llegar al total; cada línea se puede desplegar
+// suelta tocándola, sin tener que desplegar todas otra vez
+function toggleColapsarTodasLasLineas(){
+  const filas = document.querySelectorAll('#ie-items-body tr');
+  const btn = document.getElementById('ie-toggle-colapsar-btn');
+  const hayAlgunaExpandida = Array.from(filas).some(tr=>!tr.classList.contains('colapsada'));
+  filas.forEach(tr=>{
+    tr.classList.toggle('colapsada', hayAlgunaExpandida);
+    if(hayAlgunaExpandida) actualizarResumenLinea(tr.id);
+  });
+  if(btn) btn.textContent = hayAlgunaExpandida ? '▸ Desplegar todas' : '▾ Plegar todas';
+}
+// ordena las líneas ya introducidas por su fecha (las que no tienen fecha van al final,
+// manteniendo su orden relativo) — reordena las filas reales en la tabla, sin tocar datos
+function ordenarLineasPorFecha(){
+  const tbody = document.getElementById('ie-items-body');
+  const filas = Array.from(tbody.querySelectorAll('tr'));
+  const conFecha = filas.filter(tr=>tr.querySelector('.ie-linea-fecha')?.value);
+  const sinFecha = filas.filter(tr=>!tr.querySelector('.ie-linea-fecha')?.value);
+  conFecha.sort((a,b)=> a.querySelector('.ie-linea-fecha').value.localeCompare(b.querySelector('.ie-linea-fecha').value));
+  [...conFecha, ...sinFecha].forEach(tr=>tbody.appendChild(tr));
+  mostrarToast('Líneas ordenadas por fecha.');
+}
 function renderConceptCombo(input, comboId){
   const box = document.getElementById(comboId);
   const q = input.value.toLowerCase();
@@ -11243,6 +11294,7 @@ function recalcTotals(){
     const lineTotal = qty * price;
     tr.querySelector('.line-total').textContent = lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
     base += lineTotal;
+    if(tr.id) actualizarResumenLinea(tr.id);
   });
   const tratamientoIva = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
   const ivaPct = hasIva ? (Number(document.getElementById('ie-iva-pct').value) || 0) : 0;
@@ -11418,7 +11470,7 @@ function togglePreview(){
   if(isPreview){
     previewPane.style.display = 'none';
     editPane.style.display = 'block';
-    btn.textContent = 'Vista previa de impresión';
+    if(btn) btn.textContent = 'Vista previa de impresión';
     contenedor?.classList.remove('ie-modo-preview');
     return;
   }
@@ -13554,7 +13606,7 @@ function openNewInvoiceModal(contexto, forzarEditorCompleto){
   document.getElementById('ie-dictado-note').textContent = 'La lectura automática de fotos (OCR) todavía no está conectada — de momento solo guarda la imagen adjunta como referencia. Cuando conectemos IA con visión, esto rellenará las líneas solo.';
   document.getElementById('ie-preview-pane').style.display = 'none';
   document.getElementById('ie-paper-edit').style.display = 'block';
-  document.getElementById('ni-preview-btn').textContent = 'Vista previa de impresión';
+  const __pvb=document.getElementById('ni-preview-btn'); if(__pvb) __pvb.textContent = 'Vista previa de impresión';
   addItemRow();
   onDocTypeChange();
   if(contexto.clientName){ setClientPickerValue('ni', contexto.clientName); onClientChange(); }
@@ -13944,7 +13996,7 @@ function openDocumentViewer(id){
   document.getElementById('ni-draft').textContent = 'Guardar como borrador';
   document.getElementById('ie-preview-pane').style.display = 'none';
   document.getElementById('ie-paper-edit').style.display = 'block';
-  document.getElementById('ni-preview-btn').textContent = 'Vista previa de impresión';
+  const __pvb=document.getElementById('ni-preview-btn'); if(__pvb) __pvb.textContent = 'Vista previa de impresión';
   const convBtn = document.getElementById('ni-convert-btn');
   const deshacerBtn = document.getElementById('ni-deshacer-btn');
   deshacerBtn.style.display = 'none';
