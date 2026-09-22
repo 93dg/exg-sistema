@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.66</div>
+        <div class="sub">V2.67</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5414,6 +5414,30 @@ async function cargarHistorialExpediente(expedienteId, filaId, docActualId){
   cont2.innerHTML = `<div style="font-size:11px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;font-weight:700;">Historial del expediente</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">${pasos}</div>`;
 }
+const ESTADOS_CONFORMIDAD_PROFORMA = [
+  ['borrador','Borrador'], ['pendiente_enviar','Pendiente de enviar'], ['pendiente_conformidad','Pendiente de conformidad'],
+  ['conforme','Conforme'], ['necesita_cambios','Necesita cambios'], ['rechazada','Rechazada'],
+];
+function estadoConformidadSelect(id, actual){
+  const act = actual || 'borrador';
+  const label = ESTADOS_CONFORMIDAD_PROFORMA.find(o=>o[0]===act)?.[1] || act;
+  const ddId = 'estado-conf-dd-'+id;
+  return `<div class="estado-cobro-dd" id="${ddId}" data-doc-id="${id}">
+    <span class="pill ${act==='conforme'?'cobrado':act==='rechazada'?'anulado':'pendiente_enviar'}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${ddId}')">${label}</span>
+    <div class="estado-cobro-menu">
+      ${ESTADOS_CONFORMIDAD_PROFORMA.map(([v,l])=>`<span class="pill" onclick="event.stopPropagation();cambiarEstadoConformidad('${id}','${v}','${ddId}')">${l}</span>`).join('')}
+    </div>
+  </div>`;
+}
+async function cambiarEstadoConformidad(id, valor, ddId){
+  if(!sb) return;
+  const {error} = await sb.from('documentos_economicos').update({estado_conformidad: valor}).eq('id', id);
+  if(error){ mostrarToast('Error: '+errText(error)); return; }
+  if(documentosRealesById[id]) documentosRealesById[id].estado_conformidad = valor;
+  const dd = document.getElementById(ddId);
+  if(dd) dd.outerHTML = estadoConformidadSelect(id, valor);
+  mostrarToast('Estado actualizado.');
+}
 function toggleExpandirDocFila(id, colspan){
   const filaExistente = document.getElementById('docrow-detalle-'+id);
   if(filaExistente){ filaExistente.remove(); return; }
@@ -5433,6 +5457,7 @@ function toggleExpandirDocFila(id, colspan){
     : '<span class="sub-t">Sin líneas de concepto guardadas</span>';
   detalle.innerHTML = `<td colspan="${colspan}" style="background:var(--concrete);padding:10px 20px;">
     ${lineasHtml}
+    ${doc?.type==='proforma' ? `<div style="margin-top:8px;display:flex;align-items:center;gap:8px;"><span class="sub-t">Conformidad del cliente:</span>${estadoConformidadSelect(id, doc.estado_conformidad)}</div>` : ''}
     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">${accionesDocumentoHtml(doc)}</div>
     ${doc?.expediente_id ? `<div id="historial-expediente-${id}" style="margin-top:10px;"></div>` : ''}
   </td>`;
@@ -6112,7 +6137,7 @@ document.getElementById('wa-list').innerHTML = waMessages.map(m=>`
   </div>`).join('');
 let jobs = [];
 const stateLabels = {posible:'Posible trabajo', pendiente:'Pendiente de fecha', planificado:'Planificado', porconfirmar:'Por confirmar con el cliente', confirmado:'Confirmado', encurso:'En curso', terminado:'Terminado', facturado:'Facturado', cobrado:'Cobrado', cancelado:'Cancelado'};
-const jobStates = ['posible','pendiente','planificado','porconfirmar','confirmado','encurso','terminado','facturado','cobrado'];
+const jobStates = ['posible','pendiente','planificado','porconfirmar','confirmado','encurso','terminado','facturado','cobrado','cancelado'];
 
 function pill(state){ return `<span class="pill ${state}">${stateLabels[state]||state}</span>`; }
 
@@ -11160,6 +11185,8 @@ function pedirCampos(titulo, campos){
       <div class="field" style="margin-bottom:12px;"><div class="l">${c.label}</div>
         ${c.tipo==='textarea'
           ? `<textarea class="search-box" style="width:100%;height:70px;" id="fp-${c.id}" placeholder="${c.placeholder||''}">${c.valor??''}</textarea>`
+          : c.tipo==='select'
+          ? `<select class="search-box" style="width:100%;" id="fp-${c.id}"><option value="">— Elegir —</option>${(c.opciones||[]).map(([v,l])=>`<option value="${v}" ${v===c.valor?'selected':''}>${l}</option>`).join('')}</select>`
           : `<input class="search-box" style="width:100%;" id="fp-${c.id}" type="${c.tipo||'text'}" value="${c.valor??''}" placeholder="${c.placeholder||''}">`}
       </div>`).join('');
     document.getElementById('form-picker-overlay').classList.add('active');
@@ -13491,15 +13518,32 @@ cargarDocumentosEconomicosReales();
   }
 })();
 
-function changeJobState(code, newState){
+const MOTIVOS_CANCELACION = [
+  ['cliente_no_interesado','Cliente ya no está interesado'], ['lo_hizo_otra_empresa','Lo hizo otra empresa'],
+  ['precio','Precio'], ['demasiado_tiempo_espera','Demasiado tiempo de espera'], ['sin_disponibilidad','Sin disponibilidad'],
+  ['cliente_pospone','Cliente lo pospone'], ['no_se_pudo_contactar','No se pudo contactar'], ['otro','Otro'],
+];
+async function changeJobState(code, newState){
   const j = jobs.find(x=>x.code===code);
-  if(j){
-    j.state = newState;
-    if(sb && j.id){
-      sb.from('trabajos').update({estado: newState}).eq('id', j.id).then(({error})=>{
-        if(error) console.error('No se pudo guardar el cambio de estado en Supabase', error);
-      });
-    }
+  if(!j) return;
+  let motivo = null, motivoDetalle = null;
+  if(newState==='cancelado'){
+    // el trabajo NUNCA se borra — se conserva con el motivo para poder sacar estadísticas
+    // reales de por qué se pierden trabajos, tal como se pidió
+    const r = await pedirCampos('Motivo de la cancelación', [
+      {id:'motivo', label:'Motivo', tipo:'select', opciones: MOTIVOS_CANCELACION, requerido:true},
+      {id:'detalle', label:'Detalle (opcional)', tipo:'textarea'},
+    ]);
+    if(!r) return; // canceló el diálogo, no cambia el estado
+    motivo = r.motivo; motivoDetalle = r.detalle || null;
+  }
+  j.state = newState;
+  if(sb && j.id){
+    const payload = {estado: newState};
+    if(newState==='cancelado'){ payload.motivo_cancelacion = motivo; payload.motivo_cancelacion_detalle = motivoDetalle; }
+    sb.from('trabajos').update(payload).eq('id', j.id).then(({error})=>{
+      if(error) console.error('No se pudo guardar el cambio de estado en Supabase', error);
+    });
   }
   openJobDrawer(code);
   renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
