@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.5";
+export const VERSION_MOTOR = "motor-exg-2.6";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -426,7 +426,9 @@ export function leerTexto(texto: string, anioEsperado?: string) {
    Orden de evidencia: NIF → nombre normalizado → alias aprendidos → similitud.
    Solo se permite ficha NUEVA si el candidato tiene forma de entidad.
    Nunca se vincula a una ficha cuyo propio nombre no es una entidad (fichas basura). */
-export function nombreNorm(t: any) { return norm(t).replace(/[.,]/g, " ").replace(/\s+/g, " ").trim(); }
+// CAR#1: "(Departamento de …)", "(Área …)", "(Servicio …)" son subunidades del mismo cliente, no otro cliente
+export function sinSubunidad(t: any) { return norm(t).replace(/\s*\((DEPARTAMENTO|DPTO|AREA|SERVICIO|DELEGACION|OFICINA|SECCION|PROGRAMA|PROYECTO)\b[^)]*\)?\s*$/, "").trim(); }
+export function nombreNorm(t: any) { return sinSubunidad(t).replace(/[.,]/g, " ").replace(/\s+/g, " ").trim(); }
 const EQUIV: any = { EXCM: "EXCMO", EXMO: "EXCMO", EXM: "EXCMO", EXCMO: "EXCMO", FTE: "FUENTE", FT: "FUENTE", AYTO: "AYUNTAMIENTO" };
 function tokens(t: string) { return nombreNorm(t).split(" ").map((w) => EQUIV[w] || w).filter((w) => w.length > 2 && !/^(SL|SA|SLU|SAL|SCP|SCA|DEL|LAS|LOS|DE)$/.test(w)); }
 export function parecidos(a: string, b: string): boolean {
@@ -463,7 +465,8 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
     if (porNombre.length) {
       const conNifDistinto = nifC && porNombre.every((e: any) => e.nif && e.nif.replace(/[^A-Z0-9]/gi, "").toUpperCase() !== nifC);
       if (conNifDistinto) return { estado: "conflicto", motivo: "mismo nombre, NIF distinto", ids: porNombre.map((e: any) => e.id) };
-      if (porNombre.length === 1) return { estado: "existente", id: porNombre[0].id, nombre: porNombre[0].nombre, evidencia: "nombre" };
+      // CAR#1: si el NIF del documento solo vivía en una ficha basura y la ficha buena no lo tiene, se le traslada
+      if (porNombre.length === 1) return { estado: "existente", id: porNombre[0].id, nombre: porNombre[0].nombre, evidencia: "nombre", enriquecer_nif: nifC && !porNombre[0].nif ? nifC : null };
       if (cand.preferidoId && porNombre.some((e: any) => e.id === cand.preferidoId)) return { estado: "existente", id: cand.preferidoId, evidencia: "nombre (ficha actual)" };
       return { estado: "revisar", motivo: `nombre en ${porNombre.length} fichas`, ids: porNombre.map((e: any) => e.id) };
     }
