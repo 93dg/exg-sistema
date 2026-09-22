@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.0";
+export const VERSION_MOTOR = "motor-exg-2.1";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -66,7 +66,7 @@ export function clasificarTexto(t: any): Clase {
   if (/^[\d.,\s€%-]+$/.test(n)) return "importe";
   if (/\d{1,2}\/\d{1,2}\/\d{2,4}|\bHASTA\b|\bPENDIENTES?\b|\bRELACION DE\b|\bRESUMEN\b|\bLISTADO\b/.test(n)) return "titulo";
   if (/^(PER|PFEA|PROFEA|FINCA|CAMINO|CTRA\.?|CARRETERA|ARROYO|PARAJE|VEREDA|CANADA|VIA VERDE|CORTIJO)\b/.test(n)) return "obra";
-  if (/^(C\/|CL\/|CL\.|C\.\s|CALLE\b|AVDA?\.?\s|AVENIDA|PLAZA\b|PL\.|PZA|PASEO|BARRIADA|URB\.|URBANIZACION|POLIGONO|POL\.|APARTADO|APDO)/.test(n) || /\b(S\/N|N[º°O]\s?\d+)\b/.test(n)) return "direccion";
+  if (/^(C\/|CL\/|CL\.|C\.\s|CALLE\b|AVDA?\.?\s|AVENIDA|PLAZA\b|PL\.|PZA|PASEO|BARRIADA|URB\.|URBANIZACION|POLIGONO|POL\.|PLG\.?\s|P\.?\s?I\.?\s|APARTADO|APDO)/.test(n) || /\b(S\/N|N[º°O]\s?\d+)\b/.test(n)) return "direccion";
   if (new RegExp(`\\((${PROVINCIAS}|[A-Z ]{3,20})\\)\\s*,?\\s*(\\d{5})?$`).test(n) || /,?\s*\d{5}$/.test(n) && n.split(" ").length <= 6 || new RegExp(`^(${PROVINCIAS}|${OTRAS_CAPITALES})$`).test(n)) return "poblacion";
   if (/^\d{5}\b/.test(n) || new RegExp(`^[A-Z\\- .]+\\(\\s*(${PROVINCIAS})\\s*\\)$`).test(n) || /^(FUENTE[ -]?OBEJUNA|FT\.? OBEJUNA|CORDOBA|POZOBLANCO|PENARROYA[ -]PUEBLONUEVO|BELMEZ|LA GRANJUELA|VALSEQUILLO|AZUAGA|HINOJOSA DEL DUQUE)$/.test(n)) return "poblacion";
   if (RE_ORGANISMO.test(n)) return "organismo";
@@ -93,8 +93,15 @@ export function mesPorPrefijo(texto: string): string | null {
   if (t.length < 3) return null;
   if (t.startsWith("set")) return "09";
   for (let i = 0; i < 12; i++) if (MESES[i].startsWith(t) || t.startsWith(MESES[i].slice(0, 3))) return String(i + 1).padStart(2, "0");
+  const ABREV: any = { sbre: "09", stbre: "09", setbre: "09", obre: "10", octbre: "10", nbre: "11", nvbre: "11", novbre: "11", dbre: "12", dcbre: "12", dicbre: "12", mzo: "03", fbro: "02", fbre: "02", ag: "08", agto: "08" };
+  if (ABREV[t]) return ABREV[t];
+  // abreviaturas sin vocales: "fbre", "fbro", "sbre", "nbre", "dbre", "mzo", "jnio"…
+  const esq = (x: string) => x[0] + x.slice(1).replace(/[aeiou]/g, "");
+  const et = esq(t);
+  const porEsqueleto = MESES.map((m, i) => ({ i, e: esq(m) })).filter((x) => et.length >= 3 && x.e.startsWith(et.slice(0, 3)) && x.e[0] === et[0]);
+  if (porEsqueleto.length === 1) return String(porEsqueleto[0].i + 1).padStart(2, "0");
   let best = -1, bd = 99, emp = 0;
-  for (let i = 0; i < 12; i++) { const d = lev(t, MESES[i].slice(0, t.length)); if (d < bd) { bd = d; best = i; emp = 1; } else if (d === bd) emp++; }
+  for (let i = 0; i < 12; i++) { if (MESES[i][0] !== t[0]) continue; const d = lev(t, MESES[i].slice(0, t.length)); if (d < bd) { bd = d; best = i; emp = 1; } else if (d === bd) emp++; }
   return best >= 0 && bd <= 2 && emp === 1 ? String(best + 1).padStart(2, "0") : null;
 }
 function fechaValida(iso: string): boolean {
@@ -202,6 +209,8 @@ export function detectarCliente(filas: any[][], limiteFila: number) {
   if (!nombre && ancla) {
     const candidatos = utiles.filter((x) => x.r <= ancla!.r && x.r >= ancla!.r - 6 && CLASES_ENTIDAD.includes(x.cl) && !esDatoEmisor(x.t))
       .sort((a, b) => (b.r - a.r) || (Math.abs(a.c - ancla!.c) - Math.abs(b.c - ancla!.c)));
+    // NIF de organismo público (P/Q/S): si en el bloque hay un organismo, ese es el cliente
+    if (nif && /^[PQS]/.test(nif)) { const org = candidatos.filter((x) => x.cl === "organismo"); if (org.length) candidatos.splice(0, candidatos.length, ...org); }
     // la fila más cercana por encima; en empate, la columna más próxima
     if (candidatos.length) { nombre = candidatos[0].t; via = nif ? "ancla_nif" : "ancla_direccion"; }
     else if (nif) {
@@ -232,7 +241,7 @@ function numeroDesdeRejilla(filas: any[][], limiteFila: number) {
     for (let c = 0; c < fila.length && !numero; c++) {
       const v = fila[c]; if (typeof v !== "string") continue;
       const n = norm(v);
-      const mInline = n.match(/^N\.?\s*[º°O1]?\.?\s*(DE\s*)?FACTURA\s*[:.]?\s*([A-Z]{0,4}[-\/]?\d+([-\/]\d+)*)$/);
+      const mInline = n.match(/^N\.?\s*[º°O1]?\.?\s*(DE\s*)?FACTURA\s*[:.]?\s*([A-Z]{0,4}[-\/]?\d+[A-Z]?([-\/]\d+)*)$/);
       if (mInline) { numero = mInline[2]; break; }
       if (!/^(N\.?\s*[º°O1]?\.?\s*(DE\s*)?FACTURA|FACTURA\s*N[º°O]?\.?|NUMERO\s*(DE\s*)?FACTURA|FACTURA)\s*[:.]?$/.test(n)) continue;
       const derecha = fila.slice(c + 1).find((x: any) => x !== "" && x != null);
@@ -241,7 +250,7 @@ function numeroDesdeRejilla(filas: any[][], limiteFila: number) {
         if (cand == null || cand === "") continue;
         valorBruto = valorBruto ?? cand;
         const s = String(cand).trim();
-        if (typeof cand === "number" ? (cand > 0 && cand < 100000 && Number.isInteger(cand)) : (/^[A-Z]{0,4}[-\/]?\d{1,6}([-\/]\d{1,4})?$/i.test(s) && !/^0+$/.test(s))) { numero = s; break; }
+        if (typeof cand === "number" ? (cand > 0 && cand < 100000 && Number.isInteger(cand)) : (/^[A-Z]{0,4}[-\/]?\d{1,6}[A-Z]?([-\/]\d{1,4})?$/i.test(s) && !/^0+[A-Z]?$/i.test(s))) { numero = s; break; }
       }
     }
   }
@@ -309,7 +318,10 @@ export function leerTexto(texto: string, anioEsperado?: string) {
   const limite = idxTabla >= 0 ? idxTabla : Math.min(lineas.length, 30);
   const filas = lineas.map((l) => [l]);
   let fecha: string | null = null;
-  for (const l of lineas.slice(0, Math.max(limite, 40))) {
+  // la fecha suele ir al pie ("Fuente Obejuna, a 7 de febrero de 2011"): se busca en todo el texto,
+  // primero la fórmula de lugar+fecha y luego cualquier fecha completa
+  const ordenadas = [...lineas.filter((l) => /\ba\s+\d{1,2}\s+de\s+/i.test(l)), ...lineas];
+  for (const l of ordenadas) {
     const m = l.match(/(\d{1,2})\s+de\s+([a-záéíóú]+)\s+(?:de|del)?\s*(\d{4})/i) || l.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
     if (m) {
       const r = isNaN(Number(m[2])) ? (mesPorPrefijo(m[2]) ? `${m[3]}-${mesPorPrefijo(m[2])}-${m[1].padStart(2, "0")}` : null) : fechaTexto(`${m[1]}/${m[2]}/${m[3]}`, anioEsperado);
@@ -318,10 +330,10 @@ export function leerTexto(texto: string, anioEsperado?: string) {
   }
   let numero: string | null = null;
   for (const l of lineas.slice(0, limite + 3)) {
-    const m = norm(l).match(/(?:N\.?\s*[º°O1]?\.?\s*(?:DE\s*)?(?:FACTURA|PRESUPUESTO)|(?:FACTURA|PRESUPUESTO)\s*N[º°O]?\.?)\s*[:.]?\s*([A-Z]{0,4}[-\/]?\d{1,6}([-\/]\d{1,4})?)\b/);
+    const m = norm(l).match(/(?:N\.?\s*[º°O1]?\.?\s*(?:DE\s*)?(?:FACTURA|PRESUPUESTO)|(?:FACTURA|PRESUPUESTO)\s*(?:N[º°O]?\.?)?)\s*[:.]?\s*([A-Z]{0,4}[-\/]?\d{1,6}[A-Z]?([-\/]\d{1,4})?)\b/);
     if (m) { numero = m[1]; break; }
   }
-  const cliente = detectarCliente(filas, limite + 1);
+  const cliente = detectarCliente(filas, Math.max(limite + 1, 40));
   const tipo = detectarTipo(lineas.slice(0, limite), null);
   return { filas, limite, numero, fecha, cliente, tipo };
 }
@@ -331,7 +343,13 @@ export function leerTexto(texto: string, anioEsperado?: string) {
    Solo se permite ficha NUEVA si el candidato tiene forma de entidad.
    Nunca se vincula a una ficha cuyo propio nombre no es una entidad (fichas basura). */
 export function nombreNorm(t: any) { return norm(t).replace(/[.,]/g, " ").replace(/\s+/g, " ").trim(); }
-export async function resolverCliente(sb: any, cand: { nombre: string | null; nif: string | null; direccion?: string | null }, cache?: any) {
+function parecidos(a: string, b: string): boolean {
+  const ta = nombreNorm(a).split(" ").filter((w) => w.length > 2 && !/^(S ?L|S ?A|DEL?|LA|LOS|LAS|Y)$/.test(w));
+  const tb = new Set(nombreNorm(b).split(" "));
+  const comunes = ta.filter((w) => tb.has(w) || [...tb].some((x) => x.length > 3 && (x.startsWith(w.slice(0, 4)) || w.startsWith(x.slice(0, 4)))));
+  return ta.length === 0 || comunes.length / ta.length >= 0.5;
+}
+export async function resolverCliente(sb: any, cand: { nombre: string | null; nif: string | null; direccion?: string | null; preferidoId?: string | null }, cache?: any) {
   const nifC = cand.nif && !esDatoEmisor(cand.nif) ? cand.nif.replace(/[^A-Z0-9]/gi, "").toUpperCase() : null;
   const claseC = cand.nombre ? clasificarTexto(cand.nombre) : "vacio";
   // "dudoso" (p.ej. una sola palabra: CARIMSA, URBINA) solo vale si viene respaldado por un NIF
@@ -342,7 +360,13 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
   const validas = ents.filter((e: any) => esEntidad(e.nombre) || (clasificarTexto(e.nombre) === "dudoso" && e.nif));
   if (nifC) {
     const porNif = validas.filter((e: any) => (e.nif || "").replace(/[^A-Z0-9]/gi, "").toUpperCase() === nifC);
-    if (porNif.length === 1) return { estado: "existente", id: porNif[0].id, nombre: porNif[0].nombre, evidencia: "nif" };
+    if (porNif.length === 1) {
+      // el NIF manda, pero si el nombre del documento no se parece en nada a la ficha de ese NIF, hay contradicción
+      if (cand.nombre && CLASES_ENTIDAD.includes(clasificarTexto(cand.nombre)) && !parecidos(cand.nombre, porNif[0].nombre))
+        return { estado: "conflicto", motivo: `NIF de ${porNif[0].nombre} pero nombre ${cand.nombre}`, ids: [porNif[0].id] };
+      return { estado: "existente", id: porNif[0].id, nombre: porNif[0].nombre, evidencia: "nif" };
+    }
+    if (porNif.length > 1 && cand.preferidoId && porNif.some((e: any) => e.id === cand.preferidoId)) return { estado: "existente", id: cand.preferidoId, evidencia: "nif (ficha actual)" };
     if (porNif.length > 1) return { estado: "revisar", motivo: `NIF ${nifC} en ${porNif.length} fichas`, ids: porNif.map((e: any) => e.id) };
   }
   if (nombreOk) {
@@ -352,6 +376,7 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
       const conNifDistinto = nifC && porNombre.every((e: any) => e.nif && e.nif.replace(/[^A-Z0-9]/gi, "").toUpperCase() !== nifC);
       if (conNifDistinto) return { estado: "conflicto", motivo: "mismo nombre, NIF distinto", ids: porNombre.map((e: any) => e.id) };
       if (porNombre.length === 1) return { estado: "existente", id: porNombre[0].id, nombre: porNombre[0].nombre, evidencia: "nombre" };
+      if (cand.preferidoId && porNombre.some((e: any) => e.id === cand.preferidoId)) return { estado: "existente", id: cand.preferidoId, evidencia: "nombre (ficha actual)" };
       return { estado: "revisar", motivo: `nombre en ${porNombre.length} fichas`, ids: porNombre.map((e: any) => e.id) };
     }
     const alias = (cache?.alias || (await sb.from("aprendizaje_nombres_clientes").select("variante,canonico")).data || []);
