@@ -3,7 +3,7 @@
 // fichas con nombres que no son entidad; documento nace "pendiente" y pasa por verificar_calidad.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import WordExtractor from "npm:word-extractor@1.0.4";
-import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/4db025d28983627a57d0732bf7dd84e43d482129/motor/extractor.ts";
+import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/0a658e83c9490a8c93380124cae9b517959f881c/motor/extractor.ts";
 
 const BUCKET = "documentos-exg";
 
@@ -12,7 +12,7 @@ async function extraer(admin: any, ruta: string, anio: string) {
   const { data: blob } = await admin.storage.from(BUCKET).download(ruta);
   if (!blob) return null;
   const buf = new Uint8Array(await blob.arrayBuffer());
-  if (["xls", "xlsx", "xlsm", "xlsb"].includes(ext)) return leerHoja(XLSX.read(buf, { type: "array", cellDates: false }), anio);
+  if (["xls", "xlsx", "xlsm", "xlsb"].includes(ext)) return leerHoja(XLSX.read(buf, { type: "array", cellDates: false }), anio, { archivo: ruta });
   if (ext === "doc") {
     const tmp = await Deno.makeTempFile({ suffix: ".doc" });
     await Deno.writeFile(tmp, buf);
@@ -46,7 +46,7 @@ async function procesarAnio(admin: any, anio: string, limite: number, crearClien
     const conceptos = lineasParaGuardar(r?.conceptos || []);
     let entidadId: string | null = null, notaCliente = "";
     if (r) {
-      const c: any = await resolverCliente(admin, { nombre: r.cliente.nombre, nif: r.cliente.nif, direccion: r.cliente.direccion, bloque: r.cliente.bloque, archivo: f.ruta_exacta }, cache);
+      const c: any = await resolverCliente(admin, { nombre: r.cliente.nombre, nif: r.cliente.nif, direccion: r.cliente.direccion, bloque: r.cliente.bloque, archivo: f.ruta_exacta, poblacion: r.cliente.poblacion }, cache);
       if (c.estado === "existente") entidadId = c.id;
       else if (c.estado === "nuevo" && crearClientes) {
         const { data: n } = await admin.from("entidades").insert({ nombre: String(c.nombre).toUpperCase(), tipo: "cliente", nif: c.nif || null, direccion: r.cliente.direccion ? String(r.cliente.direccion).toUpperCase() : null, poblacion: r.cliente.poblacion ? String(r.cliente.poblacion).toUpperCase() : null }).select("id").single();

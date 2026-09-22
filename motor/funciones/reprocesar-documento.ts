@@ -1,4 +1,4 @@
-// reprocesar-documento v21 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
+// reprocesar-documento v24 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
 // Solo reglas. Rellena campos VACÍOS; nunca sobrescribe un dato válido: si el motor ve otra cosa
 // lo devuelve como discrepancia (CONFLICTO) para revisión. 0 IA en esta versión.
 // v17: es el paso central del CIRCUITO DE CALIDAD:
@@ -6,7 +6,7 @@
 //   → REVALIDAR → estado final: validado (OK) | corregido_automatico | revision_necesaria/error (REVISAR) | conflicto
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import WordExtractor from "npm:word-extractor@1.0.4";
-import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/4db025d28983627a57d0732bf7dd84e43d482129/motor/extractor.ts";
+import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/0a658e83c9490a8c93380124cae9b517959f881c/motor/extractor.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const codigos = (info: any) => (String(info || "").match(/\[control-calidad: ([^\]]+)\]/)?.[1] || "").split(", ").filter(Boolean);
@@ -40,7 +40,7 @@ export async function extraer(sb: any, path: string) {
   const buf = new Uint8Array(await blob.arrayBuffer());
   const anio = path.match(/\/(\d{4})\//)?.[1];
   if (["xls", "xlsx", "xlsm", "xlsb"].includes(ext)) {
-    const r = leerHoja(XLSX.read(buf, { type: "array", cellDates: false }), anio);
+    const r = leerHoja(XLSX.read(buf, { type: "array", cellDates: false }), anio, { archivo: path });
     return r ? { r, anio } : { error: "sin_reglas", detalle: "hoja sin forma de documento" };
   }
   if (ext === "doc") {
@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
     else if (doc.fecha_devengo && r.fecha && doc.fecha_devengo !== r.fecha) discrepancias.push({ campo: "fecha", actual: doc.fecha_devengo, motor: r.fecha });
     // cliente
     const actualValido = doc.entidad && fichaEsValida(doc.entidad.nombre, doc.entidad.nif);
-    const res: any = await resolverCliente(sb, { nombre: r.cliente.nombre, nif: r.cliente.nif, direccion: r.cliente.direccion, preferidoId: doc.entidad_id, bloque: r.cliente.bloque, archivo: doc.archivo_path });
+    const res: any = await resolverCliente(sb, { nombre: r.cliente.nombre, nif: r.cliente.nif, direccion: r.cliente.direccion, preferidoId: doc.entidad_id, bloque: r.cliente.bloque, archivo: doc.archivo_path, poblacion: r.cliente.poblacion });
     if (actualValido) {
       if (res.estado === "existente" && res.id !== doc.entidad_id) discrepancias.push({ campo: "cliente", actual: doc.entidad.nombre, motor: res.nombre, evidencia: res.evidencia });
       else if (res.estado === "nuevo") discrepancias.push({ campo: "cliente", actual: doc.entidad.nombre, motor: res.nombre, evidencia: "cliente distinto sin ficha" });
