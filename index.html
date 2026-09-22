@@ -2256,7 +2256,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.03</div>
+        <div class="sub">V3.04</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4757,6 +4757,10 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <div class="field" style="flex:2;min-width:140px;"><div class="l">Provincia</div><input class="search-box" style="width:100%;" id="ni-client-provincia"></div>
           <div class="field" style="flex:2;min-width:140px;"><div class="l">Teléfono (opcional)</div><input class="search-box" style="width:100%;" id="ni-client-telefono"></div>
           <div class="field" style="flex:3;min-width:180px;"><div class="l">Email (opcional)</div><input class="search-box" style="width:100%;" id="ni-client-email"></div>
+        </div>
+        <div id="ni-client-update-row" style="display:none;margin:0 0 16px 0;">
+          <button type="button" class="btn sm" onclick="actualizarClienteDesdeEditor()">💾 Actualizar datos del cliente</button>
+          <span class="sub-t" style="margin-left:8px;">guarda estos campos en la ficha del cliente ahora mismo, sin esperar a guardar el documento</span>
         </div>
 
         <div class="ie-items-toolbar" style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
@@ -10771,6 +10775,7 @@ function onClientChange(){
   const data = clientFiscalData[name]; // compatibilidad con clientes creados en esta sesión
   document.getElementById('ni-client-fiscal').style.display = name ? 'flex' : 'none';
   document.getElementById('ni-client-fiscal-2').style.display = name ? 'flex' : 'none';
+  document.getElementById('ni-client-update-row').style.display = (name && entidad.id) ? 'block' : 'none';
   document.getElementById('ni-client-nif').value = entidad.nif || (data ? data.nif : '') || '';
   document.getElementById('ni-client-addr').value = entidad.direccion || (data ? data.addr : '') || '';
   document.getElementById('ni-client-cp').value = entidad.cp || '';
@@ -10778,6 +10783,59 @@ function onClientChange(){
   document.getElementById('ni-client-provincia').value = entidad.provincia || '';
   document.getElementById('ni-client-telefono').value = entidad.telefono || '';
   document.getElementById('ni-client-email').value = entidad.email || '';
+}
+
+// botón "Actualizar datos del cliente" — guarda en la ficha del cliente EN EL ACTO, sin
+// esperar a guardar el documento y sin la pregunta de "solo este documento" (aquí la
+// intención ya es explícitamente actualizar la ficha). Para la dirección, si ya había una
+// guardada y es distinta, se pregunta si sustituirla o añadir esta como una dirección más
+// (un cliente puede tener obras en varios sitios) — el resto de campos son de un único
+// valor y se sustituyen directamente si cambian.
+async function actualizarClienteDesdeEditor(){
+  const nombre = document.getElementById('ni-client').value;
+  const entidad = clientes.find(c=>c.name===nombre);
+  if(!entidad?.id){ mostrarToast('Elige primero un cliente.'); return; }
+  if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
+  const nuevo = {
+    nif: document.getElementById('ni-client-nif').value.trim().toUpperCase(),
+    direccion: document.getElementById('ni-client-addr').value.trim().toUpperCase(),
+    cp: document.getElementById('ni-client-cp').value.trim(),
+    poblacion: document.getElementById('ni-client-poblacion').value.trim().toUpperCase(),
+    provincia: document.getElementById('ni-client-provincia').value.trim().toUpperCase(),
+    telefono: document.getElementById('ni-client-telefono').value.trim(),
+    email: document.getElementById('ni-client-email').value.trim(),
+  };
+  const {data: actual} = await sb.from('entidades').select('nif,direccion,cp,poblacion,provincia,telefono,email').eq('id', entidad.id).maybeSingle();
+  const patch = {};
+  for(const campo of ['nif','cp','poblacion','provincia','telefono','email']){
+    if(nuevo[campo] && nuevo[campo] !== (actual?.[campo]||'').trim()) patch[campo] = nuevo[campo];
+  }
+  // la dirección es el único campo donde un cliente puede tener legítimamente más de un
+  // valor válido a la vez (obras en sitios distintos) — el resto son datos únicos del cliente
+  if(nuevo.direccion){
+    const direccionActual = (actual?.direccion||'').trim();
+    if(!direccionActual){ patch.direccion = nuevo.direccion; }
+    else if(direccionActual.toUpperCase() !== nuevo.direccion.toUpperCase()){
+      const eleccion = await mostrarModal3({
+        titulo: 'La dirección ya guardada es distinta',
+        texto: `Guardada:\n${direccionActual}\n\nNueva:\n${nuevo.direccion}`,
+        opciones: [
+          {label:'SUSTITUIR la dirección guardada', valor:'sustituir', primary:true},
+          {label:'AÑADIR como nueva dirección', valor:'añadir'},
+          {label:'CANCELAR', valor:'cancelar'},
+        ],
+      });
+      if(eleccion==='sustituir') patch.direccion = nuevo.direccion;
+      else if(eleccion==='añadir') patch.direccion = direccionActual + ' / ' + nuevo.direccion;
+      // 'cancelar' o cerrar sin elegir → la dirección no se toca
+    }
+  }
+  if(!Object.keys(patch).length){ mostrarToast('No hay cambios que guardar en el cliente.'); return; }
+  const {error} = await sb.from('entidades').update(patch).eq('id', entidad.id);
+  if(error){ mostrarToast('Error al actualizar el cliente: '+errText(error)); return; }
+  Object.assign(entidad, patch);
+  if(patch.direccion) document.getElementById('ni-client-addr').value = patch.direccion;
+  mostrarToast('Ficha del cliente actualizada.');
 }
 
 function openNewClientModal(targetSelectId){
