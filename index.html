@@ -270,7 +270,7 @@ table{border-collapse:collapse;width:100%;}
   align-items:center;justify-content:center;z-index:3000;padding:20px;
 }
 .overlay.active{display:flex;}
-#tipo-doc-menu-overlay, #wizard-doc-overlay, #newjob-overlay, #picker-overlay, #form-picker-overlay, #newclient-overlay, #metodo-doc-overlay, #metodo-foto-overlay, #metodo-texto-overlay, #newinvoice-overlay{z-index:5000;}
+#tipo-doc-menu-overlay, #wizard-doc-overlay, #newjob-overlay, #picker-overlay, #form-picker-overlay, #newclient-overlay, #metodo-doc-overlay, #metodo-foto-overlay, #metodo-texto-overlay, #newinvoice-overlay{z-index:5150;}
 #ai-historial-detalle-overlay{z-index:5400;} /* tiene que estar por delante del propio panel del asistente (5300), si no se abre "por detrás" y parece que no hace nada */
 .drawer{
   background:var(--paper);width:600px;max-width:92vw;max-height:90vh;overflow-y:auto;
@@ -443,7 +443,7 @@ table{border-collapse:collapse;width:100%;}
 .attention-row .s{font-size:11.5px;color:var(--ink-soft);}
 
 .invoice-editor{background:var(--paper);width:760px;max-width:94vw;max-height:92vh;overflow-y:auto;border-radius:var(--radius);box-shadow:0 12px 40px rgba(0,0,0,0.25);margin:3vh auto;}
-.ie-topbar{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper);z-index:2;}
+.ie-topbar{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper);z-index:2;flex-wrap:wrap;}
 .ie-doc-explain{flex:1;font-size:12px;color:var(--ink-soft);}
 .ie-paper{padding:26px 30px;border:1px solid var(--line);margin:20px;background:var(--paper);}
 #ie-paper-edit.hide-fiscal #ie-company-fiscal{display:none;}
@@ -2196,7 +2196,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.90</div>
+        <div class="sub">V2.91</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -10902,7 +10902,7 @@ const DOC_TYPES = {
     explain:'Documento fiscal definitivo. Genera obligación de cobro y de declarar IVA.',
   },
   proforma: {
-    title:'FACTURA PROFORMA', button:'Crear proforma', prefix:'PF', seqRef:()=>proximoNumero('proforma'), hasIva:true,
+    title:'PROFORMA', button:'Crear proforma', prefix:'PF', seqRef:()=>proximoNumero('proforma'), hasIva:true,
     hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasBaseIva:true, hasPayment:true, hasBank:true,
     explain:'Anticipo informativo sin validez fiscal, antes de que el cliente se comprometa.',
   },
@@ -11251,17 +11251,24 @@ function descargarPDF(){
   doc.setFont('helvetica','normal');
   items.forEach(it=>{
     const lineTotal = (Number(it.qty)||0)*it.price;
+    // descripciones largas (habitual en partes de trabajo reales) se parten en varias
+    // líneas de verdad, no se recorta a la primera y se descarta el resto — antes esto
+    // perdía contenido en silencio y además apretaba las filas hasta solaparse visualmente
+    const lineasConcepto = doc.splitTextToSize(it.concept||'—', cfg.hasPrecios ? 95 : 145);
+    const altoFila = Math.max(6, lineasConcepto.length * 4.2 + 1.8);
+    if(y + altoFila > 280){ doc.addPage(); y = 20; } // salto de página si no cabe
     doc.text(it.fecha || '—', 15, y);
     doc.text(String(it.qty), 40, y);
-    doc.text(doc.splitTextToSize(it.concept||'—', cfg.hasPrecios ? 95 : 145)[0], 55, y);
+    doc.text(lineasConcepto, 55, y);
     if(cfg.hasPrecios){
       doc.text(it.price.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 150, y, {align:'right'});
     }
     doc.text(lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
-    y += 6;
+    y += altoFila;
   });
 
   if(cfg.hasTotales){
+    if(y > 265){ doc.addPage(); y = 20; }
     y += 4; doc.line(120,y,195,y); y += 6;
     const tratamientoIvaPdf = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
     if(cfg.hasBaseIva){
