@@ -2195,7 +2195,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V2.74</div>
+        <div class="sub">V2.75</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5776,9 +5776,10 @@ async function cargarConocimientoMotor(){
   const tbody = document.getElementById('conocimiento-tbody');
   if(!body || !tbody) return;
   body.innerHTML = '<div class="empty">Cargando…</div>';
-  const [{data: metricas}, {data: conocimiento}] = await Promise.all([
+  const [{data: metricas}, {data: conocimiento}, {data: mEntradas}, {data: mDigi}, {data: mAsist}] = await Promise.all([
     sb.rpc('metricas_autonomia_ia'),
     sb.from('conocimiento_unificado').select('*').order('created_at',{ascending:false}).limit(500),
+    sb.rpc('metricas_entradas'), sb.rpc('metricas_digitalizacion'), sb.rpc('metricas_asistente'),
   ]);
   // % resuelto sin IA se calcula contra el total de documentos/entradas procesados, no solo
   // contra las llamadas IA — una llamada IA no tiene "% sin IA" por sí sola, así que se
@@ -5789,12 +5790,21 @@ async function cargarConocimientoMotor(){
   const patronesTotal = (metricas||[]).reduce((s,m)=>s+Number(m.patrones_aprendidos),0);
   const totalReal = (totalDocs||0) + totalIA;
   const pctSinIA = totalReal ? Math.round(((totalReal-totalIA)/totalReal)*100) : 100;
+  const tarjeta = (titulo, filas) => `<div style="border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;min-width:200px;">
+    <div style="font-weight:700;font-size:12px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;">${titulo}</div>
+    ${filas.map(([l,v])=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:1px 0;"><span class="sub-t">${l}</span><span style="font-weight:700;">${v}</span></div>`).join('')}
+  </div>`;
   body.innerHTML = `
     <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px;">
       <div><div style="font-size:28px;font-weight:800;color:var(--green);">${pctSinIA}%</div><div class="sub-t">resuelto sin IA (${totalReal.toLocaleString('es-ES')} casos)</div></div>
       <div><div style="font-size:28px;font-weight:800;">${totalIA}</div><div class="sub-t">llamadas IA totales</div></div>
       <div><div style="font-size:28px;font-weight:800;">${costeTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:4})} €</div><div class="sub-t">coste acumulado</div></div>
       <div><div style="font-size:28px;font-weight:800;">${patronesTotal}</div><div class="sub-t">llamadas que se convirtieron en regla</div></div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+      ${mEntradas ? tarjeta('Entradas', [['Total entradas', mEntradas.total_entradas],['Sugerencia sin IA', mEntradas.con_sugerencia_sin_ia],['Necesitaron IA', mEntradas.necesitaron_ia],['Patrones aprendidos', mEntradas.patrones_aprendidos],['Correcciones confirmadas', mEntradas.correcciones_confirmadas]]) : ''}
+      ${mDigi ? tarjeta('Digitalización', [['Documentos procesados', mDigi.documentos_procesados],['Resueltos sin IA', mDigi.resueltos_sin_ia],['Llamadas IA', mDigi.llamadas_ia],['Coste', Number(mDigi.coste_total).toLocaleString('es-ES',{minimumFractionDigits:2})+' €'],['Reglas nuevas', mDigi.reglas_nuevas]]) : ''}
+      ${mAsist ? tarjeta('Asistente', [['Solicitudes', mAsist.solicitudes],['Con IA', mAsist.con_ia],['Patrones aprendidos', mAsist.patrones_aprendidos],['Coste', Number(mAsist.coste_total).toLocaleString('es-ES',{minimumFractionDigits:2})+' €']]) : ''}
     </div>
     <table class="tbl"><thead><tr><th>Proceso</th><th class="num">Llamadas IA</th><th class="num">Coste</th><th class="num">Coste medio</th><th class="num">Convertidas en regla</th></tr></thead>
     <tbody>${(metricas||[]).map(m=>`<tr><td>${m.proceso}</td><td class="num">${m.total_ia}</td><td class="num">${Number(m.coste_total).toLocaleString('es-ES',{minimumFractionDigits:4})} €</td><td class="num">${Number(m.coste_medio).toLocaleString('es-ES',{minimumFractionDigits:4})} €</td><td class="num">${m.patrones_aprendidos}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Sin llamadas IA registradas</td></tr>'}</tbody></table>`;
