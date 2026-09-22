@@ -2255,7 +2255,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.01</div>
+        <div class="sub">V3.02</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4660,7 +4660,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 </div>
 
 <!-- ================= MODAL: CREAR FACTURA ================= -->
-<div class="overlay" id="newinvoice-overlay" onclick="if(event.target===this) closeNewInvoiceModal()">
+<div class="overlay" id="newinvoice-overlay" onclick="if(event.target===this) intentarCerrarNewInvoiceModal()">
   <div class="invoice-editor">
     <div class="ie-topbar">
       <select class="search-box ie-edit-only" id="ni-doctype" style="font-weight:600;" onchange="onDocTypeChange()">
@@ -4673,7 +4673,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       <button type="button" class="btn sm ie-edit-only" onclick="document.getElementById('ie-dictado').classList.toggle('open')">📝 Rellenar desde texto o foto</button>
       <button type="button" id="ni-ver-original" onclick="abrirVisorArchivoOriginal()" class="btn sm ie-edit-only" style="display:none;">📎 Ver archivo original</button>
       <span id="ni-otras-acciones" class="ie-edit-only" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
-      <button class="close-x" onclick="closeNewInvoiceModal()">✕</button>
+      <button class="close-x" onclick="intentarCerrarNewInvoiceModal()">✕</button>
     </div>
 
     <div class="ie-dictado ie-edit-only" id="ie-dictado">
@@ -6570,6 +6570,16 @@ let sb = null;
 // direcciones, tipos, conceptos, estados) se muestra en mayúsculas sin depender de cómo
 // venga escrito en origen — un único punto, no cada pantalla por su cuenta.
 function MAY(texto){ return texto == null ? texto : String(texto).toUpperCase(); }
+// formateadores económicos comunes — un único punto de verdad para toda la app (facturas,
+// proformas, presupuestos, albaranes): importes siempre con separador de miles real y coma
+// decimal española, cantidades siempre con coma en vez de punto. useGrouping:true forzado
+// explícitamente porque no todos los navegadores/motores lo aplican igual por defecto.
+function formatMoneda(n){
+  return (Number(n)||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:true}) + ' €';
+}
+function formatCantidad(n){
+  return (Number(n)||0).toLocaleString('es-ES',{maximumFractionDigits:2,useGrouping:true});
+}
 // etiqueta de tipo documental, siempre en mayúsculas y desde un único sitio — evita que
 // una pantalla muestre "Proforma" y otra "proforma" según de dónde lea el dato
 const TIPO_DOC_LABEL = {factura:'FACTURA', proforma:'PROFORMA', presupuesto:'PRESUPUESTO', albaran:'ALBARÁN', gasto:'GASTO', cobro:'COBRO', impuesto:'IMPUESTO'};
@@ -11292,16 +11302,16 @@ function recalcTotals(){
     const qty = Number(tr.querySelector('.ie-qty').value) || 0;
     const price = Number(tr.querySelector('.ie-price').value) || 0;
     const lineTotal = qty * price;
-    tr.querySelector('.line-total').textContent = lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+    tr.querySelector('.line-total').textContent = formatMoneda(lineTotal);
     base += lineTotal;
     if(tr.id) actualizarResumenLinea(tr.id);
   });
   const tratamientoIva = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
   const ivaPct = hasIva ? (Number(document.getElementById('ie-iva-pct').value) || 0) : 0;
   const {iva, total} = hasIva ? calcularIva(base, tratamientoIva, ivaPct) : {iva:0, total:base};
-  document.getElementById('ie-base').textContent = base.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  document.getElementById('ie-iva').textContent = iva.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  document.getElementById('ie-total').textContent = total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  document.getElementById('ie-base').textContent = formatMoneda(base);
+  document.getElementById('ie-iva').textContent = formatMoneda(iva);
+  document.getElementById('ie-total').textContent = formatMoneda(total);
   return {base, iva, total, tratamientoIva};
 }
 
@@ -11310,9 +11320,9 @@ function descargarPDF(){
   const doc = new jsPDF({unit:'mm', format:'a4'});
   const type = document.getElementById('ni-doctype').value;
   const cfg = DOC_TYPES[type];
-  const client = document.getElementById('ni-client').value || '—';
+  const client = MAY(document.getElementById('ni-client').value || '—');
   const nif = document.getElementById('ni-client-nif').value;
-  const addr = document.getElementById('ni-client-addr').value;
+  const addr = MAY(document.getElementById('ni-client-addr').value);
   const job = document.getElementById('ni-job').value;
   const num = document.getElementById('ni-docnum').value;
   const dateRaw = document.getElementById('ni-date').value || '';
@@ -11321,13 +11331,13 @@ function descargarPDF(){
     fecha: tr.querySelector('.ie-linea-fecha')?.value || '',
     qty: tr.querySelector('.ie-qty').value,
     unidad: tr.querySelector('.ie-unidad')?.value || 'ud',
-    concept: tr.querySelector('.ie-concept').value,
+    concept: MAY(tr.querySelector('.ie-concept').value),
     price: Number(tr.querySelector('.ie-price').value)||0,
   }));
-  const payment = document.getElementById('ni-payment').value;
+  const payment = MAY(document.getElementById('ni-payment').value);
   const iban = document.getElementById('ni-iban').value;
-  const titular = document.getElementById('ni-titular').value;
-  const concepto = document.getElementById('ni-concepto-transf').value;
+  const titular = MAY(document.getElementById('ni-titular').value);
+  const concepto = MAY(document.getElementById('ni-concepto-transf').value);
 
   let y = 20;
   const logoEl = document.querySelector('.ie-logo');
@@ -11349,9 +11359,9 @@ function descargarPDF(){
     if(cfg.hasFiscalHeader){
       let yf = yc;
       yf += 5; doc.text('NIF 75706590C', xTexto, yf);
-      yf += 4.5; doc.text('Calle Industria s/n', xTexto, yf);
-      yf += 4.5; doc.text('14290 Fuente Obejuna (Córdoba)', xTexto, yf);
-      yf += 4.5; doc.text('exgomez.m@gmail.com', xTexto, yf);
+      yf += 4.5; doc.text('CALLE INDUSTRIA S/N', xTexto, yf);
+      yf += 4.5; doc.text('14290 FUENTE OBEJUNA (CÓRDOBA)', xTexto, yf);
+      yf += 4.5; doc.text('exgomez.m@gmail.com', xTexto, yf); // el email se deja tal cual, en mayúsculas no es un email válido a la vista
     }
     doc.setFont('helvetica','bold'); doc.setFontSize(10);
     doc.setTextColor(90,90,90);
@@ -11364,9 +11374,9 @@ function descargarPDF(){
     yc += 8;
     doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.text('Cliente:', 15, yc);
     doc.setFont('helvetica','normal');
-    doc.text(client + (nif ? '   NIF/CIF: '+nif : ''), 32, yc);
+    doc.text(client + (nif ? '   NIF/CIF: '+nif.toUpperCase() : ''), 32, yc);
     if(addr){ yc += 5; doc.setFontSize(9); doc.text(addr, 15, yc); }
-    if(job && job !== '—'){ yc += 5; doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.text('Obra:', 15, yc); doc.setFont('helvetica','normal'); doc.text(job.split(' — ').pop(), 28, yc); }
+    if(job && job !== '—'){ yc += 5; doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.text('Obra:', 15, yc); doc.setFont('helvetica','normal'); doc.text(MAY(job.split(' — ').pop()), 28, yc); }
     yc += 10;
     doc.setFont('helvetica','bold'); doc.setFontSize(9);
     if(hayFechas) doc.text('Fecha', 15, yc);
@@ -11409,12 +11419,12 @@ function descargarPDF(){
     altoAcumuladoPagina += altoFila;
     const lineTotal = (Number(it.qty)||0)*it.price;
     if(hayFechas) doc.text(it.fecha ? formatFechaCorta(it.fecha) : '—', 15, y);
-    doc.text(String(it.qty), hayFechas ? 40 : 15, y);
+    doc.text(formatCantidad(it.qty), hayFechas ? 40 : 15, y);
     doc.text(lineasConcepto, xConcepto + (hayFechas?0:20), y);
     if(cfg.hasPrecios){
-      doc.text(it.price.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', xPrecio, y, {align:'right'});
+      doc.text(formatMoneda(it.price), xPrecio, y, {align:'right'});
     }
-    doc.text(lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
+    doc.text(formatMoneda(lineTotal), 195, y, {align:'right'});
     y += altoFila;
   });
 
@@ -11423,21 +11433,21 @@ function descargarPDF(){
     y += 4; doc.line(120,y,195,y); y += 6;
     const tratamientoIvaPdf = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
     if(cfg.hasBaseIva){
-      doc.text('Base imponible:', 150, y, {align:'right'}); doc.text(base.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
+      doc.text('Base imponible:', 150, y, {align:'right'}); doc.text(formatMoneda(base), 195, y, {align:'right'}); y+=6;
       if(cfg.hasIva){
         if(tratamientoIvaPdf==='isp'){
-          doc.text('IVA (Inv. sujeto pasivo):', 150, y, {align:'right'}); doc.text('0,00 €', 195, y, {align:'right'}); y+=6;
+          doc.text('IVA (Inv. sujeto pasivo):', 150, y, {align:'right'}); doc.text(formatMoneda(0), 195, y, {align:'right'}); y+=6;
         } else {
           const ivaPct = document.getElementById('ie-iva-pct').value;
-          doc.text(`IVA (${ivaPct}%):`, 150, y, {align:'right'}); doc.text(iva.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'}); y+=6;
+          doc.text(`IVA (${ivaPct}%):`, 150, y, {align:'right'}); doc.text(formatMoneda(iva), 195, y, {align:'right'}); y+=6;
         }
       }
     }
     doc.setFont('helvetica','bold'); doc.setFontSize(11);
-    doc.text('TOTAL:', 150, y, {align:'right'}); doc.text(total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
+    doc.text('TOTAL:', 150, y, {align:'right'}); doc.text(formatMoneda(total), 195, y, {align:'right'});
     if(tratamientoIvaPdf==='isp'){
       y += 8; doc.setFont('helvetica','italic'); doc.setFontSize(8);
-      doc.text('Inversión del sujeto pasivo. Art. 84.Uno.2º.f) de la Ley 37/1992 del IVA.', 15, y);
+      doc.text('INVERSIÓN DEL SUJETO PASIVO. ART. 84.UNO.2º.F) DE LA LEY 37/1992 DEL IVA.', 15, y);
       doc.setFont('helvetica','normal'); doc.setFontSize(9);
     }
   }
@@ -11446,8 +11456,8 @@ function descargarPDF(){
     y += 14;
     doc.setFont('helvetica','normal'); doc.setFontSize(9);
     doc.text('Forma de pago: '+payment, 15, y);
-    if(cfg.hasBank && payment==='Transferencia'){
-      y+=5; doc.text('IBAN: '+iban, 15, y);
+    if(cfg.hasBank && payment==='TRANSFERENCIA'){
+      y+=5; doc.text('IBAN: '+iban.toUpperCase(), 15, y);
       y+=5; doc.text('Titular: '+titular, 15, y);
       y+=5; doc.text('Concepto: '+concepto, 15, y);
     }
@@ -11481,9 +11491,9 @@ function togglePreview(){
   contenedor?.classList.add('ie-modo-preview');
   const type = document.getElementById('ni-doctype').value;
   const cfg = DOC_TYPES[type];
-  const client = document.getElementById('ni-client').value || '—';
+  const client = MAY(document.getElementById('ni-client').value || '—');
   const nif = document.getElementById('ni-client-nif').value;
-  const addr = document.getElementById('ni-client-addr').value;
+  const addr = MAY(document.getElementById('ni-client-addr').value);
   const job = document.getElementById('ni-job').value;
   const num = document.getElementById('ni-docnum').value;
   const dateRaw = document.getElementById('ni-date').value;
@@ -11492,14 +11502,14 @@ function togglePreview(){
     fecha: tr.querySelector('.ie-linea-fecha')?.value || '',
     qty: tr.querySelector('.ie-qty').value,
     unidad: tr.querySelector('.ie-unidad')?.value || 'ud',
-    concept: tr.querySelector('.ie-concept').value,
+    concept: MAY(tr.querySelector('.ie-concept').value),
     price: Number(tr.querySelector('.ie-price').value)||0,
     total: (Number(tr.querySelector('.ie-qty').value)||0) * (Number(tr.querySelector('.ie-price').value)||0),
   }));
-  const payment = document.getElementById('ni-payment').value;
+  const payment = MAY(document.getElementById('ni-payment').value);
   const iban = document.getElementById('ni-iban').value;
-  const titular = document.getElementById('ni-titular').value;
-  const concepto = document.getElementById('ni-concepto-transf').value;
+  const titular = MAY(document.getElementById('ni-titular').value);
+  const concepto = MAY(document.getElementById('ni-concepto-transf').value);
 
   previewPane.innerHTML = `
     <div class="ie-header">
@@ -11507,7 +11517,7 @@ function togglePreview(){
         <img class="ie-logo" src="${document.querySelector('.ie-logo').src}">
         <div class="ie-company-text">
           <div class="ie-company-name">RAFAEL GÓMEZ MARTÍNEZ</div>
-          ${cfg.hasFiscalHeader ? `<div>NIF 75706590C</div><div>Calle Industria s/n</div><div>14290 Fuente Obejuna (Córdoba)</div><div>exgomez.m@gmail.com</div>` : ''}
+          ${cfg.hasFiscalHeader ? `<div>NIF 75706590C</div><div>CALLE INDUSTRIA S/N</div><div>14290 FUENTE OBEJUNA (CÓRDOBA)</div><div>exgomez.m@gmail.com</div>` : ''}
         </div>
       </div>
       <div class="ie-doc-meta">
@@ -11517,29 +11527,29 @@ function togglePreview(){
       </div>
     </div>
     <div style="margin-bottom:16px;font-size:13px;">
-      <b>Cliente:</b> ${client}${nif ? ` — NIF/CIF: ${nif}` : ''}${addr ? `<br>${addr}` : ''}
+      <b>Cliente:</b> ${client}${nif ? ` — NIF/CIF: ${nif.toUpperCase()}` : ''}${addr ? `<br>${addr}` : ''}
     </div>
     <table class="ie-items" style="table-layout:fixed;">
       <colgroup>${items.some(i=>i.fecha)?'<col style="width:14%;">':''}<col style="width:8%;"><col style="width:${items.some(i=>i.fecha)?(cfg.hasPrecios?'54%':'66%'):(cfg.hasPrecios?'68%':'80%')};">${cfg.hasPrecios?'<col style="width:12%;">':''}<col style="width:12%;"></colgroup>
       <thead><tr>${items.some(i=>i.fecha)?'<th>Fecha</th>':''}<th>Cant.</th><th>Concepto</th>${cfg.hasPrecios ? '<th style="text-align:right;">Precio</th>' : ''}<th style="text-align:right;">Total</th></tr></thead>
-      <tbody>${items.map(i=>`<tr>${items.some(x=>x.fecha)?`<td class="mono">${i.fecha ? formatFechaCorta(i.fecha) : '—'}</td>`:''}<td>${i.qty}</td><td style="overflow-wrap:break-word;word-break:break-word;">${i.concept||'—'}</td>${cfg.hasPrecios ? `<td style="text-align:right;white-space:nowrap;" class="mono">${i.price.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>` : ''}<td style="text-align:right;white-space:nowrap;" class="mono">${i.total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td></tr>`).join('')}</tbody>
+      <tbody>${items.map(i=>`<tr>${items.some(x=>x.fecha)?`<td class="mono">${i.fecha ? formatFechaCorta(i.fecha) : '—'}</td>`:''}<td>${formatCantidad(i.qty)}</td><td style="overflow-wrap:break-word;word-break:break-word;">${i.concept||'—'}</td>${cfg.hasPrecios ? `<td style="text-align:right;white-space:nowrap;" class="mono">${formatMoneda(i.price)}</td>` : ''}<td style="text-align:right;white-space:nowrap;" class="mono">${formatMoneda(i.total)}</td></tr>`).join('')}</tbody>
     </table>
     <div class="ie-footer">
       <div class="ie-payment" style="font-size:13px;">
         ${cfg.hasPayment && payment ? `<div><b>Forma de pago:</b> ${payment}</div>` : ''}
-        ${cfg.hasBank && payment==='Transferencia' ? `<div><b>IBAN:</b> ${iban}</div><div><b>Titular:</b> ${titular}</div><div><b>Concepto:</b> ${concepto}</div>` : ''}
+        ${cfg.hasBank && payment==='TRANSFERENCIA' ? `<div><b>IBAN:</b> ${iban.toUpperCase()}</div><div><b>Titular:</b> ${titular}</div><div><b>Concepto:</b> ${concepto}</div>` : ''}
       </div>
       ${cfg.hasTotales ? `<div class="ie-totals">
-        ${cfg.hasBaseIva ? `<div class="econ-line"><span>Base imponible</span><span class="v mono">${base.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>` : ''}
-        ${cfg.hasBaseIva && cfg.hasIva ? `<div class="econ-line"><span>IVA</span><span class="v mono">${iva.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>` : ''}
-        <div class="econ-line"><span>TOTAL</span><span class="v mono">${total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span></div>
+        ${cfg.hasBaseIva ? `<div class="econ-line"><span>Base imponible</span><span class="v mono">${formatMoneda(base)}</span></div>` : ''}
+        ${cfg.hasBaseIva && cfg.hasIva ? `<div class="econ-line"><span>IVA</span><span class="v mono">${formatMoneda(iva)}</span></div>` : ''}
+        <div class="econ-line"><span>TOTAL</span><span class="v mono">${formatMoneda(total)}</span></div>
       </div>` : ''}
-      ${(document.getElementById('ie-tratamiento-iva')?.value==='isp') ? `<div style="font-size:11px;margin-top:10px;font-style:italic;">Inversión del sujeto pasivo. Art. 84.Uno.2º.f) de la Ley 37/1992 del IVA.</div>` : ''}
+      ${(document.getElementById('ie-tratamiento-iva')?.value==='isp') ? `<div style="font-size:11px;margin-top:10px;font-style:italic;">INVERSIÓN DEL SUJETO PASIVO. ART. 84.UNO.2º.F) DE LA LEY 37/1992 DEL IVA.</div>` : ''}
     </div>
   `;
   editPane.style.display = 'none';
   previewPane.style.display = 'block';
-  btn.textContent = '← Volver a editar';
+  if(btn) btn.textContent = '← Volver a editar';
 }
 
 function parseDictado(){
@@ -13721,7 +13731,23 @@ async function guardarGasto(){
     cerrarRegistrarGasto();
   }catch(err){ statusEl.textContent = 'Error de red: '+errText(err); statusEl.style.color = 'var(--red)'; }
 }
-function closeNewInvoiceModal(){ document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); document.getElementById('ie-dictado').classList.remove('open'); document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview'); }
+function closeNewInvoiceModal(){ document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); document.getElementById('ie-dictado').classList.remove('open'); document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview'); window.__newInvoiceDirty = false; }
+// aviso de cambios sin guardar — solo se llama desde los cierres iniciados por el usuario
+// (botón ✕ y clic fuera), nunca desde el cierre automático tras guardar con éxito
+function intentarCerrarNewInvoiceModal(){
+  if(!window.__newInvoiceDirty){ closeNewInvoiceModal(); return; }
+  const salir = confirm('HAY CAMBIOS SIN GUARDAR en este documento.\n\nAceptar = salir (se preguntará si guardar como borrador)\nCancelar = seguir editando');
+  if(!salir) return;
+  const guardar = confirm('¿Guardar estos cambios como BORRADOR antes de salir?\n\nAceptar = guardar borrador\nCancelar = descartar los cambios');
+  if(guardar){ submitNewInvoice(null, true); }
+  else { closeNewInvoiceModal(); }
+}
+// marca la edición como "con cambios" en cuanto se toca cualquier campo del formulario —
+// una sola vez, delegado, para no tener que enganchar el aviso campo por campo
+document.addEventListener('DOMContentLoaded', ()=>{
+  const form = document.getElementById('newinvoice-form');
+  if(form){ form.addEventListener('input', ()=>{ window.__newInvoiceDirty = true; }); }
+});
 
 /* ---------------- ASISTENTE MÓVIL — mismo motor, mismo guardado real, solo cambia cómo se pide ---------------- */
 let wiz = null; // estado del asistente actual
@@ -14055,25 +14081,36 @@ async function submitNewInvoice(ev, isDraft){
   const jobCode = job !== '—' ? job.split(' — ')[0].trim() : null;
   const trabajo = jobCode ? jobs.find(j=>j.code===jobCode) : null;
 
-  // si has escrito NIF/dirección/población/etc. aquí y la ficha del cliente no los tenía
-  // guardados, se actualizan también en el cliente — nunca se pisa un dato ya bueno
+  // Campos vacíos en la ficha del cliente se rellenan solos con lo escrito aquí (nunca pisa
+  // un dato ya bueno). Si en cambio un campo YA TENÍA un valor distinto al de aquí, se
+  // pregunta explícitamente si es un cambio solo de este documento o si hay que corregir
+  // también la ficha maestra del cliente — nunca se sobrescribe en silencio.
   if(entidad?.id){
-    const nifEditor = document.getElementById('ni-client-nif').value.trim();
-    const addrEditor = document.getElementById('ni-client-addr').value.trim();
-    const cpEditor = document.getElementById('ni-client-cp').value.trim();
-    const poblacionEditor = document.getElementById('ni-client-poblacion').value.trim();
-    const provinciaEditor = document.getElementById('ni-client-provincia').value.trim();
-    const telefonoEditor = document.getElementById('ni-client-telefono').value.trim();
-    const emailEditor = document.getElementById('ni-client-email').value.trim();
+    const camposEditor = {
+      nif: document.getElementById('ni-client-nif').value.trim().toUpperCase(),
+      direccion: document.getElementById('ni-client-addr').value.trim().toUpperCase(),
+      cp: document.getElementById('ni-client-cp').value.trim(),
+      poblacion: document.getElementById('ni-client-poblacion').value.trim().toUpperCase(),
+      provincia: document.getElementById('ni-client-provincia').value.trim().toUpperCase(),
+      telefono: document.getElementById('ni-client-telefono').value.trim(),
+      email: document.getElementById('ni-client-email').value.trim(),
+    };
     const {data: entidadActual} = await sb.from('entidades').select('nif,direccion,cp,poblacion,provincia,telefono,email').eq('id', entidad.id).maybeSingle();
     const patchEntidad = {};
-    if(nifEditor && !entidadActual?.nif) patchEntidad.nif = nifEditor.toUpperCase();
-    if(addrEditor && !entidadActual?.direccion) patchEntidad.direccion = addrEditor.toUpperCase();
-    if(cpEditor && !entidadActual?.cp) patchEntidad.cp = cpEditor;
-    if(poblacionEditor && !entidadActual?.poblacion) patchEntidad.poblacion = poblacionEditor.toUpperCase();
-    if(provinciaEditor && !entidadActual?.provincia) patchEntidad.provincia = provinciaEditor.toUpperCase();
-    if(telefonoEditor && !entidadActual?.telefono) patchEntidad.telefono = telefonoEditor;
-    if(emailEditor && !entidadActual?.email) patchEntidad.email = emailEditor;
+    const etiquetas = {nif:'NIF/CIF', direccion:'dirección', cp:'código postal', poblacion:'población', provincia:'provincia', telefono:'teléfono', email:'email'};
+    const diferencias = [];
+    for(const campo in camposEditor){
+      const nuevo = camposEditor[campo];
+      const actual = (entidadActual?.[campo] || '').toString().trim();
+      if(!nuevo) continue;
+      if(!actual){ patchEntidad[campo] = nuevo; continue; } // vacío en la ficha → se rellena solo, sin preguntar
+      if(actual.toUpperCase() !== nuevo.toUpperCase()) diferencias.push({campo, actual, nuevo});
+    }
+    if(diferencias.length){
+      const lista = diferencias.map(d=>`${etiquetas[d.campo]}: "${d.actual}" → "${d.nuevo}"`).join('\n');
+      const actualizarFicha = confirm(`Estos datos de ${client} no coinciden con la ficha del cliente:\n\n${lista}\n\nAceptar = ACTUALIZAR FICHA DEL CLIENTE (se corrige para siempre)\nCancelar = usar solo en este documento (la ficha del cliente no cambia)`);
+      if(actualizarFicha) diferencias.forEach(d=>{ patchEntidad[d.campo] = d.nuevo; });
+    }
     if(Object.keys(patchEntidad).length){
       await sb.from('entidades').update(patchEntidad).eq('id', entidad.id);
       Object.assign(entidad, patchEntidad); // refleja el cambio también en memoria, sin esperar a recargar
