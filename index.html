@@ -2259,7 +2259,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.11</div>
+        <div class="sub">V3.12</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13619,7 +13619,54 @@ async function procesarMetodoFoto(){
   }
 }
 
-// ---- Desde texto/dictado ----
+// separa un texto largo (pegado o dictado) en bloques manejables por el motor — una tirada
+// única con más de ~45 líneas de trabajo puede agotar el tiempo del servidor y devolver
+// un error 504 sin nada útil. Si el texto es grande, lo trocea, llama al motor una vez por
+// bloque (repitiendo la cabecera/instrucción en cada uno para que el cliente/obra salgan
+// igual en todos) y une los resultados en un solo documento — antes esto había que hacerlo
+// a mano fuera de la app.
+function trocearTextoParaIA(texto, lineasPorBloque){
+  lineasPorBloque = lineasPorBloque || 45;
+  const lineas = texto.split('\n');
+  const esLineaDeItem = l => /^\s*[-*•]/.test(l) || /^\s*\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(l);
+  const primeraLineaItem = lineas.findIndex(esLineaDeItem);
+  if(primeraLineaItem === -1) return [texto]; // no parece una lista — se manda entero, tal cual
+  const cabecera = lineas.slice(0, primeraLineaItem).join('\n').trim();
+  const items = lineas.slice(primeraLineaItem);
+  if(items.length <= lineasPorBloque) return [texto];
+  const bloques = [];
+  for(let i=0; i<items.length; i+=lineasPorBloque){
+    const trozo = items.slice(i, i+lineasPorBloque).join('\n');
+    bloques.push(cabecera ? `${cabecera}\n\n${trozo}` : trozo);
+  }
+  return bloques;
+}
+async function crearDocumentoConIA(mensaje, imagenes, onProgreso){
+  const bloques = (mensaje && !imagenes?.length) ? trocearTextoParaIA(mensaje) : [mensaje];
+  if(bloques.length === 1){
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/asistente-ia', {
+      method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY},
+      body: JSON.stringify({modo:'crear_documento', mensaje: mensaje || null, imagenes}),
+    });
+    const data = await resp.json();
+    return {ok: resp.ok && !data.error, data};
+  }
+  // texto largo: un bloque cada vez, uniendo los conceptos de todos al final
+  let acumulado = null;
+  for(let i=0; i<bloques.length; i++){
+    if(onProgreso) onProgreso(i+1, bloques.length);
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/asistente-ia', {
+      method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY},
+      body: JSON.stringify({modo:'crear_documento', mensaje: bloques[i], forzar_ia: true}),
+    });
+    const data = await resp.json();
+    if(!resp.ok || data.error) return {ok:false, data, bloqueFallido: i+1, totalBloques: bloques.length};
+    if(!acumulado) acumulado = data;
+    else acumulado.conceptos = [...(acumulado.conceptos||[]), ...(data.conceptos||[])];
+  }
+  return {ok:true, data: acumulado};
+}
+
 let metodoTextoDictadoActivo = false, metodoTextoReconocedor = null;
 function abrirMetodoTexto(){
   cerrarMetodoDoc();
@@ -13664,12 +13711,15 @@ async function procesarMetodoTexto(){
   btn.disabled = true;
   statusEl.textContent = 'Interpretando…';
   try{
-    const resp = await fetch(SUPABASE_URL + '/functions/v1/asistente-ia', {
-      method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY},
-      body: JSON.stringify({modo:'crear_documento', mensaje: texto}),
+    const {ok, data, bloqueFallido, totalBloques} = await crearDocumentoConIA(texto, null, (actual, total)=>{
+      statusEl.textContent = `Interpretando parte ${actual}/${total}…`;
     });
-    const data = await resp.json();
-    if(!resp.ok || data.error){ statusEl.textContent = 'Error: '+(data.error||'algo ha fallado.'); btn.disabled=false; return; }
+    if(!ok){
+      statusEl.textContent = bloqueFallido
+        ? `Error en la parte ${bloqueFallido}/${totalBloques}: ${data.error||'algo ha fallado'} — lo ya interpretado antes no se ha perdido, puedes reintentar con el texto restante.`
+        : 'Error: '+(data.error||'algo ha fallado.');
+      btn.disabled=false; return;
+    }
     cerrarMetodoTexto();
     abrirEditorConDatosIA(data);
   }catch(err){
