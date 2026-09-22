@@ -1,4 +1,4 @@
-// reprocesar-documento v24 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
+// reprocesar-documento v25 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
 // Solo reglas. Rellena campos VACÍOS; nunca sobrescribe un dato válido: si el motor ve otra cosa
 // lo devuelve como discrepancia (CONFLICTO) para revisión. 0 IA en esta versión.
 // v17: es el paso central del CIRCUITO DE CALIDAD:
@@ -6,7 +6,7 @@
 //   → REVALIDAR → estado final: validado (OK) | corregido_automatico | revision_necesaria/error (REVISAR) | conflicto
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import WordExtractor from "npm:word-extractor@1.0.4";
-import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/0a658e83c9490a8c93380124cae9b517959f881c/motor/extractor.ts";
+import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/e9ca32215516af42a8e138d787a8dab8846fde3d/motor/extractor.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const codigos = (info: any) => (String(info || "").match(/\[control-calidad: ([^\]]+)\]/)?.[1] || "").split(", ").filter(Boolean);
@@ -115,7 +115,10 @@ Deno.serve(async (req) => {
       } else pendientes.push({ campo: "cliente", estado: res.estado, propuesta: res.nombre || r.cliente.nombre || null, motivo: res.motivo || null });
     }
     // tipo documental: nunca automático
-    if (r.tipo && r.tipo !== doc.tipo) {
+    // "si pone PROFORMA dentro, es proforma": el tipo que declara el propio documento se aplica
+    if (r.tipo && r.tipo !== doc.tipo && r.tipo_origen === "contenido" && r.tipo === "proforma") {
+      cambios.tipo = "proforma";
+    } else if (r.tipo && r.tipo !== doc.tipo) {
       // si el documento parece de otro tipo, NO se rellena nada: número/fecha/cliente serían de otro documento
       discrepancias.push({ campo: "tipo", actual: doc.tipo, motor: r.tipo });
       for (const k of Object.keys(cambios)) { pendientes.push({ campo: k, motor: k === "conceptos" ? `${cambios[k].length} líneas` : cambios[k], motivo: "tipo documental en duda" }); delete cambios[k]; }
