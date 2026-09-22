@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.11";
+export const VERSION_MOTOR = "motor-exg-2.12";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -414,9 +414,12 @@ export function leerHoja(wb: any, anioEsperado?: string, opciones?: { archivo?: 
   const numero = numeroRej || numeroTpl;
   const cliente = detectarCliente(filas, limite + 1);
   const textosCab = filas.slice(0, limite).flat().filter((v: any) => typeof v === "string");
-  const tipo = detectarTipo(textosCab, numero || valorBruto, opciones?.archivo);
+  // Decisión de Daniel: lo que dice DENTRO del documento manda sobre el nombre del archivo y la carpeta
+  const tipoContenido = detectarTipo(textosCab, numero || valorBruto, null);
+  const tipo = tipoContenido || detectarTipo(textosCab, numero || valorBruto, opciones?.archivo);
+  const tipo_origen = tipoContenido ? "contenido" : (tipo ? "archivo" : null);
   const totales = lineasYTotales(filas, wb);
-  return { hoja: nombreHoja, filas, limite, numero, fecha, cliente, tipo, ...totales };
+  return { hoja: nombreHoja, filas, limite, numero, fecha, cliente, tipo, tipo_origen, ...totales };
 }
 
 /* ---------------- TEXTO LIBRE (.doc / .rtf / texto de PDF) ---------------- */
