@@ -2255,7 +2255,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.00</div>
+        <div class="sub">V3.01</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11371,7 +11371,7 @@ function descargarPDF(){
     doc.setFont('helvetica','bold'); doc.setFontSize(9);
     if(hayFechas) doc.text('Fecha', 15, yc);
     doc.text('Cant.', hayFechas ? 40 : 15, yc); doc.text('Concepto', xConcepto + (hayFechas?0:20), yc);
-    if(cfg.hasPrecios){ doc.text('Precio', 150, yc, {align:'right'}); }
+    if(cfg.hasPrecios){ doc.text('Precio', xPrecio, yc, {align:'right'}); }
     doc.text('Total', 195, yc, {align:'right'});
     yc += 2; doc.line(15,yc,195,yc); yc += 5;
     doc.setFont('helvetica','normal');
@@ -11379,6 +11379,10 @@ function descargarPDF(){
   }
   const hayFechas = items.some(it=>it.fecha);
   const xConcepto = hayFechas ? 55 : 15;
+  // Precio y Total acercados de verdad: antes había 45mm de hueco vacío entre dos números
+  // cortos (ej. "40,00 €" y "300,00 €"). Ahora el hueco es el que necesita el número más
+  // ancho previsto, y el resto del ancho libre se lo queda Concepto en vez de perderse.
+  const xPrecio = cfg.hasPrecios ? 172 : 195;
   const yInicio = dibujarCabeceraPDF();
   y = yInicio;
   // reparto equilibrado entre páginas: primero se calcula cuánto ocupa cada línea y el
@@ -11386,7 +11390,7 @@ function descargarPDF(){
   // — así no queda una última página casi vacía mientras las demás van muy cargadas
   const capacidadPagina = 275 - yInicio;
   const filasCalculadas = items.map(it=>{
-    const anchoConcepto = (cfg.hasPrecios ? 82 : 132) + (hayFechas ? 0 : 20);
+    const anchoConcepto = (xPrecio - 25) - (xConcepto + (hayFechas ? 0 : 20));
     const lineasConcepto = doc.splitTextToSize(it.concept||'—', anchoConcepto);
     return {it, lineasConcepto, alto: Math.max(7, lineasConcepto.length * 4.6 + 2.6)};
   });
@@ -11404,11 +11408,11 @@ function descargarPDF(){
     }
     altoAcumuladoPagina += altoFila;
     const lineTotal = (Number(it.qty)||0)*it.price;
-    if(hayFechas) doc.text(it.fecha || '—', 15, y);
+    if(hayFechas) doc.text(it.fecha ? formatFechaCorta(it.fecha) : '—', 15, y);
     doc.text(String(it.qty), hayFechas ? 40 : 15, y);
     doc.text(lineasConcepto, xConcepto + (hayFechas?0:20), y);
     if(cfg.hasPrecios){
-      doc.text(it.price.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 150, y, {align:'right'});
+      doc.text(it.price.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', xPrecio, y, {align:'right'});
     }
     doc.text(lineTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €', 195, y, {align:'right'});
     y += altoFila;
@@ -11516,7 +11520,7 @@ function togglePreview(){
       <b>Cliente:</b> ${client}${nif ? ` — NIF/CIF: ${nif}` : ''}${addr ? `<br>${addr}` : ''}
     </div>
     <table class="ie-items" style="table-layout:fixed;">
-      <colgroup>${items.some(i=>i.fecha)?'<col style="width:14%;">':''}<col style="width:8%;"><col style="width:${items.some(i=>i.fecha)?(cfg.hasPrecios?'46%':'60%'):(cfg.hasPrecios?'60%':'74%')};">${cfg.hasPrecios?'<col style="width:16%;">':''}<col style="width:16%;"></colgroup>
+      <colgroup>${items.some(i=>i.fecha)?'<col style="width:14%;">':''}<col style="width:8%;"><col style="width:${items.some(i=>i.fecha)?(cfg.hasPrecios?'54%':'66%'):(cfg.hasPrecios?'68%':'80%')};">${cfg.hasPrecios?'<col style="width:12%;">':''}<col style="width:12%;"></colgroup>
       <thead><tr>${items.some(i=>i.fecha)?'<th>Fecha</th>':''}<th>Cant.</th><th>Concepto</th>${cfg.hasPrecios ? '<th style="text-align:right;">Precio</th>' : ''}<th style="text-align:right;">Total</th></tr></thead>
       <tbody>${items.map(i=>`<tr>${items.some(x=>x.fecha)?`<td class="mono">${i.fecha ? formatFechaCorta(i.fecha) : '—'}</td>`:''}<td>${i.qty}</td><td style="overflow-wrap:break-word;word-break:break-word;">${i.concept||'—'}</td>${cfg.hasPrecios ? `<td style="text-align:right;white-space:nowrap;" class="mono">${i.price.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>` : ''}<td style="text-align:right;white-space:nowrap;" class="mono">${i.total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</td></tr>`).join('')}</tbody>
     </table>
