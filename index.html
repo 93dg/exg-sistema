@@ -3203,6 +3203,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <button class="btn sm" id="fact-enviar-sel-btn" title="Enviar seleccionadas al gestor" onclick="enviarSeleccionadasAlGestor('fact-sel-chk')">📤</button>
             <button class="btn sm" id="fact-enviarcliente-sel-btn" title="Enviar seleccionadas al cliente" onclick="enviarSeleccionadasAlCliente('fact-sel-chk')">✉</button>
             <button class="btn sm" id="fact-imprimir-sel-btn" title="Imprimir seleccionadas" onclick="imprimirSeleccionadas('fact-sel-chk')">🖨</button>
+            <button class="btn sm" title="Mover a otra sección" onclick="abrirMoverSeleccionados(this)" data-chk="fact-sel-chk">↗ Mover</button>
             <button class="btn sm" style="color:var(--red);" id="fact-borrar-sel-btn" title="Borrar seleccionadas" onclick="borrarDocumentosSeleccionados('fact-sel-chk')">🗑</button>
           </div>
         </div>
@@ -3253,6 +3254,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div style="display:flex;align-items:center;justify-content:space-between;">
             <h3>Albaranes</h3>
             <span style="display:flex;align-items:center;gap:10px;">
+              <button class="btn" style="display:none;" id="alb-mover-sel-btn" onclick="abrirMoverSeleccionados(this)" data-chk="alb-sel-chk">↗ Mover seleccionados</button>
               <button class="btn" style="color:var(--red);display:none;" id="alb-borrar-sel-btn" onclick="borrarDocumentosSeleccionados('alb-sel-chk')">🗑 Borrar seleccionados (<span id="alb-sel-count">0</span>)</button>
               <button class="btn" id="alb-enviarcliente-sel-btn" style="display:none;" onclick="enviarSeleccionadasAlCliente('alb-sel-chk')">✉ Enviar al cliente</button>
               <button class="btn" id="alb-imprimir-sel-btn" style="display:none;" onclick="imprimirSeleccionadas('alb-sel-chk')">🖨 Imprimir</button>
@@ -3327,6 +3329,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div style="display:flex;align-items:center;justify-content:space-between;">
             <h3 id="presprof-h3">Presupuestos</h3>
             <span style="display:flex;align-items:center;gap:10px;">
+              <button class="btn" style="display:none;" id="pres-mover-sel-btn" onclick="abrirMoverSeleccionados(this)" data-chk="pres-sel-chk">↗ Mover seleccionados</button>
               <button class="btn" style="color:var(--red);display:none;" id="pres-borrar-sel-btn" onclick="borrarDocumentosSeleccionados('pres-sel-chk')">🗑 Borrar seleccionados (<span id="pres-sel-count">0</span>)</button>
               <button class="btn" id="pres-enviarcliente-sel-btn" style="display:none;" onclick="enviarSeleccionadasAlCliente('pres-sel-chk')">✉ Enviar al cliente</button>
               <button class="btn" id="pres-imprimir-sel-btn" style="display:none;" onclick="imprimirSeleccionadas('pres-sel-chk')">🖨 Imprimir</button>
@@ -10702,7 +10705,7 @@ function actualizarSeleccionDoc(claseChk, btnId, countId){
   // compatibilidad con secciones que todavía no tienen la barra unificada
   const btn = document.getElementById(btnId);
   if(btn) btn.style.display = marcados.length ? '' : 'none';
-  ['-enviar-sel-btn','-enviarcliente-sel-btn','-imprimir-sel-btn'].forEach(suf=>{
+  ['-enviar-sel-btn','-enviarcliente-sel-btn','-imprimir-sel-btn','-mover-sel-btn'].forEach(suf=>{
     const b = document.getElementById(btnId.replace('-borrar-sel-btn', suf));
     if(b) b.style.display = marcados.length ? '' : 'none';
   });
@@ -16343,6 +16346,26 @@ function openJobDrawer(code){
   }
 
   document.getElementById('drawer-overlay').classList.add('active');
+}
+function abrirMoverSeleccionados(btn){
+  const claseChk = btn.dataset.chk;
+  const ids = Array.from(document.querySelectorAll('.'+claseChk+':checked')).map(x=>x.dataset.id).filter(Boolean);
+  if(!ids.length){ mostrarToast('Selecciona al menos uno.'); return; }
+  const TIPOS = [['factura','Factura'],['albaran','Albarán'],['presupuesto','Presupuesto'],['proforma','Proforma']];
+  mostrarModalGenerico(
+    `Mover ${ids.length} documento(s) a…`,
+    `<div style="display:flex;flex-direction:column;gap:10px;">${TIPOS.map(([t,l])=>`<button class="btn primary" onclick="confirmarMoverSeleccionados(${JSON.stringify(ids)},'${t}',this)">${l}</button>`).join('')}</div>`
+  );
+}
+async function confirmarMoverSeleccionados(ids, nuevoTipo, btnEl){
+  if(!sb) return;
+  btnEl.disabled = true; btnEl.textContent = 'Moviendo…';
+  const {error} = await sb.from('documentos_economicos').update({tipo: nuevoTipo}).in('id', ids);
+  if(error){ mostrarToast('Error: '+errText(error)); btnEl.disabled=false; return; }
+  const TIPOS = {factura:'Factura',albaran:'Albarán',presupuesto:'Presupuesto',proforma:'Proforma'};
+  mostrarToast(`${ids.length} doc(s) movidos a ${TIPOS[nuevoTipo]}`, 'ok');
+  document.querySelector('.modal-overlay.active')?.classList.remove('active');
+  if(typeof cargarDatosReales==='function') cargarDatosReales();
 }
 async function moverDocumentoA(nuevoTipo){
   if(!editingDocId || !sb) return;
