@@ -736,30 +736,89 @@ table{border-collapse:collapse;width:100%;}
      filtros — alcanzable con el pulgar sin bajar hasta la tabla */
   .dd-filter-acciones-sel{flex:1 1 100%;margin-left:0;justify-content:flex-end;}
 }
-/* ===== Tabla de FACTURAS en móvil: lo que más se toca, a la izquierda =====
-   Selección · Estado · Cliente · Fecha/Nº · Total van primero; Trabajo, Base, IVA, %IVA,
-   Gestor y Archivo (poco usados a diario en el móvil) se ocultan — siguen disponibles en
-   escritorio. Reordenado con flex, sin tocar el HTML que genera cada fila. */
+/* =====================================================================================
+   PATRÓN COMÚN: listados de documentos (Facturas/Proformas/Presupuestos/Albaranes) en móvil.
+   En vez de intentar meter la tabla de escritorio comprimida, cada registro se convierte en
+   una TARJETA con jerarquía real: estado+total arriba, cliente destacado, fecha/nº compactos,
+   cobrado/calidad como datos secundarios, acciones al fondo sin estorbar. Se aplica con CSS
+   Grid (grid-template-areas) sobre las MISMAS celdas que ya genera cada tabla — no hace falta
+   tocar el HTML/JS que construye las filas, así que es un solo sitio que mantener y cualquier
+   tabla nueva de este tipo hereda el patrón añadiendo la clase "tbl-tarjeta-movil" a la tabla
+   y su propio bloque de grid-template-areas más abajo.
+   ===================================================================================== */
 @media(max-width:768px){
-  #econ-facturas-table tr{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;width:100%;}
-  #econ-facturas-table th, #econ-facturas-table td{flex:0 0 auto;border:none !important;padding:6px 2px !important;}
-  #econ-facturas-table th:nth-child(1), #econ-facturas-table td:nth-child(1){order:1;text-align:left;} /* checkbox */
-  #econ-facturas-table th:nth-child(11), #econ-facturas-table td:nth-child(11){order:2;text-align:left;} /* Estado */
-  #econ-facturas-table th:nth-child(4), #econ-facturas-table td:nth-child(4){order:3;flex:1 1 100%;min-width:0;font-weight:600;text-align:left;} /* Cliente: línea propia */
-  #econ-facturas-table th:nth-child(2), #econ-facturas-table td:nth-child(2){order:4;text-align:left;} /* Fecha */
-  #econ-facturas-table th:nth-child(3), #econ-facturas-table td:nth-child(3){order:5;text-align:left;} /* Nº */
-  #econ-facturas-table th:nth-child(9), #econ-facturas-table td:nth-child(9){order:6;font-weight:700;text-align:left;} /* Total */
-  #econ-facturas-table th:nth-child(14), #econ-facturas-table td:nth-child(14){order:7;text-align:left;} /* Calidad */
-  #econ-facturas-table th:nth-child(15), #econ-facturas-table td:nth-child(15){order:8;text-align:left;} /* Borrar (icono de fila) */
-  #econ-facturas-table th:nth-child(10), #econ-facturas-table td:nth-child(10){order:9;flex:1 1 100%;font-size:12px;color:var(--ink-soft);text-align:left;} /* Cobrado */
-  #econ-facturas-table th:nth-child(5), #econ-facturas-table td:nth-child(5), /* Trabajo */
-  #econ-facturas-table th:nth-child(6), #econ-facturas-table td:nth-child(6), /* Base */
-  #econ-facturas-table th:nth-child(7), #econ-facturas-table td:nth-child(7), /* IVA */
-  #econ-facturas-table th:nth-child(8), #econ-facturas-table td:nth-child(8), /* %IVA */
-  #econ-facturas-table th:nth-child(12), #econ-facturas-table td:nth-child(12), /* Gestor */
-  #econ-facturas-table th:nth-child(13), #econ-facturas-table td:nth-child(13){display:none;} /* Archivo */
-  #econ-facturas-table tr{border-bottom:1px solid var(--line);padding:8px 4px;}
+  .tbl-tarjeta-movil{border-collapse:separate;border-spacing:0;display:block;width:100%;min-width:0 !important;}
+  .tbl-tarjeta-movil > thead{display:none;} /* la fila de cabecera de escritorio no aporta nada en tarjeta */
+  .tbl-tarjeta-movil tbody{display:block;}
+  .tbl-tarjeta-movil tbody tr{
+    display:grid;grid-template-columns:22px 1fr auto;column-gap:10px;row-gap:3px;
+    align-items:start;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px 12px 10px 12px;margin-bottom:10px;
+  }
+  .tbl-tarjeta-movil tbody tr:hover{background:var(--paper);}
+  .tbl-tarjeta-movil tbody td{border:none !important;padding:0 !important;text-align:left !important;
+    font-size:13px;vertical-align:baseline;white-space:normal;}
+  /* casilla de selección: arriba a la izquierda, ocupa todas las filas de la tarjeta */
+  .tbl-tarjeta-movil .col-check{grid-area:check;align-self:start;grid-row:1/-1;}
+  .tbl-tarjeta-movil .col-total{grid-area:total;font-weight:800;font-size:15px;text-align:right !important;white-space:nowrap;}
+  .tbl-tarjeta-movil .col-cliente{grid-area:cliente;font-weight:700;font-size:14px;}
+  .tbl-tarjeta-movil .col-tipo{grid-area:tipo;font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.03em;}
+  .tbl-tarjeta-movil .col-estado{grid-area:estado;}
+  .tbl-tarjeta-movil .col-fecha{grid-area:fecha;font-size:12px;color:var(--ink-soft);}
+  .tbl-tarjeta-movil .col-num{grid-area:num;font-size:12px;color:var(--ink-soft);text-align:right !important;}
+  .tbl-tarjeta-movil .col-cobrado{grid-area:cobrado;font-size:12px;color:var(--ink-soft);}
+  .tbl-tarjeta-movil .col-calidad{grid-area:calidad;text-align:right !important;}
+  .tbl-tarjeta-movil .col-acciones{grid-area:acciones;text-align:right !important;}
+  .tbl-tarjeta-movil .col-oculto{display:none !important;}
+
+  /* FACTURAS: estado+total · cliente · fecha/nº · cobrado/calidad · acciones */
+  #econ-facturas-table tbody tr{
+    grid-template-areas:"check estado total" "check cliente cliente" "check fecha num" "check cobrado calidad" "check . acciones";
+  }
+  #econ-facturas-table td:nth-child(1){grid-area:check;} #econ-facturas-table td:nth-child(2){grid-area:fecha;}
+  #econ-facturas-table td:nth-child(3){grid-area:num;} #econ-facturas-table td:nth-child(4){grid-area:cliente;}
+  #econ-facturas-table td:nth-child(9){grid-area:total;} #econ-facturas-table td:nth-child(10){grid-area:cobrado;}
+  #econ-facturas-table td:nth-child(11){grid-area:estado;} #econ-facturas-table td:nth-child(14){grid-area:calidad;}
+  #econ-facturas-table td:nth-child(15){grid-area:acciones;}
+  #econ-facturas-table td:nth-child(5), #econ-facturas-table td:nth-child(6), #econ-facturas-table td:nth-child(7),
+  #econ-facturas-table td:nth-child(8), #econ-facturas-table td:nth-child(12), #econ-facturas-table td:nth-child(13){display:none !important;} /* Trabajo/Base/IVA/%IVA/Gestor/Archivo */
+  #econ-facturas-table td:nth-child(2),#econ-facturas-table td:nth-child(3),#econ-facturas-table td:nth-child(10){color:var(--ink-soft);font-size:12px;}
+  #econ-facturas-table td:nth-child(3){text-align:right !important;}
+  #econ-facturas-table td:nth-child(9){font-weight:800;font-size:15px;text-align:right !important;white-space:nowrap;}
+  #econ-facturas-table td:nth-child(4){font-weight:700;font-size:14px;}
+  #econ-facturas-table td:nth-child(14){text-align:right !important;}
+  #econ-facturas-table td:nth-child(15){text-align:right !important;}
+
+  /* ALBARANES: mismo esquema, sin Cobrado (los albaranes no llevan cobro) */
+  #albaranes-table tbody tr{
+    grid-template-areas:"check estado total" "check cliente cliente" "check fecha num" "check . calidad" "check . acciones";
+  }
+  #albaranes-table td:nth-child(1){grid-area:check;} #albaranes-table td:nth-child(2){grid-area:fecha;color:var(--ink-soft);font-size:12px;}
+  #albaranes-table td:nth-child(3){grid-area:num;color:var(--ink-soft);font-size:12px;text-align:right !important;}
+  #albaranes-table td:nth-child(4){grid-area:cliente;font-weight:700;font-size:14px;}
+  #albaranes-table td:nth-child(6){grid-area:total;font-weight:800;font-size:15px;text-align:right !important;white-space:nowrap;}
+  #albaranes-table td:nth-child(7){grid-area:estado;} #albaranes-table td:nth-child(9){grid-area:calidad;text-align:right !important;}
+  #albaranes-table td:nth-child(10){grid-area:acciones;text-align:right !important;}
+  #albaranes-table td:nth-child(5), #albaranes-table td:nth-child(8){display:none !important;} /* Trabajo/Archivo */
+
+  /* PRESUPUESTOS/PROFORMAS: mismo esquema + badge de Tipo (Presupuesto/Proforma) junto al estado */
+  #presupuestos-table tbody tr{
+    grid-template-areas:"check tipo total" "check estado ." "check cliente cliente" "check fecha num" "check . calidad" "check . acciones";
+  }
+  #presupuestos-table td:nth-child(1){grid-area:check;} #presupuestos-table td:nth-child(2){grid-area:fecha;color:var(--ink-soft);font-size:12px;}
+  #presupuestos-table td:nth-child(3){grid-area:num;color:var(--ink-soft);font-size:12px;text-align:right !important;}
+  #presupuestos-table td:nth-child(4){grid-area:tipo;font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.03em;}
+  #presupuestos-table td:nth-child(5){grid-area:cliente;font-weight:700;font-size:14px;}
+  #presupuestos-table td:nth-child(7){grid-area:total;font-weight:800;font-size:15px;text-align:right !important;white-space:nowrap;}
+  #presupuestos-table td:nth-child(8){grid-area:estado;} #presupuestos-table td:nth-child(10){grid-area:calidad;text-align:right !important;}
+  #presupuestos-table td:nth-child(11){grid-area:acciones;text-align:right !important;}
+  #presupuestos-table td:nth-child(6), #presupuestos-table td:nth-child(9){display:none !important;} /* Trabajo/Archivo */
+
+  /* acciones sobre lo seleccionado: su propia fila completa junto a los filtros — a mano del
+     pulgar, entre los filtros y el primer registro, sin bajar hasta la tabla */
+  .dd-filter-acciones-sel{flex:1 1 100%;margin-left:0;justify-content:flex-end;}
 }
+
 .dd-filter{position:relative;}
 .dd-filter-btn{
   display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;
@@ -2321,7 +2380,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.20</div>
+        <div class="sub">V3.21</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2911,8 +2970,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
         </div>
         <div class="panel-body" style="padding:0;">
-          <table class="tbl" id="econ-facturas-table">
-            <tr>
+          <table class="tbl tbl-tarjeta-movil" id="econ-facturas-table">
+            <thead><tr>
               <th style="width:30px;"><input type="checkbox" id="fact-sel-todo" onchange="toggleSeleccionarTodoDoc(this,'fact-sel-chk')"></th>
               <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',1,'fecha')">Fecha ⇅</th>
               <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',2,'num')">Nº ⇅</th>
@@ -2928,7 +2987,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <th>Archivo</th>
               <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',13,'text')">Calidad ⇅</th>
               <th style="width:30px;"></th>
-            </tr>
+            </tr></thead>
             <tbody id="econ-facturas-tbody">
             </tbody>
           </table>
@@ -2987,8 +3046,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
         </div>
         <div class="panel-body" style="padding:0;">
-          <table class="tbl">
-            <tr>
+          <table class="tbl tbl-tarjeta-movil" id="albaranes-table">
+            <thead><tr>
               <th style="width:30px;"><input type="checkbox" id="alb-sel-todo" onchange="toggleSeleccionarTodoDoc(this,'alb-sel-chk')"></th>
               <th class="ord" onclick="ordenarTabla('albaranes-tbody-standalone',1,'fecha')">Fecha ⇅</th>
               <th class="ord" onclick="ordenarTabla('albaranes-tbody-standalone',2,'num')">Nº ⇅</th>
@@ -2999,7 +3058,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <th>Archivo</th>
               <th class="ord" onclick="ordenarTabla('albaranes-tbody-standalone',8,'text')">Calidad ⇅</th>
               <th style="width:30px;"></th>
-            </tr>
+            </tr></thead>
             <tbody id="albaranes-tbody-standalone"></tbody>
           </table>
         </div>
@@ -3065,8 +3124,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
         </div>
         <div class="panel-body" style="padding:0;">
-          <table class="tbl">
-            <tr>
+          <table class="tbl tbl-tarjeta-movil" id="presupuestos-table">
+            <thead><tr>
               <th style="width:30px;"><input type="checkbox" id="pres-sel-todo" onchange="toggleSeleccionarTodoDoc(this,'pres-sel-chk')"></th>
               <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',1,'fecha')">Fecha ⇅</th>
               <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',2,'num')">Nº ⇅</th>
@@ -3078,7 +3137,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <th>Archivo</th>
               <th class="ord" onclick="ordenarTabla('presupuestos-tbody-standalone',9,'text')">Calidad ⇅</th>
               <th style="width:30px;"></th>
-            </tr>
+            </tr></thead>
             <tbody id="presupuestos-tbody-standalone"></tbody>
           </table>
         </div>
