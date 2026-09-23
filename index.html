@@ -899,6 +899,8 @@ table{border-collapse:collapse;width:100%;}
     cursor:pointer;
   }
   .lista-movil-solo #econ-facturas-lista-movil{padding-top:2px;}
+  .lista-movil-solo #alb-lista-movil{padding-top:2px;}
+  .lista-movil-solo #pres-lista-movil{padding-top:2px;}
   .factura-card-movil:active{background:var(--concrete);}
   /* ··· y PDF: esquina superior derecha, fuera de la rejilla */
   .fc-mas-btn{
@@ -2602,7 +2604,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.43</div>
+        <div class="sub">V3.44</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3286,6 +3288,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
         </div>
         <div class="panel-body" style="padding:0;">
+          <div class="lista-movil-solo" id="alb-lista-movil-wrap">
+            <div id="alb-lista-movil"></div>
+          </div>
+          <div class="tabla-escritorio-solo">
           <table class="tbl tbl-tarjeta-movil" id="albaranes-table">
             <thead><tr>
               <th style="width:30px;"><input type="checkbox" id="alb-sel-todo" onchange="toggleSeleccionarTodoDoc(this,'alb-sel-chk')"></th>
@@ -3301,6 +3307,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             </tr></thead>
             <tbody id="albaranes-tbody-standalone"></tbody>
           </table>
+          </div><!-- /tabla-escritorio-solo -->
         </div>
       </div>
     </div>
@@ -3364,6 +3371,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
         </div>
         <div class="panel-body" style="padding:0;">
+          <div class="lista-movil-solo" id="pres-lista-movil-wrap">
+            <div id="pres-lista-movil"></div>
+          </div>
+          <div class="tabla-escritorio-solo">
           <table class="tbl tbl-tarjeta-movil" id="presupuestos-table">
             <thead><tr>
               <th style="width:30px;"><input type="checkbox" id="pres-sel-todo" onchange="toggleSeleccionarTodoDoc(this,'pres-sel-chk')"></th>
@@ -3380,6 +3391,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             </tr></thead>
             <tbody id="presupuestos-tbody-standalone"></tbody>
           </table>
+          </div><!-- /tabla-escritorio-solo -->
         </div>
       </div>
       <div class="two-col-note">Independiente en el menú, pero mismos datos que Economía → Gastos — lo que crees aquí se ve allí también.</div>
@@ -15654,6 +15666,38 @@ async function toggleEnviadoGestor(id){
 // nunca dos plantillas que puedan desincronizarse).
 // Iconos SVG limpios (trazo fino, currentColor) para la tarjeta móvil de facturas — nada
 // de emoji de colores, que quedaban desproporcionados y con estilo inconsistente.
+// Construye una tarjeta móvil con el mismo diseño que Facturas — reutiliza todas las
+// clases fc-* y gestorMovilHtml ya existentes. Se llama desde el bucle de renderizado
+// de cada tipo de documento para poblar su propio lista-movil-solo.
+function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta, entidad, trabajo, archivoUrl, calidadInfo){
+  const lista = document.getElementById(listaId);
+  if(!lista) return;
+  const c = calidadInfo || {texto:'OK', codigos:[]};
+  const fallosHtml = c.texto==='OK' ? '' : `<span class="fc-fallos" onclick="event.stopPropagation();abrirCalidadDetalle('${doc.id}')">${ICO_WARN} ${c.codigos.length||1} FALLO${(c.codigos.length||1)===1?'':'S'}</span>`;
+  const estadoHtml = estadoDocumentoSelect(tipo, doc.id, doc.estado_cobro, 'cm-'+tipo+'-');
+  const verOriginalHtml = archivoUrl ? `<span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${archivoUrl}')">${ICO_CLIP} Original</span>` : '';
+  const extraHtml = (verOriginalHtml || fallosHtml) ? `<div class="fc-extra">${verOriginalHtml}${fallosHtml}</div>` : '';
+  const nombreObra = (trabajo && trabajo.code) || doc.obra_texto || '';
+  const obraHtml = nombreObra ? `<div class="fc-obra">${nombreObra}</div>` : '';
+  const metaHtml = `<span class="fc-meta-ico">${ICO_DOC} Nº ${doc.numero||'—'}</span><span class="fc-meta-sep">|</span><span class="fc-meta-ico">${ICO_CAL} ${fechaCorta}</span>`;
+  const card = document.createElement('div');
+  card.className = 'factura-card-movil';
+  card.id = 'mcard-'+doc.id;
+  card.dataset.docId = doc.id;
+  card.onclick = () => openDocumentViewer(doc.id);
+  card.innerHTML = `
+    <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${doc.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
+    <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
+    <input type="checkbox" class="fc-check ${cbClass}" data-id="${doc.id}" onclick="event.stopPropagation();">
+    <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}</div>
+    <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
+    ${obraHtml}
+    <div class="fc-meta">${metaHtml}</div>
+    <div class="fc-gestor-wrap celda-gestor-movil-${doc.id}" onclick="event.stopPropagation();">${gestorMovilHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha)}</div>
+    ${extraHtml}
+    <div class="fc-total-block"><span class="fc-total-label">Total</span><span class="fc-total-valor">${amountLabel}</span></div>`;
+  lista.appendChild(card);
+}
 const ICO_DOC = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
 const ICO_CAL = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
 const ICO_SEND = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>';
@@ -15942,6 +15986,8 @@ async function cargarDocumentosEconomicosReales(){
         const row2 = document.createElement('tr'); row2.id = 'presrow-'+doc.id; row2.onclick = () => toggleExpandirDocFila(doc.id, 11); row2.innerHTML = rowHtml;
         row2.dataset.contabilidad = doc.contabilidad || 'oficial'; row2.dataset.fechaIso = doc.fecha_devengo || ''; row2.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row2.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row2.dataset.total = totalNum; row2.dataset.tipo = doc.tipo;
         document.getElementById('presupuestos-tbody-standalone')?.appendChild(row2);
+        // Tarjeta móvil — misma estructura que Facturas
+        construirCardMovil(doc, doc.tipo, 'pres-lista-movil', 'pres-sel-chk', amountLabel, fechaCortaP, entidad, trabajo, archivoUrlRealP, calidadCorta(doc));
       } else if(doc.tipo==='gasto'){
         const row = document.createElement('tr');
         row.dataset.contabilidad = doc.contabilidad || 'oficial';
@@ -15964,6 +16010,8 @@ async function cargarDocumentosEconomicosReales(){
         row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum;
         row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="alb-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('alb-sel-chk','alb-borrar-sel-btn','alb-sel-count')"></td><td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtmlA}</td><td class="mono">${trabajoHtmlA}</td><td class="num" data-num="${totalNum}">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('albaran', doc.id, doc.estado_cobro, 'alb-')}</td><td>${archivoHtmlA}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
         document.getElementById('albaranes-tbody-standalone')?.appendChild(row);
+        // Tarjeta móvil — misma estructura que Facturas
+        construirCardMovil(doc, 'albaran', 'alb-lista-movil', 'alb-sel-chk', amountLabel, fechaCortaA, entidad, trabajo, archivoUrlRealA, calidadCorta(doc));
       }
     });
     const contAlb = document.getElementById('albaranes-standalone-count');
