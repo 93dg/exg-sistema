@@ -16341,112 +16341,129 @@ function openJobDrawer(code){
 
   document.getElementById('drawer-overlay').classList.add('active');
 }
+// IDs pendientes de mover (evita JSON.stringify en onclick)
+let __moverIds = [];
+
 function abrirMoverSeleccionados(btn){
   const claseChk = btn.dataset.chk;
   const ids = Array.from(document.querySelectorAll('.'+claseChk+':checked')).map(x=>x.dataset.id).filter(Boolean);
   if(!ids.length){ mostrarToast('Selecciona al menos uno.'); return; }
   abrirMoverSeccion(ids);
 }
+
 function abrirMoverSeccion(ids){
+  __moverIds = ids;
   const secciones = [
-    ['factura','📄 Facturas'],['albaran','📦 Albaranes'],
-    ['presupuesto','📋 Presupuestos'],['proforma','📑 Proformas'],
-    ['empresa','🏢 Empresa'],['flota','🚜 Flota / Maquinaria'],
+    ['factura','📄 Facturas'],
+    ['albaran','📦 Albaranes'],
+    ['presupuesto','📋 Presupuestos'],
+    ['proforma','📑 Proformas'],
+    ['gasto','💶 Gastos'],
+    ['empresa','🏢 Empresa'],
+    ['flota','🚜 Flota / Maquinaria'],
   ];
   mostrarModalGenerico(
     `Mover ${ids.length} archivo(s) a…`,
-    `<div style="display:flex;flex-direction:column;gap:8px;">${secciones.map(([t,l])=>`<button class="btn" style="text-align:left;" onclick="elegirDestinoMover(${JSON.stringify(ids)},'${t}')">${l}</button>`).join('')}</div>`
+    `<div style="display:flex;flex-direction:column;gap:8px;">${secciones.map(([t,l])=>`<button class="btn" style="text-align:left;padding:10px 14px;" onclick="elegirDestinoMover('${t}')">${l}</button>`).join('')}</div>`
   );
 }
-async function elegirDestinoMover(ids, destino){
-  // Secciones económicas: solo cambia el tipo
-  if(['factura','albaran','presupuesto','proforma'].includes(destino)){
-    const TIPOS={factura:'Factura',albaran:'Albarán',presupuesto:'Presupuesto',proforma:'Proforma'};
+
+async function elegirDestinoMover(destino){
+  const ids = __moverIds;
+  if(!ids.length) return;
+
+  // Secciones económicas: cambia el tipo dentro de documentos_economicos
+  if(['factura','albaran','presupuesto','proforma','gasto'].includes(destino)){
+    const TIPOS={factura:'Facturas',albaran:'Albaranes',presupuesto:'Presupuestos',proforma:'Proformas',gasto:'Gastos'};
     const {error}=await sb.from('documentos_economicos').update({tipo:destino}).in('id',ids);
-    if(error){mostrarToast('Error: '+errText(error));return;}
+    if(error){ mostrarToast('Error: '+errText(error)); return; }
     mostrarToast(`${ids.length} archivo(s) movidos a ${TIPOS[destino]}`, 'ok');
-    document.querySelector('.modal-overlay.active')?.classList.remove('active');
+    cerrarModalGenerico();
     if(typeof cargarDatosReales==='function') cargarDatosReales();
     return;
   }
+
   // Empresa: pedir nombre y categoría
   if(destino==='empresa'){
     const cats=[...new Set((window.EMPRESA_DOCS||[]).map(d=>d.categoria).filter(Boolean))];
-    mostrarModalGenerico('Mover a Empresa',`
+    mostrarModalGenerico('Mover a Empresa', `
       <div style="display:flex;flex-direction:column;gap:10px;">
         <div class="field"><div class="l">Categoría</div>
           <input class="search-box" id="mover-emp-cat" list="mover-emp-cat-list" style="width:100%;" placeholder="Ej. Contratos, Seguros…">
           <datalist id="mover-emp-cat-list">${cats.map(c=>`<option value="${c}">`).join('')}</datalist>
         </div>
-        <div class="field"><div class="l">Nombre del documento</div>
+        <div class="field"><div class="l">Nombre</div>
           <input class="search-box" id="mover-emp-nom" style="width:100%;" placeholder="Ej. Contrato obra Ayuntamiento">
         </div>
-        <button class="btn primary" onclick="confirmarMoverAEmpresa(${JSON.stringify(ids)},this)">Confirmar</button>
+        <button class="btn primary" style="width:100%;" onclick="confirmarMoverAEmpresa()">Confirmar</button>
       </div>`);
     return;
   }
-  // Flota: elegir vehículo/máquina
+
+  // Flota: elegir máquina
   if(destino==='flota'){
-    const lista=(window.fleet||[]).sort((a,b)=>a.name.localeCompare(b.name));
-    if(!lista.length){mostrarToast('No hay maquinaria cargada');return;}
-    mostrarModalGenerico('Mover a Flota — ¿a qué máquina?',`
-      <div style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;">
-        ${lista.map(m=>`<button class="btn" style="text-align:left;" onclick="confirmarMoverAFlota(${JSON.stringify(ids)},'${m.id}','${m.name.replace(/'/g,"\'")}',this)">${m.name}</button>`).join('')}
+    const lista=(window.fleet||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+    if(!lista.length){ mostrarToast('No hay maquinaria cargada'); return; }
+    mostrarModalGenerico('¿A qué máquina?', `
+      <div style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;">
+        ${lista.map(m=>`<button class="btn" style="text-align:left;" data-fid="${m.id}" onclick="confirmarMoverAFlota('${m.id}','${m.name.replace(/'/g,"\'")}')">${m.name}</button>`).join('')}
       </div>`);
     return;
   }
 }
-async function confirmarMoverAEmpresa(ids, btn){
+
+async function confirmarMoverAEmpresa(){
+  const ids=__moverIds;
   const cat=document.getElementById('mover-emp-cat')?.value.trim();
   const nom=document.getElementById('mover-emp-nom')?.value.trim();
-  if(!cat||!nom){mostrarToast('Rellena categoría y nombre.');return;}
-  btn.disabled=true; btn.textContent='Moviendo…';
+  if(!cat||!nom){ mostrarToast('Rellena categoría y nombre.'); return; }
   let ok=0;
-  for(const id of ids){
-    const doc=documentosRealesById[id];
+  for(let i=0;i<ids.length;i++){
+    const doc=documentosRealesById[ids[i]];
     if(!doc) continue;
     const {error}=await sb.from('documentos_empresa').insert({
-      nombre:nom+(ids.length>1?' ('+(ok+1)+')':''),
-      categoria:cat,
-      archivo_path:doc.archivo_path||null,
-      archivo_url:doc.archivo_url||null,
+      nombre: nom + (ids.length>1 ? ' ('+(i+1)+')' : ''),
+      categoria: cat,
+      archivo_path: doc.archivo_path||null,
+      archivo_url: doc.archivo_url||null,
     });
     if(!error){
-      await sb.from('documentos_economicos').delete().eq('id',id);
-      delete documentosRealesById[id]; ok++;
+      await sb.from('documentos_economicos').delete().eq('id',ids[i]);
+      delete documentosRealesById[ids[i]]; ok++;
     }
   }
   mostrarToast(`${ok} archivo(s) movidos a Empresa`, 'ok');
-  document.querySelector('.modal-overlay.active')?.classList.remove('active');
+  cerrarModalGenerico();
   if(typeof cargarDatosReales==='function') cargarDatosReales();
 }
-async function confirmarMoverAFlota(ids, flotaId, flotaNombre, btn){
-  btn.disabled=true; btn.textContent='Moviendo…';
-  const {data:maquina}=await sb.from('flota').select('documentos').eq('id',flotaId).single();
-  const docs=maquina?.documentos||[];
+
+async function confirmarMoverAFlota(flotaId, flotaNombre){
+  const ids=__moverIds;
+  const {data:maq}=await sb.from('flota').select('documentos').eq('id',flotaId).single();
+  const docs=Array.isArray(maq?.documentos)?maq.documentos:[];
   let ok=0;
   for(const id of ids){
     const doc=documentosRealesById[id];
     if(!doc) continue;
-    docs.push({nombre:doc.numero||doc.concepto||doc.archivo_path?.split('/').pop()||'Documento',url:doc.archivo_url||null,path:doc.archivo_path||null,fecha:doc.fecha_devengo||null});
+    docs.push({
+      nombre: doc.numero || doc.archivo_path?.split('/').pop() || 'Documento',
+      url: doc.archivo_url||null, path: doc.archivo_path||null, fecha: doc.fecha_devengo||null
+    });
     await sb.from('documentos_economicos').delete().eq('id',id);
     delete documentosRealesById[id]; ok++;
   }
   await sb.from('flota').update({documentos:docs}).eq('id',flotaId);
   mostrarToast(`${ok} archivo(s) movidos a ${flotaNombre}`, 'ok');
-  document.querySelector('.modal-overlay.active')?.classList.remove('active');
+  cerrarModalGenerico();
   if(typeof cargarDatosReales==='function') cargarDatosReales();
 }
+
 async function confirmarMoverSeleccionados(ids, nuevoTipo, btnEl){
   if(!sb) return;
-  btnEl.disabled = true; btnEl.textContent = 'Moviendo…';
-  const {error} = await sb.from('documentos_economicos').update({tipo: nuevoTipo}).in('id', ids);
-  if(error){ mostrarToast('Error: '+errText(error)); btnEl.disabled=false; return; }
-  const TIPOS = {factura:'Factura',albaran:'Albarán',presupuesto:'Presupuesto',proforma:'Proforma'};
-  mostrarToast(`${ids.length} doc(s) movidos a ${TIPOS[nuevoTipo]}`, 'ok');
-  document.querySelector('.modal-overlay.active')?.classList.remove('active');
-  if(typeof cargarDatosReales==='function') cargarDatosReales();
+  __moverIds = ids;
+  await elegirDestinoMover(nuevoTipo);
 }
+
 function moverDocumentoA(nuevoTipo){
   if(!editingDocId) return;
   abrirMoverSeccion([editingDocId]);
