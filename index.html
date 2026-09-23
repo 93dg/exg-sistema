@@ -2290,7 +2290,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.18</div>
+        <div class="sub">V3.19</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11872,38 +11872,53 @@ function generarPDFDocumento(accion){
     y += altoFila;
   });
 
-  if(cfg.hasTotales){
-    if(y > 265){ doc.addPage(); y = dibujarCabeceraPDF(); }
-    y += 4; doc.line(120,y,195,y); y += 6;
+  if(cfg.hasTotales || (cfg.hasPayment && payment)){
+    if(y > 255){ doc.addPage(); y = dibujarCabeceraPDF(); }
+    y += 4; doc.line(15,y,195,y); y += 8;
+    const yBloques = y;
+    let yIzq = yBloques, yDer = yBloques;
     const tratamientoIvaPdf = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
-    if(cfg.hasBaseIva){
-      doc.text('Base imponible:', 150, y, {align:'right'}); doc.text(formatMoneda(base), 195, y, {align:'right'}); y+=6;
-      if(cfg.hasIva){
-        if(tratamientoIvaPdf==='isp'){
-          doc.text('IVA (Inv. sujeto pasivo):', 150, y, {align:'right'}); doc.text(formatMoneda(0), 195, y, {align:'right'}); y+=6;
-        } else {
-          const ivaPct = document.getElementById('ie-iva-pct').value;
-          doc.text(`IVA (${ivaPct}%):`, 150, y, {align:'right'}); doc.text(formatMoneda(iva), 195, y, {align:'right'}); y+=6;
-        }
+
+    // IZQUIERDA: forma de pago — mismo tamaño de cabecera y misma altura de inicio que
+    // TOTALES, para que no parezca una nota secundaria perdida al final del documento
+    if(cfg.hasPayment && payment){
+      doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
+      doc.text('FORMA DE PAGO', 15, yIzq); yIzq += 6.5;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      doc.text(payment, 15, yIzq); yIzq += 5.5;
+      if(cfg.hasBank && payment==='TRANSFERENCIA'){
+        doc.text('IBAN: '+iban.toUpperCase(), 15, yIzq); yIzq += 5.5;
+        doc.text('Titular: '+titular, 15, yIzq); yIzq += 5.5;
+        doc.text('Concepto: '+concepto, 15, yIzq); yIzq += 5.5;
       }
     }
-    doc.setFont('helvetica','bold'); doc.setFontSize(11);
-    doc.text('TOTAL:', 150, y, {align:'right'}); doc.text(formatMoneda(total), 195, y, {align:'right'});
-    if(tratamientoIvaPdf==='isp'){
-      y += 8; doc.setFont('helvetica','italic'); doc.setFontSize(8);
+
+    // DERECHA: totales
+    if(cfg.hasTotales){
+      doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
+      doc.text('TOTALES', 195, yDer, {align:'right'}); yDer += 6.5;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      if(cfg.hasBaseIva){
+        doc.text('Base imponible:', 150, yDer, {align:'right'}); doc.text(formatMoneda(base), 195, yDer, {align:'right'}); yDer += 5.5;
+        if(cfg.hasIva){
+          if(tratamientoIvaPdf==='isp'){
+            doc.text('IVA (Inv. sujeto pasivo):', 150, yDer, {align:'right'}); doc.text(formatMoneda(0), 195, yDer, {align:'right'}); yDer += 5.5;
+          } else {
+            const ivaPct = document.getElementById('ie-iva-pct').value;
+            doc.text(`IVA (${ivaPct}%):`, 150, yDer, {align:'right'}); doc.text(formatMoneda(iva), 195, yDer, {align:'right'}); yDer += 5.5;
+          }
+        }
+      }
+      doc.setFont('helvetica','bold'); doc.setFontSize(11);
+      doc.text('TOTAL:', 150, yDer, {align:'right'}); doc.text(formatMoneda(total), 195, yDer, {align:'right'}); yDer += 7;
+    }
+
+    y = Math.max(yIzq, yDer);
+    if(cfg.hasTotales && tratamientoIvaPdf==='isp'){
+      doc.setFont('helvetica','italic'); doc.setFontSize(8);
       doc.text('INVERSIÓN DEL SUJETO PASIVO. ART. 84.UNO.2º.F) DE LA LEY 37/1992 DEL IVA.', 15, y);
       doc.setFont('helvetica','normal'); doc.setFontSize(9);
-    }
-  }
-
-  if(cfg.hasPayment && payment){
-    y += 14;
-    doc.setFont('helvetica','normal'); doc.setFontSize(9);
-    doc.text('Forma de pago: '+payment, 15, y);
-    if(cfg.hasBank && payment==='TRANSFERENCIA'){
-      y+=5; doc.text('IBAN: '+iban.toUpperCase(), 15, y);
-      y+=5; doc.text('Titular: '+titular, 15, y);
-      y+=5; doc.text('Concepto: '+concepto, 15, y);
+      y += 5;
     }
   }
 
