@@ -537,9 +537,22 @@ table{border-collapse:collapse;width:100%;}
 .ie-nf-row .ie-nf-num{flex:0 0 68px;width:68px;min-width:0;}
 .ie-nf-row .ie-nf-fecha{flex:1 1 0;min-width:0;overflow:hidden;}
 .ie-nf-row .field input{width:100%;max-width:100%;box-sizing:border-box;min-width:0;height:36px;}
-#ni-date{font-size:14px;}
-@media(max-width:400px){ #ni-date{font-size:12px;} }
 .ie-nf-num input{text-align:right;}
+/* FECHA: ya no dependemos de cómo cada navegador decide mostrar el <input type=date> (en
+   iOS Safari usa su propio ancho, con un formato distinto al DD/MM/AA de toda la app). La
+   caja visible es nuestra, con el mismo formato que se ve en las tarjetas y en todos
+   lados — el input de tipo fecha real sigue existiendo pero invisible, tapando toda la
+   caja, así que un toque en cualquier parte abre el calendario nativo de siempre; nunca
+   se pierde esa función, solo se deja de ver su renderizado nativo. */
+.fecha-caja{position:relative;width:100%;height:36px;}
+.fecha-texto{
+  position:absolute;inset:0;display:flex;align-items:center;padding:0 10px;
+  border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);
+  font-size:13.5px;color:var(--ink);pointer-events:none;box-sizing:border-box;
+}
+.fecha-caja input#ni-date{
+  position:absolute;inset:0;width:100%;height:100%;opacity:0;margin:0;padding:0;border:none;
+}
 .ie-doc-title{font-family:'Archivo',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;color:var(--ink-soft);margin-bottom:10px;text-transform:uppercase;}
 .ie-doc-meta .field{text-align:left;}
 .ie-client-row{display:flex;gap:16px;margin-bottom:20px;}
@@ -1008,6 +1021,14 @@ table{border-collapse:collapse;width:100%;}
 }
 
 .client-picker{position:relative;}
+/* Guardar cliente: solo un icono junto a la caja, no un botón grande — gris y apagado
+   sin cambios, se ilumina en naranja (clase .primary, la misma que ya pone
+   marcarCambioCliente()) en cuanto hay algo real que guardar en la ficha */
+.ico-guardar-cliente{
+  flex:0 0 auto;width:36px;height:36px;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--paper);font-size:16px;display:flex;align-items:center;justify-content:center;padding:0;
+}
+.ico-guardar-cliente.primary{background:var(--orange);border-color:var(--orange);}
 .client-picker-trigger{
   display:flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid var(--line);border-radius:var(--radius);
   background:var(--paper);cursor:pointer;font-size:13px;color:var(--ink);
@@ -2544,7 +2565,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.33</div>
+        <div class="sub">V3.34</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5074,7 +5095,12 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
               <div class="field ie-nf-num"><div class="l">Nº</div>
                 <input class="search-box mono" id="ni-docnum" oninput="sincronizarConceptoConNumero()">
               </div>
-              <div class="field ie-nf-fecha"><div class="l">Fecha</div><input class="search-box" id="ni-date" type="date" required lang="sv-SE"></div>
+              <div class="field ie-nf-fecha"><div class="l">Fecha</div>
+                <div class="fecha-caja" onclick="const i=document.getElementById('ni-date'); i.showPicker ? i.showPicker() : i.focus();">
+                  <span class="fecha-texto" id="ni-date-texto">—</span>
+                  <input class="search-box" id="ni-date" type="date" required oninput="document.getElementById('ni-date-texto').textContent = formatFechaCorta(this.value)">
+                </div>
+              </div>
             </div>
             <div id="ni-suggest" style="font-size:11.5px;font-weight:400;color:var(--ink-soft);margin-top:2px;"></div>
           </div>
@@ -5100,9 +5126,9 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
                 </div>
                 <input type="hidden" id="ni-client">
               </div>
-              <button type="button" class="btn sm" id="ni-client-update-btn" disabled
-                style="flex:0 0 auto;white-space:nowrap;opacity:0.4;cursor:not-allowed;display:none;"
-                onclick="actualizarClienteDesdeEditor()" title="Cambia algo en los datos del cliente para poder actualizarlos">💾 Actualizar cliente</button>
+              <button type="button" class="ico-guardar-cliente" id="ni-client-update-btn" disabled
+                style="opacity:0.4;cursor:not-allowed;display:none;"
+                onclick="actualizarClienteDesdeEditor()" title="Guardar estos datos en la ficha del cliente">💾</button>
             </div>
           </div>
         </div>
@@ -14594,7 +14620,7 @@ function openNewInvoiceModal(contexto, forzarEditorCompleto){
   if(contexto.jobLabel){ document.getElementById('ni-job').value = contexto.jobLabel; }
   sugerirTratamientoIva(contexto.clientName, contexto.jobLabel);
   document.getElementById('newinvoice-overlay').classList.add('active');
-  setTimeout(ajustarAnchoFecha, 30);
+  setTimeout(sincronizarFechaTexto, 20);
 }
 // sugiere (nunca aplica sola) el tratamiento ISP si el trabajo o el cliente ya lo tuvieron antes
 async function sugerirTratamientoIva(clientName, jobLabel){
@@ -14964,7 +14990,7 @@ function convertirDocumento(){
   document.getElementById('ni-convert-btn').style.display = 'none';
   onDocTypeChange();
   document.getElementById('newinvoice-overlay').classList.add('active');
-  setTimeout(ajustarAnchoFecha, 30);
+  setTimeout(sincronizarFechaTexto, 20);
 }
 
 // El selector nativo de fecha en iOS Safari IGNORA el ancho que le manda el CSS — por
@@ -14972,24 +14998,16 @@ function convertirDocumento(){
 // el ancho REAL que Safari le da (scrollWidth, sin restricciones) contra el hueco
 // disponible de verdad, y si no cabe, lo encoge visualmente con transform:scale — así el
 // óvalo/rectángulo completo (con su borde) se ve entero y más pequeño, en vez de cortado.
-function ajustarAnchoFecha(){
+// La caja visible de Fecha es nuestra (mismo formato DD/MM/AA de toda la app); el
+// <input type=date> real sigue ahí pero invisible, solo para el calendario nativo. Esta
+// función mantiene el texto sincronizado con el valor real cada vez que se abre el editor
+// (al elegir una fecha nueva ya se sincroniza solo, vía el oninput del propio campo).
+function sincronizarFechaTexto(){
   const input = document.getElementById('ni-date');
-  if(!input) return;
-  const disponible = input.parentElement.clientWidth;
-  if(!disponible) return;
-  input.style.transform = 'none';
-  input.style.width = 'auto';
-  const natural = input.scrollWidth;
-  if(natural > disponible && disponible > 0){
-    const escala = Math.max(disponible / natural, 0.6); // nunca más pequeño del 60%, se vería ilegible
-    input.style.width = (100/escala) + '%';
-    input.style.transformOrigin = 'left center';
-    input.style.transform = 'scale(' + escala + ')';
-  } else {
-    input.style.width = '100%';
-  }
+  const texto = document.getElementById('ni-date-texto');
+  if(!input || !texto) return;
+  texto.textContent = formatFechaCorta(input.value);
 }
-window.addEventListener('resize', () => { if(document.getElementById('newinvoice-overlay')?.classList.contains('active')) ajustarAnchoFecha(); });
 function openDocumentViewer(id){
   const doc = documentosRealesById[id];
   if(!doc){ mostrarToast('No se encuentra este documento.'); return; }
@@ -15079,7 +15097,7 @@ function openDocumentViewer(id){
   convBtn.style.display = 'none'; // las conversiones (Duplicar/Rectificar/Crear factura/Convertir en factura) se hacen desde las acciones de la fila, con un criterio único — ver accionesDocumento()
   recalcTotals();
   document.getElementById('newinvoice-overlay').classList.add('active');
-  setTimeout(ajustarAnchoFecha, 30);
+  setTimeout(sincronizarFechaTexto, 20);
 }
 async function deshacerConversion(){
   const doc = documentosRealesById[editingDocId];
