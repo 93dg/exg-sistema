@@ -2638,7 +2638,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.55</div>
+        <div class="sub" id="version-badge">V3.56</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2711,6 +2711,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
         </div>
         <div class="dd-filter-row">
+          <input class="search-box" id="control-search" style="max-width:280px;" placeholder="Buscar por cliente, nº…" oninput="renderControlDocs()">
           <div class="dd-filter" id="dd-tipo">
             <button type="button" class="dd-filter-btn" onclick="toggleDocDD('tipo')">Tipo<span class="dd-badge" id="dd-tipo-badge"></span><span class="dd-caret">▾</span></button>
             <div class="dd-filter-panel">
@@ -3373,6 +3374,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             </span>
           </div>
           <div class="dd-filter-row">
+            <input class="search-box" id="pres-search" style="max-width:260px;" placeholder="Buscar cliente, nº…" oninput="renderEconDocs('pres')">
             <div class="dd-filter" id="dd-pres-anio">
               <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-pres-anio')">Año<span class="dd-caret">▾</span></button>
               <div class="dd-filter-panel"><div class="filters" id="pres-filtro-anio-chips" style="margin:0;"></div></div>
@@ -5883,6 +5885,11 @@ document.querySelectorAll('#pres-filtro-tipo-chips .chip-filter').forEach(chip=>
     filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
   });
 });
+function renderEconDocs(prefijo){
+  if(prefijo==='fact') filtrarTablaOrdenable('econ-facturas-tbody');
+  else if(prefijo==='alb') filtrarPorAnioTrim('albaranes-tbody-standalone','alb');
+  else if(prefijo==='pres') filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
+}
 function filtrarPorAnioTrim(tbodyId, prefijo){
   const tbody = document.getElementById(tbodyId);
   if(!tbody) return;
@@ -5900,7 +5907,13 @@ function filtrarPorAnioTrim(tbodyId, prefijo){
       const estadoActual = pillEl ? (pillEl.classList ? Array.from(pillEl.classList).find(c=>c!=='pill') : pillEl.value) : null;
       okEstado = estadoActual ? estadosSel.has(estadoActual) : true;
     }
-    tr.style.display = (okAnio && okTrim && okEstado && okTipo) ? '' : 'none';
+    const prefQ = tbodyId.startsWith('albar') ? 'alb' : 'pres';
+    const qVal = (document.getElementById(prefQ+'-search')?.value||'').trim().toLowerCase();
+    // cliente está en col 4 (alb) o col 5 (pres), número en col 3 o 2
+    const tds = Array.from(tr.children);
+    const textoFila = tds.map(td=>td.textContent).join(' ').toLowerCase();
+    const okQ = !qVal || textoFila.includes(qVal);
+    tr.style.display = (okAnio && okTrim && okEstado && okTipo && okQ) ? '' : 'none';
     // una fila que se oculta nunca puede quedarse seleccionada (evita borrar/enviar documentos que no se ven)
     if(tr.style.display==='none'){ const chk = tr.querySelector('input[type="checkbox"]'); if(chk) chk.checked = false; }
   });
@@ -5963,7 +5976,9 @@ function filtrarTablaOrdenable(tbodyId){
       const estadoActual = pillEl ? Array.from(pillEl.classList).find(c=>c!=='pill') : null;
       okEstado = estadoActual ? estadosSel.has(estadoActual) : true;
     }
-    tr.style.display = (okAnio && okTrim && okKpi && okEstado) ? '' : 'none';
+    const q = (document.getElementById('fact-search')?.value||'').trim().toLowerCase();
+    const okQ = !q || [tr.children[3]?.textContent||'', tr.children[2]?.textContent||'', tr.children[4]?.textContent||''].join(' ').toLowerCase().includes(q);
+    tr.style.display = (okAnio && okTrim && okKpi && okEstado && okQ) ? '' : 'none';
   });
   if(tbodyId==='econ-facturas-tbody') sincronizarListaMovilFacturas();
 }
@@ -15612,9 +15627,11 @@ function renderControlDocs(){
   const estadosSel = new Set(estadoChecks.flatMap(c=>c.dataset.estado.split(',')));
   const aniosSel = new Set(anioChecks.map(c=>c.dataset.anio));
   const trimsSel = new Set(trimChecks.map(c=>c.dataset.trim));
+  const q = (document.getElementById('control-search')?.value||'').trim().toLowerCase();
   const filtrados = todos.filter(d=>{
     if(!tiposSel.has(d.type)) return false;
     if(estadosSel.size && !estadosSel.has(controlDocsEstadoDe(d))) return false;
+    if(q && ![(d.client||''),(d.numero||d.num||''),(d.job||'')].join(' ').toLowerCase().includes(q)) return false;
     if(aniosSel.size || trimsSel.size){
       const dt = d.dateRaw ? new Date(d.dateRaw) : null;
       if(!dt || isNaN(dt)) return false;
