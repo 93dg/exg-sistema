@@ -3076,6 +3076,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div><h1>Clientes</h1><div class="desc">Ayuntamientos, particulares y empresas</div></div>
         <div class="quickactions">
           <button class="btn" style="color:var(--red);display:none;" id="clientes-borrar-sel-btn" onclick="borrarClientesSeleccionados()">🗑 Borrar seleccionados (<span id="clientes-sel-count">0</span>)</button>
+          <button class="btn primary" style="display:none;" id="clientes-fusionar-sel-btn" onclick="abrirFusionMultiple()">⟲ Fusionar seleccionados</button>
           <button class="btn" style="display:none;" id="clientes-prioridad-sel-btn" onclick="cambiarPrioridadSeleccionados()">🚩 Cambiar prioridad</button>
           <button class="btn" onclick="toggleColumnasClientesPanel()">☰ Columnas</button>
         </div>
@@ -10738,11 +10739,13 @@ function toggleSeleccionarTodoClientes(master){
 }
 function actualizarSeleccionClientes(){
   const marcados = document.querySelectorAll('.clientes-sel-chk:checked');
-  const btn = document.getElementById('clientes-borrar-sel-btn');
-  document.getElementById('clientes-sel-count').textContent = marcados.length;
-  btn.style.display = marcados.length ? '' : 'none';
+  const n = marcados.length;
+  document.getElementById('clientes-sel-count').textContent = n;
+  document.getElementById('clientes-borrar-sel-btn').style.display = n ? '' : 'none';
+  const btnFus = document.getElementById('clientes-fusionar-sel-btn');
+  if(btnFus) btnFus.style.display = n >= 2 ? '' : 'none';
   const btnPrio = document.getElementById('clientes-prioridad-sel-btn');
-  if(btnPrio) btnPrio.style.display = marcados.length ? '' : 'none';
+  if(btnPrio) btnPrio.style.display = n ? '' : 'none';
 }
 async function borrarClientesSeleccionados(){
   const marcados = Array.from(document.querySelectorAll('.clientes-sel-chk:checked'));
@@ -10839,6 +10842,128 @@ async function resolverCasoIdentidadPendiente(caso){
   }
   window.__casoIdentidadPendienteId = caso.id;
 }
+// ============ FUSIÓN MÚLTIPLE DESDE CHECKBOXES ============
+async function abrirFusionMultiple(){
+  const marcados = Array.from(document.querySelectorAll('.clientes-sel-chk:checked'));
+  if(marcados.length < 2){ mostrarToast('Selecciona al menos 2 clientes para fusionar.'); return; }
+  const ids = marcados.map(c=>c.dataset.id).filter(Boolean);
+  // Cargar datos completos de cada cliente
+  const {data, error} = await sb.from('entidades').select('*').in('id', ids);
+  if(error || !data){ mostrarToast('Error al cargar clientes.'); return; }
+  // Contar documentos de cada uno para preseleccionar principal
+  const docCounts = {};
+  await Promise.all(data.map(async c => {
+    const {count} = await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('entidad_id',c.id);
+    docCounts[c.id] = count || 0;
+  }));
+  // Validar NIFs
+  window.__nifValidoCache = {};
+  const nifs = [...new Set(data.map(c=>c.nif).filter(Boolean))];
+  await Promise.all(nifs.map(async n => {
+    const {data:v} = await sb.rpc('validar_nif_cif', {valor: n});
+    window.__nifValidoCache[n] = v;
+  }));
+  // Calcular selección inicial: valor más fiable entre todos
+  const seleccion = {};
+  CAMPOS_FUSION.forEach(([campo]) => {
+    const candidatos = data.map((c,i) => ({idx:i, val:c[campo]})).filter(x => x.val && String(x.val).trim());
+    if(!candidatos.length){ seleccion[campo] = 0; return; }
+    // el que tenga NIF válido gana en NIF; en el resto el más largo
+    if(campo==='nif'){
+      const valido = candidatos.find(x => window.__nifValidoCache?.[x.val]);
+      seleccion[campo] = valido ? valido.idx : candidatos[0].idx;
+    } else {
+      candidatos.sort((a,b) => String(b.val).length - String(a.val).length);
+      seleccion[campo] = candidatos[0].idx;
+    }
+  });
+  fusionEnCurso = {clientes: data, docCounts, seleccion, modo:'multiple'};
+  renderComparacionFusionMultiple();
+  document.getElementById('fusion-overlay').classList.add('active');
+}
+
+function renderComparacionFusionMultiple(){
+  const {clientes, docCounts, seleccion} = fusionEnCurso;
+  const n = clientes.length;
+  const colWidth = Math.floor(100/n);
+  const header = `<div style="display:grid;grid-template-columns:90px ${clientes.map(()=>'1fr').join(' ')};gap:6px;padding-bottom:8px;font-size:12px;color:var(--sub);font-weight:700;">
+    <div></div>${clientes.map((c,i) => `<div>${c.nombre||'?'}<br><span style="font-weight:400;font-size:11px;">${docCounts[c.id]||0} docs</span></div>`).join('')}
+  </div>`;
+  const filas = CAMPOS_FUSION.filter(([campo]) => clientes.some(c => c[campo]))
+    .map(([campo,label]) => {
+      const vals = clientes.map(c => c[campo] || '');
+      const unicas = new Set(vals.filter(v=>v.trim()));
+      const hayConflicto = unicas.size > 1;
+      const celdas = clientes.map((c,i) => {
+        const v = c[campo] || '';
+        const elegido = seleccion[campo] === i;
+        return `<div onclick="elegirValorFusionMultiple('${campo}',${i})" style="cursor:pointer;padding:6px 8px;border-radius:6px;font-size:13px;word-break:break-word;${elegido?'background:var(--green);color:#fff;font-weight:700;':'background:var(--concrete);color:var(--ink);'}">${v||'—'}</div>`;
+      }).join('');
+      return `<div style="display:grid;grid-template-columns:90px ${clientes.map(()=>'1fr').join(' ')};gap:6px;padding:6px 0;border-bottom:1px solid var(--line);align-items:center;">
+        <div style="font-weight:700;font-size:12px;">${label}${hayConflicto?' <span style="color:var(--orange);">⚠</span>':''}</div>${celdas}
+      </div>`;
+    }).join('');
+  document.getElementById('fusion-comparacion-body').innerHTML = `
+    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">Toca el valor que quieres conservar en cada campo (verde = seleccionado). Todos los documentos pasarán al cliente resultante.</div>
+    ${header}${filas}
+  `;
+}
+
+function elegirValorFusionMultiple(campo, idx){
+  if(fusionEnCurso.modo==='multiple'){
+    fusionEnCurso.seleccion[campo] = idx;
+    renderComparacionFusionMultiple();
+  } else {
+    elegirValorFusion(campo, idx===0?'a':'b');
+  }
+}
+
+async function confirmarFusionDesdeComparacion(){
+  if(!fusionEnCurso || !sb) return;
+  if(fusionEnCurso.modo==='multiple'){
+    const {clientes, docCounts, seleccion} = fusionEnCurso;
+    // Principal = el que tenga más documentos
+    const principal = clientes.reduce((best,c) => (docCounts[c.id]||0) >= (docCounts[best.id]||0) ? c : best);
+    const selecciones = {};
+    CAMPOS_FUSION.forEach(([campo]) => {
+      const idx = seleccion[campo] ?? 0;
+      selecciones[campo] = clientes[idx]?.[campo] ?? null;
+    });
+    // Fusionar todos los duplicados contra el principal en serie
+    const duplicados = clientes.filter(c=>c.id!==principal.id);
+    for(const dup of duplicados){
+      const {error} = await sb.rpc('fusionar_clientes_con_seleccion', {
+        id_principal: principal.id, id_duplicado: dup.id, selecciones
+      });
+      if(error){ mostrarToast('Error al fusionar: '+errText(error)); return; }
+    }
+    mostrarToast(`${clientes.length} clientes fusionados en uno.`, 'ok');
+    cerrarComparacionFusion();
+    if(typeof cargarDatosReales==='function') cargarDatosReales();
+    return;
+  }
+  // fusión de 2 (modo original)
+  const {a, b, seleccion} = fusionEnCurso;
+  const selecciones = {};
+  CAMPOS_FUSION.forEach(([campo])=>{ selecciones[campo] = seleccion[campo]==='a' ? a[campo] : b[campo]; });
+  const docsA = (await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('entidad_id',a.id)).count || 0;
+  const docsB = (await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('entidad_id',b.id)).count || 0;
+  const principal = docsA >= docsB ? a.id : b.id;
+  const duplicado = docsA >= docsB ? b.id : a.id;
+  const {error} = await sb.rpc('fusionar_clientes_con_seleccion', {id_principal: principal, id_duplicado: duplicado, selecciones});
+  if(error){ mostrarToast('Error al fusionar: '+errText(error)); return; }
+  if(window.__casoIdentidadPendienteId){
+    await sb.from('identidad_pendiente_casos').update({estado:'resuelto', resuelto_at: new Date().toISOString()}).eq('id', window.__casoIdentidadPendienteId);
+    window.__casoIdentidadPendienteId = null;
+  }
+  mostrarToast('Clientes fusionados.', 'ok');
+  cerrarComparacionFusion();
+  cargarDuplicadosClientes();
+  cargarIdentidadPendiente();
+  if(typeof cargarDatosReales==='function') cargarDatosReales();
+}
+// ============ FIN FUSIÓN MÚLTIPLE ============
+
 const CAMPOS_FUSION = [['nombre','Nombre'],['nif','NIF'],['direccion','Dirección'],['cp','CP'],['poblacion','Población'],['provincia','Provincia'],['telefono','Teléfono'],['email','Email']];
 let fusionEnCurso = null; // {a, b, seleccion: {campo: 'a'|'b'}}
 function valorMasFiable(campo, va, vb){
@@ -10900,28 +11025,7 @@ function cerrarComparacionFusion(){
   fusionEnCurso = null;
   window.__casoIdentidadPendienteId = null;
 }
-async function confirmarFusionDesdeComparacion(){
-  if(!fusionEnCurso || !sb) return;
-  const {a, b, seleccion} = fusionEnCurso;
-  const selecciones = {};
-  CAMPOS_FUSION.forEach(([campo])=>{ selecciones[campo] = seleccion[campo]==='a' ? a[campo] : b[campo]; });
-  // el principal es siempre el que tenga más documentos; el otro se fusiona en él
-  const docsA = (await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('entidad_id',a.id)).count || 0;
-  const docsB = (await sb.from('documentos_economicos').select('id',{count:'exact',head:true}).eq('entidad_id',b.id)).count || 0;
-  const principal = docsA >= docsB ? a.id : b.id;
-  const duplicado = docsA >= docsB ? b.id : a.id;
-  const {error} = await sb.rpc('fusionar_clientes_con_seleccion', {id_principal: principal, id_duplicado: duplicado, selecciones});
-  if(error){ mostrarToast('Error al fusionar: '+errText(error)); return; }
-  if(window.__casoIdentidadPendienteId){
-    await sb.from('identidad_pendiente_casos').update({estado:'resuelto', resuelto_at: new Date().toISOString()}).eq('id', window.__casoIdentidadPendienteId);
-    window.__casoIdentidadPendienteId = null;
-  }
-  mostrarToast('Clientes fusionados.', 'ok');
-  cerrarComparacionFusion();
-  cargarDuplicadosClientes();
-  cargarIdentidadPendiente();
-  if(typeof cargarDatosReales==='function') cargarDatosReales();
-}
+// confirmarFusionDesdeComparacion → movida a bloque fusión múltiple
 async function mantenerSeparadosDuplicado(dupId){
   await sb.from('duplicados_clientes_pendientes').update({estado:'mantener_separados'}).eq('id', dupId);
   cargarDuplicadosClientes();
