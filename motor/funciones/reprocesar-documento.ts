@@ -1,4 +1,4 @@
-// reprocesar-documento v30 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
+// reprocesar-documento v31 — usa EXCLUSIVAMENTE el motor único (motor/extractor.ts).
 // Solo reglas. Rellena campos VACÍOS; nunca sobrescribe un dato válido: si el motor ve otra cosa
 // lo devuelve como discrepancia (CONFLICTO) para revisión. 0 IA en esta versión.
 // v17: es el paso central del CIRCUITO DE CALIDAD:
@@ -6,7 +6,7 @@
 //   → REVALIDAR → estado final: validado (OK) | corregido_automatico | revision_necesaria/error (REVISAR) | conflicto
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import WordExtractor from "npm:word-extractor@1.0.4";
-import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/144503c79b979f11f1bbe6c38badf2352839cc8c/motor/extractor.ts";
+import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, fichaEsValida, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/f325f38a05753f1758b0f3b277368ead0de15459/motor/extractor.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const codigos = (info: any) => (String(info || "").match(/\[control-calidad: ([^\]]+)\]/)?.[1] || "").split(", ").filter(Boolean);
