@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.20";
+export const VERSION_MOTOR = "motor-exg-2.21";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -480,7 +480,8 @@ export function parecidos(a: string, b: string): boolean {
   // coincidir solo en la palabra genérica del tipo de negocio (CONSTRUCCIONES, SERVICIOS…) no basta:
   // hace falta que al menos una coincidencia caiga en la parte DISTINTIVA del nombre
   const da = tokensDistintivos(a), db = tokensDistintivos(b);
-  if (!da.length || !db.length) return true; // nombres formados solo por palabras genéricas: no se puede exigir más
+  if (!da.length && !db.length) return true; // los dos nombres son solo palabras de tipo de negocio: no hay más que comparar
+  if (!da.length || !db.length) return false; // uno tiene parte distintiva y el otro no: no es la misma identidad
   return da.some((x) => db.some((y) => cerca(x, y)));
 }
 // CAR#4: dirección normalizada ("CL/ NUEVA N1" ≡ "CALLE NUEVA, 1")
