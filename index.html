@@ -2290,7 +2290,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.17</div>
+        <div class="sub">V3.18</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6783,6 +6783,16 @@ let sb = null;
 // direcciones, tipos, conceptos, estados) se muestra en mayúsculas sin depender de cómo
 // venga escrito en origen — un único punto, no cada pantalla por su cuenta.
 function MAY(texto){ return texto == null ? texto : String(texto).toUpperCase(); }
+// Fija el desplegable de forma de pago sin depender de cómo esté escrito el valor guardado
+// (en BD se persiste en mayúsculas; las opciones del <select> están en formato normal) —
+// así una factura nunca vuelve a aparecer con "forma de pago" en blanco tras guardarla.
+function fijarFormaPago(valor){
+  const sel = document.getElementById('ni-payment');
+  if(!sel) return;
+  if(!valor){ sel.value = ''; return; }
+  const opt = Array.from(sel.options).find(o => o.value.toUpperCase() === String(valor).toUpperCase());
+  sel.value = opt ? opt.value : sel.value;
+}
 // ===== MAYÚSCULAS GLOBALES AL ESCRIBIR =====
 // Regla de entrada de toda la web: todo texto que se escriba se normaliza a mayúsculas desde
 // el propio campo, no al generar el PDF. Un único listener por delegación en document — así
@@ -11548,7 +11558,7 @@ function onDocTypeChange(){
   document.getElementById('ie-paper-edit').classList.toggle('hide-precios', !cfg.hasPrecios);
   document.getElementById('ie-paper-edit').classList.toggle('hide-bank', !cfg.hasBank);
   document.getElementById('ie-paper-edit').classList.toggle('hide-totales', !cfg.hasTotales);
-  document.getElementById('ni-payment').value = (t==='presupuesto' || t==='proforma') ? '' : 'Transferencia';
+  fijarFormaPago((t==='presupuesto' || t==='proforma') ? '' : 'Transferencia');
   onPaymentChange();
   updateConceptoTransferencia();
   recalcTotals();
@@ -11787,6 +11797,7 @@ function generarPDFDocumento(accion){
     yc = 50;
     doc.setDrawColor(27,31,36); doc.setLineWidth(0.5); doc.line(15,yc,195,yc);
     yc += 8;
+    const ycInicioCliente = yc;
     doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.text('Cliente:', 15, yc);
     doc.setFont('helvetica','normal'); doc.setFontSize(9);
     doc.text(client, 32, yc);
@@ -11800,8 +11811,17 @@ function generarPDFDocumento(accion){
     if(telefonoCliente){ yc += 4.3; doc.text('Tel: '+telefonoCliente, 15, yc); }
     if(emailCliente){ yc += 4.3; doc.text(emailCliente, 15, yc); }
     doc.setFontSize(10);
-    if(job && job !== '—'){ yc += 5; doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.text('Obra:', 15, yc); doc.setFont('helvetica','normal'); doc.text(MAY(job.split(' — ').pop()), 28, yc); }
-    yc += 10;
+    // Obra: columna propia a la derecha, a la altura de "Cliente:" — nunca comparte línea
+    // ni se apila debajo del bloque de cliente, aunque el cliente tenga muchos datos
+    let obraAltura = 0;
+    if(job && job !== '—'){
+      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.text('Obra:', 120, ycInicioCliente);
+      doc.setFont('helvetica','normal');
+      const obraLineas = doc.splitTextToSize(MAY(job.split(' — ').pop()), 60);
+      obraLineas.forEach((linea, i) => doc.text(linea, 120, ycInicioCliente + 4.3 + i*4.3));
+      obraAltura = 4.3 + obraLineas.length*4.3;
+    }
+    yc = Math.max(yc, ycInicioCliente + obraAltura) + 10;
     doc.setFont('helvetica','bold'); doc.setFontSize(9);
     if(hayFechas) doc.text('Fecha', 15, yc);
     doc.text('Cant.', hayFechas ? 40 : 15, yc); doc.text('Concepto', xConcepto + (hayFechas?0:20), yc);
@@ -14108,7 +14128,7 @@ function openNewInvoiceModal(contexto, forzarEditorCompleto){
   document.getElementById('ni-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('ni-iban').value = EMPRESA_BANCO.iban;
   document.getElementById('ni-titular').value = EMPRESA_BANCO.titular;
-  document.getElementById('ni-payment').value = 'Transferencia';
+  fijarFormaPago('Transferencia');
   const __pawNuevo = document.getElementById('ni-pasar-a-wrap'); if(__pawNuevo) __pawNuevo.style.display = 'none';
   const __otrasNuevo = document.getElementById('ni-otras-acciones'); if(__otrasNuevo) __otrasNuevo.innerHTML = '';
   document.getElementById('ie-dictado-text').value = '';
@@ -14441,7 +14461,7 @@ async function wizGuardar(isDraft){
   document.getElementById('ie-iva-pct').value = 21;
   document.getElementById('ni-iban').value = EMPRESA_BANCO.iban;
   document.getElementById('ni-titular').value = EMPRESA_BANCO.titular;
-  document.getElementById('ni-payment').value = 'Transferencia';
+  fijarFormaPago('Transferencia');
   const __pawWiz = document.getElementById('ni-pasar-a-wrap'); if(__pawWiz) __pawWiz.style.display = 'none';
   const __otrasWiz = document.getElementById('ni-otras-acciones'); if(__otrasWiz) __otrasWiz.innerHTML = '';
   const cfg = DOC_TYPES[wiz.tipo];
@@ -14480,7 +14500,7 @@ function convertirDocumento(){
   setClientPickerValue('ni', origen.client);
   document.getElementById('ni-job').value = origen.job==='—' ? '' : origen.job;
   document.getElementById('ni-date').value = new Date().toISOString().slice(0,10);
-  document.getElementById('ni-payment').value = origen.payment || 'Transferencia';
+  fijarFormaPago(origen.payment || 'Transferencia');
   document.getElementById('ni-iban').value = origen.iban || EMPRESA_BANCO.iban;
   document.getElementById('ni-titular').value = origen.titular || EMPRESA_BANCO.titular;
   onClientChange();
@@ -14508,7 +14528,7 @@ function openDocumentViewer(id){
   setClientPickerValue('ni', doc.client);
   document.getElementById('ni-job').value = (doc.job && doc.job!=='—') ? doc.job : (doc.obra_texto || '');
   document.getElementById('ni-date').value = doc.dateRaw;
-  document.getElementById('ni-payment').value = doc.payment;
+  fijarFormaPago(doc.payment);
   document.getElementById('ni-iban').value = doc.iban;
   document.getElementById('ni-titular').value = doc.titular;
   const btnOriginal = document.getElementById('ni-ver-original');
