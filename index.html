@@ -603,7 +603,7 @@ table{border-collapse:collapse;width:100%;}
      va primero y a ancho completo; guardar borrador debajo, también a ancho completo;
      PDF/Imprimir en una fila de dos; el resto queda recogido en "Más acciones" */
   .ie-actions-top{flex-direction:column;}
-  .ie-actions-top #ni-submit{flex:1 1 auto !important;order:1;}
+  .ie-actions-top #ni-emitir{flex:1 1 auto !important;order:1;}
   .ie-actions-top #ni-draft{flex:1 1 auto !important;order:2;}
 }
 
@@ -864,7 +864,7 @@ table{border-collapse:collapse;width:100%;}
   .fc-gestor-btn{padding:2px 8px;font-size:10.5px;border-radius:12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);}
   .fc-gestor-btn.primary{background:var(--orange);color:#fff;border-color:var(--orange);}
   .fc-ver-original{color:var(--blue,#3B6FA0);font-weight:600;font-size:11.5px;}
-  .fc-fallos{flex:0 0 auto;background:var(--red);color:#fff;font-weight:700;font-size:10.5px;padding:2px 8px;border-radius:10px;}
+  .fc-fallos{flex:0 0 auto;background:var(--red);color:#fff;font-weight:700;font-size:9.5px;padding:1px 6px;border-radius:8px;letter-spacing:0.02em;}
 }
 @media(max-width:768px){
   .tbl-tarjeta-movil tbody tr{
@@ -922,6 +922,11 @@ table{border-collapse:collapse;width:100%;}
 
 .dd-filter{position:relative;}
 .dd-orden-resumen{font-weight:700;color:var(--orange);}
+/* Ordenar suele ser el filtro más a la derecha — su panel se abre hacia la IZQUIERDA
+   (right:0 en vez de left:0), si no se sale de la pantalla en móvil */
+.dd-filter-orden .dd-filter-panel{left:auto !important;right:0 !important;min-width:0 !important;width:220px;max-width:calc(100vw - 32px);}
+.dd-filter-orden #fact-orden-chips{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.dd-filter-orden .chip-orden{text-align:center;justify-content:center;}
 .chip-orden.active{background:var(--orange);color:#fff;border-color:var(--orange);}
 .orden-flecha{font-weight:800;}
 .dd-filter-btn{
@@ -2484,7 +2489,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.26</div>
+        <div class="sub">V3.27</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4949,10 +4954,13 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       <button type="button" class="btn-flecha" title="Pasar al documento seleccionado" aria-label="Pasar al documento seleccionado" onclick="ejecutarTransicion(document.getElementById('ni-pasar-a-select').value)">→</button>
     </div>
 
-    <!-- Acciones principales: guardar es lo primero que se ve y ocupa todo el ancho en móvil -->
+    <!-- Acciones principales: guardar es lo primero que se ve y ocupa todo el ancho en móvil.
+         GUARDAR nunca toca la numeración (documento sigue en borrador). EMITIR es la única
+         acción que consolida el número en firme — desaparece en cuanto el documento ya está
+         emitido, porque entonces no hay nada que volver a emitir. -->
     <div class="ie-actions ie-actions-top">
-      <button type="button" class="btn primary ie-submit" id="ni-submit" onclick="submitNewInvoice(event, false)">Crear factura</button>
-      <button type="button" class="btn" id="ni-draft" onclick="submitNewInvoice(event, true)">Guardar como borrador</button>
+      <button type="button" class="btn primary ie-submit" id="ni-emitir" onclick="submitNewInvoice(event, false)">Emitir factura</button>
+      <button type="button" class="btn" id="ni-draft" onclick="submitNewInvoice(event, true)">Guardar</button>
     </div>
     <div class="ie-actions ie-actions-secondary" id="ie-pdf-acciones-escritorio">
       <button type="button" class="btn dark" onclick="descargarPDF()">⬇ Descargar PDF</button>
@@ -11686,29 +11694,30 @@ function submitNewJob(ev){
 let itemSeq = 0;
 
 function proximoNumero(tipoDoc){
-  // cuenta de verdad los documentos de este tipo que ya existen, y devuelve el siguiente número con ceros a la izquierda
-  const existentes = Object.values(documentosRealesById).filter(d=>d.type===tipoDoc).length;
+  // cuenta solo los documentos EMITIDOS de este tipo — un borrador nunca consolida su
+  // numeración, así que no debe ocupar el hueco del siguiente número en firme
+  const existentes = Object.values(documentosRealesById).filter(d=>d.type===tipoDoc && d.estado==='emitido').length;
   return String(existentes + 1).padStart(3,'0');
 }
 
 const DOC_TYPES = {
   factura: {
-    title:'FACTURA', button:'Crear factura', prefix:'F', seqRef:()=>proximoNumero('factura'), hasIva:true,
+    title:'FACTURA', button:'Emitir factura', numera:true, prefix:'F', seqRef:()=>proximoNumero('factura'), hasIva:true,
     hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasBaseIva:true, hasPayment:true, hasBank:true,
     explain:'Documento fiscal definitivo. Genera obligación de cobro y de declarar IVA.',
   },
   proforma: {
-    title:'PROFORMA', button:'Crear proforma', prefix:'PF', seqRef:()=>proximoNumero('proforma'), hasIva:true,
+    title:'PROFORMA', button:'Emitir proforma', numera:true, prefix:'PF', seqRef:()=>proximoNumero('proforma'), hasIva:true,
     hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasBaseIva:true, hasPayment:true, hasBank:true,
     explain:'Anticipo informativo sin validez fiscal, antes de que el cliente se comprometa.',
   },
   presupuesto: {
-    title:'PRESUPUESTO', button:'Crear presupuesto', prefix:'P', seqRef:()=>proximoNumero('presupuesto'), hasIva:true,
+    title:'PRESUPUESTO', button:'Emitir presupuesto', numera:true, prefix:'P', seqRef:()=>proximoNumero('presupuesto'), hasIva:true,
     hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasBaseIva:true, hasPayment:true, hasBank:false,
     explain:'Propuesta de precio. No obliga a nada — si se acepta, se convierte en trabajo.',
   },
   albaran: {
-    title:'ALBARÁN', button:'Crear albarán', prefix:'ALB', seqRef:()=>proximoNumero('albaran'), hasIva:false,
+    title:'ALBARÁN', button:'Crear albarán', numera:false, prefix:'ALB', seqRef:()=>proximoNumero('albaran'), hasIva:false,
     hasFiscalHeader:false, hasPrecios:false, hasTotales:true, hasBaseIva:false, hasPayment:false, hasBank:false,
     explain:'Justificante de entrega/trabajo realizado. No es un documento fiscal, así que no lleva IVA ni desglose.',
   },
@@ -11878,8 +11887,11 @@ function onDocTypeChange(){
   const t = document.getElementById('ni-doctype').value;
   const cfg = DOC_TYPES[t];
   document.getElementById('ni-title').textContent = cfg.title;
-  document.getElementById('ni-submit').textContent = cfg.button;
-  document.getElementById('ni-draft').textContent = 'Guardar '+cfg.title.toLowerCase()+' como borrador';
+  document.getElementById('ni-emitir').textContent = cfg.button;
+  document.getElementById('ni-draft').textContent = 'Guardar';
+  // el albarán no tiene numeración en firme que consolidar — es un único paso, sin
+  // distinción Guardar/Emitir
+  document.getElementById('ni-draft').style.display = cfg.numera ? '' : 'none';
   document.getElementById('ni-explain').textContent = cfg.explain;
   if(t === 'albaran'){
     document.getElementById('ni-docnum').value = '';
@@ -13409,7 +13421,7 @@ function aiRevisarYConfirmar(iaLlamadaId, tareaIndex){
     trabajo: 'CONFIRMAR Y CREAR TRABAJO',
   }[t.tipo];
   if(!etiquetaConfirmar) return;
-  const idBoton = {documento:'ni-submit', gasto:'gasto-submit-btn', trabajo:'nj-submit-btn'}[t.tipo];
+  const idBoton = {documento:'ni-emitir', gasto:'gasto-submit-btn', trabajo:'nj-submit-btn'}[t.tipo];
   setTimeout(()=>{
     const btn = document.getElementById(idBoton);
     if(btn){ btn.dataset.textoOriginal = btn.textContent; btn.textContent = etiquetaConfirmar; }
@@ -14962,8 +14974,19 @@ function openDocumentViewer(id){
   onPaymentChange();
   document.getElementById('ni-title').textContent = DOC_TYPES[doc.type].title;
   document.getElementById('ni-explain').textContent = DOC_TYPES[doc.type].explain;
-  document.getElementById('ni-submit').textContent = doc.status==='Borrador' ? 'Guardar y numerar en firme' : 'Guardar cambios';
-  document.getElementById('ni-draft').textContent = 'Guardar como borrador';
+  // GUARDAR nunca toca la numeración; EMITIR es la única acción que la consolida — y solo
+  // existe mientras el documento sigue sin emitir. Una vez emitido, ya no hay nada que
+  // "emitir de nuevo": queda un único botón, Guardar cambios.
+  const yaEmitido = doc.status !== 'Borrador';
+  const cfgDoc = DOC_TYPES[doc.type];
+  if(yaEmitido){
+    document.getElementById('ni-emitir').textContent = 'Guardar cambios';
+    document.getElementById('ni-draft').style.display = 'none';
+  } else {
+    document.getElementById('ni-emitir').textContent = cfgDoc.button;
+    document.getElementById('ni-draft').style.display = cfgDoc.numera ? '' : 'none';
+    document.getElementById('ni-draft').textContent = 'Guardar';
+  }
   document.getElementById('ie-preview-pane').style.display = 'none';
   document.getElementById('ie-paper-edit').style.display = 'block';
   const __pvb=document.getElementById('ni-preview-btn'); if(__pvb) __pvb.textContent = 'Vista previa de impresión';
@@ -15016,8 +15039,13 @@ async function submitNewInvoice(ev, isDraft){
   // CONCEPTO = F + NÚMERO DE FACTURA — siempre recalculado a partir del número final que se
   // guarda en este mismo guardado (así una factura que se numera en firme ahora queda al día)
   const concepto = type==='factura' ? conceptoDeFactura(num) : document.getElementById('ni-concepto-transf').value;
-  const status = isDraft ? 'Borrador' : (type==='factura' ? 'Pendiente' : type==='albaran' ? 'Validado' : 'Enviado');
-  const estado = isDraft ? 'borrador' : 'emitido';
+  // Un documento YA EMITIDO nunca puede volver a "Borrador" — ni siquiera si esta llamada
+  // llega con isDraft=true desde el diálogo de "cambios sin guardar" o desde el asistente.
+  // GUARDAR (isDraft=true) solo significa "borrador" mientras el documento sigue sin emitir;
+  // una vez emitido, guardar es simplemente editar, y su numeración ya consolidada no se toca.
+  const yaEstabaEmitido = editingDocId && documentosRealesById[editingDocId]?.estado === 'emitido';
+  const status = (isDraft && !yaEstabaEmitido) ? 'Borrador' : (type==='factura' ? 'Pendiente' : type==='albaran' ? 'Validado' : 'Enviado');
+  const estado = (isDraft && !yaEstabaEmitido) ? 'borrador' : 'emitido';
 
   // coincidencia exacta primero; si falla, defensa adicional sin distinguir mayúsculas ni
   // espacios sobrantes — un cliente sugerido por la IA (u otra fuente) que venga con una
