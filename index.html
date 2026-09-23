@@ -455,7 +455,7 @@ table{border-collapse:collapse;width:100%;}
 .ie-pdf-movil{display:none;}
 @media(max-width:640px){
   #ie-pdf-acciones-escritorio{display:none;}
-  .ie-pdf-movil{display:block;width:calc(100% - 40px);margin:0 20px 10px 20px;}
+  .ie-pdf-movil{display:block;width:calc(100% - 28px);margin:0 14px 10px 14px;}
 }
 @media(max-width:640px){
   /* Pantalla completa (V3.26) hacía que el modal se confundiera con "otra página", porque
@@ -536,7 +536,7 @@ table{border-collapse:collapse;width:100%;}
 .ie-nf-row{display:flex;gap:10px;align-items:flex-start;overflow-x:hidden;width:100%;box-sizing:border-box;}
 .ie-nf-row .ie-nf-num{flex:0 0 68px;width:68px;min-width:0;}
 .ie-nf-row .ie-nf-fecha{flex:1 1 0;min-width:0;overflow:hidden;}
-.ie-nf-row .field input{width:100%;max-width:100%;box-sizing:border-box;min-width:0;}
+.ie-nf-row .field input{width:100%;max-width:100%;box-sizing:border-box;min-width:0;height:36px;}
 #ni-date{font-size:14px;}
 @media(max-width:400px){ #ni-date{font-size:12px;} }
 .ie-nf-num input{text-align:right;}
@@ -618,12 +618,26 @@ table{border-collapse:collapse;width:100%;}
 .ie-more[open] summary::before{content:'▾ ';}
 .ie-more-body{display:flex;gap:6px;flex-wrap:wrap;padding-top:8px;}
 @media(max-width:640px){
-  /* jerarquía real, no "lo que quepa": guardar y numerar en firme es lo más importante y
-     va primero y a ancho completo; guardar borrador debajo, también a ancho completo;
-     PDF/Imprimir en una fila de dos; el resto queda recogido en "Más acciones" */
-  .ie-actions-top{flex-direction:column;}
+  /* Compacto de verdad: Guardar y Emitir en la MISMA fila (ya no cada uno a ancho
+     completo), con mucho menos alto/padding/letra que el botón genérico de la app —
+     estos botones se usan todo el rato, no tiene sentido que ocupen tanto. */
+  .ie-actions-top{flex-direction:row !important;gap:8px;margin:0 14px 8px 14px !important;}
   .ie-actions-top #ni-emitir{flex:1 1 auto !important;order:1;}
   .ie-actions-top #ni-draft{flex:1 1 auto !important;order:2;}
+  .invoice-editor .ie-actions-top .btn,
+  .invoice-editor .ie-actions-secondary .btn,
+  .invoice-editor .ie-pdf-movil{
+    padding:8px 10px !important;font-size:12.5px !important;min-height:0 !important;line-height:1.3;
+  }
+  .invoice-editor .ie-actions-secondary{margin:0 14px 10px 14px !important;}
+  .invoice-editor .ie-pdf-movil{margin:0 14px 10px 14px !important;}
+  /* Campos del editor: más bajos, menos aire entre bloques, letra más pequeña — el
+     tamaño "accesible" genérico de toda la app (44px, 15px) es excesivo aquí, donde se
+     edita un documento entero y el objetivo es que quepa más de un vistazo */
+  .invoice-editor .search-box{padding:8px 10px !important;font-size:13.5px !important;min-height:0 !important;}
+  .invoice-editor .field .l{font-size:10.5px !important;margin-bottom:2px;}
+  .invoice-editor .ie-client-row{margin-bottom:10px !important;gap:10px !important;}
+  .invoice-editor .field{margin-bottom:0 !important;}
 }
 
 /* ---------- MÓVIL / iPhone ---------- */
@@ -2530,7 +2544,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.31</div>
+        <div class="sub">V3.32</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14578,6 +14592,7 @@ function openNewInvoiceModal(contexto, forzarEditorCompleto){
   if(contexto.jobLabel){ document.getElementById('ni-job').value = contexto.jobLabel; }
   sugerirTratamientoIva(contexto.clientName, contexto.jobLabel);
   document.getElementById('newinvoice-overlay').classList.add('active');
+  setTimeout(ajustarAnchoFecha, 30);
 }
 // sugiere (nunca aplica sola) el tratamiento ISP si el trabajo o el cliente ya lo tuvieron antes
 async function sugerirTratamientoIva(clientName, jobLabel){
@@ -14947,8 +14962,32 @@ function convertirDocumento(){
   document.getElementById('ni-convert-btn').style.display = 'none';
   onDocTypeChange();
   document.getElementById('newinvoice-overlay').classList.add('active');
+  setTimeout(ajustarAnchoFecha, 30);
 }
 
+// El selector nativo de fecha en iOS Safari IGNORA el ancho que le manda el CSS — por
+// eso se cortaba el borde derecho con overflow-x:hidden en vez de encajar. Esta función mide
+// el ancho REAL que Safari le da (scrollWidth, sin restricciones) contra el hueco
+// disponible de verdad, y si no cabe, lo encoge visualmente con transform:scale — así el
+// óvalo/rectángulo completo (con su borde) se ve entero y más pequeño, en vez de cortado.
+function ajustarAnchoFecha(){
+  const input = document.getElementById('ni-date');
+  if(!input) return;
+  const disponible = input.parentElement.clientWidth;
+  if(!disponible) return;
+  input.style.transform = 'none';
+  input.style.width = 'auto';
+  const natural = input.scrollWidth;
+  if(natural > disponible && disponible > 0){
+    const escala = Math.max(disponible / natural, 0.6); // nunca más pequeño del 60%, se vería ilegible
+    input.style.width = (100/escala) + '%';
+    input.style.transformOrigin = 'left center';
+    input.style.transform = 'scale(' + escala + ')';
+  } else {
+    input.style.width = '100%';
+  }
+}
+window.addEventListener('resize', () => { if(document.getElementById('newinvoice-overlay')?.classList.contains('active')) ajustarAnchoFecha(); });
 function openDocumentViewer(id){
   const doc = documentosRealesById[id];
   if(!doc){ mostrarToast('No se encuentra este documento.'); return; }
@@ -15038,6 +15077,7 @@ function openDocumentViewer(id){
   convBtn.style.display = 'none'; // las conversiones (Duplicar/Rectificar/Crear factura/Convertir en factura) se hacen desde las acciones de la fila, con un criterio único — ver accionesDocumento()
   recalcTotals();
   document.getElementById('newinvoice-overlay').classList.add('active');
+  setTimeout(ajustarAnchoFecha, 30);
 }
 async function deshacerConversion(){
   const doc = documentosRealesById[editingDocId];
