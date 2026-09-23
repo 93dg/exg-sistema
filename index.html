@@ -3097,6 +3097,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div class="filters" id="clientes-filtro-extra-chips" style="margin:0;">
             <div class="chip-filter" data-extra="deuda">Con deuda</div>
             <div class="chip-filter" data-extra="sindatos">Ficha incompleta</div>
+            <div class="chip-filter" data-extra="sindocs">Sin documentos</div>
+            <div class="chip-filter active" data-extra="ocultar_basura" title="Oculta entidades con nombres que no son clientes reales">Solo clientes reales</div>
           </div>
           <button class="btn" id="clientes-restablecer-filtros" style="margin-left:auto;" title="Restablecer filtros" onclick="restablecerFiltrosClientes()">↻</button>
         </div>
@@ -11042,7 +11044,12 @@ const CLIENTES_COLUMNAS = [
   ['enb','En B'],['pendiente','Pendiente cobro'],['ultimo','Último trabajo'],
 ];
 function clientesColumnasVisibles(){
-  try{ return JSON.parse(localStorage.getItem('clientes-columnas-ocultas')||'[]'); }catch(e){ return []; }
+  try{
+    const stored = localStorage.getItem('clientes-columnas-ocultas');
+    if(stored !== null) return JSON.parse(stored);
+    // Defecto: ocultar columnas secundarias para que quepan en pantalla
+    return ['direccion','cp','provincia','email','telefono','enb','calidad'];
+  }catch(e){ return ['direccion','cp','provincia','email','telefono','enb','calidad']; }
 }
 function aplicarVisibilidadColumnasClientes(){
   const ocultas = new Set(clientesColumnasVisibles());
@@ -11106,6 +11113,11 @@ function renderClientesTable(){
     if(prioSel.size && !prioSel.has(c.prio||'media')) return false;
     if(extraSel.has('deuda') && !(c.pendiente>0)) return false;
     if(extraSel.has('sindatos') && calidadDe(c)!=='incompleta') return false;
+    if(extraSel.has('sindocs') && ((c.facturado||0)+(c.enb||0)>0 || c.ultimoTrabajo)) return false;
+    if(extraSel.has('ocultar_basura')){
+      const claseBasura = ['etiqueta','emisor','poblacion','obra','direccion','contacto','titulo'];
+      if(claseBasura.includes(c.clase_nombre)) return false;
+    }
     return true;
   });
 
