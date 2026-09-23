@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.16";
+export const VERSION_MOTOR = "motor-exg-2.17";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -527,6 +527,12 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
       const corrobora = nn.split(" ").filter((w) => w.length >= 4).some((w) => fich.split(" ").includes(w)) || (cand.poblacion && e.poblacion && norm(cand.poblacion).includes(norm(e.poblacion).split(" ")[0]));
       if (corrobora) return { estado: "existente", id: e.id, nombre: e.nombre, evidencia: "nombre abreviado corroborado" };
       return { estado: "revisar", motivo: `puede ser ${e.nombre}`, ids: [e.id] };
+    }
+    // CAR#9: nombre con erratas típicas (letra que falta, consonante cambiada) de una ficha VÁLIDA existente
+    // — mismo criterio de "parecidos" que ya usamos para fusionar duplicados, aplicado a la coincidencia
+    if (!nifC) {
+      const porErrata = validas.filter((e: any) => CLASES_ENTIDAD.includes(clasificarTexto(e.nombre)) && parecidos(nombreOk, e.nombre));
+      if (porErrata.length === 1) return { estado: "revisar", motivo: `parecido a ${porErrata[0].nombre} (posible errata)`, ids: [porErrata[0].id] };
     }
     const alias = (cache?.alias || (await sb.from("aprendizaje_nombres_clientes").select("variante,canonico")).data || []);
     if (cache && !cache.alias) cache.alias = alias;
