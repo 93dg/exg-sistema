@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.14";
+export const VERSION_MOTOR = "motor-exg-2.15";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
