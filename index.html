@@ -458,14 +458,19 @@ table{border-collapse:collapse;width:100%;}
   .ie-pdf-movil{display:block;width:calc(100% - 40px);margin:0 20px 10px 20px;}
 }
 @media(max-width:640px){
-  /* El modal del editor debe ocupar la pantalla entera de verdad — si no, el padding del
-     overlay (pensado para escritorio) deja un hueco al fondo donde se ve el fondo oscurecido
-     detrás, y da la sensación de que el popup "se pierde" según se hace scroll hacia abajo */
-  #newinvoice-overlay{padding:0 !important;}
+  /* Pantalla completa (V3.26) hacía que el modal se confundiera con "otra página", porque
+     no quedaba ningún margen que dejara ver el fondo oscurecido y así distinguirlo. Vuelve a
+     ser un modal flotante de verdad: margen visible en los 4 lados durante TODO el scroll,
+     borde marcado y sombra fuerte — para que en ningún momento parezca una página normal. */
+  #newinvoice-overlay{padding:10px !important;align-items:flex-start !important;}
   .invoice-editor{
-    width:100vw !important;max-width:100vw !important;margin:0 !important;border-radius:0 !important;
-    height:100vh !important;max-height:100vh !important;box-sizing:border-box !important;
-    padding-bottom:env(safe-area-inset-bottom,0px) !important;
+    width:100% !important;max-width:100% !important;margin:0 !important;
+    border-radius:14px !important;border:1.5px solid var(--line-dark,#c9c2b4) !important;
+    box-shadow:0 10px 34px rgba(0,0,0,0.38) !important;
+    height:calc(100vh - 20px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
+    max-height:calc(100vh - 20px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) !important;
+    box-sizing:border-box !important;
+    margin-top:env(safe-area-inset-top,0px) !important;
   }
   /* cualquier fila en flex dentro del editor debe poder encogerse de verdad y bajar de
      línea — sin esto, un solo campo con texto largo (placeholder, opción larga...)
@@ -482,9 +487,8 @@ table{border-collapse:collapse;width:100%;}
   /* Nº documento y Fecha: excepción deliberada, SIEMPRE en la misma fila y compactos —
      no tiene sentido gastar dos líneas en dos campos tan cortos. La regla base ya usa CSS
      Grid (más arriba, fuera de este media query) con minmax(0,1fr) para la Fecha — así
-     nunca puede desbordar su columna, sea cual sea el ancho real de pantalla. Aquí solo se
-     afina el tamaño de letra para que el selector nativo de fecha respire mejor. */
-  .ie-nf-row .field input{font-size:13px !important;}
+     nunca puede desbordar su columna, sea cual sea el ancho real de pantalla, y #ni-date
+     ya lleva su propio tamaño de letra reducido para el selector nativo. */
   .ie-actions{flex-wrap:wrap !important;margin:0 12px 16px 12px !important;}
   .ie-actions > *{flex:1 1 45% !important;min-width:0 !important;}
   /* el bloque "Pasar a…" es la excepción deliberada: select + flecha SIEMPRE en una sola
@@ -517,9 +521,14 @@ table{border-collapse:collapse;width:100%;}
    solo lo que necesita (columna estrecha, tope 32%) y la Fecha se lleva TODO el resto
    (minmax(0,1fr): puede reducirse hasta 0 antes de desbordar, nunca empuja fuera de su
    columna). No depende de un ancho de pantalla concreto ni de píxeles fijos en los inputs. */
-.ie-nf-row{display:grid;grid-template-columns:minmax(64px,32%) minmax(0,1fr);gap:10px;align-items:start;}
+.ie-nf-row{display:grid;grid-template-columns:minmax(50px,26%) minmax(0,1fr);gap:10px;align-items:start;}
 .ie-nf-row .field{min-width:0;}
 .ie-nf-row .field input{width:100%;max-width:100%;box-sizing:border-box;min-width:0;}
+/* El selector nativo de fecha en iOS no reduce su ancho por debajo del que necesita su
+   propio texto — la única palanca real es achicar la letra: así su ancho mínimo cabe
+   siempre en la columna, sea cual sea el iPhone */
+#ni-date{font-size:14px;}
+@media(max-width:400px){ #ni-date{font-size:12.5px;} }
 .ie-nf-num input{text-align:right;}
 .ie-doc-title{font-family:'Archivo',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;color:var(--ink-soft);margin-bottom:10px;text-transform:uppercase;}
 .ie-doc-meta .field{text-align:left;}
@@ -823,57 +832,70 @@ table{border-collapse:collapse;width:100%;}
   .seleccionar-todo-movil{padding:8px 14px;font-size:12px;font-weight:600;color:var(--blue,#3B6FA0);text-decoration:underline;cursor:pointer;}
 
   /* ===== TARJETA de factura — CSS Grid de áreas con NOMBRE =====
-     Cada dato tiene su celda fija: check/estado/total arriba, cliente, meta (fecha·nº·
-     cobrado), gestor, y extra (original+calidad) al fondo. Si un dato no existe, su
-     grid-area entera no se renderiza — el resto NUNCA se reorganiza ni cambia de fila
-     porque las áreas están fijadas de antemano, no dependen del contenido presente.
-     El botón ··· es aparte, position:absolute en la esquina superior derecha, siempre.
-     Regla de oro: solo los CONTROLES (checkbox, estado, gestor, ···, ver original,
-     calidad) paran el toque — cada uno ajustado a su contenido, nunca una celda entera,
-     para que no queden zonas "muertas". Todo lo demás abre la factura. */
+     Cada dato tiene su celda fija: check/estado arriba, cliente, meta (fecha·nº·cobrado),
+     gestor, extra (original+calidad), y TOTAL siempre al fondo a la derecha, separado con
+     una línea — nunca junto al "···". Si un dato no existe, su grid-area entera no se
+     renderiza — el resto NUNCA se reorganiza ni cambia de fila porque las áreas están
+     fijadas de antemano, no dependen del contenido presente. El botón ··· es aparte,
+     position:absolute en la esquina superior derecha, siempre. Regla de oro: solo los
+     CONTROLES (checkbox, estado, gestor, ···, ver original, calidad) paran el toque —
+     cada uno ajustado a su contenido, nunca una celda entera, para que no queden zonas
+     "muertas". Todo lo demás abre la factura. */
   .factura-card-movil{
     position:relative;
     display:grid;
-    grid-template-columns:20px 1fr auto;
+    grid-template-columns:18px 1fr auto;
     grid-template-areas:
-      "check estado total"
+      "check estado estado"
       "check cliente cliente"
       "check meta meta"
       "check gestor gestor"
-      "check extra extra";
-    row-gap:4px;column-gap:8px;align-items:center;
-    padding:12px 40px 12px 14px;border-bottom:1px solid var(--line);
+      "check extra extra"
+      "check . total";
+    row-gap:5px;column-gap:8px;align-items:center;
+    padding:11px 34px 10px 12px;border-bottom:1px solid var(--line);
     cursor:pointer;
   }
   .factura-card-movil:active{background:var(--concrete);}
-  /* ··· SIEMPRE en la esquina superior derecha, fuera de la rejilla */
+  /* ··· SIEMPRE en la esquina superior derecha, fuera de la rejilla — más discreto */
   .fc-mas-btn{
-    position:absolute;top:10px;right:8px;
-    width:26px;height:26px;flex:none;
+    position:absolute;top:9px;right:6px;
+    width:22px;height:22px;flex:none;
     display:flex;align-items:center;justify-content:center;
-    font-size:16px;font-weight:700;color:var(--ink-soft);
+    font-size:14px;font-weight:700;color:var(--ink-soft);
     background:var(--concrete);border:none;border-radius:50%;padding:0;line-height:1;
   }
   .fc-mas-btn:active{background:var(--concrete-2);}
-  .fc-check{grid-area:check;align-self:start;width:19px;height:19px;margin:2px 0 0 0;}
+  .fc-check{grid-area:check;align-self:start;width:17px;height:17px;margin:2px 0 0 0;}
   .fc-estado-wrap{grid-area:estado;display:inline-flex;justify-self:start;}
-  .fc-estado-wrap .pill{font-size:11.5px;padding:3px 10px;}
-  .fc-total{grid-area:total;text-align:right;font-weight:800;font-size:15.5px;white-space:nowrap;}
-  .fc-cliente{grid-area:cliente;font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .fc-meta{grid-area:meta;font-size:12px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fc-estado-wrap .pill{font-size:10px;padding:2px 8px;font-weight:700;}
+  /* TOTAL: siempre al fondo, a la derecha, separado con una línea propia — nunca pegado
+     al "···" ni a ningún otro control */
+  .fc-total{
+    grid-area:total;text-align:right;font-weight:800;font-size:15px;white-space:nowrap;
+    padding-top:6px;margin-top:2px;border-top:1px solid var(--line);
+  }
+  .fc-cliente{grid-area:cliente;font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fc-meta{grid-area:meta;font-size:11.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   /* Gestor: su propia celda fija, siempre en el mismo sitio bajo Fecha·Nº·Cobrado */
-  .fc-gestor-wrap{grid-area:gestor;display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11.5px;}
+  .fc-gestor-wrap{grid-area:gestor;display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11px;}
   .fc-gestor-label{color:var(--ink-soft);}
   .fc-gestor-estado{font-weight:600;}
   .fc-gestor-estado.enviada{color:var(--green,#6FA37C);}
   .fc-gestor-estado.pendiente{color:var(--ink-soft);}
-  .fc-gestor-btn{padding:2px 8px;font-size:10.5px;border-radius:12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);}
+  .fc-gestor-btn{padding:1px 7px;font-size:10px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink);}
   .fc-gestor-btn.primary{background:var(--orange);color:#fff;border-color:var(--orange);}
   /* Extra: Original + Calidad SIEMPRE juntos en esta misma celda fija, nunca mezclados
      con la línea de Gestor — si ninguno existe, la celda no se renderiza y no deja hueco */
-  .fc-extra{grid-area:extra;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-  .fc-ver-original{color:var(--blue,#3B6FA0);font-weight:600;font-size:11.5px;}
-  .fc-fallos{flex:0 0 auto;background:var(--red);color:#fff;font-weight:700;font-size:9.5px;padding:1px 6px;border-radius:8px;letter-spacing:0.02em;}
+  .fc-extra{grid-area:extra;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .fc-ver-original{color:var(--blue,#3B6FA0);font-weight:600;font-size:11px;}
+  /* Insignia de fallo rediseñada: texto en rojo con un punto, no un bloque sólido enorme —
+     se ve, pero no domina la tarjeta */
+  .fc-fallos{
+    display:inline-flex;align-items:center;gap:4px;
+    color:var(--red);font-weight:700;font-size:11px;
+  }
+  .fc-fallos::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--red);}
 }
 @media(max-width:768px){
   .tbl-tarjeta-movil tbody tr{
@@ -2498,7 +2520,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.28</div>
+        <div class="sub">V3.29</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5023,11 +5045,12 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <div class="ie-doc-meta">
             <div class="ie-doc-title" id="ni-title">FACTURA</div>
             <div class="ie-nf-row">
-              <div class="field ie-nf-num"><div class="l">Nº documento <span id="ni-suggest" style="font-weight:400;color:var(--ink-soft);"></span></div>
+              <div class="field ie-nf-num"><div class="l">Nº</div>
                 <input class="search-box mono" id="ni-docnum" oninput="sincronizarConceptoConNumero()">
               </div>
               <div class="field ie-nf-fecha"><div class="l">Fecha</div><input class="search-box" id="ni-date" type="date" required></div>
             </div>
+            <div id="ni-suggest" style="font-size:11.5px;font-weight:400;color:var(--ink-soft);margin-top:2px;"></div>
           </div>
         </div>
 
