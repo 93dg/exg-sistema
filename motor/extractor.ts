@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.19";
+export const VERSION_MOTOR = "motor-exg-2.20";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -460,12 +460,17 @@ export function sinSubunidad(t: any) { return norm(t).replace(/\s*\((DEPARTAMENT
 export function nombreNorm(t: any) { return sinSubunidad(t).replace(/[.,]/g, " ").replace(/\s+/g, " ").trim(); }
 const EQUIV: any = { EXCM: "EXCMO", EXMO: "EXCMO", EXM: "EXCMO", EXCMO: "EXCMO", FTE: "FUENTE", FT: "FUENTE", AYTO: "AYUNTAMIENTO" };
 // palabras que describen el TIPO de negocio, no la identidad: coincidir solo en ellas no es evidencia
-// (mismo motivo por el que "S.L."/"S.A." tampoco cuentan)
-const GENERICAS = /^(CONSTRUCCION(ES)?|PROMOCION(ES)?|INICIATIVA|SERVICIOS|AGROPECUARIA|EXPLOTACION(ES)?|INDUSTRIAS|MONTAJES|TRANSPORTES|REFORMAS|OBRAS|Y|DE|DEL|LAS|LOS)$/;
+// (mismo motivo por el que "S.L."/"S.A." tampoco cuentan). Se compara por cercanía (typos incluidos:
+// "CONTRUCCIONES" sigue siendo la palabra genérica, no una parte distintiva del nombre).
+const GENERICAS_LISTA = ["CONSTRUCCIONES", "CONSTRUCCION", "PROMOCIONES", "PROMOCION", "INICIATIVA", "SERVICIOS", "AGROPECUARIA", "EXPLOTACIONES", "EXPLOTACION", "INDUSTRIAS", "MONTAJES", "TRANSPORTES", "REFORMAS", "OBRAS"];
+function esGenerica(w: string): boolean {
+  if (/^(Y|DE|DEL|LAS|LOS)$/.test(w)) return true;
+  return GENERICAS_LISTA.some((g) => w === g || (w.length >= 5 && g.length >= 5 && ((w.startsWith(g.slice(0, 5)) || g.startsWith(w.slice(0, 5))) || lev(w, g) <= 2)));
+}
 function tokens(t: string) { return nombreNorm(t).split(" ").map((w) => EQUIV[w] || w).filter((w) => w.length > 2 && !/^(SL|SA|SLU|SAL|SCP|SCA|DEL|LAS|LOS|DE)$/.test(w)); }
 // versión "distintiva": para decidir si dos nombres son la MISMA identidad, se exige solape también
 // fuera de las palabras genéricas de tipo de negocio — igual que dos SL distintas no son la misma empresa
-function tokensDistintivos(t: string) { return tokens(t).filter((w) => !GENERICAS.test(w)); }
+function tokensDistintivos(t: string) { return tokens(t).filter((w) => !esGenerica(w)); }
 export function parecidos(a: string, b: string): boolean {
   const ta = tokens(a), tb = tokens(b);
   if (!ta.length || !tb.length) return false;
