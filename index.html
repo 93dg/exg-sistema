@@ -729,6 +729,37 @@ table{border-collapse:collapse;width:100%;}
 .dt-filter-btn.has-changes .dt-dot{display:block;}
 
 .dd-filter-row{display:flex;flex-wrap:wrap;gap:8px;padding:12px 18px;border-bottom:1px solid var(--line);}
+.dd-filter-acciones-sel{display:flex;gap:6px;margin-left:auto;align-items:center;}
+.dd-filter-acciones-sel .btn.sm{padding:6px 10px;}
+@media(max-width:768px){
+  /* acciones sobre lo seleccionado: SIEMPRE en su propia fila completa, justo debajo de los
+     filtros — alcanzable con el pulgar sin bajar hasta la tabla */
+  .dd-filter-acciones-sel{flex:1 1 100%;margin-left:0;justify-content:flex-end;}
+}
+/* ===== Tabla de FACTURAS en móvil: lo que más se toca, a la izquierda =====
+   Selección · Estado · Cliente · Fecha/Nº · Total van primero; Trabajo, Base, IVA, %IVA,
+   Gestor y Archivo (poco usados a diario en el móvil) se ocultan — siguen disponibles en
+   escritorio. Reordenado con flex, sin tocar el HTML que genera cada fila. */
+@media(max-width:768px){
+  #econ-facturas-table tr{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;width:100%;}
+  #econ-facturas-table th, #econ-facturas-table td{flex:0 0 auto;border:none !important;padding:6px 2px !important;}
+  #econ-facturas-table th:nth-child(1), #econ-facturas-table td:nth-child(1){order:1;text-align:left;} /* checkbox */
+  #econ-facturas-table th:nth-child(11), #econ-facturas-table td:nth-child(11){order:2;text-align:left;} /* Estado */
+  #econ-facturas-table th:nth-child(4), #econ-facturas-table td:nth-child(4){order:3;flex:1 1 100%;min-width:0;font-weight:600;text-align:left;} /* Cliente: línea propia */
+  #econ-facturas-table th:nth-child(2), #econ-facturas-table td:nth-child(2){order:4;text-align:left;} /* Fecha */
+  #econ-facturas-table th:nth-child(3), #econ-facturas-table td:nth-child(3){order:5;text-align:left;} /* Nº */
+  #econ-facturas-table th:nth-child(9), #econ-facturas-table td:nth-child(9){order:6;font-weight:700;text-align:left;} /* Total */
+  #econ-facturas-table th:nth-child(14), #econ-facturas-table td:nth-child(14){order:7;text-align:left;} /* Calidad */
+  #econ-facturas-table th:nth-child(15), #econ-facturas-table td:nth-child(15){order:8;text-align:left;} /* Borrar (icono de fila) */
+  #econ-facturas-table th:nth-child(10), #econ-facturas-table td:nth-child(10){order:9;flex:1 1 100%;font-size:12px;color:var(--ink-soft);text-align:left;} /* Cobrado */
+  #econ-facturas-table th:nth-child(5), #econ-facturas-table td:nth-child(5), /* Trabajo */
+  #econ-facturas-table th:nth-child(6), #econ-facturas-table td:nth-child(6), /* Base */
+  #econ-facturas-table th:nth-child(7), #econ-facturas-table td:nth-child(7), /* IVA */
+  #econ-facturas-table th:nth-child(8), #econ-facturas-table td:nth-child(8), /* %IVA */
+  #econ-facturas-table th:nth-child(12), #econ-facturas-table td:nth-child(12), /* Gestor */
+  #econ-facturas-table th:nth-child(13), #econ-facturas-table td:nth-child(13){display:none;} /* Archivo */
+  #econ-facturas-table tr{border-bottom:1px solid var(--line);padding:8px 4px;}
+}
 .dd-filter{position:relative;}
 .dd-filter-btn{
   display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;
@@ -2290,7 +2321,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.19</div>
+        <div class="sub">V3.20</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2839,12 +2870,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
       <div class="panel">
         <div class="panel-head" style="flex-direction:column;align-items:stretch;gap:10px;">
-          <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
-            <button class="btn" id="fact-enviar-sel-btn" style="display:none;" onclick="enviarSeleccionadasAlGestor('fact-sel-chk')">📤 Enviar seleccionadas al gestor</button>
-            <button class="btn" id="fact-enviarcliente-sel-btn" style="display:none;" onclick="enviarSeleccionadasAlCliente('fact-sel-chk')">✉ Enviar al cliente</button>
-            <button class="btn" id="fact-imprimir-sel-btn" style="display:none;" onclick="imprimirSeleccionadas('fact-sel-chk')">🖨 Imprimir</button>
-            <button class="btn" style="color:var(--red);display:none;" id="fact-borrar-sel-btn" onclick="borrarDocumentosSeleccionados('fact-sel-chk')">🗑 Borrar seleccionadas (<span id="fact-sel-count">0</span>)</button>
-          </div>
           <div class="dd-filter-row">
             <div class="dd-filter" id="dd-fact-anio">
               <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-fact-anio')">Año<span class="dd-caret">▾</span></button>
@@ -2873,6 +2898,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
                   <div class="chip-filter" data-estado="cobrado">Cobrado</div>
                 </div>
               </div>
+            </div>
+            <!-- acciones sobre lo seleccionado, EN LA MISMA fila que los filtros — así en móvil
+                 quedan a mano del pulgar, entre los filtros y la primera factura, sin tener que
+                 bajar a buscarlas -->
+            <div class="dd-filter-acciones-sel">
+              <button class="btn sm" id="fact-enviar-sel-btn" style="display:none;" title="Enviar seleccionadas al gestor" onclick="enviarSeleccionadasAlGestor('fact-sel-chk')">📤</button>
+              <button class="btn sm" id="fact-enviarcliente-sel-btn" style="display:none;" title="Enviar seleccionadas al cliente" onclick="enviarSeleccionadasAlCliente('fact-sel-chk')">✉</button>
+              <button class="btn sm" id="fact-imprimir-sel-btn" style="display:none;" title="Imprimir seleccionadas" onclick="imprimirSeleccionadas('fact-sel-chk')">🖨</button>
+              <button class="btn sm" style="color:var(--red);display:none;" id="fact-borrar-sel-btn" title="Borrar seleccionadas" onclick="borrarDocumentosSeleccionados('fact-sel-chk')">🗑 <span id="fact-sel-count">0</span></button>
             </div>
           </div>
         </div>
@@ -11911,15 +11945,19 @@ function generarPDFDocumento(accion){
       }
       doc.setFont('helvetica','bold'); doc.setFontSize(11);
       doc.text('TOTAL:', 150, yDer, {align:'right'}); doc.text(formatMoneda(total), 195, yDer, {align:'right'}); yDer += 7;
+      // va debajo del TOTAL, en su misma columna — está relacionado con el IVA, no con la
+      // forma de pago, así que no puede compartir columna con el IBAN/concepto (se confundía
+      // visualmente con el concepto de la transferencia)
+      if(tratamientoIvaPdf==='isp'){
+        doc.setFont('helvetica','italic'); doc.setFontSize(7.5);
+        const notaIsp = doc.splitTextToSize('Inversión del sujeto pasivo. Art. 84.Uno.2º.f) de la Ley 37/1992 del IVA.', 75);
+        notaIsp.forEach((linea, i) => doc.text(linea, 120, yDer + i*3.6));
+        yDer += notaIsp.length*3.6 + 2;
+        doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      }
     }
 
     y = Math.max(yIzq, yDer);
-    if(cfg.hasTotales && tratamientoIvaPdf==='isp'){
-      doc.setFont('helvetica','italic'); doc.setFontSize(8);
-      doc.text('INVERSIÓN DEL SUJETO PASIVO. ART. 84.UNO.2º.F) DE LA LEY 37/1992 DEL IVA.', 15, y);
-      doc.setFont('helvetica','normal'); doc.setFontSize(9);
-      y += 5;
-    }
   }
 
   // numeración real de página, en todas las páginas del documento — se añade al final,
