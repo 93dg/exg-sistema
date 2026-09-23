@@ -746,10 +746,66 @@ table{border-collapse:collapse;width:100%;}
    tabla nueva de este tipo hereda el patrón añadiendo la clase "tbl-tarjeta-movil" a la tabla
    y su propio bloque de grid-template-areas más abajo.
    ===================================================================================== */
+/* =====================================================================================
+   DATOS COMPARTIDOS + COMPONENTE DE ESCRITORIO + COMPONENTE MÓVIL — FACTURAS.
+   La tabla de escritorio (#econ-facturas-table) sigue siendo la única fuente de datos:
+   se construye igual que siempre y de ahí salen los KPI, el orden, los filtros… El móvil
+   NO es esa tabla con columnas escondidas — es una lista de tarjetas propia
+   (#econ-facturas-lista-movil), construida por renderFacturasListaMovil() a partir de los
+   MISMOS documentos, con su propio HTML pensado para pantalla estrecha desde el principio.
+   ===================================================================================== */
+.tabla-escritorio-solo{display:block;}
+.lista-movil-solo{display:none;}
 @media(max-width:768px){
-  .tbl-tarjeta-movil{border-collapse:separate;border-spacing:0;display:block;width:100%;min-width:0 !important;}
-  .tbl-tarjeta-movil > thead{display:none;} /* la fila de cabecera de escritorio no aporta nada en tarjeta */
-  .tbl-tarjeta-movil tbody{display:block;}
+  .tabla-escritorio-solo{display:none;}
+  .lista-movil-solo{display:block;}
+
+  /* KPI compactos: 2 columnas, letra pequeña — no cuatro bloques enormes antes de llegar
+     a las facturas */
+  #facturas-kpi-strip{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
+  #facturas-kpi-strip .kpi{padding:7px 10px;}
+  #facturas-kpi-strip .kpi .lbl{font-size:10px;margin-bottom:1px;}
+  #facturas-kpi-strip .kpi .val{font-size:15px;}
+
+  /* Filtros: una sola fila compacta, con scroll horizontal si no cabe — el botón de
+     restablecer va DENTRO de la misma fila, nunca aparte */
+  .dd-filter-row-compacta{
+    flex-wrap:nowrap;overflow-x:auto;padding:8px 0;gap:6px;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none;
+  }
+  .dd-filter-row-compacta::-webkit-scrollbar{display:none;}
+  .dd-filter-row-compacta .dd-filter-btn{padding:6px 10px;font-size:12.5px;white-space:nowrap;}
+  .dd-filter-row-compacta .reset-filtros-vista{flex:0 0 auto;width:30px;padding:6px;}
+
+  /* Barra de seleccionadas: solo existe cuando hay algo marcado */
+  .barra-seleccion-movil{
+    display:flex;align-items:center;gap:8px;padding:8px 4px 0 4px;
+    border-top:1px solid var(--line);margin-top:8px;
+  }
+  .barra-seleccion-count{font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-right:auto;}
+  .barra-seleccion-movil .btn.sm{padding:5px 10px;}
+
+  .seleccionar-todo-movil{padding:8px 14px;font-size:12px;font-weight:600;color:var(--blue,#3B6FA0);text-decoration:underline;cursor:pointer;}
+
+  /* ===== TARJETA de factura ===== */
+  .factura-card-movil{
+    display:flex;flex-direction:column;gap:3px;
+    padding:12px 14px;border-bottom:1px solid var(--line);
+    cursor:pointer;
+  }
+  .factura-card-movil:active{background:var(--concrete);}
+  .fc-fila1{display:flex;align-items:center;gap:8px;}
+  .fc-check{flex:0 0 auto;width:20px;height:20px;}
+  .fc-estado{flex:1 1 auto;min-width:0;}
+  .fc-total{flex:0 0 auto;font-weight:800;font-size:16px;white-space:nowrap;}
+  .fc-cliente{font-weight:700;font-size:14.5px;margin-left:28px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fc-fila3{display:flex;align-items:center;gap:8px;margin-left:28px;font-size:12.5px;color:var(--ink-soft);}
+  .fc-meta{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fc-cobrado{flex:0 0 auto;}
+  .fc-fallos{flex:0 0 auto;background:var(--red);color:#fff;font-weight:700;font-size:11px;padding:2px 8px;border-radius:10px;}
+  .fc-mas-btn{flex:0 0 auto;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--ink-soft);}
+}
+@media(max-width:768px){
   .tbl-tarjeta-movil tbody tr{
     display:grid;grid-template-columns:22px 1fr auto;column-gap:10px;row-gap:3px;
     align-items:start;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
@@ -771,23 +827,7 @@ table{border-collapse:collapse;width:100%;}
   .tbl-tarjeta-movil .col-acciones{grid-area:acciones;text-align:right !important;}
   .tbl-tarjeta-movil .col-oculto{display:none !important;}
 
-  /* FACTURAS: estado+total · cliente · fecha/nº · cobrado/calidad · acciones */
-  #econ-facturas-table tbody tr{
-    grid-template-areas:"check estado total" "check cliente cliente" "check fecha num" "check cobrado calidad" "check . acciones";
-  }
-  #econ-facturas-table td:nth-child(1){grid-area:check;} #econ-facturas-table td:nth-child(2){grid-area:fecha;}
-  #econ-facturas-table td:nth-child(3){grid-area:num;} #econ-facturas-table td:nth-child(4){grid-area:cliente;}
-  #econ-facturas-table td:nth-child(9){grid-area:total;} #econ-facturas-table td:nth-child(10){grid-area:cobrado;}
-  #econ-facturas-table td:nth-child(11){grid-area:estado;} #econ-facturas-table td:nth-child(14){grid-area:calidad;}
-  #econ-facturas-table td:nth-child(15){grid-area:acciones;}
-  #econ-facturas-table td:nth-child(5), #econ-facturas-table td:nth-child(6), #econ-facturas-table td:nth-child(7),
-  #econ-facturas-table td:nth-child(8), #econ-facturas-table td:nth-child(12), #econ-facturas-table td:nth-child(13){display:none !important;} /* Trabajo/Base/IVA/%IVA/Gestor/Archivo */
-  #econ-facturas-table td:nth-child(2),#econ-facturas-table td:nth-child(3),#econ-facturas-table td:nth-child(10){color:var(--ink-soft);font-size:12px;}
-  #econ-facturas-table td:nth-child(3){text-align:right !important;}
-  #econ-facturas-table td:nth-child(9){font-weight:800;font-size:15px;text-align:right !important;white-space:nowrap;}
-  #econ-facturas-table td:nth-child(4){font-weight:700;font-size:14px;}
-  #econ-facturas-table td:nth-child(14){text-align:right !important;}
-  #econ-facturas-table td:nth-child(15){text-align:right !important;}
+  /* FACTURAS: presentación móvil propia, ver #econ-facturas-lista-movil / renderFacturasListaMovil() */
 
   /* ALBARANES: mismo esquema, sin Cobrado (los albaranes no llevan cobro) */
   #albaranes-table tbody tr{
@@ -2380,7 +2420,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.21</div>
+        <div class="sub">V3.22</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2928,8 +2968,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="kpi-strip" id="facturas-kpi-strip" style="margin-bottom:16px;"></div>
 
       <div class="panel">
-        <div class="panel-head" style="flex-direction:column;align-items:stretch;gap:10px;">
-          <div class="dd-filter-row">
+        <div class="panel-head" style="flex-direction:column;align-items:stretch;gap:0;padding:10px 14px;">
+          <div class="dd-filter-row dd-filter-row-compacta">
             <div class="dd-filter" id="dd-fact-anio">
               <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-fact-anio')">Año<span class="dd-caret">▾</span></button>
               <div class="dd-filter-panel"><div class="filters" id="fact-filtro-anio-chips" style="margin:0;"></div></div>
@@ -2958,19 +2998,20 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
                 </div>
               </div>
             </div>
-            <!-- acciones sobre lo seleccionado, EN LA MISMA fila que los filtros — así en móvil
-                 quedan a mano del pulgar, entre los filtros y la primera factura, sin tener que
-                 bajar a buscarlas -->
-            <div class="dd-filter-acciones-sel">
-              <button class="btn sm" id="fact-enviar-sel-btn" style="display:none;" title="Enviar seleccionadas al gestor" onclick="enviarSeleccionadasAlGestor('fact-sel-chk')">📤</button>
-              <button class="btn sm" id="fact-enviarcliente-sel-btn" style="display:none;" title="Enviar seleccionadas al cliente" onclick="enviarSeleccionadasAlCliente('fact-sel-chk')">✉</button>
-              <button class="btn sm" id="fact-imprimir-sel-btn" style="display:none;" title="Imprimir seleccionadas" onclick="imprimirSeleccionadas('fact-sel-chk')">🖨</button>
-              <button class="btn sm" style="color:var(--red);display:none;" id="fact-borrar-sel-btn" title="Borrar seleccionadas" onclick="borrarDocumentosSeleccionados('fact-sel-chk')">🗑 <span id="fact-sel-count">0</span></button>
-            </div>
+          </div>
+          <!-- Barra de seleccionadas: NO existe en el DOM visible salvo que haya algo marcado
+               (actualizarSeleccionDoc la muestra/oculta entera, no botón a botón) -->
+          <div class="barra-seleccion-movil" id="fact-barra-seleccion" style="display:none;">
+            <span class="barra-seleccion-count"><span id="fact-sel-count">0</span> seleccionada(s)</span>
+            <button class="btn sm" id="fact-enviar-sel-btn" title="Enviar seleccionadas al gestor" onclick="enviarSeleccionadasAlGestor('fact-sel-chk')">📤</button>
+            <button class="btn sm" id="fact-enviarcliente-sel-btn" title="Enviar seleccionadas al cliente" onclick="enviarSeleccionadasAlCliente('fact-sel-chk')">✉</button>
+            <button class="btn sm" id="fact-imprimir-sel-btn" title="Imprimir seleccionadas" onclick="imprimirSeleccionadas('fact-sel-chk')">🖨</button>
+            <button class="btn sm" style="color:var(--red);" id="fact-borrar-sel-btn" title="Borrar seleccionadas" onclick="borrarDocumentosSeleccionados('fact-sel-chk')">🗑</button>
           </div>
         </div>
         <div class="panel-body" style="padding:0;">
-          <table class="tbl tbl-tarjeta-movil" id="econ-facturas-table">
+          <div class="tabla-escritorio-solo" id="econ-facturas-table-wrap">
+          <table class="tbl" id="econ-facturas-table">
             <thead><tr>
               <th style="width:30px;"><input type="checkbox" id="fact-sel-todo" onchange="toggleSeleccionarTodoDoc(this,'fact-sel-chk')"></th>
               <th class="ord" onclick="ordenarTabla('econ-facturas-tbody',1,'fecha')">Fecha ⇅</th>
@@ -2991,6 +3032,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <tbody id="econ-facturas-tbody">
             </tbody>
           </table>
+          </div>
+          <!-- MÓVIL: lista de tarjetas propia, construida directamente desde los mismos datos
+               (no es la tabla de escritorio con columnas escondidas) -->
+          <div class="lista-movil-solo" id="econ-facturas-lista-movil-wrap">
+            <div class="seleccionar-todo-movil" onclick="const m=document.getElementById('fact-sel-todo'); m.checked=!m.checked; m.dispatchEvent(new Event('change'));">Seleccionar todas</div>
+            <div id="econ-facturas-lista-movil"></div>
+          </div>
         </div>
       </div>
       <div class="two-col-note">Esta sección es independiente en el menú, pero usa los mismos datos que Economía → Resumen y Rentabilidad — cualquier factura que crees aquí se refleja allí también.</div>
@@ -5650,6 +5698,21 @@ function filtrarTablaOrdenable(tbodyId){
     }
     tr.style.display = (okAnio && okTrim && okKpi && okEstado) ? '' : 'none';
   });
+  if(tbodyId==='econ-facturas-tbody') sincronizarListaMovilFacturas();
+}
+// La lista móvil de facturas NUNCA decide por su cuenta qué se ve ni en qué orden — copia
+// exactamente el estado (visible/oculto) y el orden de la tabla de escritorio, que sigue
+// siendo la única fuente de verdad para filtros y orden. Cero lógica de filtrado duplicada.
+function sincronizarListaMovilFacturas(){
+  const tbody = document.getElementById('econ-facturas-tbody');
+  const lista = document.getElementById('econ-facturas-lista-movil');
+  if(!tbody || !lista) return;
+  tbody.querySelectorAll('tr[data-doc-id]').forEach(tr=>{
+    const card = document.getElementById('mcard-'+tr.dataset.docId);
+    if(!card) return;
+    card.style.display = tr.style.display === 'none' ? 'none' : '';
+    lista.appendChild(card); // conserva el mismo orden que el tbody
+  });
 }
 function formatFechaCorta(dateRaw){
   if(!dateRaw) return '—';
@@ -5748,6 +5811,17 @@ function accionesDocumento(doc){
 }
 function accionesDocumentoHtml(doc){
   return accionesDocumento(doc).map(x=>`<button class="btn sm" onclick="event.stopPropagation();${x.fn}">${x.t}</button>`).join(' ');
+}
+// Menú "···" de la tarjeta móvil: mismas acciones que ya calcula accionesDocumento() para
+// esta factura (Editar aparte, porque tocar la tarjeta ya abre el documento) — ninguna
+// lógica nueva, solo una presentación compacta en vez de una fila de botones sueltos.
+function abrirMenuAccionesMovil(docId, event){
+  event?.stopPropagation();
+  const doc = documentosRealesById[docId];
+  if(!doc) return;
+  const botones = accionesDocumento(doc).filter(x=>x.t!=='Editar')
+    .map(x=>`<button class="btn" style="width:100%;text-align:left;margin-bottom:6px;" onclick="cerrarModalGenerico();${x.fn}">${x.t}</button>`).join('');
+  mostrarModalGenerico(tipoDocEtiqueta(doc.type)+' '+(doc.num||'')+' — '+doc.client, `<div style="display:flex;flex-direction:column;">${botones}</div>`);
 }
 async function avanzarFaseDocumento(id, tipoDestino){
   if(!sb) return;
@@ -5968,6 +6042,7 @@ function ordenarTabla(tbodyId, colIndex, tipo){
       if(i===colIndex) th.dataset.ordDir = dir;
     });
   }
+  if(tbodyId==='econ-facturas-tbody') sincronizarListaMovilFacturas();
 }
 
 /* ---------------- HISTÓRICO — revisión de documentos antiguos extraídos automáticamente ---------------- */
@@ -10293,14 +10368,34 @@ async function registrarRetraso(code){
 /* Clientes — se cargan de verdad desde Supabase (tabla entidades) */
 const clientes = [];
 function toggleSeleccionarTodoDoc(master, claseChk){
-  document.querySelectorAll('.'+claseChk).forEach(chk=>{ const tr = chk.closest('tr'); chk.checked = master.checked && !(tr && tr.style.display==='none'); });
+  document.querySelectorAll('.'+claseChk).forEach(chk=>{ const fila = chk.closest('tr, .factura-card-movil'); chk.checked = master.checked && !(fila && fila.style.display==='none'); });
+  // la casilla de la tarjeta móvil es solo un espejo visual — nunca se cuenta aparte,
+  // así que "seleccionar todo" también la refleja, pero la canónica (claseChk) es la única
+  // que cuentan borrarDocumentosSeleccionados/enviarSeleccionadas.../imprimirSeleccionadas
+  document.querySelectorAll('.'+claseChk+'-espejo').forEach(esp=>{
+    const canonica = document.querySelector('.'+claseChk+'[data-id="'+esp.dataset.id+'"]');
+    if(canonica) esp.checked = canonica.checked;
+  });
   actualizarSeleccionDoc(claseChk, claseChk.replace('-chk','-borrar-sel-btn'), claseChk.replace('-chk','-sel-count'));
+}
+// La tarjeta móvil solo refleja/propone el cambio — la casilla de escritorio sigue siendo
+// la única fuente real de qué está seleccionado (evita contar el mismo documento dos veces
+// en borrarDocumentosSeleccionados/enviarSeleccionadas.../imprimirSeleccionadas)
+function sincCheckMovilFactura(id, checked){
+  const canonica = document.querySelector('.fact-sel-chk[data-id="'+id+'"]');
+  if(canonica){ canonica.checked = checked; }
+  actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count');
 }
 function actualizarSeleccionDoc(claseChk, btnId, countId){
   const marcados = document.querySelectorAll('.'+claseChk+':checked');
-  const btn = document.getElementById(btnId);
   const countEl = document.getElementById(countId);
   if(countEl) countEl.textContent = marcados.length;
+  // la barra de acciones sobre lo seleccionado es un bloque único: existe o no existe,
+  // nunca botones sueltos apareciendo/desapareciendo por separado
+  const barra = document.getElementById(btnId.replace('-borrar-sel-btn', '-barra-seleccion'));
+  if(barra){ barra.style.display = marcados.length ? '' : 'none'; return; }
+  // compatibilidad con secciones que todavía no tienen la barra unificada
+  const btn = document.getElementById(btnId);
   if(btn) btn.style.display = marcados.length ? '' : 'none';
   ['-enviar-sel-btn','-enviarcliente-sel-btn','-imprimir-sel-btn'].forEach(suf=>{
     const b = document.getElementById(btnId.replace('-borrar-sel-btn', suf));
@@ -15384,6 +15479,7 @@ async function cargarDocumentosEconomicosReales(){
       if(doc.tipo==='factura'){
         const row = document.createElement('tr');
         row.id = 'docrow-'+doc.id;
+        row.dataset.docId = doc.id;
         row.onclick = () => toggleExpandirFacturaFila(doc.id);
         row.dataset.fechaIso = doc.fecha_devengo || '';
         row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : '';
@@ -15406,6 +15502,31 @@ async function cargarDocumentosEconomicosReales(){
         const cobradoLabel = cobradoNum.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
         row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td>${clienteHtml}</td><td class="mono">${trabajoHtml}</td><td class="num" data-num="${baseNum2}">${baseLabel}</td><td class="num" data-num="${ivaNum2}">${ivaLabel}</td><td class="num" data-num="${ivaPctDoc}">${ivaPctDoc}%</td><td class="num" data-num="${totalNum}">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" data-num="${cobradoNum}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-')}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
         document.getElementById('econ-facturas-tbody')?.appendChild(row);
+        // MÓVIL: misma factura, presentación propia — reutiliza exactamente los mismos
+        // valores ya calculados arriba (nunca vuelve a leer/derivar nada)
+        const listaMovil = document.getElementById('econ-facturas-lista-movil');
+        if(listaMovil){
+          const c = calidadCorta(doc);
+          const fallosHtml = c.texto==='OK' ? '' : `<span class="fc-fallos" onclick="event.stopPropagation();abrirCalidadDetalle('${doc.id}')">${c.codigos.length||1} FALLO${(c.codigos.length||1)===1?'':'S'}</span>`;
+          const estadoHtml = estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-');
+          const card = document.createElement('div');
+          card.className = 'factura-card-movil';
+          card.id = 'mcard-'+doc.id;
+          card.onclick = () => openDocumentViewer(doc.id);
+          card.innerHTML = `
+            <div class="fc-fila1">
+              <input type="checkbox" class="fc-check fact-sel-chk-espejo" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="sincCheckMovilFactura('${doc.id}', this.checked)">
+              <span class="fc-estado" onclick="event.stopPropagation();">${estadoHtml}</span>
+              <span class="fc-total">${amountLabel}</span>
+            </div>
+            <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
+            <div class="fc-fila3">
+              <span class="fc-meta">${fechaCorta} · Nº ${doc.numero||'—'}${cobradoNum ? ' · Cobrado '+cobradoLabel : ''}</span>
+              ${fallosHtml}
+              <span class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)">⋯</span>
+            </div>`;
+          listaMovil.appendChild(card);
+        }
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
         const clienteHtmlP = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '<span class="pill mantenimiento">Falta cliente</span>';
         const trabajoHtmlP = trabajo ? trabajo.code : '—';
