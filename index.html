@@ -873,90 +873,101 @@ table{border-collapse:collapse;width:100%;}
 
   .seleccionar-todo-movil{padding:8px 14px;font-size:12px;font-weight:600;color:var(--blue,#3B6FA0);text-decoration:underline;cursor:pointer;}
 
-  /* ===== TARJETA de factura — CSS Grid de áreas con NOMBRE =====
-     Cada dato tiene su celda fija: check/estado arriba, cliente, meta (fecha·nº·cobrado),
-     gestor, extra (original+calidad), y TOTAL siempre al fondo a la derecha, separado con
-     una línea — nunca junto al "···". Si un dato no existe, su grid-area entera no se
-     renderiza — el resto NUNCA se reorganiza ni cambia de fila porque las áreas están
-     fijadas de antemano, no dependen del contenido presente. El botón ··· es aparte,
-     position:absolute en la esquina superior derecha, siempre. Regla de oro: solo los
-     CONTROLES (checkbox, estado, gestor, ···, ver original, calidad) paran el toque —
-     cada uno ajustado a su contenido, nunca una celda entera, para que no queden zonas
-     "muertas". Todo lo demás abre la factura. */
+  /* ===== TARJETA de factura — diseño de la maqueta =====
+     Cada dato tiene su celda fija en la rejilla: check/estado arriba, cliente, obra, meta
+     (Nº·fecha·cobrado con divisor), Gestor, extra (original+calidad) — y TOTAL a la
+     derecha, con un divisor vertical, ocupando la misma altura que Gestor+extra. Si un
+     dato no existe, su grid-area entera no se renderiza — el resto NUNCA se reorganiza.
+     El botón ··· y el de PDF son aparte, position:absolute en la esquina superior
+     derecha, siempre. Regla de oro: solo los CONTROLES paran el toque — cada uno
+     ajustado a su contenido, nunca una celda entera. Todo lo demás abre la factura. */
   .factura-card-movil{
     position:relative;
     display:grid;
-    grid-template-columns:18px 1fr auto;
+    grid-template-columns:20px 1fr auto;
     grid-template-areas:
       "check estado estado"
       "check cliente cliente"
       "check obra obra"
       "check meta meta"
-      "check gestor gestor"
-      "check extra extra"
-      "check . total";
-    row-gap:5px;column-gap:8px;align-items:center;
-    padding:11px 34px 10px 12px;border-bottom:1px solid var(--line);
+      "check gestor total"
+      "check extra total";
+    row-gap:6px;column-gap:10px;align-items:center;
+    padding:14px 34px 14px 14px;
+    background:var(--paper);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.08);
+    margin:0 10px 10px 10px;
     cursor:pointer;
   }
+  .lista-movil-solo #econ-facturas-lista-movil{padding-top:2px;}
   .factura-card-movil:active{background:var(--concrete);}
-  /* ··· SIEMPRE en la esquina superior derecha, fuera de la rejilla — más discreto.
-     El icono de PDF se coloca justo a su izquierda, misma fila fija. */
+  /* ··· y PDF: esquina superior derecha, fuera de la rejilla */
   .fc-mas-btn{
-    position:absolute;top:9px;right:6px;
-    width:22px;height:22px;flex:none;
+    position:absolute;top:12px;right:10px;
+    width:24px;height:24px;flex:none;
     display:flex;align-items:center;justify-content:center;
-    font-size:14px;font-weight:700;color:var(--ink-soft);
+    font-size:15px;font-weight:700;color:var(--ink-soft);
     background:var(--concrete);border:none;border-radius:50%;padding:0;line-height:1;
   }
-  .fc-pdf-btn{right:32px;font-size:12px;}
+  .fc-pdf-btn{right:38px;font-size:12px;}
   .fc-mas-btn:active{background:var(--concrete-2);}
-  .fc-check{grid-area:check;align-self:start;width:17px;height:17px;margin:2px 0 0 0;}
+  .fc-check{grid-area:check;align-self:start;width:18px;height:18px;margin:2px 0 0 0;}
   .fc-estado-wrap{grid-area:estado;display:inline-flex;justify-self:start;}
-  .fc-estado-wrap .pill{font-size:10px;padding:2px 8px;font-weight:700;}
-  /* TOTAL: siempre al fondo, a la derecha, separado con una línea propia — nunca pegado
-     al "···" ni a ningún otro control */
-  .fc-total{
-    grid-area:total;text-align:right;font-weight:800;font-size:15px;white-space:nowrap;
-    padding-top:6px;margin-top:2px;border-top:1px solid var(--line);
+  /* Pastilla de estado con punto de color delante, como en la maqueta */
+  .fc-estado-wrap .pill{font-size:11.5px;padding:5px 12px 5px 10px;font-weight:700;display:inline-flex;align-items:center;gap:6px;border-radius:20px;}
+  .fc-estado-wrap .pill::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;flex:none;}
+  .fc-cliente{grid-area:cliente;font-weight:800;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fc-obra{grid-area:obra;font-size:13px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* Nº · Fecha · Cobrado, con iconos y divisores — línea propia, separada del resto con
+     una raya debajo (igual que en la maqueta) */
+  .fc-meta{
+    grid-area:meta;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    font-size:13px;color:var(--ink);padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:2px;
   }
-  .fc-cliente{grid-area:cliente;font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .fc-obra{grid-area:obra;font-size:11.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  /* Fecha + Nº: dos etiquetas pequeñas separadas visualmente, no un texto corrido — Nº
-     primero (identifica el documento), fecha después; Cobrado (si aporta algo) al final */
-  .fc-meta{grid-area:meta;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft);}
-  .fc-meta-num{font-weight:700;color:var(--ink);}
-  .fc-meta-sep{opacity:0.5;}
+  .fc-meta-ico{display:inline-flex;align-items:center;gap:5px;}
+  .fc-meta-sep{color:var(--line-dark,#ccc);}
   .fc-meta-cobrado{color:var(--green,#6FA37C);font-weight:600;}
-  /* Gestor: su propia celda fija, siempre en el mismo sitio — ahora es un desplegable real
-     (Pendiente/Enviada), igual que el de Estado, no una etiqueta fija */
-  .fc-gestor-wrap{grid-area:gestor;display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11px;}
-  .fc-gestor-label{color:var(--ink-soft);}
-  .fc-gestor-estado{font-weight:600;cursor:pointer;}
-  .fc-gestor-estado.enviada{color:var(--green,#6FA37C);}
-  .fc-gestor-estado.pendiente{color:var(--ink-soft);}
-  .fc-gestor-btn{padding:1px 7px;font-size:10px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink);}
-  .fc-gestor-btn.primary{background:var(--orange);color:#fff;border-color:var(--orange);}
+  /* Gestor: etiqueta de sección + caja real tipo desplegable + botón Enviar con icono,
+     igual que la maqueta */
+  .fc-gestor-wrap{grid-area:gestor;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;}
+  .fc-gestor-label{color:var(--ink-soft);flex:0 0 auto;}
   .gestor-dd{position:relative;display:inline-flex;}
+  .fc-gestor-estado{
+    display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;
+    padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--concrete);color:var(--ink);
+  }
+  .fc-gestor-estado::after{content:'▾';font-size:10px;color:var(--ink-soft);}
+  .fc-gestor-estado.enviada{color:var(--green,#6FA37C);}
   .gestor-dd-menu{
-    display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:60;min-width:120px;
+    display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:60;min-width:130px;
     background:var(--paper);border:1px solid var(--line-dark,#c9c2b4);border-radius:8px;
     box-shadow:0 6px 18px rgba(0,0,0,0.15);padding:6px;flex-direction:column;gap:4px;
   }
   .gestor-dd.open .gestor-dd-menu{display:flex;}
-  .gestor-dd-menu .fc-gestor-estado{padding:4px 8px;border-radius:6px;text-align:left;}
+  .gestor-dd-menu .fc-gestor-estado{padding:6px 9px;border:none;background:none;font-size:12.5px;}
+  .gestor-dd-menu .fc-gestor-estado::after{content:'';}
   .gestor-dd-menu .fc-gestor-estado:active{background:var(--concrete);}
-  /* Extra: Original + Calidad SIEMPRE juntos en esta misma celda fija, nunca mezclados
-     con la línea de Gestor — si ninguno existe, la celda no se renderiza y no deja hueco */
-  .fc-extra{grid-area:extra;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
-  .fc-ver-original{color:var(--blue,#3B6FA0);font-weight:600;font-size:11px;}
-  /* Insignia de fallo rediseñada: texto en rojo con un punto, no un bloque sólido enorme —
-     se ve, pero no domina la tarjeta */
-  .fc-fallos{
-    display:inline-flex;align-items:center;gap:4px;
-    color:var(--red);font-weight:700;font-size:11px;
+  .fc-gestor-btn.primary{
+    display:inline-flex;align-items:center;gap:7px;
+    padding:8px 16px;font-size:13px;font-weight:700;border-radius:10px;border:none;
+    background:var(--orange);color:#fff;
   }
-  .fc-fallos::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--red);}
+  /* Extra: Original + Calidad juntos, línea propia bajo Gestor */
+  .fc-extra{grid-area:extra;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;}
+  .fc-ver-original{display:inline-flex;align-items:center;gap:6px;color:var(--blue,#3B6FA0);font-weight:600;}
+  .fc-fallos{
+    display:inline-flex;align-items:center;gap:6px;
+    background:var(--red-soft);color:var(--red);font-weight:700;font-size:12px;
+    padding:5px 11px;border-radius:20px;
+  }
+  /* TOTAL: a la derecha, con divisor vertical, ocupando la misma altura que
+     Gestor+Original (grid-row automático al repetir el área en las dos filas) */
+  .fc-total-block{
+    grid-area:total;justify-self:end;align-self:center;text-align:right;
+    padding-left:14px;margin-left:2px;border-left:1px solid var(--line);
+    display:flex;flex-direction:column;gap:2px;height:100%;justify-content:center;
+  }
+  .fc-total-label{font-size:12px;color:var(--ink-soft);}
+  .fc-total-valor{font-weight:800;font-size:19px;white-space:nowrap;}
 }
 @media(max-width:768px){
   .tbl-tarjeta-movil tbody tr{
@@ -2589,7 +2600,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.39</div>
+        <div class="sub">V3.40</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -15641,12 +15652,12 @@ async function toggleEnviadoGestor(id){
 // nunca dos plantillas que puedan desincronizarse).
 function gestorMovilHtml(id, enviado, fecha){
   const ddId = 'gestor-dd-'+id;
-  const estadoTexto = enviado ? 'Enviada ✓' : 'Pendiente';
+  const estadoTexto = enviado ? 'Enviada' : 'Pendiente';
   const estadoClase = enviado ? 'enviada' : 'pendiente';
-  const enviarBtn = enviado ? '' : `<button class="fc-gestor-btn primary" onclick="event.stopPropagation();enviarAlGestorDoc('${id}')" title="Enviar por correo al gestor">Enviar</button>`;
-  return `<span class="fc-gestor-label">Gestor:</span>
+  const enviarBtn = enviado ? '' : `<button class="fc-gestor-btn primary" onclick="event.stopPropagation();enviarAlGestorDoc('${id}')" title="Enviar por correo al gestor">➤ Enviar</button>`;
+  return `<span class="fc-gestor-label">Gestor</span>
     <div class="gestor-dd" id="${ddId}" data-doc-id="${id}">
-      <span class="fc-gestor-estado ${estadoClase}" onclick="event.stopPropagation();toggleGestorDropdown('${ddId}')" title="${enviado ? 'Enviada el '+(fecha||'') : 'Pendiente'} — toca para cambiar">${estadoTexto} ▾</span>
+      <span class="fc-gestor-estado ${estadoClase}" onclick="event.stopPropagation();toggleGestorDropdown('${ddId}')" title="${enviado ? 'Enviada el '+(fecha||'') : 'Pendiente'} — toca para cambiar">${estadoTexto}</span>
       <div class="gestor-dd-menu">
         <span class="fc-gestor-estado pendiente" onclick="event.stopPropagation();cambiarGestorDesdeMenu('${id}', false, '${ddId}')">Pendiente</span>
         <span class="fc-gestor-estado enviada" onclick="event.stopPropagation();cambiarGestorDesdeMenu('${id}', true, '${ddId}')">Enviada</span>
@@ -15874,7 +15885,7 @@ async function cargarDocumentosEconomicosReales(){
         const listaMovil = document.getElementById('econ-facturas-lista-movil');
         if(listaMovil){
           const c = calidadCorta(doc);
-          const fallosHtml = c.texto==='OK' ? '' : `<span class="fc-fallos" onclick="event.stopPropagation();abrirCalidadDetalle('${doc.id}')">${c.codigos.length||1} FALLO${(c.codigos.length||1)===1?'':'S'}</span>`;
+          const fallosHtml = c.texto==='OK' ? '' : `<span class="fc-fallos" onclick="event.stopPropagation();abrirCalidadDetalle('${doc.id}')">⚠ ${c.codigos.length||1} FALLO${(c.codigos.length||1)===1?'':'S'}</span>`;
           // el ID del desplegable de estado tiene que ser DISTINTO al de la fila de escritorio
           // (aunque esté oculta) — si no, un toque en móvil abre el desplegable escondido
           const estadoHtml = estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-m-');
@@ -15887,7 +15898,7 @@ async function cargarDocumentosEconomicosReales(){
           const extraHtml = (verOriginalHtml || fallosHtml) ? `<div class="fc-extra">${verOriginalHtml}${fallosHtml}</div>` : '';
           const nombreObra = (trabajo && trabajo.code) || doc.obra_texto || '';
           const obraHtml = nombreObra ? `<div class="fc-obra">${nombreObra}</div>` : '';
-          const metaHtml = `<span class="fc-meta-num">Nº ${doc.numero||'—'}</span><span class="fc-meta-sep">·</span><span>${fechaCorta}</span>${cobradoNum ? '<span class="fc-meta-sep">·</span><span class="fc-meta-cobrado">Cobrado '+cobradoLabel+'</span>' : ''}`;
+          const metaHtml = `<span class="fc-meta-ico">📄 Nº ${doc.numero||'—'}</span><span class="fc-meta-sep">|</span><span class="fc-meta-ico">📅 ${fechaCorta}</span>${cobradoNum ? '<span class="fc-meta-sep">|</span><span class="fc-meta-cobrado">Cobrado '+cobradoLabel+'</span>' : ''}`;
           const card = document.createElement('div');
           card.className = 'factura-card-movil';
           card.id = 'mcard-'+doc.id;
@@ -15898,12 +15909,12 @@ async function cargarDocumentosEconomicosReales(){
             <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
             <input type="checkbox" class="fc-check fact-sel-chk-espejo" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="sincCheckMovilFactura('${doc.id}', this.checked)">
             <span class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}</span>
-            <span class="fc-total">${amountLabel}</span>
             <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
             ${obraHtml}
             <div class="fc-meta">${metaHtml}</div>
             <div class="fc-gestor-wrap celda-gestor-movil-${doc.id}" onclick="event.stopPropagation();">${gestorMovilHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha)}</div>
-            ${extraHtml}`;
+            ${extraHtml}
+            <div class="fc-total-block"><span class="fc-total-label">Total</span><span class="fc-total-valor">${amountLabel}</span></div>`;
           listaMovil.appendChild(card);
         }
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
