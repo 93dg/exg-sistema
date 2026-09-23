@@ -5111,6 +5111,13 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       <summary>Más acciones</summary>
       <div class="ie-more-body">
         <span id="ni-otras-acciones" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:12px;color:var(--ink-soft);font-weight:600;">Mover a:</span>
+          <button type="button" class="btn sm" onclick="moverDocumentoA('factura')">Factura</button>
+          <button type="button" class="btn sm" onclick="moverDocumentoA('albaran')">Albarán</button>
+          <button type="button" class="btn sm" onclick="moverDocumentoA('presupuesto')">Presupuesto</button>
+          <button type="button" class="btn sm" onclick="moverDocumentoA('proforma')">Proforma</button>
+        </div>
         <button type="button" class="btn sm" onclick="document.getElementById('ie-dictado').classList.toggle('open')">📝 Rellenar desde texto o foto</button>
         <button type="button" id="ni-ver-original" onclick="abrirVisorArchivoOriginal()" class="btn sm" style="display:none;">📎 Ver archivo original</button>
       </div>
@@ -16336,6 +16343,20 @@ function openJobDrawer(code){
   }
 
   document.getElementById('drawer-overlay').classList.add('active');
+}
+async function moverDocumentoA(nuevoTipo){
+  if(!editingDocId || !sb) return;
+  const doc = documentosRealesById[editingDocId];
+  if(!doc) return;
+  if(doc.type === nuevoTipo){ mostrarToast('Ya es '+nuevoTipo); return; }
+  const TIPOS = {factura:'Factura', albaran:'Albarán', presupuesto:'Presupuesto', proforma:'Proforma'};
+  if(!(await confirmarAccion(`¿Mover este documento de ${TIPOS[doc.type]||doc.type} a ${TIPOS[nuevoTipo]}?`))) return;
+  const {error} = await sb.from('documentos_economicos').update({tipo: nuevoTipo}).eq('id', editingDocId);
+  if(error){ mostrarToast('Error: '+errText(error)); return; }
+  doc.type = nuevoTipo;
+  mostrarToast('Movido a '+TIPOS[nuevoTipo], 'ok');
+  closeDrawer();
+  if(typeof cargarDatosReales==='function') cargarDatosReales();
 }
 function closeDrawer(){ document.getElementById('drawer-overlay').classList.remove('active'); }
 
