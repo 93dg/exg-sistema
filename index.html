@@ -475,7 +475,7 @@ table{border-collapse:collapse;width:100%;}
      no tiene sentido gastar dos líneas en dos campos tan cortos */
   .ie-nf-row{flex-wrap:nowrap !important;gap:8px !important;}
   .ie-nf-row .field{flex:1 1 50% !important;min-width:0 !important;}
-  .ie-nf-row .field input{width:100% !important;}
+  .ie-nf-row .field input{width:100% !important;box-sizing:border-box !important;}
   .ie-actions{flex-wrap:wrap !important;margin:0 12px 16px 12px !important;}
   .ie-actions > *{flex:1 1 45% !important;min-width:0 !important;}
   /* el bloque "Pasar a…" es la excepción deliberada: select + flecha SIEMPRE en una sola
@@ -806,25 +806,39 @@ table{border-collapse:collapse;width:100%;}
 
   .seleccionar-todo-movil{padding:8px 14px;font-size:12px;font-weight:600;color:var(--blue,#3B6FA0);text-decoration:underline;cursor:pointer;}
 
-  /* ===== TARJETA de factura ===== */
+  /* ===== TARJETA de factura =====
+     Regla de oro: solo los CONTROLES (checkbox, estado, gestor, ···, ver original) paran
+     el toque con stopPropagation, y cada uno se ajusta a su propio contenido (flex:0 0 auto
+     o inline-flex) — nunca un contenedor de ancho completo, para que no queden zonas
+     "muertas" que se tragan el toque sin hacer nada. Todo lo demás abre la factura. */
   .factura-card-movil{
-    display:flex;flex-direction:column;gap:3px;
-    padding:12px 14px;border-bottom:1px solid var(--line);
+    position:relative;
+    display:flex;flex-direction:column;gap:4px;
+    padding:14px 46px 14px 14px;border-bottom:1px solid var(--line);
     cursor:pointer;
   }
   .factura-card-movil:active{background:var(--concrete);}
   .fc-fila1{display:flex;align-items:center;gap:8px;}
-  .fc-check{flex:0 0 auto;width:20px;height:20px;}
-  .fc-estado{flex:1 1 auto;min-width:0;}
-  .fc-total{flex:0 0 auto;font-weight:800;font-size:16px;white-space:nowrap;}
+  .fc-check{flex:0 0 auto;width:20px;height:20px;margin:0;}
+  .fc-estado-wrap{flex:0 0 auto;display:inline-flex;}
+  .fc-total{flex:1 1 auto;text-align:right;font-weight:800;font-size:16px;white-space:nowrap;}
   .fc-cliente{font-weight:700;font-size:14.5px;margin-left:28px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .fc-fila3{display:flex;align-items:center;gap:8px;margin-left:28px;font-size:12.5px;color:var(--ink-soft);}
-  .fc-meta{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .fc-cobrado{flex:0 0 auto;}
+  .fc-meta{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .fc-fallos{flex:0 0 auto;background:var(--red);color:#fff;font-weight:700;font-size:11px;padding:2px 8px;border-radius:10px;}
-  .fc-mas-btn{flex:0 0 auto;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--ink-soft);}
-  .fc-fila4{display:flex;align-items:center;gap:6px;margin-left:28px;margin-top:2px;font-size:11.5px;}
+  .fc-fila4{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:28px;margin-top:1px;font-size:11.5px;}
+  .fc-gestor-wrap{display:inline-flex;align-items:center;gap:6px;}
   .fc-gestor-label{color:var(--ink-soft);}
+  .fc-ver-original{color:var(--blue,#3B6FA0);font-weight:600;}
+  /* ··· grande de verdad, con zona táctil cómoda, sin ocupar espacio de más gracias a
+     position:absolute (no empuja el resto de la tarjeta) */
+  .fc-mas-btn{
+    position:absolute;top:9px;right:8px;width:36px;height:36px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px;font-weight:700;color:var(--ink-soft);
+    background:var(--concrete);border:none;border-radius:50%;padding:0;line-height:1;
+  }
+  .fc-mas-btn:active{background:var(--concrete-2);}
 }
 @media(max-width:768px){
   .tbl-tarjeta-movil tbody tr{
@@ -2441,7 +2455,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.23</div>
+        <div class="sub">V3.24</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4909,7 +4923,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
          solo que agrupadas en un botón compacto en vez de dos, porque en iOS "Imprimir" no
          siempre logra el diálogo de impresión nativo (autoPrint no es fiable en Safari) y
          visualmente los dos acaban pareciendo "abrir el PDF" — pero ninguna función desaparece. -->
-    <button type="button" class="btn dark ie-pdf-movil" onclick="abrirMenuPdfMovil()">⬇ PDF / 🖨 Imprimir</button>
+    <button type="button" class="btn dark ie-pdf-movil" onclick="imprimirPDF()">⬇ PDF / 🖨 Imprimir</button>
     <button type="button" class="btn primary" id="ni-convert-btn" style="display:none;width:calc(100% - 40px);margin:0 20px 10px 20px;" onclick="convertirDocumento()">Convertir en albarán</button>
     <button type="button" class="btn" id="ni-deshacer-btn" style="display:none;color:var(--red);width:calc(100% - 40px);margin:0 20px 10px 20px;" onclick="deshacerConversion()">↺ Deshacer — volver a albarán</button>
 
@@ -15563,6 +15577,9 @@ async function cargarDocumentosEconomicosReales(){
           const c = calidadCorta(doc);
           const fallosHtml = c.texto==='OK' ? '' : `<span class="fc-fallos" onclick="event.stopPropagation();abrirCalidadDetalle('${doc.id}')">${c.codigos.length||1} FALLO${(c.codigos.length||1)===1?'':'S'}</span>`;
           const estadoHtml = estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-');
+          // VER ORIGINAL: solo si este documento tiene de verdad un archivo físico digitalizado
+          // propio — nunca se inventa uno para un documento nacido/gestionado en la web
+          const verOriginalHtml = archivoUrlReal ? `<span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${archivoUrlReal}')">📎 Ver original</span>` : '';
           const card = document.createElement('div');
           card.className = 'factura-card-movil';
           card.id = 'mcard-'+doc.id;
@@ -15570,16 +15587,19 @@ async function cargarDocumentosEconomicosReales(){
           card.innerHTML = `
             <div class="fc-fila1">
               <input type="checkbox" class="fc-check fact-sel-chk-espejo" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="sincCheckMovilFactura('${doc.id}', this.checked)">
-              <span class="fc-estado" onclick="event.stopPropagation();">${estadoHtml}</span>
+              <span class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}</span>
               <span class="fc-total">${amountLabel}</span>
             </div>
             <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
             <div class="fc-fila3">
               <span class="fc-meta">${fechaCorta} · Nº ${doc.numero||'—'}${cobradoNum ? ' · Cobrado '+cobradoLabel : ''}</span>
               ${fallosHtml}
-              <span class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)">⋯</span>
             </div>
-            <div class="fc-fila4" onclick="event.stopPropagation();"><span class="fc-gestor-label">Gestor</span>${gestorPill}</div>`;
+            <div class="fc-fila4">
+              <span class="fc-gestor-wrap" onclick="event.stopPropagation();"><span class="fc-gestor-label">Gestor</span>${gestorPill}</span>
+              ${verOriginalHtml}
+            </div>
+            <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>`;
           listaMovil.appendChild(card);
         }
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
