@@ -890,6 +890,7 @@ table{border-collapse:collapse;width:100%;}
     grid-template-areas:
       "check estado estado"
       "check cliente cliente"
+      "check obra obra"
       "check meta meta"
       "check gestor gestor"
       "check extra extra"
@@ -918,15 +919,32 @@ table{border-collapse:collapse;width:100%;}
     padding-top:6px;margin-top:2px;border-top:1px solid var(--line);
   }
   .fc-cliente{grid-area:cliente;font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .fc-meta{grid-area:meta;font-size:11.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  /* Gestor: su propia celda fija, siempre en el mismo sitio bajo Fecha·Nº·Cobrado */
+  .fc-obra{grid-area:obra;font-size:11.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fc-obra::before{content:'📍 ';}
+  /* Fecha + Nº: dos etiquetas pequeñas separadas visualmente, no un texto corrido — Nº
+     primero (identifica el documento), fecha después; Cobrado (si aporta algo) al final */
+  .fc-meta{grid-area:meta;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft);}
+  .fc-meta-num{font-weight:700;color:var(--ink);}
+  .fc-meta-sep{opacity:0.5;}
+  .fc-meta-cobrado{color:var(--green,#6FA37C);font-weight:600;}
+  /* Gestor: su propia celda fija, siempre en el mismo sitio — ahora es un desplegable real
+     (Pendiente/Enviada), igual que el de Estado, no una etiqueta fija */
   .fc-gestor-wrap{grid-area:gestor;display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11px;}
   .fc-gestor-label{color:var(--ink-soft);}
-  .fc-gestor-estado{font-weight:600;}
+  .fc-gestor-estado{font-weight:600;cursor:pointer;}
   .fc-gestor-estado.enviada{color:var(--green,#6FA37C);}
   .fc-gestor-estado.pendiente{color:var(--ink-soft);}
   .fc-gestor-btn{padding:1px 7px;font-size:10px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink);}
   .fc-gestor-btn.primary{background:var(--orange);color:#fff;border-color:var(--orange);}
+  .gestor-dd{position:relative;display:inline-flex;}
+  .gestor-dd-menu{
+    display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:60;min-width:120px;
+    background:var(--paper);border:1px solid var(--line-dark,#c9c2b4);border-radius:8px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.15);padding:6px;flex-direction:column;gap:4px;
+  }
+  .gestor-dd.open .gestor-dd-menu{display:flex;}
+  .gestor-dd-menu .fc-gestor-estado{padding:4px 8px;border-radius:6px;text-align:left;}
+  .gestor-dd-menu .fc-gestor-estado:active{background:var(--concrete);}
   /* Extra: Original + Calidad SIEMPRE juntos en esta misma celda fija, nunca mezclados
      con la línea de Gestor — si ninguno existe, la celda no se renderiza y no deja hueco */
   .fc-extra{grid-area:extra;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
@@ -2570,7 +2588,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.35</div>
+        <div class="sub">V3.36</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -15621,10 +15639,39 @@ async function toggleEnviadoGestor(id){
 // Se usa tanto al construir la tarjeta como para refrescarla tras togglear (misma función,
 // nunca dos plantillas que puedan desincronizarse).
 function gestorMovilHtml(id, enviado, fecha){
-  const label = `<span class="fc-gestor-label">Gestor:</span> `;
-  return label + (enviado
-    ? `<span class="fc-gestor-estado enviada" onclick="event.stopPropagation();toggleEnviadoGestor('${id}')" title="Enviada el ${fecha||''} — toca para desmarcar">Enviada ✓</span>`
-    : `<span class="fc-gestor-estado pendiente">Pendiente</span> <button class="fc-gestor-btn" onclick="event.stopPropagation();toggleEnviadoGestor('${id}')" title="Marcar como enviada sin mandar correo">Marcar</button><button class="fc-gestor-btn primary" onclick="event.stopPropagation();enviarAlGestorDoc('${id}')" title="Enviar por correo al gestor">Enviar</button>`);
+  const ddId = 'gestor-dd-'+id;
+  const estadoTexto = enviado ? 'Enviada ✓' : 'Pendiente';
+  const estadoClase = enviado ? 'enviada' : 'pendiente';
+  const enviarBtn = enviado ? '' : `<button class="fc-gestor-btn primary" onclick="event.stopPropagation();enviarAlGestorDoc('${id}')" title="Enviar por correo al gestor">Enviar</button>`;
+  return `<span class="fc-gestor-label">Gestor:</span>
+    <div class="gestor-dd" id="${ddId}" data-doc-id="${id}">
+      <span class="fc-gestor-estado ${estadoClase}" onclick="event.stopPropagation();toggleGestorDropdown('${ddId}')" title="${enviado ? 'Enviada el '+(fecha||'') : 'Pendiente'} — toca para cambiar">${estadoTexto} ▾</span>
+      <div class="gestor-dd-menu">
+        <span class="fc-gestor-estado pendiente" onclick="event.stopPropagation();cambiarGestorDesdeMenu('${id}', false, '${ddId}')">Pendiente</span>
+        <span class="fc-gestor-estado enviada" onclick="event.stopPropagation();cambiarGestorDesdeMenu('${id}', true, '${ddId}')">Enviada</span>
+      </div>
+    </div>
+    ${enviarBtn}`;
+}
+function toggleGestorDropdown(ddId){
+  const dd = document.getElementById(ddId);
+  if(!dd) return;
+  const wasOpen = dd.classList.contains('open');
+  document.querySelectorAll('.gestor-dd.open').forEach(e=>e.classList.remove('open'));
+  if(!wasOpen) dd.classList.add('open');
+}
+document.addEventListener('click', (ev)=>{
+  document.querySelectorAll('.gestor-dd.open').forEach(dd=>{ if(!dd.contains(ev.target)) dd.classList.remove('open'); });
+});
+// El menú solo cambia de verdad el estado si es distinto al actual — reutiliza
+// toggleEnviadoGestor (que ya guarda, refresca la tarjeta y muestra el toast) en vez de
+// duplicar esa lógica; "Enviada" desde aquí solo MARCA, no compone correo (para eso está
+// el botón Enviar, que sigue disponible mientras el gestor está en Pendiente).
+function cambiarGestorDesdeMenu(id, deseadoEnviado, ddId){
+  document.getElementById(ddId)?.classList.remove('open');
+  const doc = documentosRealesById[id];
+  if(!doc) return;
+  if(!!doc.enviado_gestor !== deseadoEnviado){ toggleEnviadoGestor(id); }
 }
 function gestorPillHtml(id, enviado, fecha){
   const doc = documentosRealesById[id];
@@ -15837,6 +15884,8 @@ async function cargarDocumentosEconomicosReales(){
           // ninguno de los dos existe, la celda entera desaparece (grid-template-rows:auto no
           // deja hueco), pero cuando existe SIEMPRE es la misma fila, nunca se mezcla con Gestor
           const extraHtml = (verOriginalHtml || fallosHtml) ? `<div class="fc-extra">${verOriginalHtml}${fallosHtml}</div>` : '';
+          const obraHtml = (trabajo && trabajo.code) ? `<div class="fc-obra">${trabajo.code}</div>` : '';
+          const metaHtml = `<span class="fc-meta-num">Nº ${doc.numero||'—'}</span><span class="fc-meta-sep">·</span><span>${fechaCorta}</span>${cobradoNum ? '<span class="fc-meta-sep">·</span><span class="fc-meta-cobrado">Cobrado '+cobradoLabel+'</span>' : ''}`;
           const card = document.createElement('div');
           card.className = 'factura-card-movil';
           card.id = 'mcard-'+doc.id;
@@ -15848,7 +15897,8 @@ async function cargarDocumentosEconomicosReales(){
             <span class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}</span>
             <span class="fc-total">${amountLabel}</span>
             <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
-            <div class="fc-meta">${fechaCorta} · Nº ${doc.numero||'—'}${cobradoNum ? ' · Cobrado '+cobradoLabel : ''}</div>
+            ${obraHtml}
+            <div class="fc-meta">${metaHtml}</div>
             <div class="fc-gestor-wrap celda-gestor-movil-${doc.id}" onclick="event.stopPropagation();">${gestorMovilHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha)}</div>
             ${extraHtml}`;
           listaMovil.appendChild(card);
