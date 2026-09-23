@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.21";
+export const VERSION_MOTOR = "motor-exg-2.22";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -462,7 +462,9 @@ const EQUIV: any = { EXCM: "EXCMO", EXMO: "EXCMO", EXM: "EXCMO", EXCMO: "EXCMO",
 // palabras que describen el TIPO de negocio, no la identidad: coincidir solo en ellas no es evidencia
 // (mismo motivo por el que "S.L."/"S.A." tampoco cuentan). Se compara por cercanía (typos incluidos:
 // "CONTRUCCIONES" sigue siendo la palabra genérica, no una parte distintiva del nombre).
-const GENERICAS_LISTA = ["CONSTRUCCIONES", "CONSTRUCCION", "PROMOCIONES", "PROMOCION", "INICIATIVA", "SERVICIOS", "AGROPECUARIA", "EXPLOTACIONES", "EXPLOTACION", "INDUSTRIAS", "MONTAJES", "TRANSPORTES", "REFORMAS", "OBRAS"];
+const GENERICAS_LISTA = ["CONSTRUCCIONES", "CONSTRUCCION", "PROMOCIONES", "PROMOCION", "INICIATIVA", "SERVICIOS", "AGROPECUARIA", "EXPLOTACIONES", "EXPLOTACION", "INDUSTRIAS", "MONTAJES", "TRANSPORTES", "REFORMAS", "OBRAS",
+  // nombres de pila muy comunes: coincidir solo en el nombre de pila (sin apellido) no basta para decir que es la misma persona
+  "JUAN", "JOSE", "MARIA", "ANTONIO", "MANUEL", "FRANCISCO", "FRANCISCA", "RAFAEL", "PEDRO", "LUIS", "MIGUEL", "CARLOS", "JESUS", "ANGEL", "ANGELA", "CARMEN", "ISABEL", "DOLORES", "PILAR", "TERESA", "ANDRES", "DAMIAN", "DAVID", "SANTIAGO", "FERNANDO", "ALONSO", "ALEJANDRO"];
 function esGenerica(w: string): boolean {
   if (/^(Y|DE|DEL|LAS|LOS)$/.test(w)) return true;
   return GENERICAS_LISTA.some((g) => w === g || (w.length >= 5 && g.length >= 5 && ((w.startsWith(g.slice(0, 5)) || g.startsWith(w.slice(0, 5))) || lev(w, g) <= 2)));
@@ -474,7 +476,7 @@ function tokensDistintivos(t: string) { return tokens(t).filter((w) => !esGeneri
 export function parecidos(a: string, b: string): boolean {
   const ta = tokens(a), tb = tokens(b);
   if (!ta.length || !tb.length) return false;
-  const cerca = (x: string, y: string) => x === y || (x.length >= 4 && y.length >= 4 && (x.startsWith(y.slice(0, 4)) || y.startsWith(x.slice(0, 4)))) || (x.length >= 5 && y.length >= 5 && lev(x, y) <= 2);
+  const cerca = (x: string, y: string) => x === y || (x.length >= 4 && y.length >= 4 && (x.startsWith(y.slice(0, 4)) || y.startsWith(x.slice(0, 4)))) || (x.length >= 5 && y.length >= 5 && x.slice(0, 2) === y.slice(0, 2) && lev(x, y) <= 2);
   const comunes = ta.filter((x) => tb.some((y) => cerca(x, y)));
   if (comunes.length / Math.min(ta.length, tb.length) < 0.5) return false;
   // coincidir solo en la palabra genérica del tipo de negocio (CONSTRUCCIONES, SERVICIOS…) no basta:
