@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.18";
+export const VERSION_MOTOR = "motor-exg-2.19";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -459,13 +459,24 @@ export function leerTexto(texto: string, anioEsperado?: string) {
 export function sinSubunidad(t: any) { return norm(t).replace(/\s*\((DEPARTAMENTO|DPTO|AREA|SERVICIO|DELEGACION|OFICINA|SECCION|PROGRAMA|PROYECTO)\b[^)]*\)?\s*$/, "").trim(); }
 export function nombreNorm(t: any) { return sinSubunidad(t).replace(/[.,]/g, " ").replace(/\s+/g, " ").trim(); }
 const EQUIV: any = { EXCM: "EXCMO", EXMO: "EXCMO", EXM: "EXCMO", EXCMO: "EXCMO", FTE: "FUENTE", FT: "FUENTE", AYTO: "AYUNTAMIENTO" };
+// palabras que describen el TIPO de negocio, no la identidad: coincidir solo en ellas no es evidencia
+// (mismo motivo por el que "S.L."/"S.A." tampoco cuentan)
+const GENERICAS = /^(CONSTRUCCION(ES)?|PROMOCION(ES)?|INICIATIVA|SERVICIOS|AGROPECUARIA|EXPLOTACION(ES)?|INDUSTRIAS|MONTAJES|TRANSPORTES|REFORMAS|OBRAS|Y|DE|DEL|LAS|LOS)$/;
 function tokens(t: string) { return nombreNorm(t).split(" ").map((w) => EQUIV[w] || w).filter((w) => w.length > 2 && !/^(SL|SA|SLU|SAL|SCP|SCA|DEL|LAS|LOS|DE)$/.test(w)); }
+// versión "distintiva": para decidir si dos nombres son la MISMA identidad, se exige solape también
+// fuera de las palabras genéricas de tipo de negocio — igual que dos SL distintas no son la misma empresa
+function tokensDistintivos(t: string) { return tokens(t).filter((w) => !GENERICAS.test(w)); }
 export function parecidos(a: string, b: string): boolean {
   const ta = tokens(a), tb = tokens(b);
   if (!ta.length || !tb.length) return false;
   const cerca = (x: string, y: string) => x === y || (x.length >= 4 && y.length >= 4 && (x.startsWith(y.slice(0, 4)) || y.startsWith(x.slice(0, 4)))) || (x.length >= 5 && y.length >= 5 && lev(x, y) <= 2);
   const comunes = ta.filter((x) => tb.some((y) => cerca(x, y)));
-  return comunes.length / Math.min(ta.length, tb.length) >= 0.5;
+  if (comunes.length / Math.min(ta.length, tb.length) < 0.5) return false;
+  // coincidir solo en la palabra genérica del tipo de negocio (CONSTRUCCIONES, SERVICIOS…) no basta:
+  // hace falta que al menos una coincidencia caiga en la parte DISTINTIVA del nombre
+  const da = tokensDistintivos(a), db = tokensDistintivos(b);
+  if (!da.length || !db.length) return true; // nombres formados solo por palabras genéricas: no se puede exigir más
+  return da.some((x) => db.some((y) => cerca(x, y)));
 }
 // CAR#4: dirección normalizada ("CL/ NUEVA N1" ≡ "CALLE NUEVA, 1")
 export function direccionNorm(t: any) {
