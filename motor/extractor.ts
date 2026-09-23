@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.15";
+export const VERSION_MOTOR = "motor-exg-2.16";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -87,7 +87,8 @@ export function clasificarTexto(t: any): Clase {
   if (/^[\d.,\s€%-]+$/.test(n)) return "importe";
   if (/\d{1,2}\/\d{1,2}\/\d{2,4}|\bHASTA\b|\bPENDIENTES?\b|\bRELACION DE\b|\bRESUMEN\b|\bLISTADO\b/.test(n)) return "titulo";
   if (/^(PER|PFEA|PROFEA|FINCA|CAMINO|CTRA\.?|CARRETERA|ARROYO|PARAJE|VEREDA|CANADA|VIA VERDE|CORTIJO)\b/.test(n)) return "obra";
-  if (/^(C\/|CL\/|CL\.|C\.\s|CALLE\b|AVDA?\.?\s|AVENIDA|PLAZA\b|PL\.|PZA|PASEO|BARRIADA|URB\.|URBANIZACION|POLIGONO|POLG\.?\s|POL\.|PLG\.?\s|P\.?\s?I\.?\s|INDUSTRIAL\s|APARTADO|APDO)/.test(n) || /\b(S\/N|N[º°O]\s?\d+)\b/.test(n)) return "direccion";
+  // CAR#8: "CLL" es abreviatura de Calle, tan válida como "CL." o "CL/"
+  if (/^(C\/|CL\/|CL\.|CLL\b|C\.\s|CALLE\b|AVDA?\.?\s|AVENIDA|PLAZA\b|PL\.|PZA|PASEO|BARRIADA|URB\.|URBANIZACION|POLIGONO|POLG\.?\s|POL\.|PLG\.?\s|P\.?\s?I\.?\s|INDUSTRIAL\s|APARTADO|APDO)/.test(n) || /\b(S\/N|N[º°O]\s?\d+)\b/.test(n)) return "direccion";
   if (new RegExp(`\\((${PROVINCIAS}|[A-Z ]{3,20})\\)\\s*,?\\s*(\\d{5})?$`).test(n) || /,?\s*\d{5}$/.test(n) && n.split(" ").length <= 6 || new RegExp(`^(${PROVINCIAS}|${OTRAS_CAPITALES})$`).test(n)) return "poblacion";
   if (/^\d{5}\b/.test(n) || new RegExp(`^[A-Z\\- .]+\\(\\s*(${PROVINCIAS})\\s*\\)$`).test(n) || /^(FUENTE[ -]?OBEJUNA|FT\.? OBEJUNA|CORDOBA|POZOBLANCO|PENARROYA[ -]PUEBLONUEVO|BELMEZ|LA GRANJUELA|VALSEQUILLO|AZUAGA|HINOJOSA DEL DUQUE)$/.test(n)) return "poblacion";
   // municipios "X DE <provincia>" y aldeas/parajes de la zona: son lugares, no clientes
