@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.17";
+export const VERSION_MOTOR = "motor-exg-2.18";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -533,6 +533,18 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
     if (!nifC) {
       const porErrata = validas.filter((e: any) => CLASES_ENTIDAD.includes(clasificarTexto(e.nombre)) && parecidos(nombreOk, e.nombre));
       if (porErrata.length === 1) return { estado: "revisar", motivo: `parecido a ${porErrata[0].nombre} (posible errata)`, ids: [porErrata[0].id] };
+      // varias candidatas por errata: si a su vez son duplicadas entre sí (mismo criterio que CAR#4), se
+      // sugiere la más usada; nunca se elige sola, siempre queda en REVISAR
+      if (porErrata.length > 1 && porErrata.every((e: any, _i: number, arr: any[]) => arr.every((f: any) => parecidos(e.nombre, f.nombre)))) {
+        if (!cache?.docsPorEntidad) {
+          const { data } = await sb.from("documentos_economicos").select("entidad_id").not("entidad_id", "is", null).range(0, 9999);
+          const m: any = {}; for (const r of data || []) m[r.entidad_id] = (m[r.entidad_id] || 0) + 1;
+          if (cache) cache.docsPorEntidad = m;
+        }
+        const docs = cache?.docsPorEntidad || {};
+        const mejor = [...porErrata].sort((a: any, b: any) => (docs[b.id] || 0) - (docs[a.id] || 0))[0];
+        return { estado: "revisar", motivo: `parecido a ${mejor.nombre} (posible errata; ${porErrata.length} fichas duplicadas)`, ids: porErrata.map((e: any) => e.id) };
+      }
     }
     const alias = (cache?.alias || (await sb.from("aprendizaje_nombres_clientes").select("variante,canonico")).data || []);
     if (cache && !cache.alias) cache.alias = alias;
