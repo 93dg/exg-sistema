@@ -490,11 +490,12 @@ table{border-collapse:collapse;width:100%;}
   .invoice-editor .ie-doc-meta, .invoice-editor .ie-payment, .invoice-editor .ie-totals{
     min-width:0 !important;flex:1 1 100% !important;
   }
-  /* Nº documento y Fecha: excepción deliberada, SIEMPRE en la misma fila y compactos —
-     no tiene sentido gastar dos líneas en dos campos tan cortos. La regla base ya usa CSS
-     Grid (más arriba, fuera de este media query) con minmax(0,1fr) para la Fecha — así
-     nunca puede desbordar su columna, sea cual sea el ancho real de pantalla, y #ni-date
-     ya lleva su propio tamaño de letra reducido para el selector nativo. */
+  /* Nº documento y Fecha: excepción deliberada al flex:1 1 100% de arriba — SIEMPRE en la
+     misma fila. Nº a ancho fijo en px (no depende de porcentajes ni del ancho de pantalla),
+     Fecha con flex:1 y min-width:0 real — la combinación estándar para que un input nunca
+     empuje más ancho del que tiene su columna. */
+  .ie-nf-row .ie-nf-num{flex:0 0 68px !important;width:68px !important;min-width:0 !important;}
+  .ie-nf-row .ie-nf-fecha{flex:1 1 0 !important;min-width:0 !important;}
   .ie-actions{flex-wrap:wrap !important;margin:0 12px 16px 12px !important;}
   .ie-actions > *{flex:1 1 45% !important;min-width:0 !important;}
   /* el bloque "Pasar a…" es la excepción deliberada: select + flecha SIEMPRE en una sola
@@ -527,14 +528,17 @@ table{border-collapse:collapse;width:100%;}
    solo lo que necesita (columna estrecha, tope 32%) y la Fecha se lleva TODO el resto
    (minmax(0,1fr): puede reducirse hasta 0 antes de desbordar, nunca empuja fuera de su
    columna). No depende de un ancho de pantalla concreto ni de píxeles fijos en los inputs. */
-.ie-nf-row{display:grid;grid-template-columns:minmax(50px,26%) minmax(0,1fr);gap:10px;align-items:start;overflow-x:hidden;}
-.ie-nf-row .field{min-width:0;}
+/* Nº + Fecha: flexbox, no grid — Nº a un ancho FIJO en px (solo necesita 3-4 dígitos,
+   nunca depende del ancho total ni de porcentajes) y Fecha se lleva TODO lo demás con
+   flex:1 y min-width:0 real, la combinación estándar para que un input nunca pueda
+   empujar más ancho del que tiene su columna. overflow-x:hidden como cinturón de
+   seguridad: pase lo que haga el control nativo de fecha por dentro, no puede salirse. */
+.ie-nf-row{display:flex;gap:10px;align-items:flex-start;overflow-x:hidden;width:100%;box-sizing:border-box;}
+.ie-nf-row .ie-nf-num{flex:0 0 68px;width:68px;min-width:0;}
+.ie-nf-row .ie-nf-fecha{flex:1 1 0;min-width:0;overflow:hidden;}
 .ie-nf-row .field input{width:100%;max-width:100%;box-sizing:border-box;min-width:0;}
-/* El selector nativo de fecha en iOS no reduce su ancho por debajo del que necesita su
-   propio texto — la única palanca real es achicar la letra: así su ancho mínimo cabe
-   siempre en la columna, sea cual sea el iPhone */
 #ni-date{font-size:14px;}
-@media(max-width:400px){ #ni-date{font-size:12.5px;} }
+@media(max-width:400px){ #ni-date{font-size:12px;} }
 .ie-nf-num input{text-align:right;}
 .ie-doc-title{font-family:'Archivo',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;color:var(--ink-soft);margin-bottom:10px;text-transform:uppercase;}
 .ie-doc-meta .field{text-align:left;}
@@ -2526,7 +2530,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.30</div>
+        <div class="sub">V3.31</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4973,13 +4977,13 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 <div class="overlay" id="newinvoice-overlay" onclick="if(event.target===this) intentarCerrarNewInvoiceModal()">
   <div class="invoice-editor">
     <div class="ie-topbar">
-      <select class="search-box ie-edit-only" id="ni-doctype" style="font-weight:600;" onchange="onDocTypeChange()">
+      <select class="search-box ie-edit-only" id="ni-doctype" style="font-weight:600;display:none;" onchange="onDocTypeChange()">
         <option value="factura">Factura</option>
         <option value="proforma">Proforma</option>
         <option value="presupuesto">Presupuesto</option>
         <option value="albaran">Albarán</option>
       </select>
-      <span class="ie-doc-explain ie-edit-only" id="ni-explain"></span>
+      <span class="ie-doc-explain ie-edit-only" id="ni-explain" style="display:none;"></span>
       <button class="close-x" onclick="intentarCerrarNewInvoiceModal()">✕</button>
     </div>
 
