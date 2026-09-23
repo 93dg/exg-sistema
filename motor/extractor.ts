@@ -7,7 +7,7 @@
    ===================================================================== */
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 export { XLSX };
-export const VERSION_MOTOR = "motor-exg-2.13";
+export const VERSION_MOTOR = "motor-exg-2.14";
 
 /* ---------------- normalización ---------------- */
 export function norm(t: any): string {
@@ -542,7 +542,9 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
     } catch (_) { /* sin similitud disponible */ }
     if (!CLASES_ENTIDAD.includes(claseC) && !(nifC && /^[A-HJ-NP-SUVW]/.test(nifC))) return { estado: "revisar", motivo: "nombre sin forma clara de entidad" };
     // CAR#2: alta automática solo con evidencia fuerte (forma de entidad + NIF oficial válido y libre)
-    const nifLibre = nifC && !ents.some((e: any) => (e.nif || "").replace(/[^A-Z0-9]/gi, "").toUpperCase() === nifC);
+    // CAR#6: un NIF "ocupado" en una ficha BASURA (Nº FACTURA, etc.) no cuenta como ocupado de verdad —
+  // esas fichas son cajones de sastre sin identidad propia, no el cliente real dueño del NIF
+  const nifLibre = nifC && !validas.some((e: any) => (e.nif || "").replace(/[^A-Z0-9]/gi, "").toUpperCase() === nifC);
     // CAR#5: DNI sin letra (8 cifras) solo vale si el nombre del archivo corrobora el nombre del cliente
     const tokensArchivo = norm(String(cand.archivo || "").split("/").pop()).replace(/[^A-Z]/g, " ").split(" ").filter((w) => w.length >= 4);
     const corroboraArchivo = nombreNorm(nombreOk).split(" ").filter((w) => w.length >= 4).some((w) => tokensArchivo.includes(w));
