@@ -3,7 +3,7 @@
 // fichas con nombres que no son entidad; documento nace "pendiente" y pasa por verificar_calidad.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import WordExtractor from "npm:word-extractor@1.0.4";
-import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/b112c24d5340a79728592c80cd639ead51c23db1/motor/extractor.ts";
+import { XLSX, leerHoja, leerTexto, textoDeRTF, resolverCliente, lineasParaGuardar, VERSION_MOTOR } from "https://raw.githubusercontent.com/93dg/exg-sistema/353ecf0c6360c066bb05e9b9a04c6b8bc43579ba/motor/extractor.ts";
 
 const BUCKET = "documentos-exg";
 
