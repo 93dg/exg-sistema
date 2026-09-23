@@ -452,6 +452,11 @@ table{border-collapse:collapse;width:100%;}
 .ie-doc-explain{flex:1;font-size:12px;color:var(--ink-soft);}
 .ie-paper{padding:26px 30px;border:1px solid var(--line);margin:20px;background:var(--paper);}
 @media(max-width:640px){ .ie-paper{padding:14px 12px;margin:10px;} }
+.ie-pdf-movil{display:none;}
+@media(max-width:640px){
+  #ie-pdf-acciones-escritorio{display:none;}
+  .ie-pdf-movil{display:block;width:calc(100% - 40px);margin:0 20px 10px 20px;}
+}
 @media(max-width:640px){
   .invoice-editor{width:100vw !important;max-width:100vw !important;margin:0 !important;border-radius:0 !important;}
   /* cualquier fila en flex dentro del editor debe poder encogerse de verdad y bajar de
@@ -466,6 +471,11 @@ table{border-collapse:collapse;width:100%;}
   .invoice-editor .ie-doc-meta, .invoice-editor .ie-payment, .invoice-editor .ie-totals{
     min-width:0 !important;flex:1 1 100% !important;
   }
+  /* Nº documento y Fecha: excepción deliberada, SIEMPRE en la misma fila y compactos —
+     no tiene sentido gastar dos líneas en dos campos tan cortos */
+  .ie-nf-row{flex-wrap:nowrap !important;gap:8px !important;}
+  .ie-nf-row .field{flex:1 1 50% !important;min-width:0 !important;}
+  .ie-nf-row .field input{width:100% !important;}
   .ie-actions{flex-wrap:wrap !important;margin:0 12px 16px 12px !important;}
   .ie-actions > *{flex:1 1 45% !important;min-width:0 !important;}
   /* el bloque "Pasar a…" es la excepción deliberada: select + flecha SIEMPRE en una sola
@@ -494,6 +504,7 @@ table{border-collapse:collapse;width:100%;}
 .ie-company-text{font-size:12px;line-height:1.55;color:var(--ink-soft);}
 .ie-company-name{font-size:12px;font-weight:400;color:var(--ink-soft);margin-bottom:2px;}
 .ie-doc-meta{text-align:right;min-width:200px;}
+.ie-nf-row{display:flex;gap:10px;justify-content:flex-end;}
 .ie-doc-title{font-family:'Archivo',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;color:var(--ink-soft);margin-bottom:10px;text-transform:uppercase;}
 .ie-doc-meta .field{text-align:left;}
 .ie-client-row{display:flex;gap:16px;margin-bottom:20px;}
@@ -760,6 +771,14 @@ table{border-collapse:collapse;width:100%;}
   .tabla-escritorio-solo{display:none;}
   .lista-movil-solo{display:block;}
 
+  /* Filtros + selección: fijos al hacer scroll — ver configurarStickyFacturas(). El CSS
+     "position:sticky" no basta aquí porque body/html tienen scroll anidado y el sticky
+     calcula mal su referencia; el JS aplica position:fixed en el momento justo. */
+  #fact-panel-head.fact-fijo{
+    position:fixed;z-index:50;background:var(--paper);box-shadow:0 2px 10px rgba(0,0,0,0.14);
+    border-radius:0;
+  }
+
   /* KPI compactos: 2 columnas, letra pequeña — no cuatro bloques enormes antes de llegar
      a las facturas */
   #facturas-kpi-strip{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
@@ -804,6 +823,8 @@ table{border-collapse:collapse;width:100%;}
   .fc-cobrado{flex:0 0 auto;}
   .fc-fallos{flex:0 0 auto;background:var(--red);color:#fff;font-weight:700;font-size:11px;padding:2px 8px;border-radius:10px;}
   .fc-mas-btn{flex:0 0 auto;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--ink-soft);}
+  .fc-fila4{display:flex;align-items:center;gap:6px;margin-left:28px;margin-top:2px;font-size:11.5px;}
+  .fc-gestor-label{color:var(--ink-soft);}
 }
 @media(max-width:768px){
   .tbl-tarjeta-movil tbody tr{
@@ -2420,7 +2441,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.22</div>
+        <div class="sub">V3.23</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2968,7 +2989,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="kpi-strip" id="facturas-kpi-strip" style="margin-bottom:16px;"></div>
 
       <div class="panel">
-        <div class="panel-head" style="flex-direction:column;align-items:stretch;gap:0;padding:10px 14px;">
+        <div class="panel-head" id="fact-panel-head" style="flex-direction:column;align-items:stretch;gap:0;padding:10px 14px;">
           <div class="dd-filter-row dd-filter-row-compacta">
             <div class="dd-filter" id="dd-fact-anio">
               <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-fact-anio')">Año<span class="dd-caret">▾</span></button>
@@ -4880,10 +4901,15 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       <button type="button" class="btn primary ie-submit" id="ni-submit" onclick="submitNewInvoice(event, false)">Crear factura</button>
       <button type="button" class="btn" id="ni-draft" onclick="submitNewInvoice(event, true)">Guardar como borrador</button>
     </div>
-    <div class="ie-actions ie-actions-secondary">
+    <div class="ie-actions ie-actions-secondary" id="ie-pdf-acciones-escritorio">
       <button type="button" class="btn dark" onclick="descargarPDF()">⬇ Descargar PDF</button>
       <button type="button" class="btn ie-edit-only" onclick="imprimirDocumento(editingDocId)">🖨 Imprimir</button>
     </div>
+    <!-- MÓVIL: el mismo PDF, las mismas dos acciones reales (descargarPDF/imprimirDocumento) —
+         solo que agrupadas en un botón compacto en vez de dos, porque en iOS "Imprimir" no
+         siempre logra el diálogo de impresión nativo (autoPrint no es fiable en Safari) y
+         visualmente los dos acaban pareciendo "abrir el PDF" — pero ninguna función desaparece. -->
+    <button type="button" class="btn dark ie-pdf-movil" onclick="abrirMenuPdfMovil()">⬇ PDF / 🖨 Imprimir</button>
     <button type="button" class="btn primary" id="ni-convert-btn" style="display:none;width:calc(100% - 40px);margin:0 20px 10px 20px;" onclick="convertirDocumento()">Convertir en albarán</button>
     <button type="button" class="btn" id="ni-deshacer-btn" style="display:none;color:var(--red);width:calc(100% - 40px);margin:0 20px 10px 20px;" onclick="deshacerConversion()">↺ Deshacer — volver a albarán</button>
 
@@ -4926,13 +4952,22 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           </div>
           <div class="ie-doc-meta">
             <div class="ie-doc-title" id="ni-title">FACTURA</div>
-            <div class="field" style="margin-bottom:8px;"><div class="l">Nº documento <span id="ni-suggest" style="font-weight:400;color:var(--ink-soft);"></span></div>
-              <input class="search-box mono" style="width:140px;text-align:right;" id="ni-docnum" oninput="sincronizarConceptoConNumero()">
+            <div class="ie-nf-row">
+              <div class="field" style="margin-bottom:8px;flex:0 0 auto;"><div class="l">Nº documento <span id="ni-suggest" style="font-weight:400;color:var(--ink-soft);"></span></div>
+                <input class="search-box mono" style="width:110px;text-align:right;" id="ni-docnum" oninput="sincronizarConceptoConNumero()">
+              </div>
+              <div class="field" style="flex:0 0 auto;"><div class="l">Fecha</div><input class="search-box" id="ni-date" type="date" required></div>
             </div>
-            <div class="field"><div class="l">Fecha</div><input class="search-box" id="ni-date" type="date" required></div>
           </div>
         </div>
 
+        <div class="ie-client-row">
+          <div class="field" style="flex:1;position:relative;"><div class="l">Trabajo asociado (opcional)</div>
+            <input class="search-box" style="width:100%;" id="ni-job" placeholder="Escribe o elige un trabajo…" autocomplete="off"
+              oninput="renderJobCombo()" onfocus="renderJobCombo()" onblur="setTimeout(()=>document.getElementById('ni-job-combo').style.display='none',150)">
+            <div id="ni-job-combo" class="combo-list"></div>
+          </div>
+        </div>
         <div class="ie-client-row">
           <div class="field" style="flex:1;"><div class="l">Cliente</div>
             <div style="display:flex;gap:8px;align-items:stretch;">
@@ -4950,11 +4985,6 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
                 style="flex:0 0 auto;white-space:nowrap;opacity:0.4;cursor:not-allowed;display:none;"
                 onclick="actualizarClienteDesdeEditor()" title="Cambia algo en los datos del cliente para poder actualizarlos">💾 Actualizar cliente</button>
             </div>
-          </div>
-          <div class="field" style="flex:1;position:relative;"><div class="l">Trabajo asociado (opcional)</div>
-            <input class="search-box" style="width:100%;" id="ni-job" placeholder="Escribe o elige un trabajo…" autocomplete="off"
-              oninput="renderJobCombo()" onfocus="renderJobCombo()" onblur="setTimeout(()=>document.getElementById('ni-job-combo').style.display='none',150)">
-            <div id="ni-job-combo" class="combo-list"></div>
           </div>
         </div>
 
@@ -11923,6 +11953,16 @@ function descargarPDF(){
 function imprimirPDF(){
   generarPDFDocumento('imprimir');
 }
+// Menú compacto móvil: las MISMAS dos funciones reales (descargarPDF/imprimirPDF), solo
+// agrupadas — nunca se pierde ninguna de las dos.
+function abrirMenuPdfMovil(){
+  mostrarModalGenerico('PDF de este documento', `
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn dark" style="width:100%;" onclick="cerrarModalGenerico();descargarPDF()">⬇ Descargar PDF</button>
+      <button class="btn" style="width:100%;" onclick="cerrarModalGenerico();imprimirPDF()">🖨 Imprimir</button>
+    </div>
+  `);
+}
 function generarPDFDocumento(accion){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'mm', format:'a4'});
@@ -13554,8 +13594,22 @@ function abrirCalidadDetalle(docId){
     return `<div class="ai-card-block"><div class="ai-card-label">${d.titulo}</div><div class="ai-card-text">${d.explicacion}</div></div>`;
   }).join('') : `<div class="ai-card-block"><div class="ai-card-label">Sin problemas</div><div class="ai-card-text">Este documento está validado.</div></div>`;
   const puedeReprocesar = doc.archivo_path && c.codigos.some(cod=>CALIDAD_DETALLE[cod]?.corregible);
+  // Trazabilidad real: si este documento nace de otro (proforma→factura, albarán→proforma…),
+  // no tiene por qué tener archivo propio — lo que tiene es un DOCUMENTO ORIGEN, y esa cadena
+  // puede a su vez llegar a un archivo físico más arriba. Se muestra siempre que exista,
+  // independientemente de si hay fallos de calidad o no.
+  const origen = doc.documento_anterior_id ? documentosRealesById[doc.documento_anterior_id] : null;
+  const bloqueOrigen = doc.documento_anterior_id
+    ? `<div class="ai-card-block" style="border-color:var(--blue,#3B6FA0);">
+        <div class="ai-card-label">DOCUMENTO ORIGEN</div>
+        <div class="ai-card-text">${origen ? `${tipoDocEtiqueta(origen.type)} Nº ${origen.num||origen.numero||'—'}${origen.archivo_path ? ' · tiene archivo original propio' : ''}` : 'Documento anterior en el expediente (id '+doc.documento_anterior_id.slice(0,8)+'…)'}
+          <br><span class="link-btn" onclick="cerrarModalGenerico();openDocumentViewer('${doc.documento_anterior_id}')">Ver documento origen →</span>
+        </div>
+      </div>`
+    : '';
   mostrarModalGenerico('Calidad de este documento', `
     <div style="margin-bottom:10px;font-size:13px;color:var(--ink-soft);">${tipoDocEtiqueta(doc.type)} ${doc.num||doc.numero||''} — ${doc.client||'sin cliente'}</div>
+    ${bloqueOrigen}
     ${bloques}
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
       ${puedeReprocesar ? `<button class="ai-btn primary" onclick="reprocesarUnDocumento('${docId}')">🔁 Reprocesar este documento</button>` : ''}
@@ -15524,7 +15578,8 @@ async function cargarDocumentosEconomicosReales(){
               <span class="fc-meta">${fechaCorta} · Nº ${doc.numero||'—'}${cobradoNum ? ' · Cobrado '+cobradoLabel : ''}</span>
               ${fallosHtml}
               <span class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)">⋯</span>
-            </div>`;
+            </div>
+            <div class="fc-fila4" onclick="event.stopPropagation();"><span class="fc-gestor-label">Gestor</span>${gestorPill}</div>`;
           listaMovil.appendChild(card);
         }
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
@@ -15606,7 +15661,54 @@ function conceptoDeFactura(numero){
   if(!numero) return '';
   return 'F' + String(numero).replace(/^[A-Za-z]+/,'').trim();
 }
+// Cabecera de filtros/selección de Facturas: fija al hacer scroll en móvil. No se usa
+// position:sticky porque body/html tienen scroll anidado en esta app y sticky calcula mal
+// su referencia (comprobado) — se fija con position:fixed en el momento justo, con un
+// hueco (spacer) de la misma altura para que el contenido no dé un salto.
+function configurarStickyFacturas(){
+  const head = document.getElementById('fact-panel-head');
+  if(!head || head.dataset.stickyListo) return;
+  head.dataset.stickyListo = '1';
+  const panel = head.closest('.panel');
+  const spacer = document.createElement('div');
+  spacer.id = 'fact-panel-head-spacer';
+  spacer.style.display = 'none';
+  head.after(spacer);
+  let offsetTop = null, fijo = false;
+  function quitarFijo(){
+    head.classList.remove('fact-fijo');
+    head.style.top = ''; head.style.left = ''; head.style.width = '';
+    spacer.style.display = 'none';
+    fijo = false;
+  }
+  function actualizar(){
+    if(window.innerWidth > 768 || !panel || panel.offsetParent === null){ if(fijo) quitarFijo(); offsetTop = null; return; }
+    if(offsetTop === null) offsetTop = head.getBoundingClientRect().top + window.scrollY;
+    const debeFijar = window.scrollY > offsetTop - 2;
+    if(debeFijar && !fijo){
+      const rect = head.getBoundingClientRect();
+      spacer.style.height = rect.height + 'px';
+      spacer.style.display = 'block';
+      head.style.left = rect.left + 'px';
+      head.style.width = rect.width + 'px';
+      head.style.top = 'env(safe-area-inset-top, 0px)';
+      head.classList.add('fact-fijo');
+      fijo = true;
+    } else if(!debeFijar && fijo){
+      quitarFijo();
+    } else if(fijo){
+      // el ancho puede cambiar si gira el móvil o cambia el layout — se mantiene alineado
+      const rectPanel = panel.getBoundingClientRect();
+      head.style.left = rectPanel.left + 'px';
+      head.style.width = rectPanel.width + 'px';
+    }
+  }
+  window.addEventListener('scroll', actualizar, {passive:true});
+  window.addEventListener('resize', ()=>{ offsetTop = null; quitarFijo(); actualizar(); });
+  actualizar();
+}
 cargarDatosEmpresa();
+configurarStickyFacturas();
 cargarDocumentosEconomicosReales();
 (function(){
   const vistaGuardada = localStorage.getItem('vista_activa');
