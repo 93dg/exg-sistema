@@ -472,10 +472,14 @@ table{border-collapse:collapse;width:100%;}
     min-width:0 !important;flex:1 1 100% !important;
   }
   /* Nº documento y Fecha: excepción deliberada, SIEMPRE en la misma fila y compactos —
-     no tiene sentido gastar dos líneas en dos campos tan cortos */
+     no tiene sentido gastar dos líneas en dos campos tan cortos. Proporción real (no
+     píxeles fijos): Nº ocupa lo justo para 3-4 dígitos, Fecha se lleva el resto del
+     ancho disponible — así el selector nativo de fecha (que impone su propio ancho
+     mínimo según el idioma) siempre tiene sitio, sea cual sea el iPhone. */
   .ie-nf-row{flex-wrap:nowrap !important;gap:8px !important;}
-  .ie-nf-row .field{flex:1 1 50% !important;min-width:0 !important;}
-  .ie-nf-row .field input{width:100% !important;box-sizing:border-box !important;}
+  .ie-nf-row .field:first-child{flex:0 0 32% !important;min-width:0 !important;max-width:32% !important;}
+  .ie-nf-row .field:last-child{flex:1 1 68% !important;min-width:0 !important;}
+  .ie-nf-row .field input{width:100% !important;max-width:100% !important;box-sizing:border-box !important;padding-left:8px !important;padding-right:6px !important;font-size:13px !important;}
   .ie-actions{flex-wrap:wrap !important;margin:0 12px 16px 12px !important;}
   .ie-actions > *{flex:1 1 45% !important;min-width:0 !important;}
   /* el bloque "Pasar a…" es la excepción deliberada: select + flecha SIEMPRE en una sola
@@ -807,38 +811,45 @@ table{border-collapse:collapse;width:100%;}
   .seleccionar-todo-movil{padding:8px 14px;font-size:12px;font-weight:600;color:var(--blue,#3B6FA0);text-decoration:underline;cursor:pointer;}
 
   /* ===== TARJETA de factura =====
-     Regla de oro: solo los CONTROLES (checkbox, estado, gestor, ···, ver original) paran
-     el toque con stopPropagation, y cada uno se ajusta a su propio contenido (flex:0 0 auto
-     o inline-flex) — nunca un contenedor de ancho completo, para que no queden zonas
-     "muertas" que se tragan el toque sin hacer nada. Todo lo demás abre la factura. */
+     Orden fijo: [check] ESTADO...TOTAL / CLIENTE / FECHA·Nº·COBRADO...··· / GESTOR (+CALIDAD
+     si hay fallo). Regla de oro: solo los CONTROLES (checkbox, estado, gestor, ···, ver
+     original, calidad) paran el toque con stopPropagation, y cada uno se ajusta a su propio
+     contenido (flex:0 0 auto o inline-flex) — nunca un contenedor de ancho completo, para que
+     no queden zonas "muertas" que se tragan el toque sin hacer nada. Todo lo demás abre la
+     factura. Compacto: menos altura y aire que antes. */
   .factura-card-movil{
-    position:relative;
-    display:flex;flex-direction:column;gap:4px;
-    padding:14px 46px 14px 14px;border-bottom:1px solid var(--line);
+    display:flex;flex-direction:column;gap:3px;
+    padding:10px 12px;border-bottom:1px solid var(--line);
     cursor:pointer;
   }
   .factura-card-movil:active{background:var(--concrete);}
   .fc-fila1{display:flex;align-items:center;gap:8px;}
-  .fc-check{flex:0 0 auto;width:20px;height:20px;margin:0;}
+  .fc-check{flex:0 0 auto;width:19px;height:19px;margin:0;}
   .fc-estado-wrap{flex:0 0 auto;display:inline-flex;}
-  .fc-total{flex:1 1 auto;text-align:right;font-weight:800;font-size:16px;white-space:nowrap;}
-  .fc-cliente{font-weight:700;font-size:14.5px;margin-left:28px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .fc-fila3{display:flex;align-items:center;gap:8px;margin-left:28px;font-size:12.5px;color:var(--ink-soft);}
-  .fc-meta{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .fc-fallos{flex:0 0 auto;background:var(--red);color:#fff;font-weight:700;font-size:11px;padding:2px 8px;border-radius:10px;}
-  .fc-fila4{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:28px;margin-top:1px;font-size:11.5px;}
-  .fc-gestor-wrap{display:inline-flex;align-items:center;gap:6px;}
-  .fc-gestor-label{color:var(--ink-soft);}
-  .fc-ver-original{color:var(--blue,#3B6FA0);font-weight:600;}
-  /* ··· grande de verdad, con zona táctil cómoda, sin ocupar espacio de más gracias a
-     position:absolute (no empuja el resto de la tarjeta) */
+  .fc-estado-wrap .pill{font-size:11.5px;padding:3px 10px;}
+  .fc-total{flex:1 1 auto;text-align:right;font-weight:800;font-size:15.5px;white-space:nowrap;}
+  .fc-cliente{font-weight:700;font-size:14px;margin-left:27px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fc-fila3{display:flex;align-items:center;gap:8px;margin-left:27px;font-size:12px;color:var(--ink-soft);}
+  .fc-meta{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* ··· visible pero sin protagonismo: dentro de la fila, no flotando encima de nada */
   .fc-mas-btn{
-    position:absolute;top:9px;right:8px;width:36px;height:36px;
+    flex:0 0 auto;width:26px;height:26px;
     display:flex;align-items:center;justify-content:center;
-    font-size:20px;font-weight:700;color:var(--ink-soft);
+    font-size:16px;font-weight:700;color:var(--ink-soft);
     background:var(--concrete);border:none;border-radius:50%;padding:0;line-height:1;
   }
   .fc-mas-btn:active{background:var(--concrete-2);}
+  /* Gestor+Calidad: solo esta fila existe cuando aporta algo, siempre en una línea */
+  .fc-fila4{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:27px;font-size:11.5px;}
+  .fc-gestor-wrap{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;}
+  .fc-gestor-label{color:var(--ink-soft);}
+  .fc-gestor-estado{font-weight:600;}
+  .fc-gestor-estado.enviada{color:var(--green,#6FA37C);}
+  .fc-gestor-estado.pendiente{color:var(--ink-soft);}
+  .fc-gestor-btn{padding:2px 8px;font-size:10.5px;border-radius:12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);}
+  .fc-gestor-btn.primary{background:var(--orange);color:#fff;border-color:var(--orange);}
+  .fc-ver-original{color:var(--blue,#3B6FA0);font-weight:600;font-size:11.5px;}
+  .fc-fallos{flex:0 0 auto;background:var(--red);color:#fff;font-weight:700;font-size:10.5px;padding:2px 8px;border-radius:10px;}
 }
 @media(max-width:768px){
   .tbl-tarjeta-movil tbody tr{
@@ -895,6 +906,9 @@ table{border-collapse:collapse;width:100%;}
 }
 
 .dd-filter{position:relative;}
+.dd-orden-resumen{font-weight:700;color:var(--orange);}
+.chip-orden.active{background:var(--orange);color:#fff;border-color:var(--orange);}
+.orden-flecha{font-weight:800;}
 .dd-filter-btn{
   display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;
   background:var(--concrete);border:1px solid var(--line);color:var(--ink-soft);
@@ -2455,7 +2469,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.24</div>
+        <div class="sub">V3.25</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3033,7 +3047,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
                 </div>
               </div>
             </div>
+            <!-- ORDENAR POR — mismo patrón compacto reutilizable para Proformas/Presupuestos/
+                 Albaranes: construido por generarOrdenDropdown(), recuerda la última elección
+                 igual que los demás filtros (localStorage, por tabla) -->
+            <div class="dd-filter dd-filter-orden" id="dd-fact-orden">
+              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-fact-orden')">Ordenar<span id="fact-orden-resumen" class="dd-orden-resumen"></span><span class="dd-caret">▾</span></button>
+              <div class="dd-filter-panel">
+                <div class="filters" id="fact-orden-chips" style="margin:0;"></div>
+              </div>
+            </div>
           </div>
+
           <!-- Barra de seleccionadas: NO existe en el DOM visible salvo que haya algo marcado
                (actualizarSeleccionDoc la muestra/oculta entera, no botón a botón) -->
           <div class="barra-seleccion-movil" id="fact-barra-seleccion" style="display:none;">
@@ -5747,6 +5771,72 @@ function filtrarTablaOrdenable(tbodyId){
 // La lista móvil de facturas NUNCA decide por su cuenta qué se ve ni en qué orden — copia
 // exactamente el estado (visible/oculto) y el orden de la tabla de escritorio, que sigue
 // siendo la única fuente de verdad para filtros y orden. Cero lógica de filtrado duplicada.
+// ===== ORDENAR POR — desplegable compacto, reutilizable para cualquier tabla de documentos =====
+// campos: [ [clave, etiqueta, colIndex, tipo], ... ]. Recuerda la última elección por tabla
+// (localStorage), igual que ya hacen los demás filtros — y usa el mismo ordenarTabla() que
+// ya tenían las cabeceras de escritorio, así no hay una segunda lógica de ordenación.
+function configurarOrdenDropdown(tbodyId, chipsId, resumenId, campos){
+  const cont = document.getElementById(chipsId);
+  const resumen = document.getElementById(resumenId);
+  if(!cont) return;
+  const claveGuardado = 'orden_'+tbodyId;
+  cont.innerHTML = campos.map(([clave,label])=>
+    `<div class="chip-filter chip-orden" data-clave="${clave}" onclick="aplicarOrdenDropdown('${tbodyId}','${chipsId}','${resumenId}','${clave}')">${label}<span class="orden-flecha"></span></div>`
+  ).join('');
+  cont.dataset.campos = JSON.stringify(campos);
+  const guardado = JSON.parse(localStorage.getItem(claveGuardado) || 'null');
+  if(guardado) pintarOrdenActivo(chipsId, resumenId, guardado.clave, guardado.dir, campos);
+}
+function aplicarOrdenDropdown(tbodyId, chipsId, resumenId, clave){
+  const cont = document.getElementById(chipsId);
+  const campos = JSON.parse(cont.dataset.campos || '[]');
+  const campo = campos.find(c=>c[0]===clave);
+  if(!campo) return;
+  const claveGuardado = 'orden_'+tbodyId;
+  const anterior = JSON.parse(localStorage.getItem(claveGuardado) || 'null');
+  const dir = (anterior && anterior.clave===clave && anterior.dir==='asc') ? 'desc' : 'asc';
+  const [,, colIndex, tipo] = campo;
+  const tbody = document.getElementById(tbodyId);
+  if(tbody){
+    // se deja en el sentido CONTRARIO al deseado: el toggle interno de ordenarTabla() lo
+    // deja exactamente en "dir" — así no hay una segunda lógica de ordenación en paralelo
+    tbody.dataset.ordCol = colIndex;
+    tbody.dataset.ordDir = dir==='asc' ? 'desc' : 'asc';
+    ordenarTabla(tbodyId, colIndex, tipo);
+  }
+  localStorage.setItem(claveGuardado, JSON.stringify({clave, dir}));
+  pintarOrdenActivo(chipsId, resumenId, clave, dir, campos);
+}
+function pintarOrdenActivo(chipsId, resumenId, clave, dir, campos){
+  const cont = document.getElementById(chipsId);
+  const resumen = document.getElementById(resumenId);
+  if(!cont) return;
+  cont.querySelectorAll('.chip-orden').forEach(ch=>{
+    const activo = ch.dataset.clave===clave;
+    ch.classList.toggle('active', activo);
+    ch.querySelector('.orden-flecha').textContent = activo ? (dir==='asc' ? ' ↑' : ' ↓') : '';
+  });
+  if(resumen){
+    const campo = campos.find(c=>c[0]===clave);
+    resumen.textContent = campo ? `: ${campo[1]} ${dir==='asc'?'↑':'↓'}` : '';
+  }
+}
+// Aplica el orden ya guardado por el usuario tras (re)cargar las filas — se llama una vez
+// que la tabla tiene datos; si no hay nada guardado, no hace nada (queda el orden natural).
+function aplicarOrdenGuardadoSiExiste(tbodyId, chipsId){
+  const guardado = JSON.parse(localStorage.getItem('orden_'+tbodyId) || 'null');
+  const cont = document.getElementById(chipsId);
+  if(!guardado || !cont) return;
+  const campos = JSON.parse(cont.dataset.campos || '[]');
+  const campo = campos.find(c=>c[0]===guardado.clave);
+  if(!campo) return;
+  const [,, colIndex, tipo] = campo;
+  const tbody = document.getElementById(tbodyId);
+  if(!tbody) return;
+  tbody.dataset.ordCol = colIndex;
+  tbody.dataset.ordDir = guardado.dir==='asc' ? 'desc' : 'asc';
+  ordenarTabla(tbodyId, colIndex, tipo);
+}
 function sincronizarListaMovilFacturas(){
   const tbody = document.getElementById('econ-facturas-tbody');
   const lista = document.getElementById('econ-facturas-lista-movil');
@@ -15576,13 +15666,20 @@ async function cargarDocumentosEconomicosReales(){
         if(listaMovil){
           const c = calidadCorta(doc);
           const fallosHtml = c.texto==='OK' ? '' : `<span class="fc-fallos" onclick="event.stopPropagation();abrirCalidadDetalle('${doc.id}')">${c.codigos.length||1} FALLO${(c.codigos.length||1)===1?'':'S'}</span>`;
-          const estadoHtml = estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-');
+          // el ID del desplegable de estado tiene que ser DISTINTO al de la fila de escritorio
+          // (aunque esté oculta) — si no, un toque en móvil abre el desplegable escondido
+          const estadoHtml = estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-m-');
+          // Gestor en una sola línea: "Gestor: Enviada ✓" o "Gestor: Pendiente [Marcar][Enviar]"
+          const gestorMovilHtml = `<span class="fc-gestor-label">Gestor:</span> ${doc.enviado_gestor
+            ? `<span class="fc-gestor-estado enviada" onclick="event.stopPropagation();toggleEnviadoGestor('${doc.id}')" title="Enviada el ${doc.enviado_gestor_fecha||''} — toca para desmarcar">Enviada ✓</span>`
+            : `<span class="fc-gestor-estado pendiente">Pendiente</span> <button class="fc-gestor-btn" onclick="event.stopPropagation();toggleEnviadoGestor('${doc.id}')" title="Marcar como enviada sin mandar correo">Marcar</button><button class="fc-gestor-btn primary" onclick="event.stopPropagation();enviarAlGestorDoc('${doc.id}')" title="Enviar por correo al gestor">Enviar</button>`}`;
           // VER ORIGINAL: solo si este documento tiene de verdad un archivo físico digitalizado
           // propio — nunca se inventa uno para un documento nacido/gestionado en la web
-          const verOriginalHtml = archivoUrlReal ? `<span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${archivoUrlReal}')">📎 Ver original</span>` : '';
+          const verOriginalHtml = archivoUrlReal ? `<span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${archivoUrlReal}')">📎 Original</span>` : '';
           const card = document.createElement('div');
           card.className = 'factura-card-movil';
           card.id = 'mcard-'+doc.id;
+          card.dataset.docId = doc.id;
           card.onclick = () => openDocumentViewer(doc.id);
           card.innerHTML = `
             <div class="fc-fila1">
@@ -15593,13 +15690,13 @@ async function cargarDocumentosEconomicosReales(){
             <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
             <div class="fc-fila3">
               <span class="fc-meta">${fechaCorta} · Nº ${doc.numero||'—'}${cobradoNum ? ' · Cobrado '+cobradoLabel : ''}</span>
-              ${fallosHtml}
+              <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
             </div>
             <div class="fc-fila4">
-              <span class="fc-gestor-wrap" onclick="event.stopPropagation();"><span class="fc-gestor-label">Gestor</span>${gestorPill}</span>
+              <span class="fc-gestor-wrap" onclick="event.stopPropagation();">${gestorMovilHtml}</span>
               ${verOriginalHtml}
-            </div>
-            <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>`;
+              ${fallosHtml}
+            </div>`;
           listaMovil.appendChild(card);
         }
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
@@ -15658,6 +15755,8 @@ async function cargarDocumentosEconomicosReales(){
     poblarFiltroAniosChipsGenerico('presupuestos-tbody-standalone','pres-filtro-anio-chips','pres');
     poblarFiltroAniosChips('econ-facturas-tbody','fact-filtro-anio-chips');
     filtrarTablaOrdenable('econ-facturas-tbody');
+    aplicarOrdenGuardadoSiExiste('econ-facturas-tbody','fact-orden-chips');
+    sincronizarListaMovilFacturas();
     filtrarPorAnioTrim('albaranes-tbody-standalone','alb');
     filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
     calcularTotalesClientes();
@@ -15729,6 +15828,11 @@ function configurarStickyFacturas(){
 }
 cargarDatosEmpresa();
 configurarStickyFacturas();
+configurarOrdenDropdown('econ-facturas-tbody', 'fact-orden-chips', 'fact-orden-resumen', [
+  ['fecha','Fecha',1,'fecha'], ['num','Nº',2,'num'], ['cliente','Cliente',3,'text'],
+  ['total','Total',8,'num'], ['cobrado','Cobrado',9,'num'], ['estado','Estado',10,'text'],
+  ['gestor','Gestor',11,'text'], ['calidad','Calidad',13,'text'],
+]);
 cargarDocumentosEconomicosReales();
 (function(){
   const vistaGuardada = localStorage.getItem('vista_activa');
