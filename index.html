@@ -458,7 +458,15 @@ table{border-collapse:collapse;width:100%;}
   .ie-pdf-movil{display:block;width:calc(100% - 40px);margin:0 20px 10px 20px;}
 }
 @media(max-width:640px){
-  .invoice-editor{width:100vw !important;max-width:100vw !important;margin:0 !important;border-radius:0 !important;}
+  /* El modal del editor debe ocupar la pantalla entera de verdad — si no, el padding del
+     overlay (pensado para escritorio) deja un hueco al fondo donde se ve el fondo oscurecido
+     detrás, y da la sensación de que el popup "se pierde" según se hace scroll hacia abajo */
+  #newinvoice-overlay{padding:0 !important;}
+  .invoice-editor{
+    width:100vw !important;max-width:100vw !important;margin:0 !important;border-radius:0 !important;
+    height:100vh !important;max-height:100vh !important;box-sizing:border-box !important;
+    padding-bottom:env(safe-area-inset-bottom,0px) !important;
+  }
   /* cualquier fila en flex dentro del editor debe poder encogerse de verdad y bajar de
      línea — sin esto, un solo campo con texto largo (placeholder, opción larga...)
      mantenía ancha TODA la fila, y como todo cuelga del mismo contenedor, arrastraba
@@ -472,14 +480,11 @@ table{border-collapse:collapse;width:100%;}
     min-width:0 !important;flex:1 1 100% !important;
   }
   /* Nº documento y Fecha: excepción deliberada, SIEMPRE en la misma fila y compactos —
-     no tiene sentido gastar dos líneas en dos campos tan cortos. Proporción real (no
-     píxeles fijos): Nº ocupa lo justo para 3-4 dígitos, Fecha se lleva el resto del
-     ancho disponible — así el selector nativo de fecha (que impone su propio ancho
-     mínimo según el idioma) siempre tiene sitio, sea cual sea el iPhone. */
-  .ie-nf-row{flex-wrap:nowrap !important;gap:8px !important;}
-  .ie-nf-row .field:first-child{flex:0 0 32% !important;min-width:0 !important;max-width:32% !important;}
-  .ie-nf-row .field:last-child{flex:1 1 68% !important;min-width:0 !important;}
-  .ie-nf-row .field input{width:100% !important;max-width:100% !important;box-sizing:border-box !important;padding-left:8px !important;padding-right:6px !important;font-size:13px !important;}
+     no tiene sentido gastar dos líneas en dos campos tan cortos. La regla base ya usa CSS
+     Grid (más arriba, fuera de este media query) con minmax(0,1fr) para la Fecha — así
+     nunca puede desbordar su columna, sea cual sea el ancho real de pantalla. Aquí solo se
+     afina el tamaño de letra para que el selector nativo de fecha respire mejor. */
+  .ie-nf-row .field input{font-size:13px !important;}
   .ie-actions{flex-wrap:wrap !important;margin:0 12px 16px 12px !important;}
   .ie-actions > *{flex:1 1 45% !important;min-width:0 !important;}
   /* el bloque "Pasar a…" es la excepción deliberada: select + flecha SIEMPRE en una sola
@@ -508,7 +513,14 @@ table{border-collapse:collapse;width:100%;}
 .ie-company-text{font-size:12px;line-height:1.55;color:var(--ink-soft);}
 .ie-company-name{font-size:12px;font-weight:400;color:var(--ink-soft);margin-bottom:2px;}
 .ie-doc-meta{text-align:right;min-width:200px;}
-.ie-nf-row{display:flex;gap:10px;justify-content:flex-end;}
+/* Nº + Fecha: SIEMPRE en la misma fila, en escritorio y en móvil, con CSS Grid — el Nº pide
+   solo lo que necesita (columna estrecha, tope 32%) y la Fecha se lleva TODO el resto
+   (minmax(0,1fr): puede reducirse hasta 0 antes de desbordar, nunca empuja fuera de su
+   columna). No depende de un ancho de pantalla concreto ni de píxeles fijos en los inputs. */
+.ie-nf-row{display:grid;grid-template-columns:minmax(64px,32%) minmax(0,1fr);gap:10px;align-items:start;}
+.ie-nf-row .field{min-width:0;}
+.ie-nf-row .field input{width:100%;max-width:100%;box-sizing:border-box;min-width:0;}
+.ie-nf-num input{text-align:right;}
 .ie-doc-title{font-family:'Archivo',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;color:var(--ink-soft);margin-bottom:10px;text-transform:uppercase;}
 .ie-doc-meta .field{text-align:left;}
 .ie-client-row{display:flex;gap:16px;margin-bottom:20px;}
@@ -790,13 +802,13 @@ table{border-collapse:collapse;width:100%;}
   #facturas-kpi-strip .kpi .lbl{font-size:10px;margin-bottom:1px;}
   #facturas-kpi-strip .kpi .val{font-size:15px;}
 
-  /* Filtros: una sola fila compacta, con scroll horizontal si no cabe — el botón de
-     restablecer va DENTRO de la misma fila, nunca aparte */
+  /* Filtros: una sola fila compacta — SIN overflow-x:auto, porque recorta también en
+     vertical (efecto colateral del CSS) y esconde cualquier desplegable que se abra por
+     debajo, como pasaba con "Ordenar". Si algún día no caben, se envuelven a una segunda
+     línea (flex-wrap normal) en vez de perder la visibilidad de los desplegables. */
   .dd-filter-row-compacta{
-    flex-wrap:nowrap;overflow-x:auto;padding:8px 0;gap:6px;
-    -webkit-overflow-scrolling:touch;scrollbar-width:none;
+    flex-wrap:wrap;padding:8px 0;gap:6px;
   }
-  .dd-filter-row-compacta::-webkit-scrollbar{display:none;}
   .dd-filter-row-compacta .dd-filter-btn{padding:6px 10px;font-size:12.5px;white-space:nowrap;}
   .dd-filter-row-compacta .reset-filtros-vista{flex:0 0 auto;width:30px;padding:6px;}
 
@@ -811,35 +823,38 @@ table{border-collapse:collapse;width:100%;}
   .seleccionar-todo-movil{padding:8px 14px;font-size:12px;font-weight:600;color:var(--blue,#3B6FA0);text-decoration:underline;cursor:pointer;}
 
   /* ===== TARJETA de factura =====
-     Orden fijo: [check] ESTADO...TOTAL / CLIENTE / FECHA·Nº·COBRADO...··· / GESTOR (+CALIDAD
-     si hay fallo). Regla de oro: solo los CONTROLES (checkbox, estado, gestor, ···, ver
-     original, calidad) paran el toque con stopPropagation, y cada uno se ajusta a su propio
-     contenido (flex:0 0 auto o inline-flex) — nunca un contenedor de ancho completo, para que
-     no queden zonas "muertas" que se tragan el toque sin hacer nada. Todo lo demás abre la
-     factura. Compacto: menos altura y aire que antes. */
+     Orden fijo, IDÉNTICO en todas las tarjetas: [check] ESTADO...TOTAL / CLIENTE /
+     FECHA·Nº·COBRADO / GESTOR (+ORIGINAL +CALIDAD si aportan algo). El botón ··· es un
+     elemento de POSICIÓN FIJA (position:absolute, esquina superior derecha) — nunca se
+     mueve ni cambia de sitio según el contenido de la fila. Regla de oro: solo los
+     CONTROLES (checkbox, estado, gestor, ···, ver original, calidad) paran el toque con
+     stopPropagation, cada uno ajustado a su propio contenido — nunca un contenedor de ancho
+     completo, para que no queden zonas "muertas". Todo lo demás abre la factura. */
   .factura-card-movil{
-    display:flex;flex-direction:column;gap:3px;
-    padding:10px 12px;border-bottom:1px solid var(--line);
+    position:relative;
+    display:flex;flex-direction:column;gap:5px;
+    padding:12px 40px 12px 14px;border-bottom:1px solid var(--line);
     cursor:pointer;
   }
   .factura-card-movil:active{background:var(--concrete);}
-  .fc-fila1{display:flex;align-items:center;gap:8px;}
-  .fc-check{flex:0 0 auto;width:19px;height:19px;margin:0;}
-  .fc-estado-wrap{flex:0 0 auto;display:inline-flex;}
-  .fc-estado-wrap .pill{font-size:11.5px;padding:3px 10px;}
-  .fc-total{flex:1 1 auto;text-align:right;font-weight:800;font-size:15.5px;white-space:nowrap;}
-  .fc-cliente{font-weight:700;font-size:14px;margin-left:27px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .fc-fila3{display:flex;align-items:center;gap:8px;margin-left:27px;font-size:12px;color:var(--ink-soft);}
-  .fc-meta{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  /* ··· visible pero sin protagonismo: dentro de la fila, no flotando encima de nada */
+  /* ··· SIEMPRE en la esquina superior derecha, fuera del flujo de las filas */
   .fc-mas-btn{
-    flex:0 0 auto;width:26px;height:26px;
+    position:absolute;top:10px;right:8px;
+    width:26px;height:26px;flex:none;
     display:flex;align-items:center;justify-content:center;
     font-size:16px;font-weight:700;color:var(--ink-soft);
     background:var(--concrete);border:none;border-radius:50%;padding:0;line-height:1;
   }
   .fc-mas-btn:active{background:var(--concrete-2);}
-  /* Gestor+Calidad: solo esta fila existe cuando aporta algo, siempre en una línea */
+  .fc-fila1{display:flex;align-items:center;gap:8px;padding-right:26px;}
+  .fc-check{flex:0 0 auto;width:19px;height:19px;margin:0;}
+  .fc-estado-wrap{flex:0 0 auto;display:inline-flex;}
+  .fc-estado-wrap .pill{font-size:11.5px;padding:3px 10px;}
+  .fc-total{flex:1 1 auto;text-align:right;font-weight:800;font-size:15.5px;white-space:nowrap;}
+  .fc-cliente{font-weight:700;font-size:14px;margin-left:27px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fc-fila3{display:flex;align-items:center;margin-left:27px;font-size:12px;color:var(--ink-soft);}
+  .fc-meta{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* Gestor+Original+Calidad: una sola línea, siempre en el mismo sitio (bajo Fecha·Nº) */
   .fc-fila4{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:27px;font-size:11.5px;}
   .fc-gestor-wrap{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;}
   .fc-gestor-label{color:var(--ink-soft);}
@@ -2469,7 +2484,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.25</div>
+        <div class="sub">V3.26</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4991,10 +5006,10 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <div class="ie-doc-meta">
             <div class="ie-doc-title" id="ni-title">FACTURA</div>
             <div class="ie-nf-row">
-              <div class="field" style="margin-bottom:8px;flex:0 0 auto;"><div class="l">Nº documento <span id="ni-suggest" style="font-weight:400;color:var(--ink-soft);"></span></div>
-                <input class="search-box mono" style="width:110px;text-align:right;" id="ni-docnum" oninput="sincronizarConceptoConNumero()">
+              <div class="field ie-nf-num"><div class="l">Nº documento <span id="ni-suggest" style="font-weight:400;color:var(--ink-soft);"></span></div>
+                <input class="search-box mono" id="ni-docnum" oninput="sincronizarConceptoConNumero()">
               </div>
-              <div class="field" style="flex:0 0 auto;"><div class="l">Fecha</div><input class="search-box" id="ni-date" type="date" required></div>
+              <div class="field ie-nf-fecha"><div class="l">Fecha</div><input class="search-box" id="ni-date" type="date" required></div>
             </div>
           </div>
         </div>
@@ -15464,6 +15479,17 @@ async function toggleEnviadoGestor(id){
   mostrarToast(nuevoValor ? 'Marcada como enviada al gestor ✓' : 'Desmarcada — vuelve a pendiente', 'ok');
   const celda = document.querySelector('.celda-gestor-'+id);
   if(celda) celda.innerHTML = gestorPillHtml(id, nuevoValor, hoy);
+  const celdaMovil = document.querySelector('.celda-gestor-movil-'+id);
+  if(celdaMovil) celdaMovil.innerHTML = gestorMovilHtml(id, nuevoValor, hoy);
+}
+// Gestor compacto de la tarjeta móvil: "Gestor: Pendiente [Marcar][Enviar]" o "Gestor: Enviada ✓".
+// Se usa tanto al construir la tarjeta como para refrescarla tras togglear (misma función,
+// nunca dos plantillas que puedan desincronizarse).
+function gestorMovilHtml(id, enviado, fecha){
+  const label = `<span class="fc-gestor-label">Gestor:</span> `;
+  return label + (enviado
+    ? `<span class="fc-gestor-estado enviada" onclick="event.stopPropagation();toggleEnviadoGestor('${id}')" title="Enviada el ${fecha||''} — toca para desmarcar">Enviada ✓</span>`
+    : `<span class="fc-gestor-estado pendiente">Pendiente</span> <button class="fc-gestor-btn" onclick="event.stopPropagation();toggleEnviadoGestor('${id}')" title="Marcar como enviada sin mandar correo">Marcar</button><button class="fc-gestor-btn primary" onclick="event.stopPropagation();enviarAlGestorDoc('${id}')" title="Enviar por correo al gestor">Enviar</button>`);
 }
 function gestorPillHtml(id, enviado, fecha){
   const doc = documentosRealesById[id];
@@ -15517,7 +15543,7 @@ function enviarAlGestorDoc(id){
   composeOnSentCallback = async () => {
     const hoy = new Date().toISOString().slice(0,10);
     const {error} = await sb.from('documentos_economicos').update({enviado_gestor: true, enviado_gestor_fecha: hoy}).eq('id', id);
-    if(!error){ if(documentosRealesById[id]){ documentosRealesById[id].enviado_gestor = true; documentosRealesById[id].enviado_gestor_fecha = hoy; } const celda = document.querySelector('.celda-gestor-'+id); if(celda) celda.innerHTML = gestorPillHtml(id, true, hoy); }
+    if(!error){ if(documentosRealesById[id]){ documentosRealesById[id].enviado_gestor = true; documentosRealesById[id].enviado_gestor_fecha = hoy; } const celda = document.querySelector('.celda-gestor-'+id); if(celda) celda.innerHTML = gestorPillHtml(id, true, hoy); const celdaMovil = document.querySelector('.celda-gestor-movil-'+id); if(celdaMovil) celdaMovil.innerHTML = gestorMovilHtml(id, true, hoy); }
   };
   openComposeDrawer();
 }
@@ -15669,10 +15695,6 @@ async function cargarDocumentosEconomicosReales(){
           // el ID del desplegable de estado tiene que ser DISTINTO al de la fila de escritorio
           // (aunque esté oculta) — si no, un toque en móvil abre el desplegable escondido
           const estadoHtml = estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-m-');
-          // Gestor en una sola línea: "Gestor: Enviada ✓" o "Gestor: Pendiente [Marcar][Enviar]"
-          const gestorMovilHtml = `<span class="fc-gestor-label">Gestor:</span> ${doc.enviado_gestor
-            ? `<span class="fc-gestor-estado enviada" onclick="event.stopPropagation();toggleEnviadoGestor('${doc.id}')" title="Enviada el ${doc.enviado_gestor_fecha||''} — toca para desmarcar">Enviada ✓</span>`
-            : `<span class="fc-gestor-estado pendiente">Pendiente</span> <button class="fc-gestor-btn" onclick="event.stopPropagation();toggleEnviadoGestor('${doc.id}')" title="Marcar como enviada sin mandar correo">Marcar</button><button class="fc-gestor-btn primary" onclick="event.stopPropagation();enviarAlGestorDoc('${doc.id}')" title="Enviar por correo al gestor">Enviar</button>`}`;
           // VER ORIGINAL: solo si este documento tiene de verdad un archivo físico digitalizado
           // propio — nunca se inventa uno para un documento nacido/gestionado en la web
           const verOriginalHtml = archivoUrlReal ? `<span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${archivoUrlReal}')">📎 Original</span>` : '';
@@ -15682,6 +15704,7 @@ async function cargarDocumentosEconomicosReales(){
           card.dataset.docId = doc.id;
           card.onclick = () => openDocumentViewer(doc.id);
           card.innerHTML = `
+            <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
             <div class="fc-fila1">
               <input type="checkbox" class="fc-check fact-sel-chk-espejo" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="sincCheckMovilFactura('${doc.id}', this.checked)">
               <span class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}</span>
@@ -15690,10 +15713,9 @@ async function cargarDocumentosEconomicosReales(){
             <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
             <div class="fc-fila3">
               <span class="fc-meta">${fechaCorta} · Nº ${doc.numero||'—'}${cobradoNum ? ' · Cobrado '+cobradoLabel : ''}</span>
-              <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
             </div>
             <div class="fc-fila4">
-              <span class="fc-gestor-wrap" onclick="event.stopPropagation();">${gestorMovilHtml}</span>
+              <span class="fc-gestor-wrap celda-gestor-movil-${doc.id}" onclick="event.stopPropagation();">${gestorMovilHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha)}</span>
               ${verOriginalHtml}
               ${fallosHtml}
             </div>`;
