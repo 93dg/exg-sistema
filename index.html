@@ -548,6 +548,30 @@ table{border-collapse:collapse;width:100%;}
 .ie-actions .ie-submit{flex:2;}
 .ie-actions #ni-draft{flex:1;}
 .ie-actions .btn.dark{flex:1;}
+.ie-actions-top{margin-bottom:10px;}
+.ie-actions-secondary{margin-bottom:16px;}
+.ie-actions-secondary > *{flex:1;}
+/* PASAR A… — bloque propio, claramente distinto de guardar */
+.ie-pasar-a{display:flex;gap:10px;margin:0 20px 16px 20px;padding:10px 12px;background:var(--concrete);border-radius:var(--radius);}
+/* Más acciones — colapsado por defecto; en escritorio no compite con lo importante y en
+   móvil libera todo el espacio de arriba para lo que de verdad se usa siempre */
+.ie-more{margin:0 20px 16px 20px;}
+.ie-more summary{cursor:pointer;font-weight:600;font-size:13px;color:var(--ink-soft);padding:6px 0;list-style:none;}
+.ie-more summary::-webkit-details-marker{display:none;}
+.ie-more summary::before{content:'▸ ';}
+.ie-more[open] summary::before{content:'▾ ';}
+.ie-more-body{display:flex;gap:6px;flex-wrap:wrap;padding-top:8px;}
+@media(max-width:640px){
+  /* jerarquía real, no "lo que quepa": guardar y numerar en firme es lo más importante y
+     va primero y a ancho completo; guardar borrador debajo, también a ancho completo;
+     PDF/Imprimir en una fila de dos; el resto queda recogido en "Más acciones" */
+  .ie-actions-top{flex-direction:column;}
+  .ie-actions-top #ni-submit{flex:1 1 auto !important;order:1;}
+  .ie-actions-top #ni-draft{flex:1 1 auto !important;order:2;}
+  .ie-pasar-a{flex-direction:column;}
+  .ie-pasar-a select{width:100%;}
+  .ie-pasar-a button{width:100%;}
+}
 
 /* ---------- MÓVIL / iPhone ---------- */
 #mobile-hamburger, #mobile-nav-backdrop, #mobile-tabbar, #mobile-add-backdrop, #mobile-add-menu{display:none;}
@@ -2259,7 +2283,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub">V3.15</div>
+        <div class="sub">V3.16</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4692,19 +4716,40 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
         <option value="albaran">Albarán</option>
       </select>
       <span class="ie-doc-explain ie-edit-only" id="ni-explain"></span>
-      <button type="button" class="btn sm ie-edit-only" onclick="document.getElementById('ie-dictado').classList.toggle('open')">📝 Rellenar desde texto o foto</button>
-      <button type="button" id="ni-ver-original" onclick="abrirVisorArchivoOriginal()" class="btn sm ie-edit-only" style="display:none;">📎 Ver archivo original</button>
-      <span id="ni-otras-acciones" class="ie-edit-only" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
       <button class="close-x" onclick="intentarCerrarNewInvoiceModal()">✕</button>
     </div>
 
-    <div class="ie-actions ie-actions-top">
-      <button type="button" class="btn" id="ni-draft" onclick="submitNewInvoice(event, true)">Guardar como borrador</button>
-      <button type="button" class="btn dark" onclick="descargarPDF()">⬇ Descargar PDF</button>
-      <button type="button" class="btn primary" id="ni-convert-btn" style="display:none;" onclick="convertirDocumento()">Convertir en albarán</button>
-      <button type="button" class="btn" id="ni-deshacer-btn" style="display:none;color:var(--red);" onclick="deshacerConversion()">↺ Deshacer — volver a albarán</button>
-      <button type="button" class="btn primary ie-submit" id="ni-submit" onclick="submitNewInvoice(event, false)">Crear factura</button>
+    <!-- PASAR A… — desplegable único, mismo criterio para presupuesto/albarán/proforma/factura.
+         Solo aparece si hay alguna transición válida para ESTE documento en su estado actual;
+         una factura ya emitida nunca la muestra. -->
+    <div class="ie-pasar-a ie-edit-only" id="ni-pasar-a-wrap" style="display:none;">
+      <select class="search-box" id="ni-pasar-a-select" style="flex:1;"></select>
+      <button type="button" class="btn primary" onclick="ejecutarTransicion(document.getElementById('ni-pasar-a-select').value)">Ir</button>
     </div>
+
+    <!-- Acciones principales: guardar es lo primero que se ve y ocupa todo el ancho en móvil -->
+    <div class="ie-actions ie-actions-top">
+      <button type="button" class="btn primary ie-submit" id="ni-submit" onclick="submitNewInvoice(event, false)">Crear factura</button>
+      <button type="button" class="btn" id="ni-draft" onclick="submitNewInvoice(event, true)">Guardar como borrador</button>
+    </div>
+    <div class="ie-actions ie-actions-secondary">
+      <button type="button" class="btn dark" onclick="descargarPDF()">⬇ Descargar PDF</button>
+      <button type="button" class="btn ie-edit-only" onclick="imprimirDocumento(editingDocId)">🖨 Imprimir</button>
+    </div>
+    <button type="button" class="btn primary" id="ni-convert-btn" style="display:none;width:calc(100% - 40px);margin:0 20px 10px 20px;" onclick="convertirDocumento()">Convertir en albarán</button>
+    <button type="button" class="btn" id="ni-deshacer-btn" style="display:none;color:var(--red);width:calc(100% - 40px);margin:0 20px 10px 20px;" onclick="deshacerConversion()">↺ Deshacer — volver a albarán</button>
+
+    <!-- Más acciones: todo lo que no es "guardar" ni "pasar a…" — enviar, duplicar, rectificar,
+         ver el original, rellenar desde texto/foto. Colapsado por defecto: en móvil ya no compite
+         por sitio con lo importante. -->
+    <details class="ie-more ie-edit-only" id="ni-more">
+      <summary>Más acciones</summary>
+      <div class="ie-more-body">
+        <span id="ni-otras-acciones" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
+        <button type="button" class="btn sm" onclick="document.getElementById('ie-dictado').classList.toggle('open')">📝 Rellenar desde texto o foto</button>
+        <button type="button" id="ni-ver-original" onclick="abrirVisorArchivoOriginal()" class="btn sm" style="display:none;">📎 Ver archivo original</button>
+      </div>
+    </details>
 
     <div class="ie-dictado ie-edit-only" id="ie-dictado">
       <h4>Rellenar desde texto o imagen</h4>
@@ -5521,6 +5566,44 @@ function formatFechaHoraCorta(dateRaw){
   const mi = String(d.getMinutes()).padStart(2,'0');
   return `${formatFechaCorta(d)} · ${hh}:${mi}`;
 }
+// ===== Transiciones documentales — sistema común para PRESUPUESTO/ALBARÁN/PROFORMA/FACTURA =====
+// Un solo criterio, usado tanto en los botones de fila como en el desplegable "Pasar a…" del
+// editor. Las transiciones dependen del TIPO y del ESTADO real — una factura YA EMITIDA
+// (pendiente de cobro, parcial o cobrada) nunca puede volver atrás por aquí.
+function transicionesDocumento(doc){
+  const out = [];
+  if(doc.type==='presupuesto'){
+    out.push({tipo:'albaran', principal:true});
+    out.push({tipo:'proforma', principal:false});
+    out.push({tipo:'factura', principal:false});
+  } else if(doc.type==='albaran'){
+    out.push({tipo:'proforma', principal:true});
+    out.push({tipo:'factura', principal:false});
+  } else if(doc.type==='proforma'){
+    out.push({tipo:'factura', principal:true});
+    out.push({tipo:'albaran', principal:false});
+  } else if(doc.type==='factura' && doc.status==='Borrador'){
+    // factura EN BORRADOR (todavía no emitida/numerada en firme): sí puede volver a albarán
+    out.push({tipo:'albaran', principal:true});
+  }
+  // "volver a la fase anterior" solo si de verdad existe en este expediente, y nunca en una
+  // factura ya emitida (pendiente de cobro / parcial / cobrada)
+  const puedeVolver = doc.documento_anterior_id && !(doc.type==='factura' && doc.status!=='Borrador');
+  if(puedeVolver){
+    const anterior = documentosRealesById[doc.documento_anterior_id];
+    if(anterior) out.push({tipo: anterior.type, principal:false, volver:true, idDestino: doc.documento_anterior_id});
+  }
+  return out;
+}
+function etiquetaTransicion(t){
+  return t.volver ? '← Volver a '+tipoDocEtiqueta(t.tipo, false) : 'Pasar a '+tipoDocEtiqueta(t.tipo, false).toUpperCase();
+}
+function valorTransicion(t){ return t.volver ? 'volver' : 'pasar:'+t.tipo; }
+function ejecutarTransicion(valor){
+  if(!valor) return;
+  if(valor==='volver') volverAFaseAnterior(editingDocId);
+  else avanzarFaseDocumento(editingDocId, valor.slice(6));
+}
 // ===== Acciones centralizadas de documentos — una sola fuente de verdad, usada en toda la app =====
 function accionesDocumento(doc){
   const a = [];
@@ -5529,9 +5612,13 @@ function accionesDocumento(doc){
   const eliminar = {t:'Eliminar', fn:`borrarUnDocumento('${doc.id}')`};
   const enviarCliente = {t:'Enviar al cliente', fn:`enviarDocumentoAlCliente('${doc.id}')`};
   const imprimir = {t:'Imprimir', fn:`imprimirDocumento('${doc.id}')`};
-  // "Volver a [fase anterior]" solo aparece si de verdad existe una fase anterior en este
-  // expediente — nunca se muestra una acción que no tiene sentido para este documento
-  const volver = doc.documento_anterior_id ? [{t:'← Volver a '+tipoDocEtiqueta(documentosRealesById[doc.documento_anterior_id]?.tipo||'anterior'), fn:`volverAFaseAnterior('${doc.id}')`}] : [];
+  // transiciones (Pasar a…/Volver a…) con la MISMA terminología y el mismo criterio en todas
+  // las filas de todas las secciones — nunca "Crear factura" cuando se está evolucionando
+  // un documento existente
+  const transiciones = transicionesDocumento(doc).map(t=>({
+    t: etiquetaTransicion(t),
+    fn: t.volver ? `volverAFaseAnterior('${doc.id}')` : `avanzarFaseDocumento('${doc.id}','${t.tipo}')`,
+  }));
   if(doc.type==='factura'){
     const estado = doc.estado_cobro || 'pendiente_enviar';
     if(doc.enviado_gestor || ['pendiente_cobrar','parcial','cobrado'].includes(estado)){
@@ -5539,18 +5626,12 @@ function accionesDocumento(doc){
       a.push({t:'Rectificar', fn:`rectificarFactura('${doc.id}')`}, duplicar);
     } else {
       // factura borrador/no emitida SÍ puede volver atrás — una ya emitida, nunca (lo
-      // bloquea retroceder_fase en el propio motor, pero el botón ni se ofrece aquí)
-      a.push(editar, duplicar, ...volver, eliminar);
+      // bloquea retroceder_fase en el propio motor, y transicionesDocumento tampoco la ofrece)
+      a.push(editar, duplicar, ...transiciones, eliminar);
     }
     a.push(enviarCliente, imprimir);
-  } else if(doc.type==='presupuesto' || doc.type==='proforma'){
-    a.push(editar, duplicar, eliminar, {t:'Crear factura', fn:`avanzarFaseDocumento('${doc.id}','factura')`});
-    if(doc.type==='presupuesto') a.push({t:'Crear proforma', fn:`avanzarFaseDocumento('${doc.id}','proforma')`}, {t:'Crear albarán', fn:`avanzarFaseDocumento('${doc.id}','albaran')`});
-    a.push(...volver, enviarCliente, imprimir);
-  } else if(doc.type==='albaran'){
-    // desde un albarán, lo habitual es primero la proforma (para que el cliente confirme
-    // el importe) y solo después la factura — pero ambas quedan disponibles directamente
-    a.push(editar, duplicar, eliminar, {t:'Crear proforma', fn:`avanzarFaseDocumento('${doc.id}','proforma')`}, {t:'Crear factura', fn:`avanzarFaseDocumento('${doc.id}','factura')`}, ...volver, enviarCliente, imprimir);
+  } else if(['presupuesto','proforma','albaran'].includes(doc.type)){
+    a.push(editar, duplicar, eliminar, ...transiciones, enviarCliente, imprimir);
   } else {
     a.push(editar, eliminar);
   }
@@ -5564,7 +5645,17 @@ async function avanzarFaseDocumento(id, tipoDestino){
   const {data: nuevoId, error} = await sb.rpc('avanzar_fase', {p_documento_origen_id: id, p_tipo_destino: tipoDestino, p_campos_extra: {}});
   if(error){ mostrarToast('Error: '+errText(error)); return; }
   // el número lo asigna la app, no el motor — avanzar_fase deja el campo vacío a propósito
-  await sb.from('documentos_economicos').update({numero: ['factura','presupuesto','proforma'].includes(tipoDestino) ? proximoNumero(tipoDestino) : null}).eq('id', nuevoId);
+  const numeroNuevo = ['factura','presupuesto','proforma'].includes(tipoDestino) ? proximoNumero(tipoDestino) : null;
+  const extra = {numero: numeroNuevo};
+  // al pasar a FACTURA: forma de pago y datos bancarios predefinidos desde los datos maestros
+  // de la empresa, y el concepto de transferencia F+número — nunca queda en blanco ni "undefined"
+  if(tipoDestino==='factura'){
+    extra.forma_pago = 'TRANSFERENCIA';
+    extra.iban = EMPRESA_BANCO.iban;
+    extra.titular = EMPRESA_BANCO.titular;
+    extra.concepto_transferencia = conceptoDeFactura(numeroNuevo);
+  }
+  await sb.from('documentos_economicos').update(extra).eq('id', nuevoId);
   mostrarToast(`${tipoDocEtiqueta(tipoDestino)} creada — pasa a ser la fase activa del expediente.`);
   await cargarDocumentosEconomicosReales();
   openDocumentViewer(nuevoId);
@@ -11428,7 +11519,9 @@ function onDocTypeChange(){
   recalcTotals();
 }
 function updateConceptoTransferencia(){
-  document.getElementById('ni-concepto-transf').value = document.getElementById('ni-docnum').value;
+  const t = document.getElementById('ni-doctype').value;
+  const num = document.getElementById('ni-docnum').value;
+  document.getElementById('ni-concepto-transf').value = t==='factura' ? conceptoDeFactura(num) : num;
 }
 
 const UNIDADES = ['ud','h','m³','m²','ml','km','día','servicio','transporte'];
@@ -13918,9 +14011,11 @@ function openNewInvoiceModal(contexto, forzarEditorCompleto){
   document.getElementById('ni-client-fiscal').style.display = 'none';
   document.getElementById('ni-job').value = '';
   document.getElementById('ni-date').value = new Date().toISOString().slice(0,10);
-  document.getElementById('ni-iban').value = 'ES40 3187 0588 5420 6788 5612';
-  document.getElementById('ni-titular').value = 'RAFAEL GÓMEZ MARTÍNEZ';
+  document.getElementById('ni-iban').value = EMPRESA_BANCO.iban;
+  document.getElementById('ni-titular').value = EMPRESA_BANCO.titular;
   document.getElementById('ni-payment').value = 'Transferencia';
+  const __pawNuevo = document.getElementById('ni-pasar-a-wrap'); if(__pawNuevo) __pawNuevo.style.display = 'none';
+  const __otrasNuevo = document.getElementById('ni-otras-acciones'); if(__otrasNuevo) __otrasNuevo.innerHTML = '';
   document.getElementById('ie-dictado-text').value = '';
   document.getElementById('ni-ver-original').style.display = 'none';
   document.getElementById('ie-dictado-note').textContent = 'La lectura automática de fotos (OCR) todavía no está conectada — de momento solo guarda la imagen adjunta como referencia. Cuando conectemos IA con visión, esto rellenará las líneas solo.';
@@ -14247,9 +14342,11 @@ async function wizGuardar(isDraft){
   document.getElementById('ie-items-body').innerHTML = '';
   wiz.conceptos.forEach(c => addItemRow(c.cantidad, c.desc, c.precio, ''));
   document.getElementById('ie-iva-pct').value = 21;
-  document.getElementById('ni-iban').value = 'ES40 3187 0588 5420 6788 5612';
-  document.getElementById('ni-titular').value = 'RAFAEL GÓMEZ MARTÍNEZ';
+  document.getElementById('ni-iban').value = EMPRESA_BANCO.iban;
+  document.getElementById('ni-titular').value = EMPRESA_BANCO.titular;
   document.getElementById('ni-payment').value = 'Transferencia';
+  const __pawWiz = document.getElementById('ni-pasar-a-wrap'); if(__pawWiz) __pawWiz.style.display = 'none';
+  const __otrasWiz = document.getElementById('ni-otras-acciones'); if(__otrasWiz) __otrasWiz.innerHTML = '';
   const cfg = DOC_TYPES[wiz.tipo];
   document.getElementById('ni-docnum').value = wiz.tipo==='albaran' ? '' : cfg.prefix + cfg.seqRef();
   updateConceptoTransferencia();
@@ -14287,8 +14384,8 @@ function convertirDocumento(){
   document.getElementById('ni-job').value = origen.job==='—' ? '' : origen.job;
   document.getElementById('ni-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('ni-payment').value = origen.payment || 'Transferencia';
-  document.getElementById('ni-iban').value = origen.iban || 'ES40 3187 0588 5420 6788 5612';
-  document.getElementById('ni-titular').value = origen.titular || 'RAFAEL GÓMEZ MARTÍNEZ';
+  document.getElementById('ni-iban').value = origen.iban || EMPRESA_BANCO.iban;
+  document.getElementById('ni-titular').value = origen.titular || EMPRESA_BANCO.titular;
   onClientChange();
   items.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine));
   const cfg = DOC_TYPES[siguienteTipo];
@@ -14320,7 +14417,19 @@ function openDocumentViewer(id){
   const urlOriginal = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
   if(urlOriginal){ btnOriginal.dataset.url = urlOriginal; btnOriginal.style.display = ''; }
   else { btnOriginal.style.display = 'none'; }
-  document.getElementById('ni-otras-acciones').innerHTML = accionesDocumento(doc).filter(x=>x.t!=='Editar').map(x=>`<button type="button" class="btn sm" onclick="${x.fn}">${x.t}</button>`).join('');
+  document.getElementById('ni-otras-acciones').innerHTML = accionesDocumento(doc).filter(x=>x.t!=='Editar' && x.t!=='Imprimir' && !x.t.startsWith('Pasar a') && !x.t.startsWith('← Volver a')).map(x=>`<button type="button" class="btn sm" onclick="${x.fn}">${x.t}</button>`).join('');
+  // PASAR A… — desplegable único con la transición principal preseleccionada
+  {
+    const opciones = transicionesDocumento(doc);
+    const wrap = document.getElementById('ni-pasar-a-wrap');
+    if(opciones.length){
+      wrap.style.display = 'flex';
+      const sel = document.getElementById('ni-pasar-a-select');
+      sel.innerHTML = opciones.map(t=>`<option value="${valorTransicion(t)}" ${t.principal?'selected':''}>${etiquetaTransicion(t)}</option>`).join('');
+    } else {
+      wrap.style.display = 'none';
+    }
+  }
   onClientChange();
   // los datos de cliente propios de ESTE documento (si los hay) pisan lo que acaba de
   // rellenar onClientChange() desde la ficha maestra — así "usar solo en este documento"
@@ -14343,7 +14452,7 @@ function openDocumentViewer(id){
   doc.items.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, undefined, i.fecha));
   document.getElementById('ni-docnum').value = doc.num;
   document.getElementById('ni-suggest').textContent = doc.status==='Borrador' ? '(borrador sin numerar en firme)' : '';
-  document.getElementById('ni-concepto-transf').value = doc.concepto_transferencia || doc.num;
+  document.getElementById('ni-concepto-transf').value = doc.type==='factura' ? conceptoDeFactura(doc.num) : (doc.concepto_transferencia || doc.num);
   document.getElementById('ie-iva-row').style.display = DOC_TYPES[doc.type].hasIva ? 'flex' : 'none';
   document.getElementById('ie-payment-fields').style.display = DOC_TYPES[doc.type].hasPayment ? '' : 'none';
   document.getElementById('ie-paper-edit').classList.toggle('hide-fiscal', !DOC_TYPES[doc.type].hasFiscalHeader);
@@ -14397,14 +14506,16 @@ async function submitNewInvoice(ev, isDraft){
     concept: tr.querySelector('.ie-concept').value,
     price: Number(tr.querySelector('.ie-price').value)||0,
   }));
-  const payment = document.getElementById('ni-payment').value;
-  const iban = document.getElementById('ni-iban').value;
-  const titular = document.getElementById('ni-titular').value;
-  const concepto = document.getElementById('ni-concepto-transf').value;
+  const payment = document.getElementById('ni-payment').value || (type!=='albaran' ? 'Transferencia' : '');
+  const iban = document.getElementById('ni-iban').value || EMPRESA_BANCO.iban;
+  const titular = document.getElementById('ni-titular').value || EMPRESA_BANCO.titular;
   const ivaPct = Number(document.getElementById('ie-iva-pct').value)||0;
   const tratamientoIva = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
 
   const num = document.getElementById('ni-docnum').value || (cfg.prefix + cfg.seqRef());
+  // CONCEPTO = F + NÚMERO DE FACTURA — siempre recalculado a partir del número final que se
+  // guarda en este mismo guardado (así una factura que se numera en firme ahora queda al día)
+  const concepto = type==='factura' ? conceptoDeFactura(num) : document.getElementById('ni-concepto-transf').value;
   const status = isDraft ? 'Borrador' : (type==='factura' ? 'Pendiente' : type==='albaran' ? 'Validado' : 'Enviado');
   const estado = isDraft ? 'borrador' : 'emitido';
 
@@ -14485,6 +14596,12 @@ async function submitNewInvoice(ev, isDraft){
     contabilidad: 'oficial',
     iva_pct: tratamientoIva==='isp' ? 0 : ivaPct,
     tratamiento_iva: tratamientoIva,
+    // forma de pago / IBAN / titular / concepto de transferencia — antes solo vivían en el
+    // navegador y se perdían al reabrir el documento (aparecían como "undefined")
+    forma_pago: DOC_TYPES[type].hasPayment ? payment.toUpperCase() : null,
+    iban: DOC_TYPES[type].hasBank ? iban : null,
+    titular: DOC_TYPES[type].hasBank ? titular : null,
+    concepto_transferencia: DOC_TYPES[type].hasBank ? concepto : null,
   };
   // estado_cobro: se fija solo al crear, o al pasar de borrador a numerado en firme —
   // nunca se pisa un estado de cobro ya elegido a mano al simplemente editar/guardar.
@@ -15018,9 +15135,17 @@ async function cargarDocumentosEconomicosReales(){
       const baseNum = tratIvaTmp==='isp' ? totalNum : totalNum / (1 + (Number(doc.iva_pct!=null?doc.iva_pct:21))/100);
       const ivaNum = totalNum - baseNum;
       const status = doc.estado==='borrador' ? 'Borrador' : doc.tipo==='factura' ? 'Pendiente' : doc.tipo==='albaran' ? 'Validado' : 'Enviado';
+      // forma de pago / IBAN / titular / concepto: si el documento no los tiene guardados (p.ej.
+      // viene de avanzar_fase antes de este fix, o es un tipo sin banco), se rellenan con los
+      // datos maestros — nunca se deja el campo en "undefined"
+      const paymentReal = doc.forma_pago || (doc.tipo==='factura' || doc.tipo==='proforma' || doc.tipo==='presupuesto' ? 'Transferencia' : '');
+      const ibanReal = doc.iban || EMPRESA_BANCO.iban;
+      const titularReal = doc.titular || EMPRESA_BANCO.titular;
+      const conceptoReal = doc.tipo==='factura' ? (doc.concepto_transferencia || conceptoDeFactura(doc.numero)) : (doc.concepto_transferencia || '');
       documentosRealesById[doc.id] = {
         ...doc, id: doc.id, type: doc.tipo, num: doc.numero, client: entidad ? entidad.name : '—', job: trabajo ? (trabajo.code+' — '+trabajo.client) : '—',
         dateRaw: doc.fecha_devengo, dateLabel, amountLabel, status, items, ivaPct: doc.iva_pct != null ? doc.iva_pct : 21, tratamientoIva: doc.tratamiento_iva || 'normal', total: totalNum, base: baseNum, iva: ivaNum,
+        payment: paymentReal, iban: ibanReal, titular: titularReal, concepto_transferencia: conceptoReal,
       };
       const estadoPill = estadoDocumentoSelect(doc.tipo, doc.id, doc.estado_cobro, 'pres-');
       const estadoPillStandalone = estadoDocumentoSelect(doc.tipo, doc.id, doc.estado_cobro, 'pres2-');
@@ -15111,6 +15236,24 @@ async function cargarDocumentosEconomicosReales(){
     renderGastosPro();
   }catch(err){ console.error('No se pudieron cargar los documentos reales', err); }
 }
+// Datos maestros de la empresa: única fuente de verdad para IBAN/titular al pasar a factura.
+// Nunca deja campos en "undefined" — si el fetch falla, se mantiene el valor de reserva.
+let EMPRESA_BANCO = {iban:'ES40 3187 0588 5420 6788 5612', titular:'RAFAEL GÓMEZ MARTÍNEZ'};
+async function cargarDatosEmpresa(){
+  if(!sb) return;
+  try{
+    const {data} = await sb.from('sistema').select('data').eq('tipo','config_empresa').order('created_at',{ascending:false}).limit(1).maybeSingle();
+    if(data?.data?.iban) EMPRESA_BANCO.iban = data.data.iban;
+    if(data?.data?.titular) EMPRESA_BANCO.titular = data.data.titular;
+  }catch(_){ /* se queda con el valor de reserva, nunca undefined */ }
+}
+// CONCEPTO = F + NÚMERO DE FACTURA. Se recalcula siempre a partir del número actual —
+// así si una factura borrador se numera en firme más tarde, el concepto queda al día solo.
+function conceptoDeFactura(numero){
+  if(!numero) return '';
+  return 'F' + String(numero).replace(/^[A-Za-z]+/,'').trim();
+}
+cargarDatosEmpresa();
 cargarDocumentosEconomicosReales();
 (function(){
   const vistaGuardada = localStorage.getItem('vista_activa');
