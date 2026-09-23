@@ -551,7 +551,7 @@ export async function resolverCliente(sb: any, cand: { nombre: string | null; ni
     const nifAceptable = !!nifC && (nifValido(nifC) || (/^\d{8}$/.test(nifC) && claseC === "persona" && corroboraArchivo));
     // Decisión de Daniel: sin NIF, si el nombre del ARCHIVO confirma el nombre del cliente, se da de alta
     const altaSegura = CLASES_ENTIDAD.includes(claseC) && ((nifAceptable && nifLibre) || (!nifC && corroboraArchivo));
-    return { estado: "nuevo", nombre: nombreOk, nif: nifC, alta_segura: altaSegura, motivo: altaSegura ? (!nifC ? "sin NIF, confirmado por el nombre del archivo" : nifValido(nifC) ? "NIF oficial válido y sin ficha" : "DNI sin letra corroborado por el nombre del archivo") : (nifC ? (nifAceptable ? "NIF ya en otra ficha" : "NIF no supera el control") : "sin NIF") };
+    return { estado: "nuevo", nombre: nombreOk, nif: nifC, clase: claseC, alta_segura: altaSegura, motivo: altaSegura ? (!nifC ? "sin NIF, confirmado por el nombre del archivo" : nifValido(nifC) ? "NIF oficial válido y sin ficha" : "DNI sin letra corroborado por el nombre del archivo") : (nifC ? (nifAceptable ? "NIF ya en otra ficha" : "NIF no supera el control") : "sin NIF") };
   }
   return { estado: "no_resuelto", motivo: `NIF ${nifC} sin ficha y sin nombre válido` };
 }
