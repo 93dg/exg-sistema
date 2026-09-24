@@ -273,6 +273,11 @@ table{border-collapse:collapse;width:100%;}
   .cli-pend-problema { font-size:12px; color:var(--orange); margin:2px 0 4px; }
   .cli-pend-sugerencias { display:flex; gap:6px; flex-wrap:wrap; }
   .cli-pend-sugerencias .btn { padding:4px 10px; font-size:11.5px; height:26px; }
+  /* Colapso de paneles pendientes — controlado por clase open */
+  #pendientes-revision-body, #posibles-duplicados-body,
+  #pend-identidad-body, #dup-clientes-body { display:none; }
+  #pendientes-revision-body.open, #posibles-duplicados-body.open,
+  #pend-identidad-body.open, #dup-clientes-body.open { display:block; }
 }
 @media (min-width:769px){
   #clientes-lista-movil-wrap { display:none; }
@@ -2677,7 +2682,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.75</div>
+        <div class="sub" id="version-badge">V3.76</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3243,10 +3248,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <!-- Pendientes de revisión: una línea plegable -->
       <div class="panel" id="panel-pendientes-revision" style="margin-bottom:8px;display:none;">
         <div class="panel-head" onclick="toggleCliPanel('pendientes-revision-body')" style="cursor:pointer;padding:10px 14px;">
-          <h3 style="font-size:13px;margin:0;">📋 Pendientes de revisión (<span id="pendientes-revision-count">0</span>)</h3>
+          <h3 style="font-size:13px;margin:0;">📋 Datos incompletos (<span id="pendientes-revision-count">0</span>)</h3>
           <span style="color:var(--ink-soft);">▾</span>
         </div>
-        <div id="pendientes-revision-body" style="display:none;"></div>
+        <div id="pendientes-revision-body"></div>
+      </div>
+      <div class="panel" id="panel-posibles-duplicados" style="margin-bottom:8px;display:none;">
+        <div class="panel-head" onclick="toggleCliPanel('posibles-duplicados-body')" style="cursor:pointer;padding:10px 14px;">
+          <h3 style="font-size:13px;margin:0;">🔁 Posibles duplicados (<span id="posibles-duplicados-count">0</span>)</h3>
+          <span style="color:var(--ink-soft);">▾</span>
+        </div>
+        <div id="posibles-duplicados-body"></div>
       </div>
 
       <!-- Lista móvil de clientes (tarjetas) -->
@@ -11550,30 +11562,44 @@ async function revisarClientesAuto(){
 
   if(!total){ panel.style.display='none'; mostrarToast(`✓ ${corregidos} correcciones — sin pendientes`,'ok'); return; }
 
-  countEl.textContent = total;
-  panel.style.display = '';
-  body.style.display  = 'block';
+  // Panel de datos incompletos
+  if(pendientes.length){
+    panel.style.display = '';
+    countEl.textContent = pendientes.length;
+    body.classList.remove('open'); // plegado por defecto
+    body.innerHTML = pendientes.map(p=>`
+      <div class="cli-pend-item">
+        <div class="cli-pend-nombre">${svgEsc(p.nombre)}</div>
+        <div class="cli-pend-problema">${p.problemas.join(' · ')}</div>
+        <span style="color:var(--orange);font-weight:700;font-size:13px;cursor:pointer;" onclick="openClientDrawer('${(p.nombre||'').replace(/'/g,"\'")}')">+ Añadir datos</span>
+      </div>`).join('');
+  } else {
+    panel.style.display = 'none';
+  }
 
-  const htmlPend = pendientes.map(p=>`
-    <div class="cli-pend-item">
-      <div class="cli-pend-nombre">${svgEsc(p.nombre)}</div>
-      <div class="cli-pend-problema">${p.problemas.join(' · ')}</div>
-      <span style="color:var(--orange);font-weight:700;font-size:13px;cursor:pointer;" onclick="openClientDrawer('${(p.nombre||'').replace(/'/g,"\'")}')">+ Añadir datos</span>
-    </div>`).join('');
+  // Panel separado de posibles duplicados
+  const panelDup = document.getElementById('panel-posibles-duplicados');
+  const bodyDup  = document.getElementById('posibles-duplicados-body');
+  const countDup = document.getElementById('posibles-duplicados-count');
+  if(posiblesDuplicados.length && panelDup){
+    panelDup.style.display = '';
+    countDup.textContent = posiblesDuplicados.length;
+    bodyDup.classList.remove('open'); // plegado por defecto
+    bodyDup.innerHTML = posiblesDuplicados.map(d=>`
+      <div class="cli-pend-item">
+        <div class="cli-pend-nombre">${svgEsc(d.a.nombre)} ↔ ${svgEsc(d.b.nombre)}</div>
+        <div class="cli-pend-problema">Nombres similares — posible duplicado</div>
+        <div class="cli-pend-sugerencias">
+          <button class="btn primary" onclick="abrirFusionDosClientes('${d.a.id}','${d.b.id}')">⟲ Fusionar</button>
+          <button class="btn" onclick="this.closest('.cli-pend-item').remove();if(!document.querySelector('#posibles-duplicados-body .cli-pend-item'))document.getElementById('panel-posibles-duplicados').style.display='none'">✕ No son el mismo</button>
+        </div>
+      </div>`).join('');
+  } else if(panelDup){
+    panelDup.style.display = 'none';
+  }
 
-  const htmlDup = posiblesDuplicados.length ? `<div style="padding:8px 14px;font-size:12px;font-weight:700;color:var(--ink-soft);border-bottom:1px solid var(--line);">POSIBLES DUPLICADOS (${posiblesDuplicados.length})</div>`
-    + posiblesDuplicados.map(d=>`
-    <div class="cli-pend-item">
-      <div class="cli-pend-nombre">${svgEsc(d.a.nombre)} ↔ ${svgEsc(d.b.nombre)}</div>
-      <div class="cli-pend-problema">Nombres similares — posible duplicado</div>
-      <div class="cli-pend-sugerencias">
-        <button class="btn primary" onclick="abrirFusionDosClientes('${d.a.id}','${d.b.id}')">⟲ Fusionar</button>
-        <button class="btn" onclick="this.closest('.cli-pend-item').remove()">✕ No son el mismo</button>
-      </div>
-    </div>`).join('') : '';
-
-  body.innerHTML = htmlPend + htmlDup;
-  mostrarToast(`${corregidos} correcciones · ${pendientes.length} pendientes · ${posiblesDuplicados.length} posibles duplicados`,'ok');
+  const msg = [corregidos?`${corregidos} correcciones`:'', pendientes.length?`${pendientes.length} incompletos`:'', posiblesDuplicados.length?`${posiblesDuplicados.length} posibles duplicados`:''].filter(Boolean).join(' · ');
+  mostrarToast(msg||'✓ Sin pendientes','ok');
 }
 
 async function abrirFusionDosClientes(idA, idB){
