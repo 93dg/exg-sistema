@@ -2638,7 +2638,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.58</div>
+        <div class="sub" id="version-badge">V3.59</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13367,10 +13367,104 @@ function aiToggleGrabarAudio(){
   aiGrabandoAudio = true;
   btn.classList.add('listening');
 }
+// ============ PARSEO LOCAL SIN IA ============
+// Intenta resolver la petición sin IA. Devuelve true si lo resolvió, false si necesita IA.
+function intentarParsearSinIA(mensaje){
+  if(!mensaje) return false;
+
+  const num = s => Number((s||'').replace(/\./g,'').replace(',','.'));
+
+  // PATRÓN: documento estructurado con CLIENTE: + líneas + TOTAL
+  // Ejemplo: "CLIENTE: JUAN
+19/08/26 — 2,30 H — CONCEPTO — 45 €/H — 103,50 €
+TOTAL: 207,00 €"
+  const tieneCliente = /CLIENTE\s*:\s*.+/i.test(mensaje);
+  const tieneLineas = (mensaje.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]?\d{0,4}\s*[—–\-]/g)||[]).length >= 1
+    || (mensaje.match(/\*\s*\d{1,2}[\/\-]\d{1,2}/g)||[]).length >= 1;
+
+  if(!tieneCliente || !tieneLineas) return false;
+
+  // Determinar tipo de documento
+  const tipoDoc = /FACTURA/i.test(mensaje) ? 'factura'
+    : /PROFORMA/i.test(mensaje) ? 'proforma'
+    : /PRESUPUESTO/i.test(mensaje) ? 'presupuesto'
+    : 'albaran';
+
+  // Extraer cliente
+  const clienteMatch = mensaje.match(/CLIENTE\s*:\s*(.+?)(?:
+|$)/i);
+  const clienteNombre = (clienteMatch?.[1]||'').trim();
+
+  // Parsear líneas (igual que parseDictado pero devuelve objetos)
+  const sep = mensaje.includes('—') ? '—' : '–';
+  const lineas = mensaje.split('
+').map(l=>l.replace(/^\*\s*/,'').trim()).filter(l=>
+    /\d{1,2}[\/\-]\d{1,2}/.test(l) && l.includes(sep)
+  );
+
+  if(!lineas.length) return false;
+
+  const conceptos = lineas.map(line => {
+    const partes = line.split(sep).map(p=>p.trim()).filter(Boolean);
+    const esFecha = /^\d{1,2}[\/\-]\d{1,2}/.test(partes[0]);
+    const base = esFecha ? partes.slice(1) : partes;
+    const fechaStr = esFecha ? partes[0] : null;
+    const cantUnidad = (base[0]||'').match(/^([\d.,]+)\s*(\w+)?$/);
+    const precioMatch = (base[2]||'').match(/([\d.,]+)/);
+    if(!cantUnidad || !base[1]) return null;
+    const [d,m,y] = (fechaStr||'').split(/[\/\-]/);
+    const fechaISO = y ? `20${y.length===2?y:y.slice(-2)}-${m.padStart(2,'0')}-${d.padStart(2,'0')}` : null;
+    return {
+      descripcion: base[1].trim(),
+      cantidad: num(cantUnidad[1]),
+      unidad: (cantUnidad[2]||'H').toUpperCase(),
+      precio_unitario: precioMatch ? num(precioMatch[1]) : null,
+      importe: base[3] ? num((base[3].match(/([\d.,]+)/)||[])[1]) : null,
+      fecha: fechaISO,
+    };
+  }).filter(Boolean);
+
+  if(!conceptos.length) return false;
+
+  const totalMatch = mensaje.match(/TOTAL\s*:?\s*([\d.,]+)\s*€/i);
+  const importe = totalMatch ? num(totalMatch[1]) : conceptos.reduce((s,c)=>s+(c.importe||0),0);
+
+  // Abrir editor directamente sin IA
+  metodoDocContexto = { tipo: tipoDoc };
+  abrirEditorConDatosIA({ cliente: clienteNombre, conceptos, tipo: tipoDoc });
+
+  mostrarToast('✓ Creado sin IA — motor local', 'ok');
+  cerrarAsistenteIA();
+  document.getElementById('asistente-ia-input').value = '';
+  return true;
+}
+
+// Pide confirmación antes de usar IA, explicando el motivo
+function pedirPermisoIA(mensaje, motivo, callback){
+  mostrarModalGenerico(
+    '¿Usar IA?',
+    `<div style="font-size:13px;line-height:1.6;margin-bottom:12px;">
+      <div style="margin-bottom:8px;">El motor local no puede procesar esto:</div>
+      <div style="color:var(--orange);font-style:italic;margin-bottom:12px;">${motivo}</div>
+      <div style="color:var(--sub);font-size:12px;">Coste estimado: ~0,07 €</div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn primary" style="flex:1;" onclick="cerrarModalGenerico();(${callback.toString()})()">Usar IA</button>
+      <button class="btn" style="flex:1;" onclick="cerrarModalGenerico()">Cancelar</button>
+    </div>`
+  );
+}
+// ============ FIN PARSEO LOCAL ============
+
 async function enviarAsistenteIA(){
   const mensaje = document.getElementById('asistente-ia-input').value.trim();
   window.__ultimoMensajeAsistente = mensaje;
   if(!mensaje && !aiAdjuntos.length){ mostrarToast('Escribe, dicta o adjunta algo primero.'); return; }
+
+  // 1. Intentar sin IA si hay texto y no hay adjuntos
+  if(mensaje && !aiAdjuntos.length && !window.__aiContextoContinuacion){
+    if(intentarParsearSinIA(mensaje)) return; // resuelto localmente ✓
+  }
   // si venimos de "Continuar" desde el historial sobre una propuesta de documento, esto
   // no es una petición nueva — es una corrección sobre lo ya extraído. Se manda por el modo
   // dedicado de documentos, con los datos anteriores como contexto para que los modifique
@@ -13420,8 +13514,30 @@ async function enviarAsistenteIA(){
     return;
   }
   window.__aiContextoContinuacion = null;
+
+  // 2. Gate de permiso: pedir confirmación antes de llamar a la IA
+  const tieneAdjunto = aiAdjuntos.length > 0;
+  if(!tieneAdjunto && !window.__aiConfirmado){
+    const motivo = 'El texto no tiene un formato que el motor local reconozca.';
+    const coste = '~0,07 €';
+    const ok = await new Promise(resolve => {
+      window.__aiResolvePermiso = resolve;
+      mostrarModalGenerico('¿Usar IA para interpretar esto?',
+        `<div style="font-size:13px;line-height:1.6;gap:10px;display:flex;flex-direction:column;">
+          <div><b>Motivo:</b> ${motivo}</div>
+          <div style="color:var(--sub);">Coste estimado: <b>${coste}</b></div>
+          <div style="display:flex;gap:10px;margin-top:4px;">
+            <button class="btn primary" style="flex:1;" onclick="cerrarModalGenerico();window.__aiResolvePermiso(true)">Usar IA</button>
+            <button class="btn" style="flex:1;" onclick="cerrarModalGenerico();window.__aiResolvePermiso(false)">Cancelar</button>
+          </div>
+        </div>`);
+    });
+    if(!ok) return; // usuario canceló
+  }
+  window.__aiConfirmado = false;
+
   aiMostrarVista('loading');
-  document.getElementById('ai-loading-text').textContent = aiAdjuntos.some(a=>a.esImagen) ? 'Mirando lo que has adjuntado…' : 'Separando lo que me has pedido…';
+  document.getElementById('ai-loading-text').textContent = tieneAdjunto ? 'Mirando lo que has adjuntado…' : 'Separando lo que me has pedido…';
   try{
     const imagenes = aiAdjuntos.filter(a=>a.esImagen).map(a=>({
       media_type: a.tipo,
