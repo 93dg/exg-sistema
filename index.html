@@ -242,6 +242,37 @@ table{border-collapse:collapse;width:100%;}
 .pill-cal-err { background:#4a1a1a; color:#f87171; }
 .pill-cal-nd  { background:var(--concrete-2); color:var(--ink-soft); }
 
+/* ======= CLIENTES MÓVIL — cards + filtros plegables ======= */
+@media (max-width:768px){
+  #clientes-filtros-movil-toggle{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--paper);border-radius:10px;margin-bottom:8px;cursor:pointer;font-weight:700;font-size:14px;border:1px solid var(--line);}
+  #clientes-filtros-movil-inner{display:none;padding:10px 0 4px;}
+  #clientes-filtros-movil-inner.open{display:block;}
+  .cli-plegable-head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:10px 14px;border-bottom:1px solid var(--line);}
+  .cli-plegable-body{display:none;}
+  .cli-plegable-body.open{display:block;}
+  .cliente-card{background:var(--paper);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:12px 14px 10px;margin:0 0 8px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;}
+  .cliente-card:active{background:var(--concrete);}
+  .cliente-card .cc-body{flex:1;min-width:0;}
+  .cliente-card .cc-nombre{font-weight:800;font-size:15px;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cliente-card .cc-meta{font-size:12px;color:var(--ink-soft);display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:5px;}
+  .cliente-card .cc-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .cliente-card .cc-total{font-size:15px;font-weight:800;font-family:'IBM Plex Mono',monospace;}
+  .cliente-card .cc-pend{font-size:12px;font-weight:700;color:var(--red,#c00);}
+  .cli-pend-acciones{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .cli-pend-acciones .btn{padding:5px 11px;font-size:12px;height:28px;display:inline-flex;align-items:center;}
+  #view-clientes .panel-body .tbl-scroll{display:none;}
+  #clientes-lista-movil{display:block;padding:10px;}
+}
+@media (min-width:769px){
+  #clientes-filtros-movil-toggle{display:none;}
+  #clientes-filtros-movil-inner{display:block!important;}
+  .cliente-card{display:none;}
+  #clientes-lista-movil{display:none;}
+  .cli-plegable-head .cli-chevron{display:none;}
+  .cli-plegable-body{display:block!important;}
+}
+/* ======= FIN CLIENTES MÓVIL ======= */
+
 
 .pill{
   display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;
@@ -2638,7 +2669,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.67</div>
+        <div class="sub" id="version-badge">V3.68</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3117,13 +3148,44 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="topbar">
         <div><h1>Clientes</h1><div class="desc">Ayuntamientos, particulares y empresas</div></div>
         <div class="quickactions">
-          <button class="btn" style="color:var(--red);display:none;" id="clientes-borrar-sel-btn" onclick="borrarClientesSeleccionados()">🗑 Borrar seleccionados (<span id="clientes-sel-count">0</span>)</button>
-          <button class="btn primary" style="display:none;" id="clientes-fusionar-sel-btn" onclick="abrirFusionMultiple()">⟲ Fusionar seleccionados</button>
-          <button class="btn" style="display:none;" id="clientes-prioridad-sel-btn" onclick="cambiarPrioridadSeleccionados()">🚩 Cambiar prioridad</button>
-          <button class="btn" onclick="toggleColumnasClientesPanel()">☰ Columnas</button>
+          <button class="btn" style="color:var(--red);display:none;" id="clientes-borrar-sel-btn" onclick="borrarClientesSeleccionados()">🗑 Borrar (<span id="clientes-sel-count">0</span>)</button>
+          <button class="btn primary" style="display:none;" id="clientes-fusionar-sel-btn" onclick="abrirFusionMultiple()">⟲ Fusionar</button>
+          <button class="btn" style="display:none;" id="clientes-prioridad-sel-btn" onclick="cambiarPrioridadSeleccionados()">🚩 Prioridad</button>
+          <button class="btn tabla-escritorio-solo" onclick="toggleColumnasClientesPanel()">☰ Columnas</button>
+          <button class="btn lista-movil-solo" onclick="revisarClientesAuto()" title="Revisar errores automáticamente">🔍 Revisar</button>
         </div>
       </div>
-      <div class="panel" style="margin-bottom:12px;">
+
+      <!-- FILTROS MÓVIL: plegables -->
+      <div class="lista-movil-solo" style="margin-bottom:10px;">
+        <div id="clientes-filtros-movil-toggle" onclick="toggleFiltrosClientesMovil()">
+          <span>🔍 Filtros</span>
+          <span id="clientes-filtros-badge" style="font-size:12px;color:var(--orange);" class="cli-chevron">▼</span>
+        </div>
+        <div id="clientes-filtros-movil-inner">
+          <input class="search-box" id="clientes-search-movil" style="width:100%;margin-bottom:8px;" placeholder="Buscar nombre, NIF, teléfono…" oninput="sincronizarBusquedaClientes(this.value)">
+          <div class="filters" id="clientes-filtro-tipo-chips-movil" style="margin:0 0 6px;">
+            <div class="chip-filter" data-tipo="ayuntamiento">Ayuntamiento</div>
+            <div class="chip-filter" data-tipo="empresa">Empresa</div>
+            <div class="chip-filter" data-tipo="particular">Particular</div>
+          </div>
+          <div class="filters" id="clientes-filtro-prio-chips-movil" style="margin:0 0 6px;">
+            <div class="chip-filter" data-prio="alta">🔴 Alta</div>
+            <div class="chip-filter" data-prio="media">🟡 Media</div>
+            <div class="chip-filter" data-prio="baja">🟢 Baja</div>
+          </div>
+          <div class="filters" id="clientes-filtro-extra-chips-movil" style="margin:0 0 6px;">
+            <div class="chip-filter" data-extra="deuda">Con deuda</div>
+            <div class="chip-filter" data-extra="sindatos">Ficha incompleta</div>
+            <div class="chip-filter" data-extra="sindocs">Sin docs</div>
+            <div class="chip-filter active" data-extra="ocultar_basura">Solo reales</div>
+          </div>
+          <button class="btn" style="font-size:12px;" onclick="restablecerFiltrosClientes()">↻ Limpiar filtros</button>
+        </div>
+      </div>
+
+      <!-- FILTROS ESCRITORIO -->
+      <div class="panel tabla-escritorio-solo" style="margin-bottom:12px;">
         <div class="panel-body" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 16px;">
           <input class="search-box" id="clientes-search" style="max-width:320px;" placeholder="Buscar por nombre, NIF, teléfono, email, población…" oninput="renderClientesTable()">
           <div class="filters" id="clientes-filtro-tipo-chips" style="margin:0;">
@@ -3140,27 +3202,46 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="chip-filter" data-extra="deuda">Con deuda</div>
             <div class="chip-filter" data-extra="sindatos">Ficha incompleta</div>
             <div class="chip-filter" data-extra="sindocs">Sin documentos</div>
-            <div class="chip-filter active" data-extra="ocultar_basura" title="Oculta entidades con nombres que no son clientes reales">Solo clientes reales</div>
+            <div class="chip-filter active" data-extra="ocultar_basura">Solo clientes reales</div>
           </div>
-          <button class="btn" id="clientes-restablecer-filtros" style="margin-left:auto;" title="Restablecer filtros" onclick="restablecerFiltrosClientes()">↻</button>
+          <button class="btn" id="clientes-restablecer-filtros" style="margin-left:auto;" onclick="restablecerFiltrosClientes()">↻</button>
         </div>
       </div>
-      <div class="panel" id="clientes-columnas-panel" style="display:none;margin-bottom:12px;">
+
+      <div class="panel tabla-escritorio-solo" id="clientes-columnas-panel" style="display:none;margin-bottom:12px;">
         <div class="panel-body" style="display:flex;flex-wrap:wrap;gap:12px;padding:12px 16px;font-size:13px;" id="clientes-columnas-checks"></div>
       </div>
-      <div class="panel" id="panel-duplicados-clientes" style="margin-bottom:12px;display:none;">
-        <div class="panel-head" style="justify-content:space-between;">
-          <h3>⚠ Posibles clientes duplicados (<span id="dup-clientes-count">0</span>)</h3>
+
+      <!-- PENDIENTES: plegable -->
+      <div class="panel" id="panel-duplicados-clientes" style="margin-bottom:10px;display:none;">
+        <div class="cli-plegable-head panel-head" onclick="toggleCliPanel('dup-clientes-body')">
+          <h3>⚠ Duplicados (<span id="dup-clientes-count">0</span>)</h3>
+          <span class="cli-chevron">▾</span>
         </div>
-        <div class="panel-body" id="dup-clientes-body"></div>
+        <div class="cli-plegable-body panel-body" id="dup-clientes-body"></div>
       </div>
-      <div class="panel" id="panel-identidad-pendiente" style="margin-bottom:12px;display:none;">
-        <div class="panel-head" style="justify-content:space-between;">
-          <h3>🕓 Identidad pendiente de confirmar (<span id="pend-identidad-count">0</span>)</h3>
+
+      <div class="panel" id="panel-identidad-pendiente" style="margin-bottom:10px;display:none;">
+        <div class="cli-plegable-head panel-head" onclick="toggleCliPanel('pend-identidad-body')">
+          <h3>🕓 Pendientes de confirmar (<span id="pend-identidad-count">0</span>)</h3>
+          <span class="cli-chevron">▾</span>
         </div>
-        <div class="panel-body" id="pend-identidad-body"></div>
+        <div class="cli-plegable-body panel-body open" id="pend-identidad-body"></div>
       </div>
-      <div class="panel">
+
+      <div class="panel" id="panel-pendientes-revision" style="margin-bottom:10px;display:none;">
+        <div class="cli-plegable-head panel-head" onclick="toggleCliPanel('pendientes-revision-body')">
+          <h3>📋 Pendientes de revisión (<span id="pendientes-revision-count">0</span>)</h3>
+          <span class="cli-chevron">▾</span>
+        </div>
+        <div class="cli-plegable-body panel-body" id="pendientes-revision-body"></div>
+      </div>
+
+      <!-- Lista móvil de clientes -->
+      <div id="clientes-lista-movil"></div>
+
+      <!-- Tabla escritorio -->
+      <div class="panel tabla-escritorio-solo">
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
             <thead><tr>
@@ -10953,16 +11034,27 @@ async function cargarIdentidadPendiente(){
   const panel = document.getElementById('panel-identidad-pendiente');
   document.getElementById('pend-identidad-count').textContent = lista.length;
   panel.style.display = lista.length ? '' : 'none';
-  document.getElementById('pend-identidad-body').innerHTML = lista.map(c=>`
-    <div style="padding:10px 0;border-bottom:1px solid var(--line);">
-      <div><b>${c.a.nombre}</b> ↔ <b>${c.b.nombre}</b> — conflicto en <b>${c.campo}</b>: "${c.valor_a||'—'}" / "${c.valor_b||'—'}"</div>
-      ${c.aviso_nueva_evidencia ? `
-        <div style="background:var(--concrete);border:1px solid var(--green);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13px;">
-          <b style="color:var(--green);">✓ Nueva información puede resolver este cliente pendiente</b>
-          <div style="margin-top:4px;">La evidencia reciente apunta a: <b>${c.sugerido}</b> (${(c.evidencia||[]).filter(e=>e.valor===c.sugerido).length} documentos lo confirman)</div>
-          <button class="btn sm primary" style="margin-top:6px;" onclick='resolverCasoIdentidadPendiente(${JSON.stringify(c)})'>Ver y confirmar fusión</button>
-        </div>` : `<div style="font-size:12px;color:var(--sub);margin-top:2px;">Esperando más evidencia (${(c.evidencia||[]).length} documento(s) visto(s) hasta ahora). Ambos clientes siguen funcionando con normalidad.</div>`}
-    </div>`).join('');
+  document.getElementById('pend-identidad-body').innerHTML = lista.map(caso=>{
+    const hasEv = caso.aviso_nueva_evidencia;
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--line);">
+      <div style="font-size:13px;margin-bottom:4px;"><b>${caso.a.nombre}</b> ↔ <b>${caso.b.nombre}</b></div>
+      <div style="font-size:12px;color:var(--orange);margin-bottom:6px;">Conflicto en <b>${caso.campo}</b>: «${caso.valor_a||'—'}» / «${caso.valor_b||'—'}»</div>
+      ${hasEv ? `<div style="font-size:12px;color:var(--green);margin-bottom:6px;">✓ Evidencia reciente apunta a: <b>${caso.sugerido}</b></div>` : `<div style="font-size:12px;color:var(--sub);margin-bottom:6px;">Sin evidencia suficiente todavía (${(caso.evidencia||[]).length} doc(s) vistos)</div>`}
+      <div class="cli-pend-acciones">
+        <button class="btn primary" onclick='resolverCasoIdentidadPendiente(${JSON.stringify(caso)})'>⟲ Fusionar</button>
+        <button class="btn" onclick='descartarCasoIdentidad("${caso.id}")'>✕ Descartar</button>
+        <button class="btn" onclick='openClientDrawer("${caso.a.nombre.replace(/"/g,"&quot;")}")'>✏️ ${caso.a.nombre.slice(0,14)}</button>
+        <button class="btn" onclick='openClientDrawer("${caso.b.nombre.replace(/"/g,"&quot;")}")'>✏️ ${caso.b.nombre.slice(0,14)}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function descartarCasoIdentidad(id){
+  if(!sb) return;
+  const {error} = await sb.from('identidad_pendiente_casos').update({estado:'descartado'}).eq('id',id);
+  if(error){ mostrarToast('Error: '+errText(error)); return; }
+  mostrarToast('Caso descartado.', 'ok');
+  cargarIdentidadPendiente();
 }
 async function resolverCasoIdentidadPendiente(caso){
   await abrirComparacionFusion(caso.a, caso.b);
@@ -11216,6 +11308,91 @@ async function cambiarPrioridadSeleccionados(){
   mostrarToast('Prioridad actualizada.', 'ok');
   renderClientesTable();
 }
+// ======== CLIENTES MÓVIL ========
+function toggleFiltrosClientesMovil(){
+  const inner = document.getElementById('clientes-filtros-movil-inner');
+  inner?.classList.toggle('open');
+}
+function toggleCliPanel(bodyId){
+  document.getElementById(bodyId)?.classList.toggle('open');
+}
+function sincronizarBusquedaClientes(v){
+  const d = document.getElementById('clientes-search');
+  if(d) d.value = v;
+  renderClientesTable();
+}
+
+// Actualizar cards móviles de clientes
+function renderClientesMovil(clientesFiltrados){
+  const lista = document.getElementById('clientes-lista-movil');
+  if(!lista) return;
+  if(!clientesFiltrados.length){
+    lista.innerHTML = '<div style="padding:16px;color:var(--ink-soft);text-align:center;">Sin clientes con estos filtros</div>';
+    return;
+  }
+  lista.innerHTML = clientesFiltrados.map(cli => {
+    const total = (cli.facturado||0)+(cli.enB||0);
+    const totalFmt = total ? total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €' : '—';
+    const pendFmt = cli.pendiente > 0 ? `<span class="cc-pend">Pendiente: ${cli.pendiente.toLocaleString('es-ES',{minimumFractionDigits:2})} €</span>` : '';
+    const prioClass = cli.prio==='alta' ? 'cc-prio-alta' : cli.prio==='media' ? 'cc-prio-media' : '';
+    const prioLabel = cli.prio==='alta' ? '🔴' : cli.prio==='media' ? '🟡' : '';
+    const tipo = cli.type || '';
+    const pob = cli.poblacion || '';
+    const meta = [tipo, pob].filter(Boolean).join(' · ');
+    return `<div class="cliente-card" onclick="openClientDrawer('${(cli.name||'').replace(/'/g,"\'")}')">
+      <input type="checkbox" class="cc-check clientes-sel-chk" data-id="${cli.id}" onclick="event.stopPropagation();actualizarSeleccionClientes()">
+      <div class="cc-body">
+        <div class="cc-nombre">${prioLabel ? prioLabel+' ' : ''}<span class="${prioClass}">${svgEsc(cli.name||'')}</span></div>
+        ${meta ? `<div class="cc-meta">${svgEsc(meta)}</div>` : ''}
+        <div class="cc-row">
+          <span class="cc-total">${totalFmt}</span>
+          ${pendFmt}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Revisar clientes automáticamente
+async function revisarClientesAuto(){
+  mostrarToast('Analizando clientes…');
+  if(!sb) return;
+  const pendientes = [];
+  const {data: entidades} = await sb.from('entidades').select('id,nombre,nif,poblacion,provincia,cp,tipo,clase_nombre').limit(500);
+  if(!entidades) return;
+  for(const e of entidades){
+    const problemas = [];
+    if(!e.nif && e.tipo !== 'particular') problemas.push('Sin NIF/CIF');
+    if(!e.poblacion) problemas.push('Sin población');
+    if(!e.provincia) problemas.push('Sin provincia');
+    if(!e.cp) problemas.push('Sin CP');
+    if(problemas.length){
+      pendientes.push({id:e.id, nombre:e.nombre, problemas});
+    }
+  }
+  const panel = document.getElementById('panel-pendientes-revision');
+  const body = document.getElementById('pendientes-revision-body');
+  const count = document.getElementById('pendientes-revision-count');
+  if(!pendientes.length){
+    mostrarToast('✓ Sin problemas detectados', 'ok');
+    if(panel) panel.style.display = 'none';
+    return;
+  }
+  count.textContent = pendientes.length;
+  panel.style.display = '';
+  body.classList.add('open');
+  body.innerHTML = pendientes.map(p=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--line);">
+      <div style="font-weight:700;font-size:13px;">${svgEsc(p.nombre)}</div>
+      <div style="font-size:12px;color:var(--orange);margin:2px 0 6px;">${p.problemas.join(' · ')}</div>
+      <div class="cli-pend-acciones">
+        <button class="btn" onclick="openClientDrawer('${(p.nombre||'').replace(/'/g,"\'")}')">✏️ Editar</button>
+      </div>
+    </div>`).join('');
+  mostrarToast(`${pendientes.length} clientes con datos incompletos`, 'ok');
+}
+// ======== FIN CLIENTES MÓVIL ========
+
 function renderClientesTable(){
   const falta = v => v ? v : '—';
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
@@ -11260,6 +11437,8 @@ function renderClientesTable(){
     <td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnCliente('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')">🗑</span></td></tr>`;
   }).join('');
   aplicarVisibilidadColumnasClientes();
+  // Actualizar cards móviles
+  renderClientesMovil(filtrados);
 }
 function toggleExpandirClienteFila(id){
   const existente = document.getElementById('cliente-detalle-'+id);
