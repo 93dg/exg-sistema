@@ -2638,7 +2638,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.61</div>
+        <div class="sub" id="version-badge">V3.62</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2673,6 +2673,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="reportes" class="admin-only"><span class="ico">🐞</span><span class="label"> Reportes</span></button>
       <button data-view="conocimiento" class="admin-only"><span class="ico">🧠</span><span class="label"> Conocimiento</span></button>
       <button data-view="historico" class="admin-only"><span class="ico">📜</span><span class="label"> Histórico</span></button>
+      <button data-view="backup"><span class="ico">🛡️</span><span class="label"> Copias de seguridad</span></button>
       <button data-view="config" class="admin-only"><span class="ico">⚙</span><span class="label"> Configuración</span></button>
     </div>
     <div class="sidebar-foot"><span style="cursor:pointer;text-decoration:underline;" onclick="doLogout()">Cerrar sesión</span></div>
@@ -4217,6 +4218,60 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </div>
     </div>
 
+    <div class="view" id="view-backup">
+      <div class="topbar">
+        <div><h1>Copias de seguridad</h1><div class="desc">Protección de datos y recuperación ante errores</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>🛡️ Estado de protección</h3></div>
+        <div class="panel-body">
+          <div class="econ-line" style="margin-bottom:6px;">
+            <span>Papelera activa (trigger automático)</span>
+            <span class="v green">✓ Activa</span>
+          </div>
+          <div class="econ-line" style="margin-bottom:6px;">
+            <span>Tablas protegidas</span>
+            <span class="v">Documentos · Clientes · Trabajos</span>
+          </div>
+          <div class="econ-line">
+            <span>Elementos en papelera ahora</span>
+            <span class="v" id="backup-papelera-count">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>📥 Exportar copia ahora</h3></div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:13px;color:var(--ink-soft);">Descarga una copia completa de todos los datos en formato JSON. Guárdala en un lugar seguro (Google Drive, pendrive, etc.).</div>
+          <button class="btn primary" onclick="descargarBackupCompleto()" id="backup-exportar-btn">⬇️ Descargar backup completo</button>
+          <div id="backup-exportar-status" style="font-size:12px;color:var(--ink-soft);"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>🗑️ Papelera — elementos borrados</h3><span class="count" id="backup-papelera-badge">0</span></div>
+        <div class="panel-body" style="padding:0;">
+          <div id="backup-papelera-lista" style="padding:12px;">Cargando…</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>🔄 Backup automático (n8n)</h3></div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
+          <div>Para activar el backup diario automático a Google Drive:</div>
+          <ol style="margin:0;padding-left:20px;line-height:2;">
+            <li>Entra en n8n</li>
+            <li>Crea un workflow con trigger <b>Cron: 0 3 * * *</b> (las 3am)</li>
+            <li>Nodo HTTP → POST a <code>https://sshctqnpuolawtcujxkt.supabase.co/rest/v1/rpc/exportar_backup_completo</code></li>
+            <li>Nodo Google Drive → subir el resultado como <b>EXG-backup-[fecha].json</b></li>
+          </ol>
+          <div style="color:var(--orange);font-size:12px;">⚠️ Necesitas la SERVICE_ROLE_KEY de Supabase para la cabecera apikey</div>
+        </div>
+      </div>
+    </div>
+
     <div class="view" id="view-config">
       <div class="topbar"><div><h1>Configuración</h1><div class="desc">Qué secciones puede ver cada usuario</div></div></div>
       <div class="panel">
@@ -5543,6 +5598,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     if(btn.dataset.view==='mapa' && typeof realMap!=='undefined' && realMap){
       setTimeout(()=>realMap.invalidateSize(), 50);
     }
+    if(btn.dataset.view==='backup') cargarPapelera();
     if(btn.dataset.view==='facturas'){
       renderFacturasKPIs();
     }
@@ -16634,6 +16690,66 @@ function openJobDrawer(code){
 
   document.getElementById('drawer-overlay').classList.add('active');
 }
+// ======== BACKUP Y RECUPERACIÓN ========
+async function descargarBackupCompleto(){
+  const btn = document.getElementById('backup-exportar-btn');
+  const status = document.getElementById('backup-exportar-status');
+  if(!sb){ mostrarToast('Supabase no conectado.'); return; }
+  btn.disabled = true; btn.textContent = '⏳ Exportando…';
+  status.textContent = 'Consultando todas las tablas…';
+  try{
+    const {data, error} = await sb.rpc('exportar_backup_completo');
+    if(error){ throw error; }
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fecha = new Date().toISOString().slice(0,10);
+    a.href = url; a.download = `EXG-backup-${fecha}.json`;
+    a.click(); URL.revokeObjectURL(url);
+    const stats = data.estadisticas || {};
+    status.textContent = `✓ Backup descargado — ${stats.total_documentos||0} documentos, ${stats.total_clientes||0} clientes, ${stats.total_trabajos||0} trabajos`;
+    btn.textContent = '✓ Backup descargado';
+  }catch(err){
+    status.textContent = 'Error: '+(err.message||'algo falló');
+    btn.textContent = '⬇️ Descargar backup completo';
+  }
+  btn.disabled = false;
+}
+async function cargarPapelera(){
+  if(!sb) return;
+  const {data, error} = await sb.from('papelera_recuperacion').select('*').eq('recuperado',false).order('deleted_at',{ascending:false}).limit(100);
+  if(error){ return; }
+  const count = data?.length || 0;
+  document.getElementById('backup-papelera-count')?.textContent && (document.getElementById('backup-papelera-count').textContent = count);
+  const badge = document.getElementById('backup-papelera-badge'); if(badge) badge.textContent = count;
+  const lista = document.getElementById('backup-papelera-lista');
+  if(!lista) return;
+  if(!count){ lista.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;">Papelera vacía — no se ha borrado nada.</div>'; return; }
+  lista.innerHTML = data.map(r=>{
+    const d = r.datos_completos||{};
+    const nombre = d.nombre || d.numero || d.client || d.id?.slice(0,8) || '?';
+    const fecha = (r.deleted_at||'').slice(0,16).replace('T',' ');
+    return `<div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:13px;">${svgEsc(nombre)}</div>
+        <div style="font-size:11px;color:var(--ink-soft);">${r.tabla} · borrado ${fecha}</div>
+      </div>
+      <button class="btn sm" onclick="recuperarDePapelera('${r.id}')">↩ Recuperar</button>
+    </div>`;
+  }).join('');
+}
+async function recuperarDePapelera(id){
+  if(!sb) return;
+  if(!confirm('¿Recuperar este elemento borrado?')) return;
+  const {data, error} = await sb.rpc('recuperar_de_papelera', {p_id: id});
+  if(error){ mostrarToast('Error: '+errText(error)); return; }
+  mostrarToast(data||'Recuperado', 'ok');
+  cargarPapelera();
+  if(typeof cargarDatosReales==='function') cargarDatosReales();
+}
+// ======== FIN BACKUP ========
+
 // IDs pendientes de mover (evita JSON.stringify en onclick)
 let __moverIds = [];
 
