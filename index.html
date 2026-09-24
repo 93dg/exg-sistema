@@ -2638,7 +2638,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.65</div>
+        <div class="sub" id="version-badge">V3.66</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -15681,8 +15681,21 @@ async function submitNewInvoice(ev, isDraft){
   // coincidencia exacta primero; si falla, defensa adicional sin distinguir mayúsculas ni
   // espacios sobrantes — un cliente sugerido por la IA (u otra fuente) que venga con una
   // capitalización distinta no debe acabar guardándose sin cliente por un simple ===
-  const entidad = clientes.find(c=>c.name===client)
+  let entidad = clientes.find(c=>c.name===client)
     || clientes.find(c=>c.name.trim().toLowerCase()===client.trim().toLowerCase());
+
+  // PROTECCIÓN: si hay un nombre de cliente pero no coincide con ninguno en BD,
+  // crear el cliente automáticamente para que entidad_id no quede null
+  if(!entidad && client.trim()){
+    const {data: nuevoCliente, error: errCliente} = await sb.from('entidades')
+      .insert({nombre: client.trim().toUpperCase(), tipo:'cliente', clase_nombre:'persona'})
+      .select('id,nombre').single();
+    if(!errCliente && nuevoCliente){
+      entidad = {id: nuevoCliente.id, name: nuevoCliente.nombre};
+      clientes.push(entidad); // añadir a memoria para que no se pierda
+      mostrarToast(`Cliente "${nuevoCliente.nombre}" creado automáticamente.`, 'ok');
+    }
+  }
   const jobCode = job !== '—' ? job.split(' — ')[0].trim() : null;
   const trabajo = jobCode ? jobs.find(j=>j.code===jobCode) : null;
 
