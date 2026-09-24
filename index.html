@@ -2638,7 +2638,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.62</div>
+        <div class="sub" id="version-badge">V3.63</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2750,12 +2750,18 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             </div>
           </div>
         </div>
-        <div class="panel-body" style="padding:0;overflow-x:auto;">
+        <div class="panel-body tabla-escritorio-solo" style="padding:0;overflow-x:auto;">
           <table class="tbl">
             <tr><th class="ord" onclick="ordenarControlDocs('tipo')">Tipo ⇅</th><th class="ord" onclick="ordenarControlDocs('numero')">Nº ⇅</th><th class="ord" onclick="ordenarControlDocs('cliente')">Cliente ⇅</th><th class="ord" onclick="ordenarControlDocs('fecha')">Fecha ⇅</th><th class="num ord" onclick="ordenarControlDocs('importe')">Importe ⇅</th><th>Calidad</th><th>Estado</th></tr>
             <tbody id="control-docs-tbody"></tbody>
           </table>
           <div style="padding:10px;text-align:center;display:none;" id="control-docs-cargar-mas-wrap">
+            <button class="btn" onclick="controlDocsMostrarMas()">Cargar más</button>
+          </div>
+        </div>
+        <div class="lista-movil-solo" id="control-docs-lista-movil-wrap">
+          <div id="control-docs-lista-movil"></div>
+          <div style="padding:10px;text-align:center;display:none;" id="control-docs-cargar-mas-movil-wrap">
             <button class="btn" onclick="controlDocsMostrarMas()">Cargar más</button>
           </div>
         </div>
@@ -15951,6 +15957,23 @@ function renderControlDocs(){
   }).join('') : '<tr><td colspan="6" class="empty">Sin documentos con estos filtros</td></tr>';
   const wrap = document.getElementById('control-docs-cargar-mas-wrap');
   if(wrap) wrap.style.display = filtrados.length > controlDocsLimite ? '' : 'none';
+
+  // ── Lista móvil ──
+  const listaMovil = document.getElementById('control-docs-lista-movil');
+  if(listaMovil){
+    listaMovil.innerHTML = '';
+    visibles.forEach(d => {
+      const entidad = clientes.find(cli => cli.id === d.entidad_id || cli.name === d.client);
+      const trabajo = trabajos?.find(t => t.id === d.job_id);
+      const archivoUrl = d.archivo_url || null;
+      const fechaCorta = formatFechaCorta(d.dateRaw);
+      const cal = calidadCorta(d);
+      construirCardMovil(d, d.type, 'control-docs-lista-movil', 'control-sel-chk', d.amountLabel, fechaCorta, entidad, trabajo, archivoUrl, cal);
+    });
+    if(!visibles.length) listaMovil.innerHTML = '<div style="padding:16px;color:var(--ink-soft);text-align:center;">Sin documentos con estos filtros</div>';
+    const wrapMovil = document.getElementById('control-docs-cargar-mas-movil-wrap');
+    if(wrapMovil) wrapMovil.style.display = filtrados.length > controlDocsLimite ? '' : 'none';
+  }
 }
 /* ============ ESTADO DE DOCUMENTO — componente único compartido ============
    Facturas, Albaranes, Presupuestos y Proformas usan EXACTAMENTE el mismo
