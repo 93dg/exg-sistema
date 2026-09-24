@@ -2638,7 +2638,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.59</div>
+        <div class="sub" id="version-badge">V3.60</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4944,13 +4944,20 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     </div>
 
     <div class="ai-view" id="ai-view-historial" style="display:none;">
-      <div id="ai-historial-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
-        <div class="chip-filter active" data-hf="todas">Todas</div>
-        <div class="chip-filter" data-hf="hoy">Hoy</div>
-        <div class="chip-filter" data-hf="con_ia">Con IA</div>
-        <div class="chip-filter" data-hf="sin_ia">Sin IA</div>
-        <div class="chip-filter" data-hf="con_aprendizaje">Con aprendizaje</div>
+      <div id="ai-historial-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+        <div class="chip-filter active" data-hf="hoy">Hoy</div>
+        <div class="chip-filter" data-hf="semana">Esta semana</div>
+        <div class="chip-filter" data-hf="todas">Todo</div>
+        <div class="chip-filter" data-hf="pendiente">Sin confirmar</div>
+        <div class="chip-filter" data-hf="no_interpretada">No interpretadas</div>
+        <div class="chip-filter" data-hf="con_aprendizaje">Aprendió</div>
         <div class="chip-filter" data-hf="errores">Errores</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;" id="ai-hist-selbar">
+        <button class="btn sm" onclick="aiHistorialSelAll()" id="ai-hist-sel-all-btn">Seleccionar</button>
+        <span id="ai-hist-sel-count" style="font-size:12px;color:var(--ink-soft);display:none;"></span>
+        <button class="btn sm" id="ai-hist-borrar-btn" style="color:var(--red);display:none;" onclick="aiHistorialBorrarSel()">🗑 Borrar</button>
+        <button class="btn sm" id="ai-hist-archivar-btn" style="display:none;" onclick="aiHistorialArchivarSel()">📦 Archivar</button>
       </div>
       <div id="ai-historial-list"></div>
     </div>
@@ -12943,7 +12950,8 @@ function aiMostrarVista(nombre){
 // historial de peticiones al asistente — qué se le pidió, qué entendió, qué se propuso
 // hacer y cuándo. Responde al reporte "no sé dónde coño lo ha puesto ni cómo lo ha hecho".
 let aiHistorialCache = [];
-let aiHistorialFiltroActivo = 'todas';
+let aiHistorialFiltroActivo = 'hoy';
+let aiHistorialSel = new Set();
 function aiCambiarPestana(tab){
   document.querySelectorAll('#ai-panel-tabs .client-tab').forEach(el=>el.classList.toggle('active', el.dataset.aiTab===tab));
   if(tab==='historial'){ abrirAiHistorial(); }
@@ -12962,16 +12970,23 @@ async function abrirAiHistorial(){
 function aiRenderHistorialLista(){
   const cont = document.getElementById('ai-historial-list');
   const hoy = new Date().toISOString().slice(0,10);
+  const semana = new Date(Date.now()-7*24*60*60*1000).toISOString().slice(0,10);
   const filtradas = aiHistorialCache.filter(l=>{
+    if(l.archivado) return false; // siempre ocultar archivados
     const tareas = l.campos_extraidos?.tareas || [];
-    const aprendio = tareas.length && l.convertido_en_regla;
+    const resultados = l.tareas_resultado || [];
+    const aprendio = l.convertido_en_regla;
+    const noInterpretada = !tareas.length && l.estado !== 'error';
+    const tareasConRes = tareas.filter(t=>['documento','trabajo','gasto','incidente'].includes(t.tipo)).length;
+    const pendiente = tareasConRes > 0 && resultados.length < tareasConRes;
     if(aiHistorialFiltroActivo==='hoy') return (l.creado_at||'').slice(0,10)===hoy;
-    if(aiHistorialFiltroActivo==='con_ia') return Number(l.coste_estimado||0) > 0;
-    if(aiHistorialFiltroActivo==='sin_ia') return !l.coste_estimado || Number(l.coste_estimado)===0;
+    if(aiHistorialFiltroActivo==='semana') return (l.creado_at||'').slice(0,10)>=semana;
+    if(aiHistorialFiltroActivo==='pendiente') return pendiente || noInterpretada;
+    if(aiHistorialFiltroActivo==='no_interpretada') return noInterpretada;
     if(aiHistorialFiltroActivo==='con_aprendizaje') return !!aprendio;
     if(aiHistorialFiltroActivo==='errores') return l.estado==='error';
     return true;
-  });
+  }).sort((a,b)=>new Date(b.creado_at)-new Date(a.creado_at));
   if(!filtradas.length){ cont.innerHTML = '<div class="empty">Nada con este filtro.</div>'; return; }
   cont.innerHTML = filtradas.map(l=>{
     const tareas = l.campos_extraidos?.tareas || [];
@@ -12994,15 +13009,19 @@ function aiRenderHistorialLista(){
     else if(resultados.length >= tareasConResultadoEsperable) estadoPill = `<span class="pill cobrado">Completada</span>`;
     else if(resultados.length > 0) estadoPill = `<span class="pill pendiente_enviar">Parcial — ${resultados.length}/${tareasConResultadoEsperable}</span>`;
     else estadoPill = `<span class="pill anulado">Pendiente de confirmación</span>`;
-    return `<div style="border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;cursor:pointer;" onclick="aiAbrirDetalleHistorial('${l.id}')">
-      <div style="font-weight:700;font-size:13.5px;margin-bottom:2px;">${svgEsc(titulo)}</div>
-      <div class="sub-t" style="font-size:11px;margin-bottom:4px;">${fecha}</div>
-      <div class="sub-t" style="font-size:12.5px;margin-bottom:6px;">${svgEsc(resumenTareas)}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-        ${estadoPill}
-        <span class="pill ${conIA?'pendiente_enviar':'cobrado'}">${conIA ? Number(l.coste_estimado).toLocaleString('es-ES',{minimumFractionDigits:4})+' € IA' : 'Sin IA'}</span>
-        <span class="pill ${resultados.length?'cobrado':'anulado'}">${resultados.length} resultado${resultados.length===1?'':'s'}</span>
-        ${aprendio ? `<span class="pill adjudicado">🧠 Aprendió</span>` : ''}
+    const sel = aiHistorialSel.has(l.id);
+    return `<div style="border:1px solid ${sel?'var(--orange)':'var(--line)'};border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;${sel?'background:color-mix(in srgb,var(--orange) 6%,transparent);':''}">
+      <input type="checkbox" style="margin-top:3px;flex-shrink:0;" ${sel?'checked':''} onclick="event.stopPropagation();aiHistorialToggleSel('${l.id}')">
+      <div style="flex:1;min-width:0;cursor:pointer;" onclick="aiAbrirDetalleHistorial('${l.id}')">
+        <div style="font-weight:700;font-size:13.5px;margin-bottom:2px;">${svgEsc(titulo)}</div>
+        <div class="sub-t" style="font-size:11px;margin-bottom:4px;">${fecha}</div>
+        <div class="sub-t" style="font-size:12.5px;margin-bottom:6px;">${svgEsc(resumenTareas)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          ${estadoPill}
+          <span class="pill ${conIA?'pendiente_enviar':'cobrado'}">${conIA ? Number(l.coste_estimado).toLocaleString('es-ES',{minimumFractionDigits:4})+' € IA' : 'Sin IA'}</span>
+          <span class="pill ${resultados.length?'cobrado':'anulado'}">${resultados.length} resultado${resultados.length===1?'':'s'}</span>
+          ${aprendio ? `<span class="pill adjudicado">🧠 Aprendió</span>` : ''}
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -13013,8 +13032,71 @@ document.addEventListener('click', ev=>{
   document.querySelectorAll('#ai-historial-filtros .chip-filter').forEach(c=>c.classList.remove('active'));
   chip.classList.add('active');
   aiHistorialFiltroActivo = chip.dataset.hf;
+  aiHistorialSel.clear();
   aiRenderHistorialLista();
+  aiActualizarBarraSel();
 });
+
+function aiHistorialToggleSel(id){
+  if(aiHistorialSel.has(id)) aiHistorialSel.delete(id);
+  else aiHistorialSel.add(id);
+  aiRenderHistorialLista();
+  aiActualizarBarraSel();
+}
+function aiHistorialSelAll(){
+  const hoy = new Date().toISOString().slice(0,10);
+  const semana = new Date(Date.now()-7*24*60*60*1000).toISOString().slice(0,10);
+  const visibles = aiHistorialCache.filter(l=>{
+    if(l.archivado) return false;
+    const tareas = l.campos_extraidos?.tareas||[];
+    const resultados = l.tareas_resultado||[];
+    const noInt = !tareas.length && l.estado!=='error';
+    const tareasConRes = tareas.filter(t=>['documento','trabajo','gasto','incidente'].includes(t.tipo)).length;
+    const pend = tareasConRes>0 && resultados.length<tareasConRes;
+    if(aiHistorialFiltroActivo==='hoy') return (l.creado_at||'').slice(0,10)===hoy;
+    if(aiHistorialFiltroActivo==='semana') return (l.creado_at||'').slice(0,10)>=semana;
+    if(aiHistorialFiltroActivo==='pendiente') return pend||noInt;
+    if(aiHistorialFiltroActivo==='no_interpretada') return noInt;
+    if(aiHistorialFiltroActivo==='con_aprendizaje') return !!l.convertido_en_regla;
+    if(aiHistorialFiltroActivo==='errores') return l.estado==='error';
+    return true;
+  });
+  if(aiHistorialSel.size === visibles.length) aiHistorialSel.clear();
+  else visibles.forEach(l=>aiHistorialSel.add(l.id));
+  aiRenderHistorialLista();
+  aiActualizarBarraSel();
+}
+function aiActualizarBarraSel(){
+  const n = aiHistorialSel.size;
+  document.getElementById('ai-hist-sel-all-btn').textContent = n ? 'Deseleccionar' : 'Seleccionar';
+  document.getElementById('ai-hist-sel-count').textContent = n ? `${n} seleccionada(s)` : '';
+  document.getElementById('ai-hist-sel-count').style.display = n ? '' : 'none';
+  document.getElementById('ai-hist-borrar-btn').style.display = n ? '' : 'none';
+  document.getElementById('ai-hist-archivar-btn').style.display = n ? '' : 'none';
+}
+async function aiHistorialBorrarSel(){
+  if(!aiHistorialSel.size || !sb) return;
+  if(!confirm(`¿Borrar ${aiHistorialSel.size} petición(es)? No se puede deshacer.`)) return;
+  const ids = [...aiHistorialSel];
+  const {error} = await sb.from('ia_llamadas').delete().in('id', ids);
+  if(error){ mostrarToast('Error al borrar: '+errText(error)); return; }
+  aiHistorialCache = aiHistorialCache.filter(l=>!ids.includes(l.id));
+  aiHistorialSel.clear();
+  aiRenderHistorialLista();
+  aiActualizarBarraSel();
+  mostrarToast(`${ids.length} petición(es) borrada(s).`, 'ok');
+}
+async function aiHistorialArchivarSel(){
+  if(!aiHistorialSel.size || !sb) return;
+  const ids = [...aiHistorialSel];
+  const {error} = await sb.from('ia_llamadas').update({archivado:true}).in('id', ids);
+  if(error){ mostrarToast('Error al archivar: '+errText(error)); return; }
+  aiHistorialCache = aiHistorialCache.filter(l=>!ids.includes(l.id));
+  aiHistorialSel.clear();
+  aiRenderHistorialLista();
+  aiActualizarBarraSel();
+  mostrarToast(`${ids.length} petición(es) archivada(s).`, 'ok');
+}
 
 // expediente completo de una petición — todas las secciones pedidas
 function aiAbrirDetalleHistorial(id){
