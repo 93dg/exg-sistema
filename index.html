@@ -2638,7 +2638,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.57</div>
+        <div class="sub" id="version-badge">V3.58</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14805,7 +14805,26 @@ function normalizarDatosDocumentoParaEditor(datos){
 }
 function abrirEditorConDatosIA(datos){
   const contexto = {...(metodoDocContexto||{})};
-  if(datos.cliente) contexto.clientName = datos.cliente;
+  // Protección: si el asistente devolvió un cliente y el usuario había escrito otro explícitamente
+  // (CLIENTE: X en el mensaje), verificar que coinciden. Si no, usar el que dijo el usuario.
+  if(datos.cliente){
+    const msgOrig = (window.__ultimoMensajeAsistente || '');
+    const matchCliente = msgOrig.match(/CLIENTE\s*:\s*(.+)/i);
+    if(matchCliente){
+      const clienteEscrito = matchCliente[1].trim().toUpperCase();
+      const clienteIA = (datos.cliente || '').toUpperCase();
+      // Si el nombre escrito no está incluido en el de la IA ni viceversa → posible sustitución
+      const normStr = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9 ]/g,'').trim();
+      const ne = normStr(clienteEscrito), ni = normStr(clienteIA);
+      if(ne && ni && ne !== ni && !ni.includes(ne) && !ne.includes(ni)){
+        // El asistente puso un cliente diferente al que el usuario escribió → usar el del usuario
+        console.warn(`Asistente sustituyó cliente: "${datos.cliente}" por el escrito "${matchCliente[1].trim()}"`);
+        datos = {...datos, cliente: matchCliente[1].trim()};
+        mostrarToast(`Cliente corregido: "${matchCliente[1].trim()}" (el asistente había puesto "${contexto.clientName||datos.cliente||'?'}")`, 'ok');
+      }
+    }
+    contexto.clientName = datos.cliente;
+  }
   const isp = datos.isp || (window.__ultimoMensajeAsistente && /inversi[oó]n\s+del?\s+sujeto\s+pasivo|\bISP\b/i.test(window.__ultimoMensajeAsistente));
   // REVISAR/foto-archivo/texto-dictado/continuar deben llegar SIEMPRE al mismo editor real
   // con formato — nunca al asistente simplificado de pasos, que está pensado para rellenar
