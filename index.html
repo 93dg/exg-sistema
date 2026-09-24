@@ -2638,7 +2638,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.56</div>
+        <div class="sub" id="version-badge">V3.57</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12698,38 +12698,61 @@ function togglePreview(){
 function parseDictado(){
   const text = document.getElementById('ie-dictado-text').value.trim();
   if(!text) return;
-  // detección determinista: si el texto dictado menciona inversión del sujeto pasivo,
-  // cambia el tratamiento IVA directamente — no hace falta IA para esto
+
+  // Inversión sujeto pasivo
   if(/inversi[oó]n\s+del?\s+sujeto\s+pasivo|\bISP\b/i.test(text) && document.getElementById('ie-tratamiento-iva')){
     document.getElementById('ie-tratamiento-iva').value = 'isp';
     cambiarTratamientoIva();
     mostrarToast('Detectado "inversión del sujeto pasivo" — tratamiento IVA cambiado.', 'ok');
   }
-  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean).filter(l=>!/inversi[oó]n\s+del?\s+sujeto\s+pasivo|\bISP\b/i.test(l));
+
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean)
+    .filter(l=>!/inversi[oó]n\s+del?\s+sujeto\s+pasivo|\bISP\b/i.test(l))
+    .filter(l=>!/^TOTAL[:\s]/i.test(l)); // ignorar línea de total
+
+  const num = s => Number(s.replace(/\./g,'').replace(',','.'));
+
   let added = 0;
-  lines.forEach(line=>{
-    // formato esperado: "<cantidad> <concepto> a <precio>"
-    const m = line.match(/^([\d.,]+)\s+(.+?)\s+a\s+([\d.,]+)\s*€?$/i);
-    if(m){
-      const qty = Number(m[1].replace(',','.'));
-      const concept = m[2];
-      const price = Number(m[3].replace(',','.'));
-      addItemRow(qty, concept, price);
-      added++;
-    } else {
-      // sin precio: solo cantidad + concepto, sugiere precio por palabra clave
-      const m2 = line.match(/^([\d.,]+)\s+(.+)$/);
-      if(m2){
-        addItemRow(Number(m2[1].replace(',','.')), m2[2], '');
-        const rows = document.querySelectorAll('#ie-items-body tr');
-        const lastRow = rows[rows.length-1];
-        suggestFromConcept(lastRow.querySelector('.ie-concept'));
+  lines.forEach(line => {
+    // FORMATO RICO: "19/08/26 — 2,30 H — RETRO CARGANDO CAMIÓN DE ÁRIDOS — 45 €/H — 103,50 €"
+    // o con guión largo o normal: "fecha — cant unidad — concepto — precio/u — total"
+    const sep = line.includes('—') ? '—' : '–';
+    const partes = line.split(sep).map(p=>p.trim()).filter(Boolean);
+    if(partes.length >= 4){
+      // detectar si primera parte es fecha
+      const esFecha = /^\d{1,2}[/\-]\d{1,2}([/\-]\d{2,4})?$/.test(partes[0]);
+      const base = esFecha ? partes.slice(1) : partes;
+      // base[0] = "2,30 H", base[1] = concepto, base[2] = precio/u, base[3] = total
+      const cantUnidad = base[0]?.match(/^([\d.,]+)\s*(\w+)?$/);
+      const concept = base[1] || '';
+      // precio unitario: "45 €/H" → 45
+      const precioMatch = (base[2]||'').match(/([\d.,]+)/);
+      if(cantUnidad && concept && precioMatch){
+        const qty = num(cantUnidad[1]);
+        const price = num(precioMatch[1]);
+        addItemRow(qty, concept.trim(), price);
         added++;
+        return;
       }
     }
+
+    // FORMATO SIMPLE: "2,30 H RETRO CARGANDO CAMIÓN a 45"
+    const mSimple = line.match(/^([\d.,]+)\s+(.+?)\s+a\s+([\d.,]+)\s*€?$/i);
+    if(mSimple){ addItemRow(num(mSimple[1]), mSimple[2], num(mSimple[3])); added++; return; }
+
+    // SIN PRECIO: "3 m³ de excavación"
+    const mSolo = line.match(/^([\d.,]+)\s+(.+)$/);
+    if(mSolo){
+      addItemRow(num(mSolo[1]), mSolo[2], '');
+      const rows = document.querySelectorAll('#ie-items-body tr');
+      const lastRow = rows[rows.length-1];
+      suggestFromConcept(lastRow?.querySelector('.ie-concept'));
+      added++;
+    }
   });
+
   if(added){ document.getElementById('ie-dictado-text').value=''; }
-  else mostrarToast('No he podido interpretar el texto. Prueba con el formato: "3 m³ de excavación a 30"');
+  else mostrarToast('No he podido interpretar el texto. Formatos válidos:\n• "19/08/26 — 2,30 H — RETRO CARGANDO CAMIÓN — 45 €/H — 103,50 €"\n• "3 m³ de excavación a 30"');
 }
 
 function onImageAttach(input){
