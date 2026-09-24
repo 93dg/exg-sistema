@@ -2677,7 +2677,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.72</div>
+        <div class="sub" id="version-badge">V3.73</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11178,7 +11178,10 @@ async function confirmarFusionDesdeComparacion(){
     }
     mostrarToast(`${clientes.length} clientes fusionados en uno.`, 'ok');
     cerrarComparacionFusion();
-    if(typeof cargarDatosReales==='function') cargarDatosReales();
+    // Limpiar checkboxes y barra de selección
+    document.querySelectorAll('.clientes-sel-chk:checked').forEach(cb=>cb.checked=false);
+    actualizarSeleccionClientes();
+    if(typeof cargarDatosReales==='function') await cargarDatosReales();
     return;
   }
   // fusión de 2 (modo original)
@@ -11197,9 +11200,12 @@ async function confirmarFusionDesdeComparacion(){
   }
   mostrarToast('Clientes fusionados.', 'ok');
   cerrarComparacionFusion();
+  // Limpiar checkboxes y barra de selección
+  document.querySelectorAll('.clientes-sel-chk:checked').forEach(cb=>cb.checked=false);
+  actualizarSeleccionClientes();
   cargarDuplicadosClientes();
   cargarIdentidadPendiente();
-  if(typeof cargarDatosReales==='function') cargarDatosReales();
+  if(typeof cargarDatosReales==='function') await cargarDatosReales();
 }
 // ============ FIN FUSIÓN MÚLTIPLE ============
 
@@ -11476,24 +11482,24 @@ async function revisarClientesAuto(){
 
     // 5. Lo que no se puede corregir automáticamente → pendientes con sugerencias
     const problemas = [];
-    const sugerencias = [];
-    if(!e.nif && e.tipo !== 'particular') {
+    // Solo empresas/ayuntamientos necesitan NIF legalmente
+    if(!e.nif && (e.tipo==='empresa' || e.tipo==='ayuntamiento')) {
       problemas.push('Sin NIF/CIF');
-      sugerencias.push({label:'✏️ Añadir NIF', accion:`openClientDrawer('${(e.nombre||'').replace(/'/g,"\'")}')` });
     }
-    if(!e.poblacion) {
-      problemas.push('Sin población');
-      sugerencias.push({label:'✏️ Añadir población', accion:`openClientDrawer('${(e.nombre||'').replace(/'/g,"\'")}')` });
+    // Solo mostrar falta de datos si el cliente tiene documentos (es un cliente real activo)
+    // Un cliente sin ningún documento y sin ningún dato es ruido, no pendiente accionable
+    const tieneActividad = (c_mem=>{
+      if(!c_mem) return false;
+      return (c_mem.facturado||0)+(c_mem.enB||0) > 0;
+    })(clientes.find(x=>x.id===e.id));
+    if(tieneActividad){
+      if(!e.poblacion && !patch.poblacion) problemas.push('Sin población');
+      if(!e.provincia && !patch.provincia) problemas.push('Sin provincia');
+      if(!e.cp && !patch.cp) problemas.push('Sin CP');
     }
-    if(!e.provincia && !patch.provincia) {
-      problemas.push('Sin provincia');
-      if(e.cp) sugerencias.push({label:`Usar ${provinciaDeCP(e.cp)||'?'} (del CP)`, accion:`asignarProvinciaCliente('${e.id}','${provinciaDeCP(e.cp)||''}')` });
-      else sugerencias.push({label:'✏️ Añadir provincia', accion:`openClientDrawer('${(e.nombre||'').replace(/'/g,"\'")}')` });
-    }
-    if(!e.cp && !patch.cp) problemas.push('Sin CP');
 
     if(problemas.length){
-      pendientes.push({id:e.id, nombre:e.nombre, problemas, sugerencias});
+      pendientes.push({id:e.id, nombre:e.nombre, problemas, sugerencias:[]});
     }
   }
 
