@@ -2677,7 +2677,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.74</div>
+        <div class="sub" id="version-badge">V3.75</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11438,91 +11438,149 @@ async function revisarClientesAuto(){
     .select('id,nombre,nif,poblacion,provincia,cp,tipo,clase_nombre').limit(600);
   if(!entidades) return;
 
+  // PASO 0: Aprender provincia desde los propios datos existentes
+  // Si en la BD hay clientes de "FUENTE OBEJUNA" con provincia "CÓRDOBA", aprender eso
+  const mapPoblProv = {};
+  const mapPoblCp = {};
+  for(const e of entidades){
+    if(e.poblacion && e.provincia){
+      const k = e.poblacion.trim().toUpperCase();
+      mapPoblProv[k] = e.provincia.trim().toUpperCase();
+      if(e.cp && !mapPoblCp[k]) mapPoblCp[k] = e.cp;
+    }
+  }
+  // Añadir tabla base como fallback
+  const basePobl = {...POBLACION_DATOS};
+  for(const [k,v] of Object.entries(basePobl)){
+    if(!mapPoblProv[k]) mapPoblProv[k] = v.provincia;
+    if(v.cp && v.cp.length===5 && !mapPoblCp[k]) mapPoblCp[k] = v.cp;
+  }
+
   let corregidos = 0;
   const pendientes = [];
+  const posiblesDuplicados = [];
 
+  // PASO 1: Corregir automáticamente lo que se pueda
   for(const e of entidades){
     const patch = {};
 
-    // 1. Normalizar nombre: eliminar puntos múltiples, mayúsculas coherentes
+    // Normalizar nombre
     const nomNorm = (e.nombre||'').trim().replace(/\s+/g,' ').toUpperCase();
     if(nomNorm && nomNorm !== (e.nombre||'').trim()) patch.nombre = nomNorm;
 
-    // 2. Deducir provincia+CP desde POBLACIÓN si faltan
-    if(e.poblacion){
-      const datosPobl = datosDePobl(e.poblacion);
-      if(datosPobl){
-        if(!e.provincia && !patch.provincia) patch.provincia = datosPobl.provincia;
-        if(!e.cp && !patch.cp && datosPobl.cp.length===5) patch.cp = datosPobl.cp;
-      }
-    }
+    // Normalizar población a mayúsculas
+    if(e.poblacion && e.poblacion !== e.poblacion.toUpperCase())
+      patch.poblacion = e.poblacion.toUpperCase();
 
-    // 3. Deducir provincia desde CP si aún falta
+    const pobKey = ((patch.poblacion || e.poblacion)||'').trim().toUpperCase();
+
+    // Deducir provincia desde población (aprende de los propios datos)
+    if(!e.provincia && pobKey && mapPoblProv[pobKey])
+      patch.provincia = mapPoblProv[pobKey];
+
+    // Deducir CP desde población si tenemos uno fiable
+    if(!e.cp && pobKey && mapPoblCp[pobKey])
+      patch.cp = mapPoblCp[pobKey];
+
+    // Deducir provincia desde CP si aún falta
     if(!e.provincia && !patch.provincia && e.cp){
       const prov = provinciaDeCP(e.cp);
       if(prov) patch.provincia = prov;
     }
 
-    // 4. Normalizar CP: quitar espacios/letras, dejar 5 dígitos
+    // Normalizar CP
     if(e.cp){
-      const cpLimpio = String(e.cp).replace(/[^0-9]/g,'').padStart(5,'0').slice(0,5);
-      if(cpLimpio !== String(e.cp).trim()) patch.cp = cpLimpio;
+      const cpL = String(e.cp).replace(/[^0-9]/g,'').padStart(5,'0').slice(0,5);
+      if(cpL !== String(e.cp).trim()) patch.cp = cpL;
     }
 
-    // 4. Normalizar población/provincia a mayúsculas
-    if(e.poblacion && e.poblacion !== e.poblacion.toUpperCase()) patch.poblacion = e.poblacion.toUpperCase();
-    if(e.provincia && e.provincia !== e.provincia.toUpperCase()) patch.provincia = e.provincia.toUpperCase();
+    // Normalizar provincia
+    if(e.provincia && e.provincia !== e.provincia.toUpperCase())
+      patch.provincia = e.provincia.toUpperCase();
 
-    // Aplicar correcciones automáticas si hay algo que corregir
     if(Object.keys(patch).length){
       await sb.from('entidades').update(patch).eq('id', e.id);
       corregidos++;
-      Object.assign(e, patch); // actualizar en memoria
+      Object.assign(e, patch);
     }
 
-    // 5. Lo que no se puede corregir automáticamente → pendientes con sugerencias
-    const problemas = [];
-    if(!e.nif) problemas.push('Sin NIF/CIF');
-    // Solo mostrar falta de datos si el cliente tiene documentos (es un cliente real activo)
-    // Un cliente sin ningún documento y sin ningún dato es ruido, no pendiente accionable
-    const tieneActividad = (c_mem=>{
-      if(!c_mem) return false;
-      return (c_mem.facturado||0)+(c_mem.enB||0) > 0;
-    })(clientes.find(x=>x.id===e.id));
+    // Lo que no se puede corregir → pendiente (solo si tiene actividad real)
+    const memCli = clientes.find(x=>x.id===e.id);
+    const tieneActividad = memCli && ((memCli.facturado||0)+(memCli.enB||0)) > 0;
     if(tieneActividad){
-      if(!e.poblacion && !patch.poblacion) problemas.push('Sin población');
-      if(!e.provincia && !patch.provincia) problemas.push('Sin provincia');
-      if(!e.cp && !patch.cp) problemas.push('Sin CP');
-    }
-
-    if(problemas.length){
-      pendientes.push({id:e.id, nombre:e.nombre, problemas, sugerencias:[]});
+      const prob = [];
+      if(!e.nif) prob.push('Sin NIF');
+      if(!e.poblacion) prob.push('Sin población');
+      if(!e.provincia) prob.push('Sin provincia');
+      if(!e.cp) prob.push('Sin CP');
+      if(prob.length) pendientes.push({id:e.id, nombre:e.nombre, problemas:prob});
     }
   }
 
-  // Actualizar lista en memoria
-  if(typeof cargarDatosReales==='function' && corregidos > 0) cargarDatosReales();
+  // PASO 2: Detectar posibles duplicados por nombre similar
+  function normNombre(n){
+    return (n||'').toUpperCase()
+      .replace(/\b(S\.?L\.?U?\.?|S\.?A\.?U?\.?|C\.?B\.?|S\.?C\.?P\.?|S\.?L\.?)\b/g,'')
+      .replace(/[^A-ZÁÉÍÓÚÜÑ0-9 ]/g,'')
+      .replace(/\s+/g,' ').trim();
+  }
+  const normList = entidades.map(e=>({id:e.id, nombre:e.nombre, norm:normNombre(e.nombre)}));
+  const yaVistos = new Set();
+  for(let i=0;i<normList.length;i++){
+    for(let j=i+1;j<normList.length;j++){
+      const a=normList[i], b=normList[j];
+      if(yaVistos.has(a.id+b.id)) continue;
+      const la=a.norm, lb=b.norm;
+      if(!la||!lb) continue;
+      // Si uno contiene al otro (ej: "AGROGANADERA ESCOBAR" ⊂ "AGROGANADERA ESCOBAR S.L")
+      if((la.length>4&&lb.startsWith(la))||(lb.length>4&&la.startsWith(lb))||la===lb){
+        posiblesDuplicados.push({a:a, b:b, tipo:'nombre_similar'});
+        yaVistos.add(a.id+b.id);
+      }
+    }
+  }
 
+  if(corregidos>0 && typeof cargarDatosReales==='function') cargarDatosReales();
+
+  // Mostrar pendientes
   const panel = document.getElementById('panel-pendientes-revision');
-  const body = document.getElementById('pendientes-revision-body');
+  const body  = document.getElementById('pendientes-revision-body');
   const countEl = document.getElementById('pendientes-revision-count');
-  if(!pendientes.length){
-    if(panel) panel.style.display = 'none';
-    mostrarToast(`✓ ${corregidos} correcciones aplicadas — sin pendientes`, 'ok');
-    return;
-  }
-  countEl.textContent = pendientes.length;
+  const total = pendientes.length + posiblesDuplicados.length;
+
+  if(!total){ panel.style.display='none'; mostrarToast(`✓ ${corregidos} correcciones — sin pendientes`,'ok'); return; }
+
+  countEl.textContent = total;
   panel.style.display = '';
-  body.style.display = 'block';
-  body.innerHTML = pendientes.map(p=>`
+  body.style.display  = 'block';
+
+  const htmlPend = pendientes.map(p=>`
     <div class="cli-pend-item">
       <div class="cli-pend-nombre">${svgEsc(p.nombre)}</div>
       <div class="cli-pend-problema">${p.problemas.join(' · ')}</div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;">
-        <span style="color:var(--orange);font-weight:700;font-size:13px;cursor:pointer;" onclick="openClientDrawer('${(p.nombre||'').replace(/'/g,"\'")}')" >+ Añadir datos</span>
-      </div>
+      <span style="color:var(--orange);font-weight:700;font-size:13px;cursor:pointer;" onclick="openClientDrawer('${(p.nombre||'').replace(/'/g,"\'")}')">+ Añadir datos</span>
     </div>`).join('');
-  mostrarToast(`${corregidos} correcciones automáticas · ${pendientes.length} pendientes manuales`, 'ok');
+
+  const htmlDup = posiblesDuplicados.length ? `<div style="padding:8px 14px;font-size:12px;font-weight:700;color:var(--ink-soft);border-bottom:1px solid var(--line);">POSIBLES DUPLICADOS (${posiblesDuplicados.length})</div>`
+    + posiblesDuplicados.map(d=>`
+    <div class="cli-pend-item">
+      <div class="cli-pend-nombre">${svgEsc(d.a.nombre)} ↔ ${svgEsc(d.b.nombre)}</div>
+      <div class="cli-pend-problema">Nombres similares — posible duplicado</div>
+      <div class="cli-pend-sugerencias">
+        <button class="btn primary" onclick="abrirFusionDosClientes('${d.a.id}','${d.b.id}')">⟲ Fusionar</button>
+        <button class="btn" onclick="this.closest('.cli-pend-item').remove()">✕ No son el mismo</button>
+      </div>
+    </div>`).join('') : '';
+
+  body.innerHTML = htmlPend + htmlDup;
+  mostrarToast(`${corregidos} correcciones · ${pendientes.length} pendientes · ${posiblesDuplicados.length} posibles duplicados`,'ok');
+}
+
+async function abrirFusionDosClientes(idA, idB){
+  if(!sb) return;
+  const {data:a} = await sb.from('entidades').select('*').eq('id',idA).single();
+  const {data:b} = await sb.from('entidades').select('*').eq('id',idB).single();
+  if(a&&b) abrirComparacionFusion(a,b);
 }
 
 async function asignarProvinciaCliente(id, provincia){
