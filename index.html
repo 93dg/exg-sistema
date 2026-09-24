@@ -2677,7 +2677,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.71</div>
+        <div class="sub" id="version-badge">V3.72</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11374,6 +11374,36 @@ function renderClientesMovil(clientesFiltrados){
   }).join('');
 }
 
+// Tabla POBLACIÓN → {provincia, cp_prefijo} para deducciones automáticas
+const POBLACION_DATOS = {
+  'FUENTE OBEJUNA':   {provincia:'CÓRDOBA',   cp:'14290'},
+  'CÓRDOBA':          {provincia:'CÓRDOBA',   cp:'14'},
+  'BELMEZ':           {provincia:'CÓRDOBA',   cp:'14240'},
+  'PEÑARROYA':        {provincia:'CÓRDOBA',   cp:'14200'},
+  'POZOBLANCO':       {provincia:'CÓRDOBA',   cp:'14400'},
+  'ESPIEL':           {provincia:'CÓRDOBA',   cp:'14220'},
+  'VILLAVICIOSA':     {provincia:'CÓRDOBA',   cp:'14300'},
+  'HINOJOSA DEL DUQUE':{provincia:'CÓRDOBA',  cp:'14270'},
+  'BADAJOZ':          {provincia:'BADAJOZ',   cp:'06'},
+  'SEVILLA':          {provincia:'SEVILLA',   cp:'41'},
+  'HUELVA':           {provincia:'HUELVA',    cp:'21'},
+  'JAÉN':             {provincia:'JAÉN',      cp:'23'},
+  'GRANADA':          {provincia:'GRANADA',   cp:'18'},
+  'MADRID':           {provincia:'MADRID',    cp:'28'},
+  'BARCELONA':        {provincia:'BARCELONA', cp:'08'},
+  'SALAMANCA':        {provincia:'SALAMANCA', cp:'37'},
+  'MÉRIDA':           {provincia:'BADAJOZ',   cp:'06800'},
+  'CÁCERES':          {provincia:'CÁCERES',   cp:'10'},
+  'ZAFRA':            {provincia:'BADAJOZ',   cp:'06300'},
+  'DON BENITO':       {provincia:'BADAJOZ',   cp:'06400'},
+  'GUIJUELO':         {provincia:'SALAMANCA', cp:'37770'},
+};
+function datosDePobl(pob){
+  if(!pob) return null;
+  const k = pob.trim().toUpperCase();
+  return POBLACION_DATOS[k] || null;
+}
+
 // Tabla CP → Provincia para Córdoba y zonas cercanas
 const CP_PROVINCIA = {
   '14':  'CÓRDOBA',  '06': 'BADAJOZ',   '41': 'SEVILLA',
@@ -11412,13 +11442,22 @@ async function revisarClientesAuto(){
     const nomNorm = (e.nombre||'').trim().replace(/\s+/g,' ').toUpperCase();
     if(nomNorm && nomNorm !== (e.nombre||'').trim()) patch.nombre = nomNorm;
 
-    // 2. Deducir provincia desde CP si la provincia falta
-    if(!e.provincia && e.cp){
+    // 2. Deducir provincia+CP desde POBLACIÓN si faltan
+    if(e.poblacion){
+      const datosPobl = datosDePobl(e.poblacion);
+      if(datosPobl){
+        if(!e.provincia && !patch.provincia) patch.provincia = datosPobl.provincia;
+        if(!e.cp && !patch.cp && datosPobl.cp.length===5) patch.cp = datosPobl.cp;
+      }
+    }
+
+    // 3. Deducir provincia desde CP si aún falta
+    if(!e.provincia && !patch.provincia && e.cp){
       const prov = provinciaDeCP(e.cp);
       if(prov) patch.provincia = prov;
     }
 
-    // 3. Normalizar CP: quitar espacios/letras, dejar 5 dígitos
+    // 4. Normalizar CP: quitar espacios/letras, dejar 5 dígitos
     if(e.cp){
       const cpLimpio = String(e.cp).replace(/[^0-9]/g,'').padStart(5,'0').slice(0,5);
       if(cpLimpio !== String(e.cp).trim()) patch.cp = cpLimpio;
@@ -11476,8 +11515,8 @@ async function revisarClientesAuto(){
     <div class="cli-pend-item">
       <div class="cli-pend-nombre">${svgEsc(p.nombre)}</div>
       <div class="cli-pend-problema">${p.problemas.join(' · ')}</div>
-      <div class="cli-pend-sugerencias">
-        ${p.sugerencias.map(s=>`<button class="btn" onclick="(()=>{${s.accion}})()">${s.label}</button>`).join('')}
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;">
+        <span style="color:var(--orange);font-weight:700;font-size:13px;cursor:pointer;" onclick="openClientDrawer('${(p.nombre||'').replace(/'/g,"\'")}')" >+ Añadir datos</span>
       </div>
     </div>`).join('');
   mostrarToast(`${corregidos} correcciones automáticas · ${pendientes.length} pendientes manuales`, 'ok');
