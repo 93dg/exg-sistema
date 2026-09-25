@@ -2801,7 +2801,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.28</div>
+        <div class="sub" id="version-badge">V4.29</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12605,12 +12605,14 @@ async function revisarClientesAuto(forzar=false){
   try {
 
   // ── 1. Cargar datos ──────────────────────────────────────────────────────
-  const {data: entidades} = await sb.from('entidades')
+  const {data: entidades, error: errEnt} = await sb.from('entidades')
     .select('id,nombre,nif,poblacion,provincia,cp,tipo,clase_nombre,direccion').limit(600);
-  if(!entidades) return;
+  if(errEnt) throw new Error('entidades: '+errText(errEnt));
+  if(!entidades){ resetBtn(); return; }
 
   // Cargar caché de revisión (qué clientes se analizaron y su hash)
-  const {data: cacheRows} = await sb.from('clientes_revision_cache').select('entidad_id,hash_datos');
+  const {data: cacheRows, error: errCache} = await sb.from('clientes_revision_cache').select('entidad_id,hash_datos');
+  if(errCache) throw new Error('caché: '+errText(errCache));
   const cacheMap = {};
   (cacheRows||[]).forEach(r=>{ cacheMap[r.entidad_id]=r.hash_datos; });
 
@@ -12721,16 +12723,19 @@ async function revisarClientesAuto(forzar=false){
     const cacheItems = clientesNuevosOModificados.map(e=>({
       entidad_id:e.id, hash_datos:hashEntidad(e), revisado_at:new Date().toISOString()
     }));
-    for(let i=0;i<cacheItems.length;i+=100)
-      await sb.from('clientes_revision_cache').upsert(cacheItems.slice(i,i+100),{onConflict:'entidad_id'});
+    for(let i=0;i<cacheItems.length;i+=100){
+      const {error:errUp} = await sb.from('clientes_revision_cache').upsert(cacheItems.slice(i,i+100),{onConflict:'entidad_id'});
+      if(errUp) throw new Error('guardar caché: '+errText(errUp));
+    }
   }
 
   // ── 3. DETECCIÓN DE CASOS ACCIONABLES — solo para clientes nuevos/modificados ─
   if(forzar) clientesNuevosOModificados.push(...entidades); // forzar = re-analizar todos
 
-  // Cargar casos ya existentes para no duplicar
-  const {data:casosExistentes} = await sb.from('clientes_revision_casos')
-    .select('hash_grupo,estado').eq('estado','pendiente');
+  // Cargar casos ya existentes (pendientes Y descartados) para no duplicar ni resucitar los ya resueltos
+  const {data:casosExistentes, error:errCasos} = await sb.from('clientes_revision_casos')
+    .select('hash_grupo,estado');
+  if(errCasos) throw new Error('casos: '+errText(errCasos));
   const hashsYaEnCola=new Set((casosExistentes||[]).map(c=>c.hash_grupo).filter(Boolean));
 
   // Detectar grupos de posibles duplicados
@@ -12774,6 +12779,7 @@ async function revisarClientesAuto(forzar=false){
   }
 
   let casosNuevos=0;
+  const casosAInsertar=[];
   for(const [base,grupo] of Object.entries(grupos)){
     if(grupo.length<2) continue;
     // Alguno del grupo tiene que ser nuevo/modificado para generar caso
@@ -12782,14 +12788,19 @@ async function revisarClientesAuto(forzar=false){
     const ids=grupo.map(g=>g.id).sort();
     const hashG=ids.join('|');
     if(hashsYaEnCola.has(hashG)) continue; // ya está en cola
-    await sb.from('clientes_revision_casos').insert({
+    casosAInsertar.push({
       tipo:'duplicado_grupo',
       ids_involucrados:ids,
       nombres:grupo.map(g=>g.nombre),
       descripcion:`${grupo.length} variantes del mismo nombre`,
       hash_grupo:hashG
     });
+    hashsYaEnCola.add(hashG);
     casosNuevos++;
+  }
+  if(casosAInsertar.length){
+    const {error:errIns} = await sb.from('clientes_revision_casos').insert(casosAInsertar);
+    if(errIns) throw new Error('guardar casos: '+errText(errIns));
   }
 
   // ── 4. Actualizar UI inmediatamente ─────────────────────────────────────
@@ -12837,7 +12848,7 @@ async function borrarPendientesSeleccionados(grupo){
   }
   renderClientesTable();
   mostrarToast(`${ok} eliminado(s)${err?` · ${err} errores`:''}`, ok>0?'ok':'err');
-  revisarClientesAuto(true);
+  revisarClientesAuto();
 }
 // Pobla los paneles de "Nombres sospechosos" y "Sin actividad" — se llama
 // en revisarClientesAuto Y en cargarDatosReales para que persistan al recargar
@@ -12923,7 +12934,7 @@ async function borrarClienteSinDocs(id, nombre){
   renderClientesTable();
   mostrarToast(`"${nombre}" eliminado`,'ok');
   // Refrescar el panel de pendientes
-  revisarClientesAuto(true);
+  revisarClientesAuto();
 }
 async function cargarCasosRevision(){
   if(!sb) return;
