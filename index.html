@@ -286,24 +286,30 @@ table{border-collapse:collapse;width:100%;}
 }
 /* ======= FIN CLIENTES MÓVIL ======= */
 
-/* Cabecero sticky clientes móvil */
+/* Cabecero fijo clientes móvil — position:fixed garantiza que siempre acompaña el scroll */
 @media (max-width:768px){
   #cli-sticky-bar {
-    position:sticky; top:0; z-index:20;
+    position:fixed; top:0; left:0; right:0; z-index:90;
     background:var(--bg);
     border-bottom:1px solid var(--line);
-    padding:0;
   }
   #cli-bar-acciones {
-    display:flex; align-items:center; gap:4px;
-    padding:8px 12px 6px;
+    display:flex; align-items:center; gap:6px;
+    padding:10px 12px 6px;
+    min-height:44px;
   }
+  #cli-bar-acciones span { font-weight:700; font-size:15px; }
   #cli-bar-filtros {
     display:flex; align-items:center; gap:6px;
     padding:0 12px 8px;
-    overflow:visible; /* permite dropdowns */
+    overflow:visible;
   }
-  #cli-bar-filtros .dd-filter-row { flex:1; min-width:0; }
+  #cli-bar-filtros .dd-filter-row {
+    flex:1; min-width:0; flex-wrap:nowrap; overflow-x:auto; overflow-y:visible;
+    padding:0; border-bottom:none;
+  }
+  /* Spacer que empuja el contenido para no quedar debajo del header fijo */
+  #cli-sticky-spacer { display:block; }
   /* Ocultar topbar escritorio en móvil */
   #view-clientes .topbar.tabla-escritorio-solo { display:none !important; }
 }
@@ -3245,22 +3251,29 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
       </div>
 
-      <!-- MÓVIL: cabecero sticky unificado -->
+      <!-- MÓVIL: cabecero fijo unificado -->
       <div class="lista-movil-solo" id="cli-sticky-bar">
-        <!-- Fila 1: acciones (siempre visible; acciones de selección aparecen cuando hay selección) -->
-        <div id="cli-bar-acciones">
-          <span style="font-weight:700;font-size:14px;">Clientes</span>
-          <div style="display:flex;gap:4px;margin-left:auto;align-items:center;">
-            <button class="btn" style="color:var(--red);display:none;padding:5px 8px;" id="clientes-borrar-sel-btn" onclick="borrarClientesSeleccionados()">🗑 <span id="clientes-sel-count">0</span></button>
-            <button class="btn primary" style="display:none;padding:5px 8px;" id="clientes-fusionar-sel-btn" onclick="abrirFusionMultiple()">⟲</button>
-            <button class="btn" style="display:none;padding:5px 8px;" id="clientes-prioridad-sel-btn" onclick="cambiarPrioridadSeleccionados()">🚩</button>
-            <button class="btn" style="padding:5px 8px;" onclick="revisarClientesAuto()">🔍</button>
+        <!-- Fila normal: título + revisar -->
+        <div id="cli-bar-normal" style="display:flex;align-items:center;gap:6px;padding:10px 12px 6px;">
+          <span style="font-weight:700;font-size:15px;flex:1;">Clientes</span>
+          <button class="btn" style="padding:5px 10px;font-size:16px;" onclick="revisarClientesAuto()" title="Revisar y corregir">⚡</button>
+        </div>
+        <!-- Fila selección: aparece cuando hay clientes marcados (reemplaza fila normal) -->
+        <div id="cli-bar-sel" style="display:none;align-items:center;gap:6px;padding:10px 12px 6px;background:color-mix(in srgb,var(--orange) 8%,var(--bg));">
+          <span id="clientes-sel-count" style="font-weight:700;font-size:13px;color:var(--orange);">0</span>
+          <span style="font-size:13px;color:var(--ink-soft);">seleccionados</span>
+          <div style="margin-left:auto;display:flex;gap:6px;">
+            <button class="btn" style="color:var(--red);padding:5px 10px;" id="clientes-borrar-sel-btn" onclick="borrarClientesSeleccionados()">🗑</button>
+            <button class="btn primary" style="padding:5px 10px;" id="clientes-fusionar-sel-btn" onclick="abrirFusionMultiple()">⟲ Fusionar</button>
           </div>
         </div>
-        <!-- Fila 2: búsqueda + filtros compactos -->
+        <!-- Fila 2: buscador + filtros compactos -->
         <div id="cli-bar-filtros">
-          <input class="search-box" id="clientes-search" style="height:32px;font-size:13px;min-width:0;flex:1;" placeholder="Buscar…" oninput="renderClientesTable()">
-          <div class="dd-filter-row" style="padding:0;border-bottom:none;flex-wrap:nowrap;overflow-x:auto;">
+          <div style="position:relative;flex:1;min-width:0;">
+            <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;color:var(--ink-soft);">🔍</span>
+            <input class="search-box" id="clientes-search" style="height:32px;font-size:13px;width:100%;padding-left:30px;" placeholder="Buscar…" oninput="renderClientesTable()">
+          </div>
+          <div class="dd-filter-row" style="padding:0;border-bottom:none;flex-wrap:nowrap;overflow-x:auto;overflow-y:visible;">
           <div class="dd-filter" id="dd-cli-tipo">
             <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-tipo')">Tipo<span class="dd-caret">▾</span></button>
             <div class="dd-filter-panel">
@@ -3306,10 +3319,37 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               </div>
             </div>
           </div>
+            <div class="dd-filter" id="dd-cli-extra">
+              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-extra')">Más<span class="dd-caret">▾</span></button>
+              <div class="dd-filter-panel">
+                <div class="filters" id="clientes-filtro-extra-chips-m" style="margin:0;">
+                  <div class="chip-filter" data-extra="deuda" onclick="this.classList.toggle('active');renderClientesTable()">Con deuda</div>
+                  <div class="chip-filter" data-extra="sindatos" onclick="this.classList.toggle('active');renderClientesTable()">Incompleta</div>
+                  <div class="chip-filter" data-extra="sindocs" onclick="this.classList.toggle('active');renderClientesTable()">Sin docs</div>
+                  <div class="chip-filter active" data-extra="ocultar_basura" onclick="this.classList.toggle('active');renderClientesTable()">Solo reales</div>
+                </div>
+              </div>
+            </div>
+            <div class="dd-filter" id="dd-cli-orden-m">
+              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-orden-m')" style="padding:4px 8px;" title="Ordenar">≡<span class="dd-caret">▾</span></button>
+              <div class="dd-filter-panel" style="right:0;left:auto;">
+                <div class="filters" id="clientes-filtro-orden-chips-m" style="margin:0;">
+                  <div class="chip-filter active" data-orden="nombre" onclick="document.querySelectorAll('#clientes-filtro-orden-chips-m .chip-filter,#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Nombre</div>
+                  <div class="chip-filter" data-orden="docs_desc" onclick="document.querySelectorAll('#clientes-filtro-orden-chips-m .chip-filter,#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Más docs</div>
+                  <div class="chip-filter" data-orden="docs_asc" onclick="document.querySelectorAll('#clientes-filtro-orden-chips-m .chip-filter,#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Menos docs</div>
+                  <div class="chip-filter" data-orden="total_desc" onclick="document.querySelectorAll('#clientes-filtro-orden-chips-m .chip-filter,#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Mayor total</div>
+                  <div class="chip-filter" data-orden="total_asc" onclick="document.querySelectorAll('#clientes-filtro-orden-chips-m .chip-filter,#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Menor total</div>
+                  <div class="chip-filter" data-orden="pendiente" onclick="document.querySelectorAll('#clientes-filtro-orden-chips-m .chip-filter,#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Con pendiente</div>
+                  <div class="chip-filter" data-orden="reciente" onclick="document.querySelectorAll('#clientes-filtro-orden-chips-m .chip-filter,#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Más reciente</div>
+                </div>
+              </div>
+            </div>
             <button class="btn reset-filtros-vista" style="padding:0 8px;" onclick="restablecerFiltrosClientes()">↻</button>
           </div><!-- /dd-filter-row -->
         </div><!-- /cli-bar-filtros -->
       </div><!-- /cli-sticky-bar -->
+      <!-- Spacer para compensar el header fijo — altura se calcula en JS -->
+      <div class="lista-movil-solo" id="cli-sticky-spacer" style="height:96px;"></div>
 
       <!-- Columnas panel (escritorio) -->
       <div class="panel tabla-escritorio-solo" id="clientes-columnas-panel" style="display:none;margin-bottom:12px;">
@@ -3322,7 +3362,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <h3 style="font-size:13px;margin:0;">🕓 Pendientes de confirmar (<span id="pend-identidad-count">0</span>)</h3>
           <span style="color:var(--ink-soft);">▾</span>
         </div>
-        <div id="pend-identidad-body" style="display:none;"></div>
+        <div id="pend-identidad-body"></div>
       </div>
 
       <!-- Duplicados: una línea plegable -->
@@ -3331,7 +3371,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <h3 style="font-size:13px;margin:0;">⚠ Duplicados detectados (<span id="dup-clientes-count">0</span>)</h3>
           <span style="color:var(--ink-soft);">▾</span>
         </div>
-        <div id="dup-clientes-body" style="display:none;"></div>
+        <div id="dup-clientes-body"></div>
       </div>
 
       <!-- Pendientes de revisión: una línea plegable -->
@@ -5802,7 +5842,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     }
     if(btn.dataset.view==='backup') cargarPapelera();
     if(btn.dataset.view==='control') cargarNotificaciones();
-    if(btn.dataset.view==='clientes') cargarCasosRevision();
+    if(btn.dataset.view==='clientes'){ cargarCasosRevision(); setTimeout(ajustarSpacerClientes,100); }
     if(btn.dataset.view==='facturas'){
       renderFacturasKPIs();
     }
@@ -11228,12 +11268,18 @@ function toggleSeleccionarTodoClientes(master){
 function actualizarSeleccionClientes(){
   const marcados = document.querySelectorAll('.clientes-sel-chk:checked');
   const n = marcados.length;
-  // Actualizar todos los posibles elementos (móvil y escritorio)
-  ['clientes-sel-count','clientes-sel-count-d'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=n;});
-  ['clientes-borrar-sel-btn','clientes-borrar-sel-btn-d'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=n?'':'none';});
-  const nFus=n>=2?'':'none';
-  ['clientes-fusionar-sel-btn','clientes-fusionar-sel-btn-d'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=nFus;});
-  ['clientes-prioridad-sel-btn','clientes-prioridad-sel-btn-d'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=n?'':'none';});
+  // Escritorio
+  const countD=document.getElementById('clientes-sel-count-d'); if(countD) countD.textContent=n;
+  const borrarD=document.getElementById('clientes-borrar-sel-btn-d'); if(borrarD) borrarD.style.display=n?'':'none';
+  const fusD=document.getElementById('clientes-fusionar-sel-btn-d'); if(fusD) fusD.style.display=n>=2?'':'none';
+  const prioD=document.getElementById('clientes-prioridad-sel-btn-d'); if(prioD) prioD.style.display=n?'':'none';
+  // Móvil: alternar fila normal / fila selección
+  const barNormal=document.getElementById('cli-bar-normal');
+  const barSel=document.getElementById('cli-bar-sel');
+  const countM=document.getElementById('clientes-sel-count');
+  if(countM) countM.textContent=n;
+  if(barNormal) barNormal.style.display=n?'none':'flex';
+  if(barSel) barSel.style.display=n?'flex':'none';
 }
 async function borrarClientesSeleccionados(){
   const marcados = Array.from(document.querySelectorAll('.clientes-sel-chk:checked'));
@@ -11593,8 +11639,19 @@ document.querySelectorAll('#clientes-filtro-tipo-chips .chip-filter, #clientes-f
 });
 function restablecerFiltrosClientes(){
   document.getElementById('clientes-search').value = '';
-  document.querySelectorAll('#clientes-filtro-tipo-chips .chip-filter, #clientes-filtro-prio-chips .chip-filter, #clientes-filtro-extra-chips .chip-filter').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('#clientes-filtro-tipo-chips .chip-filter,#clientes-filtro-prio-chips .chip-filter,#clientes-filtro-extra-chips .chip-filter,#clientes-filtro-extra-chips-m .chip-filter').forEach(c=>c.classList.remove('active'));
+  // Restaurar "Solo reales" por defecto
+  document.querySelectorAll('[data-extra="ocultar_basura"]').forEach(c=>c.classList.add('active'));
+  // Restaurar orden por nombre
+  document.querySelectorAll('[data-orden]').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('[data-orden="nombre"]').forEach(c=>c.classList.add('active'));
   renderClientesTable();
+}
+// Ajustar spacer al tamaño real del header fijo
+function ajustarSpacerClientes(){
+  const bar=document.getElementById('cli-sticky-bar');
+  const spacer=document.getElementById('cli-sticky-spacer');
+  if(bar&&spacer) spacer.style.height=bar.offsetHeight+'px';
 }
 async function cambiarPrioridadSeleccionados(){
   const ids = Array.from(document.querySelectorAll('.clientes-sel-chk:checked')).map(c=>c.dataset.id).filter(Boolean);
@@ -11642,8 +11699,8 @@ function renderClientesMovil(clientesFiltrados){
     const telEmail = [cli.telefono, cli.email].filter(Boolean).join(' · ');
     const metaParts = [tipo, pob].filter(Boolean);
     const metaLine = metaParts.join(' · ');
+    const detalles = [nif, telEmail].filter(Boolean).join(' · ');
     const docsLabel = cli.numDocs ? `📄 ${cli.numDocs}` : '';
-    const detalles = [docsLabel, nif, telEmail].filter(Boolean).join(' · ');
     const ultimoTxt = cli.ultimoTrabajo ? `Últ: ${formatFechaCorta(cli.ultimoTrabajo)}` : '';
     const pendIdentidad = window.__casosIdentidadPendientePorEntidad?.[cli.id]
       ? `<span class="pill" style="font-size:10px;color:var(--orange);border-color:var(--orange);">⚠ ${window.__casosIdentidadPendientePorEntidad[cli.id]}</span>` : '';
@@ -11655,6 +11712,7 @@ function renderClientesMovil(clientesFiltrados){
       <div class="cc-total-v">${totalFmt}</div>
       ${pendFmt || '<div></div>'}
       ${(detalles||ultimoTxt||pendIdentidad) ? `<div class="cc-extra">${detalles ? `<span style="font-size:11px;color:var(--ink-soft);">${svgEsc(detalles)}</span>` : ''}${ultimoTxt ? `<span style="font-size:11px;color:var(--ink-soft);">${ultimoTxt}</span>` : ''}${pendIdentidad}</div>` : ''}
+      ${docsLabel ? `<div style="text-align:right;font-size:11px;color:var(--ink-soft);padding-top:2px;">${docsLabel}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -11679,6 +11737,7 @@ function normRazonSocial(n){
   let r = n.trim().toUpperCase().replace(/\s+/g,' ');
   r = r.replace(/,\s*(S\.?L\.?|S\.?A\.?|C\.?B\.?|S\.?C\.?P\.?)/gi,' $1'); // quitar coma antes de forma jurídica
   FJ.forEach(([re,rep])=>{ r = r.replace(re, rep); });
+  r = r.replace(/\.{2,}/g,'.'); // eliminar puntos dobles/triples generados por regex
   return r.trim();
 }
 function normDireccion(d){
@@ -11810,6 +11869,13 @@ async function revisarClientesAuto(forzar=false){
         if(prov) patch.provincia=prov;
       }
 
+      // Auto-clasificar tipo basado en razón social y datos
+      const nomUp=(patch.nombre||e.nombre||'').toUpperCase();
+      const esSociedad=/\b(S\.?L\.?U?\.?|S\.?A\.?U?\.?|S\.?L\.?|S\.?A\.?|C\.?B\.?|S\.?C\.?P\.?|S\.?L\.?L\.?)$|SOCIEDAD|COOPERATIVA|COMUNIDAD (DE BIENES|DE PROPIETARIOS)/i.test(nomUp);
+      const esAyuntamiento=/\bAYUNTAMIENTO|EXCMO\.?|EXMO\.?|DIPUTACION|JUNTA DE|CONSEJERIA|MINISTERIO|CONSORCIO|MANCOMUNIDAD/i.test(nomUp);
+      if(esAyuntamiento && e.tipo!=='ayuntamiento') patch.tipo='ayuntamiento';
+      else if(esSociedad && e.tipo==='particular') patch.tipo='empresa';
+
       // Normalizar CP a 5 dígitos
       if(e.cp){ const cpL=String(e.cp).replace(/[^0-9]/g,'').padStart(5,'0').slice(0,5); if(cpL!==String(e.cp).trim()) patch.cp=cpL; }
 
@@ -11843,8 +11909,9 @@ async function revisarClientesAuto(forzar=false){
   // Detectar grupos de posibles duplicados
   function normBase(n){
     return (n||'').toUpperCase()
-      .replace(/\b(S\.?L\.?U?\.?|S\.?A\.?U?\.?|C\.?B\.?|S\.?C\.?P\.?|S\.?A\.?L\.?|S\.?L\.?L\.|EXCMO\.?|EXMO\.?)\b/g,'')
-      .replace(/[^A-ZÁÉÍÓÚÜÑ0-9 ]/g,'').replace(/\s+/g,' ').trim();
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // quitar acentos: JOSÉ→JOSE, RÍOS→RIOS
+      .replace(/\b(SLU|SAU|SAL|SLL|SCL|SCP|SL|SA|CB|LTD|SRL|EXCMO|EXMO|AYUNTAMIENTO)\b/g,'')
+      .replace(/[^A-Z0-9 ]/g,'').replace(/\s+/g,' ').trim();
   }
   const grupos={};
   for(const e of entidades){
@@ -11929,8 +11996,8 @@ async function descartarCasoRevision(casoId,btn){
 }
 
 async function abrirFusionGrupo(ids, btn){
-  // Cuando se pulse desde el panel de pendientes, guardar el caso para marcarlo resuelto tras fusión
-  window.__casoRevisionBtn = btn;
+  window.__casoRevisionBtn = btn || null;
+  if(!Array.isArray(ids)||ids.length<2){ mostrarToast('Se necesitan al menos 2 clientes para fusionar'); return; }
   if(!sb||!ids||ids.length<2) return;
   const {data} = await sb.from('entidades').select('*').in('id',ids);
   if(data&&data.length>=2){
@@ -11994,7 +12061,7 @@ function renderClientesTable(){
   });
 
   // Ordenar según el filtro activo
-  const ordenCli = document.querySelector('#clientes-filtro-orden-chips .chip-filter.active')?.dataset.orden || 'nombre';
+  const ordenCli = document.querySelector('#clientes-filtro-orden-chips .chip-filter.active, #clientes-filtro-orden-chips-m .chip-filter.active')?.dataset.orden || 'nombre';
   filtrados.sort((a,b)=>{
     if(ordenCli==='total_desc') return ((b.facturado||0)+(b.enB||0)) - ((a.facturado||0)+(a.enB||0));
     if(ordenCli==='total_asc') return ((a.facturado||0)+(a.enB||0)) - ((b.facturado||0)+(b.enB||0));
