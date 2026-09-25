@@ -2799,7 +2799,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.18</div>
+        <div class="sub" id="version-badge">V4.20</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12760,33 +12760,44 @@ async function revisarClientesAuto(forzar=false){
     renderClientesTable();
   }
 
-  // ── 5. Panel pendientes: falsos clientes y urgentes ─────────────────────
-  const falsos = entidades.filter(e=>(e.clase_nombre||'')==='direccion');
-  const panelPend = document.getElementById('panel-pendientes-revision');
-  const bodyPend = document.getElementById('pendientes-revision-body');
-  const countPend = document.getElementById('pendientes-revision-count');
-  if(falsos.length && panelPend){
+  // ── 5. Panel pendientes: falsos clientes + sin docs reales ──────────────
+  const falsos = entidades.filter(e=>(e.clase_nombre||'')=='direccion');
+  const {data:docsDatos} = await sb.from('documentos_economicos')
+    .select('entidad_id,numero,fecha_devengo,importe');
+  const conDocReal = new Set(
+    (docsDatos||[]).filter(d=>(parseFloat(d.importe)||0)>0||d.numero||d.fecha_devengo)
+      .map(d=>d.entidad_id)
+  );
+  const sinDocReal = entidades.filter(e=>!conDocReal.has(e.id)&&(e.clase_nombre||'')\!=='direccion');
+  const pendItems = [
+    ...falsos.map(e=>({e,
+      problema:'El nombre parece una dirección — revisar qué cliente real corresponde',
+      accion:`<button class="btn" onclick="openClientDrawer('${(e.nombre||'').replace(/'/g,"\\'")}')">✏️ Ver ficha</button>`
+    })),
+    ...sinDocReal.map(e=>({e,
+      problema:'Sin documentos reales asociados — posible duplicado o cliente sin actividad',
+      accion:`<button class="btn" style="color:var(--red);" onclick="borrarClienteSinDocs('${e.id}','${(e.nombre||'').replace(/'/g,"\\'")}')">🗑 Borrar</button>
+              <button class="btn" onclick="openClientDrawer('${(e.nombre||'').replace(/'/g,"\\'")}')">Ver ficha</button>`
+    }))
+  ];
+  const panelPend=document.getElementById('panel-pendientes-revision');
+  const bodyPend=document.getElementById('pendientes-revision-body');
+  const countPend=document.getElementById('pendientes-revision-count');
+  if(pendItems.length&&panelPend){
     panelPend.style.display='';
-    countPend.textContent=falsos.length;
+    countPend.textContent=pendItems.length;
     bodyPend.classList.remove('open');
-    bodyPend.innerHTML=falsos.map(e=>`
+    bodyPend.innerHTML=pendItems.map(({e,problema,accion})=>`
       <div class="cli-pend-item">
         <div class="cli-pend-nombre">⚠ ${svgEsc(e.nombre)}</div>
-        <div class="cli-pend-problema">El nombre parece una dirección — revisar qué cliente real corresponde a sus documentos</div>
-        <div class="cli-pend-sugerencias">
-          <button class="btn" onclick="openClientDrawer('${(e.nombre||'').replace(/'/g,"\\'")}')">✏️ Ver ficha</button>
-        </div>
+        <div class="cli-pend-problema">${problema}</div>
+        <div class="cli-pend-sugerencias">${accion}</div>
       </div>`).join('');
-  } else if(panelPend && !falsos.length){
-    panelPend.style.display='none';
-  }
-
-  await cargarCasosRevision(); // cargar panel de duplicados desde BD
-
-  const partes=[corregidos?`${corregidos} correcciones`:'',casosNuevos?`${casosNuevos} posibles duplicados`:'',falsos.length?`${falsos.length} nombres sospechosos`:''].filter(Boolean);
+  } else if(panelPend){ panelPend.style.display='none'; }
+  await cargarCasosRevision();
+  const partes=[corregidos?`${corregidos} correcciones`:'',casosNuevos?`${casosNuevos} posibles duplicados`:'',pendItems.length?`${pendItems.length} pendientes`:''].filter(Boolean);
   mostrarToast(partes.join(' · ')||'✓ Sin cambios','ok');
 }
-
 // Cargar y mostrar los casos pendientes desde BD
 async function borrarClienteSinDocs(id, nombre){
   if(!(await confirmarAccion(`¿Borrar "${nombre}"? No tiene documentos reales. No se puede deshacer.`))) return;
