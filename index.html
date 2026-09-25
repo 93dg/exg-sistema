@@ -286,15 +286,26 @@ table{border-collapse:collapse;width:100%;}
 }
 /* ======= FIN CLIENTES MÓVIL ======= */
 
-/* Barra acciones clientes: fija en móvil */
+/* Cabecero sticky clientes móvil */
 @media (max-width:768px){
-  #view-clientes .topbar {
+  #cli-sticky-bar {
     position:sticky; top:0; z-index:20;
-    background:var(--bg); padding:8px 14px;
+    background:var(--bg);
     border-bottom:1px solid var(--line);
+    padding:0;
   }
-  #view-clientes .topbar .quickactions { flex-wrap:nowrap; gap:4px; }
-  #view-clientes .topbar .quickactions .btn { padding:5px 8px; font-size:12px; }
+  #cli-bar-acciones {
+    display:flex; align-items:center; gap:4px;
+    padding:8px 12px 6px;
+  }
+  #cli-bar-filtros {
+    display:flex; align-items:center; gap:6px;
+    padding:0 12px 8px;
+    overflow:visible; /* permite dropdowns */
+  }
+  #cli-bar-filtros .dd-filter-row { flex:1; min-width:0; }
+  /* Ocultar topbar escritorio en móvil */
+  #view-clientes .topbar.tabla-escritorio-solo { display:none !important; }
 }
 
 /* ======= NOTIFICACIONES DE CAMBIOS ======= */
@@ -2714,7 +2725,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.80</div>
+        <div class="sub" id="version-badge">V3.81</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3222,24 +3233,34 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     </div>
 
     <div class="view" id="view-clientes">
-      <div class="topbar">
+      <!-- ESCRITORIO: topbar normal -->
+      <div class="topbar tabla-escritorio-solo">
         <div><h1>Clientes</h1><div class="desc">Ayuntamientos, particulares y empresas</div></div>
         <div class="quickactions">
-          <button class="btn" style="color:var(--red);display:none;" id="clientes-borrar-sel-btn" onclick="borrarClientesSeleccionados()">🗑 (<span id="clientes-sel-count">0</span>)</button>
-          <button class="btn primary" style="display:none;" id="clientes-fusionar-sel-btn" onclick="abrirFusionMultiple()">⟲ Fusionar</button>
-          <button class="btn" style="display:none;" id="clientes-prioridad-sel-btn" onclick="cambiarPrioridadSeleccionados()">🚩</button>
-          <button class="btn tabla-escritorio-solo" onclick="toggleColumnasClientesPanel()">☰ Columnas</button>
-          <button class="btn" onclick="revisarClientesAuto()" title="Revisión incremental (solo cambios)">🔍 Revisar</button>
-          <button class="btn lista-movil-solo" onclick="revisarClientesAuto(true)" title="Forzar revisión completa" style="display:none;" id="btn-revisar-forzar">⟳ Completa</button>
+          <button class="btn" style="color:var(--red);display:none;" id="clientes-borrar-sel-btn-d" onclick="borrarClientesSeleccionados()">🗑 (<span id="clientes-sel-count-d">0</span>)</button>
+          <button class="btn primary" style="display:none;" id="clientes-fusionar-sel-btn-d" onclick="abrirFusionMultiple()">⟲ Fusionar</button>
+          <button class="btn" style="display:none;" id="clientes-prioridad-sel-btn-d" onclick="cambiarPrioridadSeleccionados()">🚩</button>
+          <button class="btn" onclick="toggleColumnasClientesPanel()">☰ Columnas</button>
+          <button class="btn" onclick="revisarClientesAuto()">🔍 Revisar</button>
         </div>
       </div>
 
-      <!-- PANEL: filtros exactamente igual que Albaranes -->
-      <div class="panel" style="margin-bottom:10px;">
-        <div class="panel-body" style="padding:10px 14px 8px;">
-          <input class="search-box" id="clientes-search" style="width:100%;margin-bottom:8px;" placeholder="Buscar por nombre, NIF, teléfono, email…" oninput="renderClientesTable()">
+      <!-- MÓVIL: cabecero sticky unificado -->
+      <div class="lista-movil-solo" id="cli-sticky-bar">
+        <!-- Fila 1: acciones (siempre visible; acciones de selección aparecen cuando hay selección) -->
+        <div id="cli-bar-acciones">
+          <span style="font-weight:700;font-size:14px;">Clientes</span>
+          <div style="display:flex;gap:4px;margin-left:auto;align-items:center;">
+            <button class="btn" style="color:var(--red);display:none;padding:5px 8px;" id="clientes-borrar-sel-btn" onclick="borrarClientesSeleccionados()">🗑 <span id="clientes-sel-count">0</span></button>
+            <button class="btn primary" style="display:none;padding:5px 8px;" id="clientes-fusionar-sel-btn" onclick="abrirFusionMultiple()">⟲</button>
+            <button class="btn" style="display:none;padding:5px 8px;" id="clientes-prioridad-sel-btn" onclick="cambiarPrioridadSeleccionados()">🚩</button>
+            <button class="btn" style="padding:5px 8px;" onclick="revisarClientesAuto()">🔍</button>
+          </div>
         </div>
-        <div class="dd-filter-row" style="padding:0 14px 10px;border-bottom:none;">
+        <!-- Fila 2: búsqueda + filtros compactos -->
+        <div id="cli-bar-filtros">
+          <input class="search-box" id="clientes-search" style="height:32px;font-size:13px;min-width:0;flex:1;" placeholder="Buscar…" oninput="renderClientesTable()">
+          <div class="dd-filter-row" style="padding:0;border-bottom:none;flex-wrap:nowrap;overflow-x:auto;">
           <div class="dd-filter" id="dd-cli-tipo">
             <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-tipo')">Tipo<span class="dd-caret">▾</span></button>
             <div class="dd-filter-panel">
@@ -3285,9 +3306,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               </div>
             </div>
           </div>
-          <button class="btn reset-filtros-vista" style="margin-left:auto;" onclick="restablecerFiltrosClientes()">↻</button>
-        </div>
-      </div>
+            <button class="btn reset-filtros-vista" style="padding:0 8px;" onclick="restablecerFiltrosClientes()">↻</button>
+          </div><!-- /dd-filter-row -->
+        </div><!-- /cli-bar-filtros -->
+      </div><!-- /cli-sticky-bar -->
 
       <!-- Columnas panel (escritorio) -->
       <div class="panel tabla-escritorio-solo" id="clientes-columnas-panel" style="display:none;margin-bottom:12px;">
@@ -11205,12 +11227,12 @@ function toggleSeleccionarTodoClientes(master){
 function actualizarSeleccionClientes(){
   const marcados = document.querySelectorAll('.clientes-sel-chk:checked');
   const n = marcados.length;
-  document.getElementById('clientes-sel-count').textContent = n;
-  document.getElementById('clientes-borrar-sel-btn').style.display = n ? '' : 'none';
-  const btnFus = document.getElementById('clientes-fusionar-sel-btn');
-  if(btnFus) btnFus.style.display = n >= 2 ? '' : 'none';
-  const btnPrio = document.getElementById('clientes-prioridad-sel-btn');
-  if(btnPrio) btnPrio.style.display = n ? '' : 'none';
+  // Actualizar todos los posibles elementos (móvil y escritorio)
+  ['clientes-sel-count','clientes-sel-count-d'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=n;});
+  ['clientes-borrar-sel-btn','clientes-borrar-sel-btn-d'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=n?'':'none';});
+  const nFus=n>=2?'':'none';
+  ['clientes-fusionar-sel-btn','clientes-fusionar-sel-btn-d'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=nFus;});
+  ['clientes-prioridad-sel-btn','clientes-prioridad-sel-btn-d'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=n?'':'none';});
 }
 async function borrarClientesSeleccionados(){
   const marcados = Array.from(document.querySelectorAll('.clientes-sel-chk:checked'));
@@ -11719,9 +11741,10 @@ async function revisarClientesAuto(forzar=false){
   mostrarToast('Analizando y corrigiendo clientes…');
   if(!sb) return;
 
-  const CACHE_KEY = 'clientes_revision_cache_v2';
+  const CACHE_KEY = 'clientes_revision_cache_v3'; // v3: siempre normaliza NIF/nombre
   let cache = {};
   try { cache = JSON.parse(localStorage.getItem(CACHE_KEY)||'{}'); } catch(e){}
+  if(forzar){ cache = {}; }
 
   const {data: entidades} = await sb.from('entidades')
     .select('id,nombre,nif,poblacion,provincia,cp,tipo,clase_nombre,direccion').limit(600);
@@ -11746,8 +11769,8 @@ async function revisarClientesAuto(forzar=false){
 
   for(const e of entidades){
     const h = hashEntidad(e);
-    // Saltar si no cambió desde la última revisión (salvo forzar)
-    if(!forzar && cache[e.id] && cache[e.id].hash === h && cache[e.id].ok) continue;
+    // Siempre normalizar (el hash solo evita repetir detección de pendientes, no las correcciones)
+    const yaRevisado = !forzar && cache[e.id] && cache[e.id].hash === h && cache[e.id].ok;
 
     const patch = {};
 
@@ -11786,19 +11809,24 @@ async function revisarClientesAuto(forzar=false){
       if(!error){ corregidos++; Object.assign(e, patch); }
     }
 
-    // Guardar en caché
+    // Guardar en caché y detectar pendientes
     const h2 = hashEntidad(e);
     const memCli = clientes.find(x=>x.id===e.id);
     const tieneActividad = memCli && ((memCli.facturado||0)+(memCli.enB||0))>0;
-    const prob = [];
-    if(!e.nif) prob.push('Sin NIF');
-    if(tieneActividad){
-      if(!e.poblacion) prob.push('Sin población');
-      if(!e.provincia) prob.push('Sin provincia');
-      if(!e.cp) prob.push('Sin CP');
+    if(!yaRevisado || Object.keys(patch).length){
+      const prob = [];
+      if(!e.nif) prob.push('Sin NIF');
+      if(tieneActividad){
+        if(!e.poblacion) prob.push('Sin población');
+        if(!e.provincia) prob.push('Sin provincia');
+        if(!e.cp) prob.push('Sin CP');
+      }
+      cache[e.id] = {hash:h2, ok:prob.length===0, problemas:prob, nombre:e.nombre};
+      if(prob.length) pendientes.push({id:e.id, nombre:e.nombre, problemas:prob});
+    } else {
+      // Ya revisado sin cambios: usar pendientes de caché si tenía
+      if(cache[e.id]?.problemas?.length) pendientes.push({id:e.id, nombre:e.nombre, problemas:cache[e.id].problemas});
     }
-    cache[e.id] = {hash:h2, ok:prob.length===0, problemas:prob, nombre:e.nombre};
-    if(prob.length) pendientes.push({id:e.id, nombre:e.nombre, problemas:prob});
   }
   localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
 
