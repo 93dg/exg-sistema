@@ -2799,7 +2799,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.16</div>
+        <div class="sub" id="version-badge">V4.17</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12788,6 +12788,20 @@ async function revisarClientesAuto(forzar=false){
 }
 
 // Cargar y mostrar los casos pendientes desde BD
+async function borrarClienteSinDocs(id, nombre){
+  if(!(await confirmarAccion(`¿Borrar "${nombre}"? No tiene documentos reales. No se puede deshacer.`))) return;
+  if(!sb) return;
+  // Borrar borradores vacíos primero
+  await sb.from('documentos_economicos').delete().eq('entidad_id',id);
+  const {error} = await sb.from('entidades').delete().eq('id',id);
+  if(error){ mostrarToast('Error: '+errText(error),'err'); return; }
+  const i = clientes.findIndex(c=>c.id===id);
+  if(i>=0) clientes.splice(i,1);
+  renderClientesTable();
+  mostrarToast(`"${nombre}" eliminado`,'ok');
+  // Refrescar el panel de pendientes
+  revisarClientesAuto(true);
+}
 async function cargarCasosRevision(){
   if(!sb) return;
   const {data:casos} = await sb.from('clientes_revision_casos')
