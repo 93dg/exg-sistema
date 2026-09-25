@@ -2714,7 +2714,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.79</div>
+        <div class="sub" id="version-badge">V3.80</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3276,6 +3276,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="dd-filter-panel">
               <div class="filters" id="clientes-filtro-orden-chips" style="margin:0;">
                 <div class="chip-filter active" data-orden="nombre" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Nombre</div>
+                <div class="chip-filter" data-orden="docs_desc" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Más docs</div>
+                <div class="chip-filter" data-orden="docs_asc" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Menos docs</div>
                 <div class="chip-filter" data-orden="total_desc" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Mayor total</div>
                 <div class="chip-filter" data-orden="total_asc" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Menor total</div>
                 <div class="chip-filter" data-orden="pendiente" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Con pendiente</div>
@@ -11607,7 +11609,8 @@ function renderClientesMovil(clientesFiltrados){
     const telEmail = [cli.telefono, cli.email].filter(Boolean).join(' · ');
     const metaParts = [tipo, pob].filter(Boolean);
     const metaLine = metaParts.join(' · ');
-    const detalles = [nif, telEmail].filter(Boolean).join(' · ');
+    const docsLabel = cli.numDocs ? `📄 ${cli.numDocs}` : '';
+    const detalles = [docsLabel, nif, telEmail].filter(Boolean).join(' · ');
     const ultimoTxt = cli.ultimoTrabajo ? `Últ: ${formatFechaCorta(cli.ultimoTrabajo)}` : '';
     const pendIdentidad = window.__casosIdentidadPendientePorEntidad?.[cli.id]
       ? `<span class="pill" style="font-size:10px;color:var(--orange);border-color:var(--orange);">⚠ ${window.__casosIdentidadPendientePorEntidad[cli.id]}</span>` : '';
@@ -11935,6 +11938,8 @@ function renderClientesTable(){
     if(ordenCli==='total_asc') return ((a.facturado||0)+(a.enB||0)) - ((b.facturado||0)+(b.enB||0));
     if(ordenCli==='pendiente') return (b.pendiente||0) - (a.pendiente||0);
     if(ordenCli==='reciente') return new Date(b.ultimoTrabajo||0) - new Date(a.ultimoTrabajo||0);
+    if(ordenCli==='docs_desc') return (b.numDocs||0) - (a.numDocs||0);
+    if(ordenCli==='docs_asc') return (a.numDocs||0) - (b.numDocs||0);
     return (a.name||'').localeCompare(b.name||'');
   });
 
@@ -12048,11 +12053,12 @@ async function borrarUnCliente(id, nombre){
   mostrarToast('Cliente borrado.', 'ok');
 }
 function calcularTotalesClientes(){
-  clientes.forEach(c=>{ c.facturado = 0; c.enB = 0; c.pendiente = 0; c.ultimoTrabajo = null; });
+  clientes.forEach(c=>{ c.facturado = 0; c.enB = 0; c.pendiente = 0; c.ultimoTrabajo = null; c.numDocs = 0; });
   Object.values(documentosRealesById).forEach(d=>{
     if(!d.entidad_id) return;
     const c = clientes.find(cl=>cl.id===d.entidad_id);
     if(!c) return;
+    c.numDocs = (c.numDocs||0) + 1;
     if(d.type==='factura' && d.status!=='Borrador'){
       c.facturado = (c.facturado||0) + (d.total||0);
       c.pendiente = (c.pendiente||0) + Math.max(0, (d.total||0) - Number(d.cobrado_importe||0));
