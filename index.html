@@ -286,33 +286,79 @@ table{border-collapse:collapse;width:100%;}
 }
 /* ======= FIN CLIENTES MÓVIL ======= */
 
-/* Cabecero fijo clientes móvil — position:fixed garantiza que siempre acompaña el scroll */
+/* ── CLIENTES MÓVIL: sticky bar ─────────────────────────────────────────── */
 @media (max-width:768px){
+  #view-clientes .topbar.tabla-escritorio-solo { display:none !important; }
+
   #cli-sticky-bar {
     position:fixed; top:0; left:0; right:0; z-index:90;
-    background:var(--bg);
-    border-bottom:1px solid var(--line);
+    background:var(--bg); border-bottom:1px solid var(--line);
+    /* Sin overflow hidden — los dropdowns deben salir del contenedor */
   }
-  #cli-bar-acciones {
-    display:flex; align-items:center; gap:6px;
-    padding:10px 12px 6px;
-    min-height:44px;
+
+  /* Fila principal: Revisar | Filtros | Buscar(icono) */
+  #cli-bar-main {
+    display:flex; align-items:center; gap:0;
+    padding:7px 10px 7px;
+    min-height:44px; box-sizing:border-box; width:100%;
   }
-  #cli-bar-acciones span { font-weight:700; font-size:15px; }
-  #cli-bar-filtros {
-    display:flex; align-items:center; gap:6px;
-    padding:0 12px 8px;
-    overflow:visible;
+  #cli-btn-revisar {
+    flex:0 0 auto; padding:6px 10px; font-size:13px; font-weight:700;
+    background:var(--concrete-2); border:1px solid var(--line);
+    border-radius:8px; cursor:pointer; white-space:nowrap; margin-right:6px;
+    color:var(--ink);
   }
-  #cli-bar-filtros .dd-filter-row {
-    flex:1; min-width:0; flex-wrap:nowrap; overflow-x:auto; overflow-y:visible;
-    padding:0; border-bottom:none;
+  #cli-filtros-strip {
+    flex:1; min-width:0; display:flex; align-items:center;
+    gap:4px; overflow:visible; /* NO overflow-x:auto — evita scroll accidental */
   }
-  /* Spacer que empuja el contenido para no quedar debajo del header fijo */
+  #cli-filtros-strip .dd-filter { flex:0 0 auto; }
+  #cli-filtros-strip .dd-filter-btn {
+    padding:5px 8px; font-size:12px; height:30px; white-space:nowrap;
+  }
+  #cli-filtros-strip .reset-filtros-vista {
+    padding:5px 8px; height:30px; font-size:13px; flex:0 0 auto;
+  }
+  #cli-btn-buscar {
+    flex:0 0 auto; padding:6px 9px; font-size:16px; line-height:1;
+    background:none; border:1px solid var(--line); border-radius:8px;
+    cursor:pointer; margin-left:4px; color:var(--ink-soft);
+  }
+  #cli-btn-buscar.activo { background:var(--orange); color:#fff; border-color:var(--orange); }
+
+  /* Fila buscador (oculta por defecto) */
+  #cli-bar-buscar {
+    display:none; align-items:center; gap:6px;
+    padding:0 10px 8px; box-sizing:border-box;
+  }
+  #cli-bar-buscar.visible { display:flex; }
+  #cli-bar-buscar input {
+    flex:1; height:34px; font-size:14px;
+  }
+  #cli-bar-buscar .cli-buscar-cerrar {
+    flex:0 0 auto; padding:5px 10px; font-size:15px; font-weight:700;
+    background:none; border:none; cursor:pointer; color:var(--ink-soft);
+  }
+
+  /* Fila selección (oculta por defecto) */
+  #cli-bar-sel {
+    display:none; align-items:center; gap:6px;
+    padding:7px 10px; background:color-mix(in srgb,var(--orange) 8%,var(--bg));
+    min-height:44px; box-sizing:border-box;
+  }
+  #cli-bar-sel.visible { display:flex; }
+
+  /* Spacer */
   #cli-sticky-spacer { display:block; }
-  /* Ocultar topbar escritorio en móvil */
-  #view-clientes .topbar.tabla-escritorio-solo { display:none !important; }
+
+  /* Dropdowns: asegurar que no queden cortados */
+  #cli-filtros-strip .dd-filter-panel {
+    z-index:200; /* más alto que el header fijo */
+  }
+  /* Último dropdown: panel alineado a la derecha */
+  #dd-cli-ord2 .dd-filter-panel { right:0; left:auto; }
 }
+/* ── FIN CLIENTES MÓVIL sticky bar ──────────────────────────────────────── */
 
 /* ======= NOTIFICACIONES DE CAMBIOS ======= */
 .notif-card {
@@ -3252,77 +3298,38 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
 
       <!-- MÓVIL: cabecero fijo unificado -->
+      <!-- MÓVIL: cabecero fijo unificado — UNA sola fila sin overflow -->
       <div class="lista-movil-solo" id="cli-sticky-bar">
-        <!-- Fila normal: título + revisar -->
-        <div id="cli-bar-normal" style="display:flex;align-items:center;gap:6px;padding:10px 12px 6px;">
-          <span style="font-weight:700;font-size:15px;flex:1;">Clientes</span>
-          <button class="btn" style="padding:5px 10px;font-size:16px;" onclick="revisarClientesAuto()" title="Revisar y corregir">⚡</button>
-        </div>
-        <!-- Fila selección: aparece cuando hay clientes marcados (reemplaza fila normal) -->
-        <div id="cli-bar-sel" style="display:none;align-items:center;gap:6px;padding:10px 12px 6px;background:color-mix(in srgb,var(--orange) 8%,var(--bg));">
-          <span id="clientes-sel-count" style="font-weight:700;font-size:13px;color:var(--orange);">0</span>
-          <span style="font-size:13px;color:var(--ink-soft);">seleccionados</span>
-          <div style="margin-left:auto;display:flex;gap:6px;">
-            <button class="btn" style="color:var(--red);padding:5px 10px;" id="clientes-borrar-sel-btn" onclick="borrarClientesSeleccionados()">🗑</button>
-            <button class="btn primary" style="padding:5px 10px;" id="clientes-fusionar-sel-btn" onclick="abrirFusionMultiple()">⟲ Fusionar</button>
-          </div>
-        </div>
-        <!-- Fila 2: buscador + filtros compactos -->
-        <div id="cli-bar-filtros">
-          <div style="position:relative;flex:1;min-width:0;">
-            <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;color:var(--ink-soft);">🔍</span>
-            <input class="search-box" id="clientes-search" style="height:32px;font-size:13px;width:100%;padding-left:30px;" placeholder="Buscar…" oninput="renderClientesTable()">
-          </div>
-          <div class="dd-filter-row" style="padding:0;border-bottom:none;flex-wrap:nowrap;overflow-x:auto;overflow-y:visible;">
-          <div class="dd-filter" id="dd-cli-tipo">
-            <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-tipo')">Tipo<span class="dd-caret">▾</span></button>
-            <div class="dd-filter-panel">
-              <div class="filters" id="clientes-filtro-tipo-chips" style="margin:0;">
-                <div class="chip-filter" data-tipo="ayuntamiento" onclick="this.classList.toggle('active');renderClientesTable()">Ayuntamiento</div>
-                <div class="chip-filter" data-tipo="empresa" onclick="this.classList.toggle('active');renderClientesTable()">Empresa</div>
-                <div class="chip-filter" data-tipo="particular" onclick="this.classList.toggle('active');renderClientesTable()">Particular</div>
-              </div>
-            </div>
-          </div>
-          <div class="dd-filter" id="dd-cli-prio">
-            <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-prio')">Prioridad<span class="dd-caret">▾</span></button>
-            <div class="dd-filter-panel">
-              <div class="filters" id="clientes-filtro-prio-chips" style="margin:0;">
-                <div class="chip-filter" data-prio="alta" onclick="this.classList.toggle('active');renderClientesTable()">🔴 Alta</div>
-                <div class="chip-filter" data-prio="media" onclick="this.classList.toggle('active');renderClientesTable()">🟡 Media</div>
-                <div class="chip-filter" data-prio="baja" onclick="this.classList.toggle('active');renderClientesTable()">🟢 Baja</div>
-              </div>
-            </div>
-          </div>
-          <div class="dd-filter" id="dd-cli-extra">
-            <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-extra')">Más<span class="dd-caret">▾</span></button>
-            <div class="dd-filter-panel">
-              <div class="filters" id="clientes-filtro-extra-chips" style="margin:0;">
-                <div class="chip-filter" data-extra="deuda" onclick="this.classList.toggle('active');renderClientesTable()">Con deuda</div>
-                <div class="chip-filter" data-extra="sindatos" onclick="this.classList.toggle('active');renderClientesTable()">Incompleta</div>
-                <div class="chip-filter" data-extra="sindocs" onclick="this.classList.toggle('active');renderClientesTable()">Sin docs</div>
-                <div class="chip-filter active" data-extra="ocultar_basura" onclick="this.classList.toggle('active');renderClientesTable()">Solo reales</div>
-              </div>
-            </div>
-          </div>
-          <div class="dd-filter dd-filter-orden" id="dd-cli-orden">
-            <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-orden')">Ordenar<span class="dd-caret">▾</span></button>
-            <div class="dd-filter-panel">
-              <div class="filters" id="clientes-filtro-orden-chips" style="margin:0;">
-                <div class="chip-filter active" data-orden="nombre" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Nombre</div>
-                <div class="chip-filter" data-orden="docs_desc" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Más docs</div>
-                <div class="chip-filter" data-orden="docs_asc" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Menos docs</div>
-                <div class="chip-filter" data-orden="total_desc" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Mayor total</div>
-                <div class="chip-filter" data-orden="total_asc" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Menor total</div>
-                <div class="chip-filter" data-orden="pendiente" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Con pendiente</div>
-                <div class="chip-filter" data-orden="reciente" onclick="document.querySelectorAll('#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Más reciente</div>
-              </div>
-            </div>
-          </div>
-            <div class="dd-filter" id="dd-cli-extra">
-              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-extra')">Más<span class="dd-caret">▾</span></button>
+
+        <!-- Fila principal: Revisar | filtros compactos | buscar -->
+        <div id="cli-bar-main">
+          <button id="cli-btn-revisar" onclick="revisarClientesAuto()" title="Revisar y corregir clientes">⚡ Revisar</button>
+
+          <div id="cli-filtros-strip">
+            <div class="dd-filter" id="dd-cli-tipo">
+              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-tipo')">Tipo<span class="dd-caret">▾</span></button>
               <div class="dd-filter-panel">
-                <div class="filters" id="clientes-filtro-extra-chips-m" style="margin:0;">
+                <div class="filters" id="clientes-filtro-tipo-chips" style="margin:0;">
+                  <div class="chip-filter" data-tipo="ayuntamiento" onclick="this.classList.toggle('active');renderClientesTable()">Ayuntamiento</div>
+                  <div class="chip-filter" data-tipo="empresa" onclick="this.classList.toggle('active');renderClientesTable()">Empresa</div>
+                  <div class="chip-filter" data-tipo="particular" onclick="this.classList.toggle('active');renderClientesTable()">Particular</div>
+                </div>
+              </div>
+            </div>
+            <div class="dd-filter" id="dd-cli-prio">
+              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-prio')">Prio<span class="dd-caret">▾</span></button>
+              <div class="dd-filter-panel">
+                <div class="filters" id="clientes-filtro-prio-chips" style="margin:0;">
+                  <div class="chip-filter" data-prio="alta" onclick="this.classList.toggle('active');renderClientesTable()">🔴 Alta</div>
+                  <div class="chip-filter" data-prio="media" onclick="this.classList.toggle('active');renderClientesTable()">🟡 Media</div>
+                  <div class="chip-filter" data-prio="baja" onclick="this.classList.toggle('active');renderClientesTable()">🟢 Baja</div>
+                </div>
+              </div>
+            </div>
+            <div class="dd-filter" id="dd-cli-extra2">
+              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-extra2')">Más<span class="dd-caret">▾</span></button>
+              <div class="dd-filter-panel">
+                <div class="filters" id="clientes-filtro-extra-chips" style="margin:0;">
                   <div class="chip-filter" data-extra="deuda" onclick="this.classList.toggle('active');renderClientesTable()">Con deuda</div>
                   <div class="chip-filter" data-extra="sindatos" onclick="this.classList.toggle('active');renderClientesTable()">Incompleta</div>
                   <div class="chip-filter" data-extra="sindocs" onclick="this.classList.toggle('active');renderClientesTable()">Sin docs</div>
@@ -3330,8 +3337,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
                 </div>
               </div>
             </div>
-            <div class="dd-filter" id="dd-cli-orden-m">
-              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-orden-m')" style="padding:4px 8px;" title="Ordenar">≡<span class="dd-caret">▾</span></button>
+            <div class="dd-filter" id="dd-cli-ord2">
+              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-ord2')" title="Ordenar" style="padding:5px 7px;">≡<span class="dd-caret">▾</span></button>
               <div class="dd-filter-panel" style="right:0;left:auto;">
                 <div class="filters" id="clientes-filtro-orden-chips-m" style="margin:0;">
                   <div class="chip-filter active" data-orden="nombre" onclick="document.querySelectorAll('#clientes-filtro-orden-chips-m .chip-filter,#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Nombre</div>
@@ -3344,12 +3351,30 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
                 </div>
               </div>
             </div>
-            <button class="btn reset-filtros-vista" style="padding:0 8px;" onclick="restablecerFiltrosClientes()">↻</button>
-          </div><!-- /dd-filter-row -->
-        </div><!-- /cli-bar-filtros -->
+            <button class="btn reset-filtros-vista" onclick="restablecerFiltrosClientes()" title="Limpiar filtros">↻</button>
+          </div>
+
+          <button id="cli-btn-buscar" onclick="toggleBuscadorClientes()" title="Buscar">🔍</button>
+        </div>
+
+        <!-- Fila buscador: aparece al pulsar la lupa -->
+        <div id="cli-bar-buscar">
+          <input class="search-box" id="clientes-search" placeholder="Buscar nombre, NIF, teléfono…" oninput="renderClientesTable()" style="height:34px;font-size:14px;">
+          <button class="cli-buscar-cerrar" onclick="toggleBuscadorClientes()">✕</button>
+        </div>
+
+        <!-- Fila selección: reemplaza fila principal al seleccionar clientes -->
+        <div id="cli-bar-sel">
+          <span id="clientes-sel-count" style="font-weight:700;font-size:13px;color:var(--orange);flex:0 0 auto;">0</span>
+          <span style="font-size:13px;color:var(--ink-soft);flex:0 0 auto;">sel.</span>
+          <div style="margin-left:auto;display:flex;gap:6px;">
+            <button class="btn" style="color:var(--red);padding:5px 10px;" id="clientes-borrar-sel-btn" onclick="borrarClientesSeleccionados()">🗑</button>
+            <button class="btn primary" style="padding:5px 12px;font-size:13px;" id="clientes-fusionar-sel-btn" onclick="abrirFusionMultiple()">⟲ Fusionar</button>
+          </div>
+        </div>
+
       </div><!-- /cli-sticky-bar -->
-      <!-- Spacer para compensar el header fijo — altura se calcula en JS -->
-      <div class="lista-movil-solo" id="cli-sticky-spacer" style="height:96px;"></div>
+      <div class="lista-movil-solo" id="cli-sticky-spacer" style="height:54px;"></div>
 
       <!-- Columnas panel (escritorio) -->
       <div class="panel tabla-escritorio-solo" id="clientes-columnas-panel" style="display:none;margin-bottom:12px;">
@@ -11871,13 +11896,16 @@ function actualizarSeleccionClientes(){
   const borrarD=document.getElementById('clientes-borrar-sel-btn-d'); if(borrarD) borrarD.style.display=n?'':'none';
   const fusD=document.getElementById('clientes-fusionar-sel-btn-d'); if(fusD) fusD.style.display=n>=2?'':'none';
   const prioD=document.getElementById('clientes-prioridad-sel-btn-d'); if(prioD) prioD.style.display=n?'':'none';
-  // Móvil: alternar fila normal / fila selección
-  const barNormal=document.getElementById('cli-bar-normal');
+  // Móvil: alternar fila principal / fila selección
+  const barMain=document.getElementById('cli-bar-main');
+  const barBuscar=document.getElementById('cli-bar-buscar');
   const barSel=document.getElementById('cli-bar-sel');
   const countM=document.getElementById('clientes-sel-count');
   if(countM) countM.textContent=n;
-  if(barNormal) barNormal.style.display=n?'none':'flex';
-  if(barSel) barSel.style.display=n?'flex':'none';
+  if(barMain) barMain.style.display=n?'none':'flex';
+  if(barBuscar && n) barBuscar.classList.remove('visible'); // cerrar buscador si se selecciona
+  if(barSel) barSel.classList.toggle('visible',n>0);
+  setTimeout(ajustarSpacerClientes, 50);
 }
 async function borrarClientesSeleccionados(){
   const marcados = Array.from(document.querySelectorAll('.clientes-sel-chk:checked'));
@@ -12235,6 +12263,25 @@ function toggleColumnaClientes(key, visible){
 document.querySelectorAll('#clientes-filtro-tipo-chips .chip-filter, #clientes-filtro-prio-chips .chip-filter, #clientes-filtro-extra-chips .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{ chip.classList.toggle('active'); renderClientesTable(); });
 });
+function toggleBuscadorClientes(){
+  const bar = document.getElementById('cli-bar-buscar');
+  const btn = document.getElementById('cli-btn-buscar');
+  const main = document.getElementById('cli-bar-main');
+  const abierto = bar.classList.contains('visible');
+  bar.classList.toggle('visible', !abierto);
+  btn?.classList.toggle('activo', !abierto);
+  if(!abierto){
+    const inp = document.getElementById('clientes-search');
+    inp?.focus(); inp && (inp.value=''); renderClientesTable();
+    // Cuando se abre el buscar, ajustar spacer
+    setTimeout(ajustarSpacerClientes, 50);
+  } else {
+    // Al cerrar, limpiar búsqueda
+    const inp = document.getElementById('clientes-search');
+    if(inp){ inp.value=''; renderClientesTable(); }
+    setTimeout(ajustarSpacerClientes, 50);
+  }
+}
 function restablecerFiltrosClientes(){
   document.getElementById('clientes-search').value = '';
   document.querySelectorAll('#clientes-filtro-tipo-chips .chip-filter,#clientes-filtro-prio-chips .chip-filter,#clientes-filtro-extra-chips .chip-filter,#clientes-filtro-extra-chips-m .chip-filter').forEach(c=>c.classList.remove('active'));
@@ -12249,7 +12296,12 @@ function restablecerFiltrosClientes(){
 function ajustarSpacerClientes(){
   const bar=document.getElementById('cli-sticky-bar');
   const spacer=document.getElementById('cli-sticky-spacer');
-  if(bar&&spacer) spacer.style.height=bar.offsetHeight+'px';
+  if(bar&&spacer){
+    spacer.style.height=bar.offsetHeight+'px';
+    // Asegurar que los paneles que siguen no tienen margen extra
+    const primer=spacer.nextElementSibling;
+    if(primer) primer.style.marginTop='0';
+  }
 }
 async function cambiarPrioridadSeleccionados(){
   const ids = Array.from(document.querySelectorAll('.clientes-sel-chk:checked')).map(c=>c.dataset.id).filter(Boolean);
