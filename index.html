@@ -3375,8 +3375,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
                 </div>
               </div>
             </div>
-            <div class="dd-filter" id="dd-cli-ord2">
-              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cli-ord2')" title="Ordenar" style="padding:5px 7px;">≡<span class="dd-caret">▾</span></button>
+            <div class="dd-filter" id="dd-cli-ord2" style="position:relative;">
+              <button type="button" onclick="toggleDDGenerico('dd-cli-ord2')" title="Ordenar" style="padding:5px 9px;height:30px;background:none;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;gap:2px;color:var(--ink);">≡</button>
               <div class="dd-filter-panel" style="right:0;left:auto;">
                 <div class="filters" id="clientes-filtro-orden-chips-m" style="margin:0;">
                   <div class="chip-filter active" data-orden="nombre" onclick="document.querySelectorAll('#clientes-filtro-orden-chips-m .chip-filter,#clientes-filtro-orden-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderClientesTable()">Nombre</div>
@@ -12170,9 +12170,12 @@ async function confirmarFusionDesdeComparacion(){
     }
     cerrarComparacionFusion();
     // ── ACTUALIZACIÓN REACTIVA INMEDIATA ──
-    // Quitar los clientes fusionados del array en memoria y re-render
     const idsEliminados = duplicados.map(d=>d.id);
-    clientes.splice(0, clientes.length, ...clientes.filter(c=>!idsEliminados.includes(c.id)));
+    // clientes aquí es fusionEnCurso.clientes (local), necesitamos el array global
+    // El array global se llama igual — usar referencia directa via window si hace falta
+    if(window.clientes && Array.isArray(window.clientes)){
+      window.clientes.splice(0, window.clientes.length, ...window.clientes.filter(cli=>!idsEliminados.includes(cli.id)));
+    }
     document.querySelectorAll('.clientes-sel-chk:checked').forEach(cb=>cb.checked=false);
     actualizarSeleccionClientes();
     renderClientesTable(); // render inmediato con datos en memoria
@@ -12419,22 +12422,24 @@ function normNIF(n){
   if(!n) return null;
   return n.trim().toUpperCase().replace(/[\s\-\.]/g,'').slice(0,9);
 }
-const FJ = [ // formas jurídicas → formato canónico
-  [/\bS\.?\s*L\.?\s*U\.?\b/gi,'S.L.U.'],
-  [/\bS\.?\s*L\.?\b/gi,'S.L.'],
-  [/\bS\.?\s*A\.?\s*U\.?\b/gi,'S.A.U.'],
-  [/\bS\.?\s*A\.?\b/gi,'S.A.'],
-  [/\bC\.?\s*B\.?\b/gi,'C.B.'],
-  [/\bS\.?\s*C\.?\s*P\.?\b/gi,'S.C.P.'],
-  [/\bS\.?\s*L\.?\s*L\.?\b/gi,'S.L.L.'],
-  [/\bS\.?\s*A\.?\s*L\.?\b/gi,'S.A.L.'],
+const FJ = [ // formas jurídicas → orden: más largo primero para evitar solapamiento
+  [/S\.?\s*L\.?\s*U\.?(?=\s|$|,)/gi,'S.L.U.'],
+  [/S\.?\s*A\.?\s*U\.?(?=\s|$|,)/gi,'S.A.U.'],
+  [/S\.?\s*L\.?\s*L\.?(?=\s|$|,)/gi,'S.L.L.'],
+  [/S\.?\s*A\.?\s*L\.?(?=\s|$|,)/gi,'S.A.L.'],
+  [/S\.?\s*C\.?\s*P\.?(?=\s|$|,)/gi,'S.C.P.'],
+  [/S\.?\s*L\.?(?=\s|$|,)/gi,'S.L.'],
+  [/S\.?\s*A\.?(?=\s|$|,)/gi,'S.A.'],
+  [/C\.?\s*B\.?(?=\s|$|,)/gi,'C.B.'],
 ];
 function normRazonSocial(n){
   if(!n) return n;
   let r = n.trim().toUpperCase().replace(/\s+/g,' ');
   r = r.replace(/,\s*(S\.?L\.?|S\.?A\.?|C\.?B\.?|S\.?C\.?P\.?)/gi,' $1'); // quitar coma antes de forma jurídica
   FJ.forEach(([re,rep])=>{ r = r.replace(re, rep); });
-  r = r.replace(/\.{2,}/g,'.'); // eliminar puntos dobles/triples generados por regex
+  r = r.replace(/\.{2,}/g,'.'); // eliminar puntos dobles/triples
+  r = r.replace(/\s+\.([A-Z])/g,' $1'); // quitar espacio+punto antes de letra (p.ej. " .S.L.")
+  r = r.replace(/^\./,''); // quitar punto inicial
   return r.trim();
 }
 function normDireccion(d){
@@ -12589,7 +12594,7 @@ async function revisarClientesAuto(forzar=false){
       // Actualizar caché
       const h2=hashEntidad(e);
       await sb.from('clientes_revision_cache')
-        .upsert({entidad_id:e.id, hash_datos:h2, revisado_at:new Date().toISOString()});
+        .upsert({entidad_id:e.id, hash_datos:h2, revisado_at:new Date().toISOString()},{onConflict:'entidad_id'});
       clientesNuevosOModificados.push(e);
     }
     // Si sin cambios, no tocamos nada
@@ -12604,18 +12609,43 @@ async function revisarClientesAuto(forzar=false){
   const hashsYaEnCola=new Set((casosExistentes||[]).map(c=>c.hash_grupo).filter(Boolean));
 
   // Detectar grupos de posibles duplicados
+  // normBase: normaliza para comparar nombres — elimina acentos, siglas, puntuación
   function normBase(n){
-    return (n||'').toUpperCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // quitar acentos: JOSÉ→JOSE, RÍOS→RIOS
-      .replace(/\b(SLU|SAU|SAL|SLL|SCL|SCP|SL|SA|CB|LTD|SRL|EXCMO|EXMO|AYUNTAMIENTO)\b/g,'')
+    if(!n) return '';
+    return n.toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')   // JOSÉ→JOSE, RÍOS→RIOS
+      .replace(/S\.?L\.?U\.?|S\.?A\.?U\.?|S\.?L\.?L\.?|S\.?A\.?L\.?|S\.?C\.?P\.?|S\.?L\.?|S\.?A\.?|C\.?B\.?/g,'') // siglas
+      .replace(/EXCMO\.?|EXMO\.?|AYUNTAMIENTO|SOCIEDAD|COMUNIDAD/g,'') // palabras genéricas
       .replace(/[^A-Z0-9 ]/g,'').replace(/\s+/g,' ').trim();
   }
+
+  // similitud entre dos cadenas normalizadas: true si son prácticamente iguales
+  function sonProbablementeMismo(a, b){
+    if(!a||!b) return false;
+    if(a===b) return true;
+    // Uno contiene al otro (diferencia de sufijo o prefijo)
+    if(a.length>4 && b.startsWith(a)) return true;
+    if(b.length>4 && a.startsWith(b)) return true;
+    // Distancia de edición aproximada para nombres cortos
+    const la=a.length, lb=b.length;
+    if(Math.abs(la-lb)>4) return false; // demasiado distintos en longitud
+    // Contar palabras en común
+    const wA=new Set(a.split(' ')), wB=new Set(b.split(' '));
+    const comunes=[...wA].filter(w=>w.length>2&&wB.has(w)).length;
+    const totalUnicas=new Set([...wA,...wB].filter(w=>w.length>2)).size;
+    if(totalUnicas>0 && comunes/totalUnicas>=0.8) return true; // 80%+ palabras coinciden
+    return false;
+  }
+  // Agrupar por nombre normalizado — también agrupa variantes casi idénticas
   const grupos={};
-  for(const e of entidades){
-    const base=normBase(e.nombre);
-    if(!base||base.length<4) continue;
-    if(!grupos[base]) grupos[base]=[];
-    grupos[base].push({id:e.id,nombre:e.nombre});
+  const entNorm = entidades.map(e=>({e, base:normBase(e.nombre)})).filter(x=>x.base&&x.base.length>=4);
+
+  for(const {e, base} of entNorm){
+    // Buscar si ya existe un grupo similar
+    const grupoKey = Object.keys(grupos).find(k=>sonProbablementeMismo(k,base));
+    const key = grupoKey || base;
+    if(!grupos[key]) grupos[key]=[];
+    grupos[key].push({id:e.id, nombre:e.nombre, nif:e.nif||''});
   }
 
   let casosNuevos=0;
