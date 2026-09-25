@@ -286,6 +286,27 @@ table{border-collapse:collapse;width:100%;}
 }
 /* ======= FIN CLIENTES MÓVIL ======= */
 
+/* ======= NOTIFICACIONES DE CAMBIOS ======= */
+.notif-card {
+  background:var(--paper); border-radius:14px;
+  box-shadow:0 1px 3px rgba(0,0,0,.08);
+  padding:12px 14px; margin:0 10px 10px;
+}
+.notif-card.no-leida { border-left:3px solid var(--orange); }
+.notif-card .nc-hora { font-size:11px; color:var(--ink-soft); margin-bottom:4px; }
+.notif-card .nc-accion { font-weight:700; font-size:14px; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.notif-card .nc-decision { font-size:12px; color:var(--ink-soft); margin-bottom:6px; }
+.notif-card .nc-links { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.notif-card .nc-links .btn { padding:4px 11px; font-size:12px; height:26px; display:inline-flex; align-items:center; gap:4px; }
+/* Resaltado temporal de elemento recién modificado */
+@keyframes highlightFade {
+  0%   { background:rgba(255,140,0,.35); box-shadow:0 0 0 3px rgba(255,140,0,.4); }
+  70%  { background:rgba(255,140,0,.15); }
+  100% { background:transparent; box-shadow:none; }
+}
+.highlight-tmp { animation:highlightFade 3s ease forwards; border-radius:4px; }
+/* ======= FIN NOTIFICACIONES ======= */
+
 
 .pill{
   display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;
@@ -2682,7 +2703,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.76</div>
+        <div class="sub" id="version-badge">V3.77</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2808,6 +2829,32 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div style="padding:10px;text-align:center;display:none;" id="control-docs-cargar-mas-movil-wrap">
             <button class="btn" onclick="controlDocsMostrarMas()">Cargar más</button>
           </div>
+        </div>
+      </div>
+
+      <!-- NOTIFICACIONES DE CAMBIOS -->
+      <div class="panel" id="panel-notificaciones" style="margin-bottom:12px;">
+        <div class="panel-head" style="justify-content:space-between;align-items:center;">
+          <h3>🔔 Notificaciones <span class="count" id="notif-count" style="display:none;"></span></h3>
+          <div style="display:flex;gap:6px;">
+            <button class="btn sm" onclick="marcarTodasLeidasNotif()">✓ Leer todo</button>
+            <button class="btn sm" onclick="cargarNotificaciones()">↻</button>
+          </div>
+        </div>
+        <div class="tabla-escritorio-solo" style="padding:0;overflow-x:auto;">
+          <table class="tbl" style="width:100%;">
+            <thead><tr>
+              <th style="width:125px;text-align:left;">Fecha / Hora</th>
+              <th style="text-align:left;">Cambio realizado</th>
+              <th style="width:130px;text-align:left;">Elemento</th>
+              <th style="width:70px;"></th>
+            </tr></thead>
+            <tbody id="notif-tbody"></tbody>
+          </table>
+        </div>
+        <div class="lista-movil-solo" id="notif-lista-movil" style="padding:8px 0;"></div>
+        <div style="padding:12px 14px;text-align:center;display:none;" id="notif-empty">
+          <span style="color:var(--ink-soft);font-size:13px;">Sin notificaciones</span>
         </div>
       </div>
 
@@ -5712,6 +5759,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
       setTimeout(()=>realMap.invalidateSize(), 50);
     }
     if(btn.dataset.view==='backup') cargarPapelera();
+    if(btn.dataset.view==='control') cargarNotificaciones();
     if(btn.dataset.view==='facturas'){
       renderFacturasKPIs();
     }
@@ -10228,8 +10276,155 @@ async function addMaquina(){
     mostrarToast('Se añadió aquí, pero Supabase no está conectado — no quedará guardado al recargar.');
   }
 }
+// ======== NOTIFICACIONES DE CAMBIOS ========
+let _notificacionesCache = [];
+
+async function cargarNotificaciones(){
+  if(!sb) return;
+  const {data, error} = await sb
+    .from('sistema_notificaciones')
+    .select('*')
+    .order('created_at', {ascending:false})
+    .limit(50);
+  if(error || !data) return;
+  _notificacionesCache = data;
+  renderNotificaciones(data);
+}
+
+function renderNotificaciones(lista){
+  const noLeidas = lista.filter(n=>!n.leida).length;
+  const badge = document.getElementById('notif-count');
+  if(badge){ badge.textContent=noLeidas; badge.style.display=noLeidas?'':'none'; }
+  const empty = document.getElementById('notif-empty');
+
+  if(!lista.length){
+    if(empty) empty.style.display='';
+    document.getElementById('notif-tbody').innerHTML='';
+    document.getElementById('notif-lista-movil').innerHTML='';
+    return;
+  }
+  if(empty) empty.style.display='none';
+
+  // ── ESCRITORIO: tabla ──
+  const tbody = document.getElementById('notif-tbody');
+  if(tbody){
+    tbody.innerHTML = lista.map(n => {
+      const fecha = new Date(n.created_at).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit'});
+      const hora  = new Date(n.created_at).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      const noLeida = !n.leida ? 'style="font-weight:700;"' : '';
+      return `<tr ${noLeida} style="cursor:default;">
+        <td style="font-size:12px;text-align:left;">${fecha} ${hora}</td>
+        <td style="text-align:left;">
+          <div style="font-size:13px;${!n.leida?'font-weight:700;':''}">${svgEsc(n.accion_realizada||'')}</div>
+          ${n.decision_sistema?`<div style="font-size:11px;color:var(--ink-soft);">${svgEsc(n.decision_sistema.slice(0,80))}</div>`:''}
+        </td>
+        <td style="text-align:left;font-size:12px;">${n.elemento_nombre?`<span class="pill" style="font-size:11px;">${svgEsc(n.elemento_nombre)}</span>`:''}</td>
+        <td style="text-align:center;">
+          <button class="btn sm" onclick="abrirDetalleNotif('${n.id}')">Ver</button>
+          ${n.elemento_id&&n.seccion?`<button class="btn sm" onclick="irAElementoNotif('${n.id}')" title="Ir al elemento">↗</button>`:''}
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── MÓVIL: tarjetas ──
+  const movil = document.getElementById('notif-lista-movil');
+  if(movil){
+    movil.innerHTML = lista.map(n => {
+      const dt = new Date(n.created_at);
+      const fechaHora = dt.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      return `<div class="notif-card ${n.leida?'':'no-leida'}">
+        <div class="nc-hora">${fechaHora}${n.origen?' · '+svgEsc(n.origen):''}</div>
+        <div class="nc-accion">${svgEsc(n.accion_realizada||'Sin descripción')}</div>
+        ${n.decision_sistema?`<div class="nc-decision">${svgEsc(n.decision_sistema.slice(0,100))}</div>`:''}
+        <div class="nc-links">
+          <button class="btn sm" onclick="abrirDetalleNotif('${n.id}')">🔍 Ver detalle</button>
+          ${n.elemento_id&&n.seccion?`<button class="btn sm primary" onclick="irAElementoNotif('${n.id}')">↗ ${svgEsc(n.elemento_nombre||'Ver elemento')}</button>`:''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function abrirDetalleNotif(id){
+  const n = _notificacionesCache.find(x=>x.id===id);
+  if(!n) return;
+  // Marcar como leída
+  if(!n.leida && sb){ sb.from('sistema_notificaciones').update({leida:true}).eq('id',id).then(()=>{ n.leida=true; renderNotificaciones(_notificacionesCache); }); }
+  const cambio = n.datos_cambio ? JSON.stringify(n.datos_cambio, null, 2) : '—';
+  mostrarModalGenerico('🔔 Detalle de cambio',
+    `<div style="font-size:13px;line-height:1.7;display:flex;flex-direction:column;gap:8px;">
+      <div><b>📥 Recibido:</b><br>${svgEsc(n.mensaje_original||'—')}</div>
+      <div><b>🧠 Decisión:</b><br>${svgEsc(n.decision_sistema||'—')}</div>
+      <div><b>✅ Cambio realizado:</b><br>${svgEsc(n.accion_realizada||'—')}</div>
+      ${n.elemento_nombre?`<div><b>📍 Elemento:</b> ${svgEsc(n.elemento_nombre)} (${svgEsc(n.seccion||'')})</div>`:''}
+      <div style="font-size:11px;color:var(--ink-soft);"><b>Datos:</b><br><pre style="font-size:11px;overflow-x:auto;">${svgEsc(cambio)}</pre></div>
+      ${n.elemento_id&&n.seccion?`<button class="btn primary" onclick="cerrarModalGenerico();irAElementoNotif('${n.id}')">↗ Ir al elemento</button>`:''}
+    </div>`
+  );
+}
+
+async function irAElementoNotif(id){
+  const n = _notificacionesCache.find(x=>x.id===id);
+  if(!n||!n.seccion) return;
+  // 1. Navegar a la sección
+  const btn = document.querySelector(`[data-view="${n.seccion}"]`);
+  if(btn) btn.click();
+  // 2. Pequeña pausa para que cargue la sección
+  await new Promise(r=>setTimeout(r,400));
+  // 3. Abrir el elemento concreto
+  if(n.elemento_id && n.elemento_tipo==='documento'){
+    openDocumentViewer(n.elemento_id);
+    // 4. Resaltar dato modificado después de que abra el drawer
+    if(n.datos_cambio) setTimeout(()=>resaltarCambioEnDrawer(n.datos_cambio), 600);
+  } else if(n.elemento_tipo==='cliente' && n.elemento_nombre){
+    openClientDrawer(n.elemento_nombre);
+  } else if(n.elemento_tipo==='trabajo' && n.elemento_id){
+    abrirTrabajoDesdeId?.(n.elemento_id);
+  }
+}
+
+function resaltarCambioEnDrawer(datos){
+  // Resaltar campo específico en el drawer abierto
+  if(!datos) return;
+  const campo = datos.campo || datos.campo_modificado;
+  const lineaIdx = datos.linea_idx;
+  // Buscar por campo
+  if(campo){
+    const el = document.querySelector(`[data-campo="${campo}"], #ni-${campo}, [name="${campo}"]`);
+    if(el){ el.classList.add('highlight-tmp'); setTimeout(()=>el.classList.remove('highlight-tmp'),3500); return; }
+  }
+  // Buscar por índice de línea (conceptos de documento)
+  if(lineaIdx !== undefined){
+    const filas = document.querySelectorAll('#ie-items-body tr');
+    const fila = filas[lineaIdx];
+    if(fila){ fila.classList.add('highlight-tmp'); setTimeout(()=>fila.classList.remove('highlight-tmp'),3500); }
+  }
+}
+
+async function marcarTodasLeidasNotif(){
+  if(!sb) return;
+  await sb.from('sistema_notificaciones').update({leida:true}).eq('leida',false);
+  _notificacionesCache.forEach(n=>n.leida=true);
+  renderNotificaciones(_notificacionesCache);
+  mostrarToast('Todas marcadas como leídas','ok');
+}
+
+// Registrar una notificación (llamado internamente cuando el sistema hace un cambio)
+async function registrarNotificacion({mensaje_original, decision_sistema, accion_realizada, elemento_tipo, elemento_id, elemento_subtipo, elemento_nombre, seccion, datos_cambio, origen}){
+  if(!sb) return;
+  await sb.from('sistema_notificaciones').insert({
+    mensaje_original, decision_sistema, accion_realizada,
+    elemento_tipo, elemento_id, elemento_subtipo, elemento_nombre, seccion,
+    datos_cambio: datos_cambio||null, origen: origen||'asistente'
+  });
+}
+// ======== FIN NOTIFICACIONES ========
+
 async function cargarDatosReales(){
   if(!sb) return;
+  // Cargar notificaciones al inicio
+  cargarNotificaciones();
   // Actualizar versión desde BD
   try{
     const {data:arr} = await sb.from('arranque').select('valor').eq('clave','web_version_actual').maybeSingle();
