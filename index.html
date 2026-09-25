@@ -745,8 +745,10 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
   .ie-items .line-total{text-align:left;padding-right:0;font-size:17px;font-weight:700;}
   .ie-items .del-row{
     display:flex !important;align-items:center;justify-content:center;text-align:center;
-    margin-top:8px;padding:10px !important;border:1px solid var(--red);border-radius:8px;font-weight:600;
+    margin-top:6px;padding:6px 10px !important;border:1px solid var(--line);border-radius:6px;
+    font-weight:500;font-size:12px !important;color:var(--ink-soft) !important;opacity:0.7;
   }
+  .ie-items .del-row:active{border-color:var(--red);color:var(--red) !important;opacity:1;}
   .ie-items .del-row-label{display:inline;}
   .ie-items .ie-linea-resumen-td{display:none;} /* solo se ve cuando la tarjeta está plegada, ver abajo */
   .ie-items tbody tr.colapsada{padding:10px 12px;cursor:pointer;}
@@ -2804,7 +2806,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.34</div>
+        <div class="sub" id="version-badge">V4.35</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -17460,7 +17462,21 @@ function openDocumentViewer(id){
     marcarCambioCliente();
   }
   const hayLineasNuevas = doc.items.some(i=>i.nuevo);
-  doc.items.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, i.unidad||undefined, i.fecha, i.nuevo||false));
+  // Orden: más reciente primero (invertir cronológico)
+  const itemsOrdenados = [...doc.items].sort((a,b)=>{
+    if(!a.fecha && !b.fecha) return 0;
+    if(!a.fecha) return 1;
+    if(!b.fecha) return -1;
+    return b.fecha.localeCompare(a.fecha);
+  });
+  itemsOrdenados.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, i.unidad||undefined, i.fecha, i.nuevo||false));
+  // Colapsar todas las líneas excepto las nuevas (naranjas)
+  setTimeout(()=>{
+    document.querySelectorAll('#ie-items-body tr').forEach(tr=>{
+      if(!tr.classList.contains('linea-nueva')) tr.classList.add('colapsada');
+      actualizarResumenLinea(tr.id);
+    });
+  }, 50);
   // Banner verificación si hay líneas pendientes
   const bannerEl = document.getElementById('ie-banner-nuevas') || (() => {
     const b = document.createElement('div');
