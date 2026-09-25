@@ -339,6 +339,9 @@ table{border-collapse:collapse;width:100%;}
 
 /* Bloquear scroll del fondo cuando hay overlay abierto */
 body.overlay-open { overflow:hidden; position:fixed; width:100%; }
+/* ======= LÍNEAS NUEVAS (motor de entradas, pendiente verificar) ======= */
+.linea-nueva { background: rgba(255,160,0,.13) !important; }
+.linea-nueva td { border-left: 3px solid var(--orange); }
 /* ======= NOTIFICACIONES DE CAMBIOS ======= */
 .notif-card {
   background:var(--paper); border-radius:14px;
@@ -2801,7 +2804,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.29</div>
+        <div class="sub" id="version-badge">V4.30</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11117,6 +11120,12 @@ async function irAElementoNotif(id){
     if(n.datos_cambio) setTimeout(()=>resaltarCambioEnDrawer(n.datos_cambio), 600);
   } else if(n.elemento_tipo==='cliente' && n.elemento_nombre){
     openClientDrawer(n.elemento_nombre);
+  } else if(n.elemento_tipo==='albaran' && n.elemento_id){
+    // Navegar a albaranes y abrir el editor directamente
+    const btnAlb = document.querySelector('[data-view="albaranes"]');
+    if(btnAlb) btnAlb.click();
+    await new Promise(r=>setTimeout(r,600));
+    openDocumentViewer(n.elemento_id);
   } else if(n.elemento_tipo==='trabajo' && n.elemento_id){
     abrirTrabajoDesdeId?.(n.elemento_id);
   }
@@ -14168,11 +14177,12 @@ function sincronizarConceptoConNumero(){
 }
 
 const UNIDADES = ['ud','h','m³','m²','ml','km','día','servicio','transporte'];
-function addItemRow(qty, concept, price, machine, unidad, fecha){
+function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva){
   const id = 'item'+(itemSeq++);
   const tbody = document.getElementById('ie-items-body');
   const tr = document.createElement('tr');
   tr.id = id;
+  if(esNueva) tr.classList.add('linea-nueva');
   const comboId = 'combo-'+id;
   tr.innerHTML = `
     <td class="ie-linea-resumen-td" onclick="document.getElementById('${id}').classList.remove('colapsada')"></td>
@@ -17448,7 +17458,36 @@ function openDocumentViewer(id){
     window.__valoresClienteOriginales = leerCamposClienteActuales();
     marcarCambioCliente();
   }
-  doc.items.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, undefined, i.fecha));
+  const hayLineasNuevas = doc.items.some(i=>i.nuevo);
+  doc.items.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, i.unidad||undefined, i.fecha, i.nuevo||false));
+  // Banner verificación si hay líneas pendientes
+  const bannerEl = document.getElementById('ie-banner-nuevas') || (() => {
+    const b = document.createElement('div');
+    b.id = 'ie-banner-nuevas';
+    b.style.cssText = 'display:none;margin:8px 0 4px;padding:8px 12px;background:rgba(255,160,0,.15);border-left:4px solid var(--orange);border-radius:6px;font-size:13px;display:flex;align-items:center;gap:10px;';
+    b.innerHTML = '<span>🟡 <b>Líneas añadidas por el motor</b> — revisa y confirma.</span><button class="btn sm primary" id="ie-btn-verificar">✓ Verificado</button>';
+    const tb = document.getElementById('ie-items-body');
+    tb.parentElement.parentElement.insertBefore(b, tb.parentElement);
+    return b;
+  })();
+  if(hayLineasNuevas){
+    bannerEl.style.display = 'flex';
+    const btnV = document.getElementById('ie-btn-verificar');
+    if(btnV) btnV.onclick = async () => {
+      if(!sb||!editingDocId) return;
+      const {data:docActual} = await sb.from('documentos_economicos').select('conceptos').eq('id',editingDocId).single();
+      if(!docActual) return;
+      const conceptosLimpios = (docActual.conceptos||[]).map(c=>{ const {nuevo:_, origen_entrada_id:__, ...resto}=c; return resto; });
+      await sb.from('documentos_economicos').update({conceptos: conceptosLimpios}).eq('id', editingDocId);
+      await sb.from('sistema_notificaciones').update({verificado:true, verificado_at: new Date().toISOString(), leida:true}).eq('elemento_id', editingDocId).eq('verificado', false);
+      bannerEl.style.display = 'none';
+      document.querySelectorAll('#ie-items-body tr.linea-nueva').forEach(tr=>tr.classList.remove('linea-nueva'));
+      mostrarToast('Líneas verificadas ✓','ok');
+      cargarNotificaciones();
+    };
+  } else {
+    bannerEl.style.display = 'none';
+  }
   colapsarPanelLineasPorDefecto();
   document.getElementById('ni-docnum').value = doc.num;
   document.getElementById('ni-suggest').textContent = doc.status==='Borrador' ? '(borrador sin numerar en firme)' : '';
