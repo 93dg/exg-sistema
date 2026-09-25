@@ -2804,7 +2804,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.32</div>
+        <div class="sub" id="version-badge">V4.33</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11064,7 +11064,7 @@ function renderNotificaciones(lista){
       const fechaHora = dt.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
       const tituloNotif = n.mensaje_original ? svgEsc(n.mensaje_original.slice(0,80)) : svgEsc(n.accion_realizada||'Acción realizada');
       const subtituloNotif = n.decision_sistema ? svgEsc(n.decision_sistema.slice(0,90)) : '';
-      const etiquetaBtn = n.elemento_tipo==='albaran' ? '📄 Abrir albarán' : n.elemento_tipo==='trabajo' ? '💼 Abrir trabajo' : n.elemento_nombre ? svgEsc(n.elemento_nombre.slice(0,30)) : 'Ver';
+      const etiquetaBtn = n.elemento_tipo==='albaran' ? '👁 Ver cambios' : n.elemento_tipo==='trabajo' ? '💼 Abrir trabajo' : n.elemento_nombre ? svgEsc(n.elemento_nombre.slice(0,30)) : 'Ver';
       return `<div class="notif-card ${n.leida?'':'no-leida'}">
         <div class="nc-hora">${fechaHora}</div>
         <div class="nc-accion">${tituloNotif}</div>
@@ -11091,7 +11091,7 @@ function abrirDetalleNotif(id){
       <div><b>✅ Cambio realizado:</b><br>${svgEsc(n.accion_realizada||'—')}</div>
       ${n.elemento_nombre?`<div><b>📍 Elemento:</b> ${svgEsc(n.elemento_nombre)} (${svgEsc(n.seccion||'')})</div>`:''}
       ${n.datos_cambio&&n.datos_cambio.lineas_nuevas?`<div style="font-size:12px;color:var(--ink-soft);">📊 ${n.datos_cambio.lineas_nuevas} líneas añadidas${n.datos_cambio.trabajo_creado?' · Trabajo '+svgEsc(n.datos_cambio.trabajo_creado):''}</div>`:''}
-      ${n.elemento_id&&n.seccion?`<button class="btn primary" onclick="cerrarModalGenerico();irAElementoNotif('${n.id}')">↗ Ir al elemento</button>`:''}
+      ${n.elemento_id?`<button class="btn primary" onclick="cerrarModalGenerico();irAElementoNotif('${n.id}')">👁 Ver cambios</button>`:''}
     </div>`
   );
 }
@@ -11112,16 +11112,13 @@ async function irAElementoNotif(id){
   } else if(n.elemento_tipo==='cliente' && n.elemento_nombre){
     openClientDrawer(n.elemento_nombre);
   } else if(n.elemento_tipo==='albaran' && n.elemento_id){
-    // Si el documento ya está en caché, abrir el popup directamente sin navegar
-    if(documentosRealesById[n.elemento_id]){
-      openDocumentViewer(n.elemento_id);
-    } else {
-      // Cargar la sección de albaranes en background para poblar la caché, luego abrir popup
-      const btnAlb = document.querySelector('[data-view="albaranes"]');
-      if(btnAlb) btnAlb.click();
-      await new Promise(r=>setTimeout(r,800));
-      openDocumentViewer(n.elemento_id);
+    // Cargar caché si hace falta, sin cambiar de sección, luego abrir popup
+    if(!documentosRealesById[n.elemento_id]){
+      await cargarDocumentosEconomicosReales();
+      await new Promise(r=>setTimeout(r,300));
     }
+    openDocumentViewer(n.elemento_id);
+    return; // no navegar a ninguna sección
   } else if(n.elemento_tipo==='trabajo' && n.elemento_id){
     abrirTrabajoDesdeId?.(n.elemento_id);
   }
@@ -17413,7 +17410,8 @@ function openDocumentViewer(id){
   document.getElementById('ie-tratamiento-iva').value = doc.tratamientoIva || 'normal';
   cambiarTratamientoIva();
   setClientPickerValue('ni', doc.client);
-  document.getElementById('ni-job').value = doc.obra_texto || ((doc.job && doc.job!=='—') ? doc.job : '');
+  // Campo obra: mostrar obra_texto si existe, si no el nombre del cliente. Nunca el código de trabajo.
+  document.getElementById('ni-job').value = doc.obra_texto || (doc.client && doc.client!=='—' ? doc.client : '');
   document.getElementById('ni-date').value = doc.dateRaw;
   fijarFormaPago(doc.payment);
   document.getElementById('ni-iban').value = doc.iban;
