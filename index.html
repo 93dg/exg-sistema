@@ -329,6 +329,8 @@ table{border-collapse:collapse;width:100%;}
 }
 /* ── FIN CLIENTES MÓVIL sticky bar ──────────────────────────────────────── */
 
+/* Bloquear scroll del fondo cuando hay overlay abierto */
+body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 /* ======= NOTIFICACIONES DE CAMBIOS ======= */
 .notif-card {
   background:var(--paper); border-radius:14px;
@@ -420,6 +422,8 @@ table{border-collapse:collapse;width:100%;}
 #ai-historial-detalle-overlay{z-index:5400;} /* tiene que estar por delante del propio panel del asistente (5300), si no se abre "por detrás" y parece que no hace nada */
 .drawer{
   background:var(--paper);width:600px;max-width:92vw;max-height:90vh;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch; /* iOS scroll dentro del drawer */
+  overscroll-behavior:contain;      /* evita que el scroll traspase al fondo */
   border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.35);
 }
 .drawer-head{
@@ -2788,7 +2792,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.03</div>
+        <div class="sub" id="version-badge">V4.04</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13065,13 +13069,14 @@ function openClientDrawer(name){
       }).join('') : '<tr><td colspan="5" class="empty">Sin documentos todavía</td></tr>') + '</table>';
   }
   document.getElementById('client-overlay').classList.add('active');
+  document.body.classList.add('overlay-open');
   cargarDireccionesCliente(c.id);
   } catch(err){
     console.error('openClientDrawer CRASH:', err.message, '\nStack:', err.stack, '\nname arg:', name);
     mostrarToast('Error ficha: '+err.message);
   }
 }
-function closeClientDrawer(){ document.getElementById('client-overlay').classList.remove('active'); }
+function closeClientDrawer(){ document.getElementById('client-overlay').classList.remove('active'); document.body.classList.remove('overlay-open'); }
 
 async function cargarDireccionesCliente(entidadId){
   const bloque = document.getElementById('c-direcciones-block');
