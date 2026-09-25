@@ -419,7 +419,7 @@ table{border-collapse:collapse;width:100%;}
 #confirmar-overlay, #modal3-overlay, #newjob-overlay, #picker-overlay, #form-picker-overlay, #newclient-overlay{z-index:5200;} /* estos se abren normalmente DESDE DENTRO del editor de documentos (5150) — tienen que quedar por encima siempre, si no se montan uno encima de otro en vez de taparlo */
 #ai-historial-detalle-overlay{z-index:5400;} /* tiene que estar por delante del propio panel del asistente (5300), si no se abre "por detrás" y parece que no hace nada */
 .drawer{
-  background:var(--paper);width:600px;max-width:92vw;max-height:90vh;overflow-y:auto;
+  background:var(--paper);width:600px;max-width:92vw;max-height:90vh;overflow-y:auto;overflow-x:hidden;
   border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.35);
 }
 .drawer-head{
@@ -2788,7 +2788,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.97</div>
+        <div class="sub" id="version-badge">V3.98</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4684,10 +4684,11 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <div class="field"><div class="l">Dirección</div><input class="search-box" style="width:100%;" id="c-direccion"></div>
           <div class="field"><div class="l">Población</div><input class="search-box" style="width:100%;" id="c-poblacion"></div>
           <div class="field"><div class="l">Provincia</div><input class="search-box" style="width:100%;" id="c-provincia"></div>
+          <div class="field"><div class="l">Código postal</div><input class="search-box" style="width:100%;" id="c-cp" maxlength="5" pattern="\d{5}" placeholder="14000"></div>
         </div>
         <button class="btn primary" style="margin-top:10px;" onclick="guardarContactoCliente()">Guardar datos de contacto</button>
         <div class="sub-t" id="c-contacto-status" style="margin-top:6px;"></div>
-        <div class="two-col-note" style="margin-top:8px;">¿Has comprobado que algún dato no aparece en ninguno de sus documentos? <span onclick="marcarCampoNoDisponible()" style="color:var(--orange);cursor:pointer;text-decoration:underline;">Marcar campo como no disponible en origen</span></div>
+
       </div>
       <div class="block" id="c-direcciones-block" style="margin-bottom:20px;display:none;">
         <h4>Otras direcciones de este cliente</h4>
@@ -4720,7 +4721,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </div>
       <div class="block">
         <h4>Actividad por año</h4>
-        <table class="tbl" id="c-anios-tbl"><tr><th>Año</th><th>Documentos</th><th class="num">Facturado</th></tr></table>
+        <div style="overflow-x:auto;"><table class="tbl" id="c-anios-tbl" style="min-width:0;width:100%;"><tr><th>Año</th><th>Documentos</th><th class="num">Facturado</th></tr></table></div>
       </div>
       <div class="block">
         <h4>Trabajos de este cliente</h4>
@@ -12089,6 +12090,10 @@ async function confirmarFusionDesdeComparacion(){
     // El array global se llama igual — usar referencia directa via window si hace falta
     if(window.clientes && Array.isArray(window.clientes)){
       window.clientes.splice(0, window.clientes.length, ...window.clientes.filter(cli=>!idsEliminados.includes(cli.id)));
+      // Actualizar tipo visual del cliente principal si cambió
+      const claseMap2 = {'persona':'Particular','empresa':'Empresa','organismo':'Entidad','obra':'Particular','nombre_parcial':'Particular','dudoso_con_nif':'Particular','direccion':'Particular'};
+      const cPrincipal = window.clientes.find(cl=>cl.id===principal.id);
+      if(cPrincipal && principal.clase_nombre) cPrincipal.type = claseMap2[principal.clase_nombre]||cPrincipal.type;
     }
     document.querySelectorAll('.clientes-sel-chk:checked').forEach(cb=>cb.checked=false);
     actualizarSeleccionClientes();
@@ -12351,7 +12356,14 @@ const FJ = [ // formas jurídicas: tokens INDEPENDIENTES — no detecta dentro d
 function normRazonSocial(n){
   if(!n) return n;
   let r = n.trim().toUpperCase().replace(/\s+/g,' ');
-  r = r.replace(/,\s*(S\.?L\.?|S\.?A\.?|C\.?B\.?|S\.?C\.?P\.?)/gi,' $1'); // quitar coma antes de forma jurídica
+  // Normalizar variantes con comas, guiones, espacios: "S,L" → "S.L.", "S L" → "S.L.", "S-L" → "S.L."
+  r = r.replace(/,\s*(S\.?L\.?|S\.?A\.?|C\.?B\.?|S\.?C\.?P\.?|S\.?A\.?L\.?)/gi,' $1'); // coma antes de forma
+  r = r.replace(/(?<![\w.])S[,\s-]+L[,\s-]*U[.,\s]*(?![\w])/gi,'S.L.U.');
+  r = r.replace(/(?<![\w.])S[,\s-]+A[,\s-]*L[.,\s]*(?![\w])/gi,'S.A.L.');
+  r = r.replace(/(?<![\w.])S[,\s-]+C[,\s-]*P[.,\s]*(?![\w])/gi,'S.C.P.');
+  r = r.replace(/(?<![\w.])S[,\s-]+L[.,\s]*(?![\w])/gi,'S.L.');
+  r = r.replace(/(?<![\w.])S[,\s-]+A[.,\s]*(?![\w])/gi,'S.A.');
+  r = r.replace(/(?<![\w.])C[,\s-]+B[.,\s]*(?![\w])/gi,'C.B.');
   FJ.forEach(([re,rep])=>{ r = r.replace(re, rep); });
   r = r.replace(/\.{2,}/g,'.'); // eliminar puntos dobles/triples
   r = r.replace(/^\./,'');        // quitar punto inicial si lo hubiera
@@ -12475,6 +12487,19 @@ async function revisarClientesAuto(forzar=false){
       const dirNorm=e.direccion?normDireccion(e.direccion):null;
       if(dirNorm&&dirNorm!==(e.direccion||'').trim()) patch.direccion=dirNorm;
 
+      // Detectar "POBLACIÓN CP (PROVINCIA)" y separar campos mezclados
+      const pobRaw = e.poblacion||'';
+      if(pobRaw && !e.cp){
+        // Patrón: "TEXTO 12345 (PROVINCIA)"
+        const m1 = pobRaw.match(/^(.+?)\s+(\d{5})\s*\(?([A-Za-záéíóúÁÉÍÓÚ][A-Za-záéíóúÁÉÍÓÚñÑ\s]+?)\)?$/);
+        if(m1){ patch.poblacion=m1[1].trim().toUpperCase(); patch.cp=m1[2]; if(!e.provincia) patch.provincia=m1[3].trim().toUpperCase(); }
+      }
+      if(pobRaw && !e.provincia && !(patch.provincia)){
+        // Patrón: "TEXTO (PROVINCIA)"
+        const m2 = pobRaw.match(/^(.+?)\s*\(([A-Za-záéíóúÁÉÍÓÚ][A-Za-záéíóúÁÉÍÓÚñÑ\s-]+?)\)\s*$/);
+        if(m2){ patch.poblacion=m2[1].trim().toUpperCase(); patch.provincia=m2[2].trim().toUpperCase(); }
+      }
+
       // Deducir provincia+CP desde población
       const pobKey=((patch.poblacion||e.poblacion)||'').trim().toUpperCase();
       if(!e.provincia&&pobKey&&mapPoblProv[pobKey]) patch.provincia=mapPoblProv[pobKey];
@@ -12488,11 +12513,13 @@ async function revisarClientesAuto(forzar=false){
 
       // Auto-clasificar tipo basado en razón social y datos
       const nomUp=(patch.nombre||e.nombre||'').toUpperCase();
-      // Forma jurídica como token independiente: (?<!\w) garantiza que no está dentro de una palabra
-      const esSociedad=/(?<!\w)(S\.?L\.?U?\.?|S\.?A\.?U?\.?|S\.?L\.?|S\.?A\.?|C\.?B\.?|S\.?C\.?P\.)(?!\w)|SOCIEDAD|COOPERATIVA/i.test(nomUp);
-      const esAyuntamiento=/AYUNTAMIENTO|EXCMO\.?|EXMO\.?|DIPUTACION|JUNTA DE|CONSEJERIA|MINISTERIO|CONSORCIO|MANCOMUNIDAD/i.test(nomUp);
-      if(esAyuntamiento && e.tipo!=='ayuntamiento') patch.tipo='ayuntamiento';
-      else if(esSociedad && e.tipo==='particular') patch.tipo='empresa';
+      // Clasificar usando clase_nombre (Particular/Empresa/Entidad)
+      const esSociedad=/(?<!\w)(S\.L\.|S\.A\.|S\.L\.U\.|S\.A\.L\.|C\.B\.|S\.C\.P\.|S\.A\.U\.)(?!\w)|\bCOOPERATIVA\b|\bSOCIEDAD\b/i.test(nomUp);
+      const esOrganismo=/\bAYUNTAMIENTO\b|\bEXCMO\b|\bEXMO\b|\bDIPUTACION\b|\bMANCOMUNIDAD\b|\bCONSORCIO\b|\bJUNTA DE\b|\bASSOCIACION\b|\bFUNDACION\b|^AAVV\b|\bA\.V\.V\./i.test(nomUp);
+      const esDireccion=/^(C\/|CL\/|AVDA\.|CTRA\.|PL\.|URB\.)/i.test(nomUp);
+      const claseActual = e.clase_nombre;
+      const claseNueva = esDireccion?'direccion':esOrganismo?'organismo':esSociedad?'empresa':null;
+      if(claseNueva && claseNueva!==claseActual) patch.clase_nombre=claseNueva;
 
       // Normalizar CP a 5 dígitos
       if(e.cp){ const cpL=String(e.cp).replace(/[^0-9]/g,'').padStart(5,'0').slice(0,5); if(cpL!==String(e.cp).trim()) patch.cp=cpL; }
@@ -12585,9 +12612,18 @@ async function revisarClientesAuto(forzar=false){
 
   // ── 4. Actualizar UI inmediatamente ─────────────────────────────────────
   if(corregidos>0){
+    const claseMapLocal = {'persona':'Particular','empresa':'Empresa','organismo':'Entidad','obra':'Particular','nombre_parcial':'Particular','dudoso_con_nif':'Particular','direccion':'Particular'};
     for(const e of entidades){
       const cli=clientes.find(x=>x.id===e.id);
-      if(cli){ cli.name=e.nombre||cli.name; cli.nif=e.nif||''; cli.poblacion=e.poblacion||''; cli.provincia=e.provincia||''; cli.cp=e.cp||''; }
+      if(cli){
+        cli.name=e.nombre||cli.name;
+        cli.nif=e.nif||'';
+        cli.poblacion=e.poblacion||'';
+        cli.provincia=e.provincia||'';
+        cli.cp=e.cp||'';
+        if(e.clase_nombre) cli.type=claseMapLocal[e.clase_nombre]||cli.type;
+        cli.clase_nombre=e.clase_nombre||cli.clase_nombre;
+      }
     }
     renderClientesTable();
   }
@@ -12855,6 +12891,7 @@ async function cargarEntidadesReales(){
     const {data} = await sb.from('entidades').select('*').order('created_at',{ascending:false});
     (data||[]).forEach(e=>{
       const tipoMap = {proveedor:'Proveedor', ayuntamiento:'Ayuntamiento', empresa:'Empresa', particular:'Particular', cliente:'Particular'};
+      const claseMap = {'persona':'Particular','empresa':'Empresa','organismo':'Entidad','obra':'Particular','nombre_parcial':'Particular','dudoso_con_nif':'Particular','direccion':'Particular'};
       const existente = clientes.find(c=>c.name===e.nombre);
       if(existente){
         existente.id = e.id;
@@ -12868,7 +12905,7 @@ async function cargarEntidadesReales(){
         existente.cp = e.cp || existente.cp || '';
         existente.provincia = MAY(e.provincia) || existente.provincia || '';
       } else {
-        clientes.push({id: e.id, name: MAY(e.nombre), type: tipoMap[(e.tipo||'').toLowerCase()] || 'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio: e.prioridad||'media', prioManual: !!e.prioridad_manual, prioRazon: e.prioridad_razon||'', nif: e.nif||'', email: e.email||'', telefono: e.telefono||'', direccion: MAY(e.direccion), poblacion: MAY(e.poblacion), provincia: MAY(e.provincia), cp: e.cp||'', clase_nombre: e.clase_nombre||''});
+        clientes.push({id: e.id, name: MAY(e.nombre), type: claseMap[e.clase_nombre] || tipoMap[(e.tipo||'').toLowerCase()] || 'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio: e.prioridad||'media', prioManual: !!e.prioridad_manual, prioRazon: e.prioridad_razon||'', nif: e.nif||'', email: e.email||'', telefono: e.telefono||'', direccion: MAY(e.direccion), poblacion: MAY(e.poblacion), provincia: MAY(e.provincia), cp: e.cp||'', clase_nombre: e.clase_nombre||''});
       }
     });
     renderClientesTable();
@@ -12896,11 +12933,12 @@ async function guardarContactoCliente(){
     direccion: document.getElementById('c-direccion').value.trim() || null,
     poblacion: document.getElementById('c-poblacion').value.trim() || null,
     provincia: document.getElementById('c-provincia').value.trim() || null,
+    cp: document.getElementById('c-cp')?.value.trim().replace(/[^0-9]/g,'').slice(0,5) || null,
   };
   const {error} = await sb.from('entidades').update(payload).eq('id', clientDrawerAbiertoId);
   if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color='var(--red)'; return; }
   const c = clientes.find(x=>x.id===clientDrawerAbiertoId);
-  if(c){ const oldName=c.name; Object.assign(c, payload); if(payload.nombre) c.name=payload.nombre; if(payload.nombre&&oldName!==payload.nombre) renderClientesTable(); }
+  if(c){ const oldName=c.name; Object.assign(c, payload); if(payload.nombre) c.name=payload.nombre; if(payload.cp!==undefined) c.cp=payload.cp||''; if(payload.nombre&&oldName!==payload.nombre) renderClientesTable(); renderClientesTable(); }
   statusEl.textContent = 'Guardado ✓'; statusEl.style.color='var(--green)';
 }
 function openClientDrawer(name){
@@ -12908,7 +12946,7 @@ function openClientDrawer(name){
   document.getElementById('c-type').textContent = c.type;
   document.getElementById('c-name').textContent = c.name;
   const niEl=document.getElementById('c-nombre-input'); if(niEl) niEl.value=c.name||'';
-  document.getElementById('c-zone').textContent = c.zone;
+
   document.getElementById('c-tarifa').textContent = c.tarifa;
   const PRIO_LABEL = {alta:'Alta', media:'Media', baja:'Baja'};
   document.getElementById('c-prio').textContent = (PRIO_LABEL[(c.prio||'').toLowerCase()] || c.prio) + (c.prioManual ? ' (Manual)' : ' (Automática)');
@@ -12921,6 +12959,7 @@ function openClientDrawer(name){
   document.getElementById('c-direccion').value = c.direccion || '';
   document.getElementById('c-poblacion').value = c.poblacion || '';
   document.getElementById('c-provincia').value = c.provincia || '';
+  const cpEl=document.getElementById('c-cp'); if(cpEl) cpEl.value=c.cp||'';
   document.getElementById('c-contacto-status').textContent = '';
   clientDrawerAbiertoId = c.id;
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
