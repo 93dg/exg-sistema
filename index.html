@@ -2731,7 +2731,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.83</div>
+        <div class="sub" id="version-badge">V3.84</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8207,6 +8207,84 @@ function toggleDictado(){
   micBtn.classList.add('recording');
 }
 
+// ════════════════════════════════════════════════════════════
+// SISTEMA EXG — CAMBIOS, CONOCIMIENTO Y CIERRE
+// ════════════════════════════════════════════════════════════
+
+// Registra un trabajo realizado por Claude en cambios_exg
+async function registrarCambioEXG({origen='CHAT_DIRECTO', origenId=null, seccion=null, seccionesAfectadas=[], descripcion, causa=null, versionInicial=null, versionFinal=null, resultado='ok', pendientes=[], conocimientoId=null}){
+  if(!sb) return null;
+  const {data,error} = await sb.from('cambios_exg').insert({
+    origen, origen_id: origenId, seccion: seccion||seccionActualNombre(),
+    secciones_afectadas: seccionesAfectadas, descripcion, causa,
+    version_inicial: versionInicial, version_final: versionFinal,
+    resultado, pendientes, conocimiento_id: conocimientoId,
+    cerrado_at: new Date().toISOString()
+  }).select('id').single();
+  if(error) console.warn('registrarCambioEXG error:', error);
+  return data?.id || null;
+}
+
+// Registra conocimiento generalizable en conocimiento_exg
+async function registrarConocimientoEXG({patron, descripcion, alcance='LOCAL', seccionOrigen=null, seccionesAplicables=[], condicionDeteccion=null, accion=null, puedeAutoaplicarse=false, requiereConfirmacion=true, nivelRiesgo='bajo', pendienteEn=[], origenCambioId=null, origenReporteId=null}){
+  if(!sb) return null;
+  // Buscar si ya existe un patrón similar para no duplicar
+  const {data:existentes} = await sb.from('conocimiento_exg').select('id,patron,version_regla').eq('activo',true);
+  const existente = (existentes||[]).find(e=>{
+    const normE=(e.patron||'').toLowerCase().replace(/[^a-záéíóú0-9 ]/g,'');
+    const normN=patron.toLowerCase().replace(/[^a-záéíóú0-9 ]/g,'');
+    return normE===normN || (normE.length>10 && normN.includes(normE.slice(0,20)));
+  });
+  if(existente){
+    // Actualizar existente — incrementar versión
+    const {data} = await sb.from('conocimiento_exg').update({
+      version_regla: (existente.version_regla||1)+1,
+      ultima_validacion: new Date().toISOString(),
+      veces_reutilizado: sb.rpc ? undefined : undefined, // incrementar en trigger si hay
+    }).eq('id',existente.id).select('id').single();
+    console.log('EXG: conocimiento actualizado (ya existía):', existente.patron);
+    return existente.id;
+  }
+  const {data,error} = await sb.from('conocimiento_exg').insert({
+    patron, descripcion, alcance, seccion_origen: seccionOrigen||seccionActualNombre(),
+    secciones_aplicables: seccionesAplicables, condicion_deteccion: condicionDeteccion,
+    accion, puede_autoaplicarse: puedeAutoaplicarse, requiere_confirmacion: requiereConfirmacion,
+    nivel_riesgo: nivelRiesgo, pendiente_en: pendienteEn,
+    ultima_validacion: new Date().toISOString(),
+    origen_cambio_id: origenCambioId, origen_reporte_id: origenReporteId
+  }).select('id').single();
+  if(error) console.warn('registrarConocimientoEXG error:', error);
+  return data?.id || null;
+}
+
+// CIERRE EXG: checklist que debe ejecutarse al terminar cualquier modificación de código
+// Devuelve true si todo OK, false si hay bloqueantes
+async function cierreEXG({descripcion, origen='CHAT_DIRECTO', versionFinal, seccionesAfectadas=[], causa=null, pendientes=[], conocimiento=null}){
+  const checks = {
+    version: !!versionFinal,
+    descripcion: !!descripcion,
+  };
+  const bloqueantes = Object.entries(checks).filter(([,v])=>!v).map(([k])=>k);
+  if(bloqueantes.length){
+    console.warn('CIERRE EXG bloqueado — faltan:', bloqueantes);
+    return false;
+  }
+  // 1. Registrar el cambio
+  const cambioId = await registrarCambioEXG({origen, descripcion, causa, versionFinal, seccionesAfectadas, pendientes, resultado: pendientes.length?'parcial':'ok'});
+  // 2. Registrar conocimiento si lo hay
+  let conocimientoId = null;
+  if(conocimiento){
+    conocimientoId = await registrarConocimientoEXG({...conocimiento, origenCambioId: cambioId});
+  }
+  // 3. Notificación visual opcional
+  console.log(`✓ CIERRE EXG — ${versionFinal} — ${descripcion}`);
+  return true;
+}
+
+// ════════════════════════════════════════════════════════════
+// FIN SISTEMA EXG
+// ════════════════════════════════════════════════════════════
+
 async function guardarReporteBug(){
   const texto = document.getElementById('report-bug-text').value.trim();
   const statusEl = document.getElementById('report-bug-status');
@@ -8246,7 +8324,32 @@ async function guardarReporteBug(){
       setTimeout(closeReportBug, 800);
       return;
     }
-    const {error} = await sb.from('sistema').insert({tipo:'mejora', data:{texto: `[${seccion}] ${texto}`, captura_url: capturaUrl, estado:'pendiente'}});
+    const protocoloEXG = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PROTOCOLO EXG — REPORTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Este reporte forma parte del sistema de aprendizaje de EXG.
+No te limites a solucionar el problema concreto.
+Después de investigar, implementar y comprobar:
+• Determina la causa raíz
+• Identifica si existe un patrón reutilizable
+• Si hay aprendizaje generalizable → regístralo en conocimiento_exg
+• Indica cómo detectarlo en el futuro sin IA
+• Determina en qué otras secciones puede aparecer el mismo problema
+• Clasifica alcance: LOCAL / COMPONENTE / GLOBAL
+• Registra el cambio en cambios_exg con origen REPORTE_WEB
+• Ejecuta CIERRE EXG antes de terminar
+• Actualiza y sincroniza la versión obligatoriamente
+El objetivo no es solo reparar. Es que EXG aprenda para no volver a necesitarte en este patrón.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    const {error} = await sb.from('sistema').insert({tipo:'mejora', data:{
+      texto: `[${seccion}] ${texto}`,
+      captura_url: capturaUrl,
+      estado: 'pendiente',
+      protocolo_exg: protocoloEXG,
+      seccion: seccion,
+      created_context: {url: window.location.href, timestamp: new Date().toISOString()}
+    }});
     if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
     statusEl.textContent = 'Guardado ✓'; statusEl.style.color = 'var(--green)';
     setTimeout(closeReportBug, 800);
@@ -9350,8 +9453,11 @@ async function subirDocumentoATriage(fileList){
     const dest = 'sin-clasificar/' + Date.now() + '-' + safeName;
     const {error: upErr} = await sb.storage.from(DOC_BUCKET).upload(dest, file, {upsert:true});
     if(upErr){ mostrarToast('Error al subir '+file.name+': '+upErr.message); continue; }
+    const protocoloEntrada = `PROTOCOLO EXG — ENTRADA\nProcesa esta entrada correctamente. Después: identifica el procedimiento usado; determina si hay patrón reutilizable; si existe → registra en conocimiento_exg; prepara regla determinista si el motor puede resolverlo sin IA en el futuro; registra resultado en cambios_exg; ejecuta CIERRE EXG; actualiza versión si modificaste código.`;
     const {error: insErr} = await sb.from('documentos').insert({
       storage_path: dest, nombre_archivo_original: file.name,
+      protocolo_exg: protocoloEntrada,
+      estado_exg: 'pendiente'
     });
     if(insErr){ mostrarToast('El archivo se subió, pero no se pudo apuntar en la bandeja: '+insErr.message); }
   }
