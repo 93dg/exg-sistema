@@ -125,7 +125,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver">Subir S2.0 · Sistema V3.88</div>
+    <div class="ver">Subir S2.1 · Sistema V3.90</div>
   </div>
 </header>
 
@@ -369,7 +369,14 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
         const filaCreada = await filaResp.json();
         const documentoId = filaCreada?.[0]?.id;
         const entrada = { documento_id: documentoId, kind:"texto", nota: notaTexto, created_at: ahora.toISOString() };
-        if (documentoId){ añadirAlHistorial([entrada]); pintarMensaje(entrada); }
+        if (documentoId){
+          añadirAlHistorial([entrada]); pintarMensaje(entrada);
+          fetch(`${SUPABASE_URL}/functions/v1/procesar-entrada`, {
+            method:"POST",
+            headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" },
+            body: JSON.stringify({ documento_id: documentoId })
+          }).then(() => actualizarPill(documentoId)).catch(() => {});
+        }
       } catch(e){ mostrarAviso("No se pudo enviar. Inténtalo otra vez."); }
       subiendo = false; btnEnviar.disabled = false;
       return;
@@ -405,12 +412,23 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
         pintarMensaje(entrada);
 
         if (documentoId){
-          const url = p.kind === "foto" ? `${SUPABASE_URL}/functions/v1/clasificar-documento` : `${SUPABASE_URL}/functions/v1/transcribir-audio`;
-          fetch(url, {
-            method:"POST",
-            headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" },
-            body: JSON.stringify({ documento_id: documentoId })
-          }).catch(() => {});
+          if (p.kind === "foto"){
+            fetch(`${SUPABASE_URL}/functions/v1/clasificar-documento`, {
+              method:"POST",
+              headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" },
+              body: JSON.stringify({ documento_id: documentoId })
+            }).then(() => actualizarPill(documentoId)).catch(() => {});
+          } else {
+            fetch(`${SUPABASE_URL}/functions/v1/transcribir-audio`, {
+              method:"POST",
+              headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" },
+              body: JSON.stringify({ documento_id: documentoId })
+            }).then(() => fetch(`${SUPABASE_URL}/functions/v1/procesar-entrada`, {
+              method:"POST",
+              headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" },
+              body: JSON.stringify({ documento_id: documentoId })
+            })).then(() => actualizarPill(documentoId)).catch(() => {});
+          }
         }
       } catch(e){ mostrarAviso("No se pudo enviar. Inténtalo otra vez."); }
     }
@@ -459,11 +477,33 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 
   async function actualizarPill(documentoId){
     try {
-      const resp = await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=eq.${documentoId}&select=status`, { headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY } });
+      const resp = await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=eq.${documentoId}&select=status,interpretacion`, { headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY } });
       const data = await resp.json();
-      const status = data?.[0]?.status || "pendiente";
+      const d = data?.[0];
+      const status = d?.status || "pendiente";
       const pill = document.getElementById(`pill-${documentoId}`);
       if (pill){ pill.className = "msg-pill " + status; pill.textContent = status === "pendiente" ? "Sin revisar" : status === "revisar" ? "Revisar" : status === "validado" ? "Validado" : status; }
+
+      const div = feed.querySelector(`.msg[data-doc-id="${documentoId}"]`);
+      const interp = d?.interpretacion;
+      if (div && interp){
+        let cajaInterp = div.querySelector(".msg-interpretacion");
+        if (!cajaInterp){
+          cajaInterp = document.createElement("div");
+          cajaInterp.className = "msg-interpretacion";
+          cajaInterp.style.cssText = "margin-top:6px;padding:8px 10px;border-radius:9px;font-size:12px;line-height:1.4;";
+          div.querySelector(".msg-cuerpo").appendChild(cajaInterp);
+        }
+        if (interp.estado_resolucion === "resuelto"){
+          cajaInterp.style.background = "var(--green-soft)"; cajaInterp.style.color = "var(--green)";
+          cajaInterp.textContent = `${interp.trabajo_nombre}${interp.cliente_nombre ? ' — ' + interp.cliente_nombre : ''} · ${interp.concepto}${interp.horas ? ' · ' + interp.horas + 'h' : ''}${interp.maquina ? ' · ' + interp.maquina : ''} · ${interp.fecha}`;
+        } else {
+          cajaInterp.style.background = "var(--orange-soft)"; cajaInterp.style.color = "var(--orange)";
+          cajaInterp.textContent = interp.estado_resolucion === "trabajo_no_encontrado"
+            ? "No encuentro ese trabajo — edita el mensaje para especificarlo"
+            : "No sé a qué trabajo pertenece — nombra el cliente/obra";
+        }
+      }
     } catch(e){}
   }
 
@@ -500,6 +540,13 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
       actualizarEnHistorial(documentoId, { nota: nuevoTexto || null });
       div.querySelector(".msg-texto").textContent = h.kind === "texto" ? nuevoTexto : (nuevoTexto ? `"${nuevoTexto}"` : (h.kind === "audio" ? "Audio" : "Foto"));
       wrap.remove();
+      if (h.kind === "texto" && nuevoTexto){
+        fetch(`${SUPABASE_URL}/functions/v1/procesar-entrada`, {
+          method:"POST",
+          headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" },
+          body: JSON.stringify({ documento_id: documentoId })
+        }).then(() => actualizarPill(documentoId)).catch(() => {});
+      }
     });
   }
   window.editarMensaje = editarMensaje;
