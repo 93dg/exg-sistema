@@ -2804,7 +2804,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.33</div>
+        <div class="sub" id="version-badge">V4.34</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11098,27 +11098,34 @@ function abrirDetalleNotif(id){
 
 async function irAElementoNotif(id){
   const n = _notificacionesCache.find(x=>x.id===id);
-  if(!n||!n.seccion) return;
-  // 1. Navegar a la sección
-  const btn = document.querySelector(`[data-view="${n.seccion}"]`);
-  if(btn) btn.click();
-  // 2. Pequeña pausa para que cargue la sección
-  await new Promise(r=>setTimeout(r,400));
-  // 3. Abrir el elemento concreto
-  if(n.elemento_id && n.elemento_tipo==='documento'){
-    openDocumentViewer(n.elemento_id);
-    // 4. Resaltar dato modificado después de que abra el drawer
-    if(n.datos_cambio) setTimeout(()=>resaltarCambioEnDrawer(n.datos_cambio), 600);
-  } else if(n.elemento_tipo==='cliente' && n.elemento_nombre){
-    openClientDrawer(n.elemento_nombre);
-  } else if(n.elemento_tipo==='albaran' && n.elemento_id){
-    // Cargar caché si hace falta, sin cambiar de sección, luego abrir popup
+  if(!n) return;
+
+  // Albarán: popup directo, sin navegar a ninguna sección
+  if(n.elemento_tipo==='albaran' && n.elemento_id){
     if(!documentosRealesById[n.elemento_id]){
       await cargarDocumentosEconomicosReales();
       await new Promise(r=>setTimeout(r,300));
     }
     openDocumentViewer(n.elemento_id);
-    return; // no navegar a ninguna sección
+    // Scroll a la primera línea nueva tras renderizar
+    setTimeout(()=>{
+      const primeraLinea = document.querySelector('#ie-items-body tr.linea-nueva');
+      if(primeraLinea) primeraLinea.scrollIntoView({behavior:'smooth', block:'center'});
+    }, 500);
+    return;
+  }
+
+  // Resto de tipos: navegar a la sección y abrir el elemento
+  if(!n.seccion) return;
+  const btn = document.querySelector(`[data-view="${n.seccion}"]`);
+  if(btn) btn.click();
+  await new Promise(r=>setTimeout(r,400));
+
+  if(n.elemento_id && n.elemento_tipo==='documento'){
+    openDocumentViewer(n.elemento_id);
+    if(n.datos_cambio) setTimeout(()=>resaltarCambioEnDrawer(n.datos_cambio), 600);
+  } else if(n.elemento_tipo==='cliente' && n.elemento_nombre){
+    openClientDrawer(n.elemento_nombre);
   } else if(n.elemento_tipo==='trabajo' && n.elemento_id){
     abrirTrabajoDesdeId?.(n.elemento_id);
   }
