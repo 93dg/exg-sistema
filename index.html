@@ -2799,7 +2799,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.14</div>
+        <div class="sub" id="version-badge">V4.15</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11922,14 +11922,24 @@ function actualizarSeleccionClientes(){
 async function borrarClientesSeleccionados(){
   const marcados = Array.from(document.querySelectorAll('.clientes-sel-chk:checked'));
   if(!marcados.length) return;
-  if(!(await confirmarAccion(`¿Borrar ${marcados.length} cliente(s)? No se puede deshacer.`))) return;
   if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
   const ids = marcados.map(c=>c.dataset.id).filter(Boolean);
+
+  // Verificar si algún cliente tiene documentos asociados
+  const {data:conDocs} = await sb.from('documentos_economicos').select('entidad_id').in('entidad_id', ids).limit(1);
+  if(conDocs && conDocs.length){
+    const nombres = ids.map(id=>clientes.find(c=>c.id===id)?.name||id);
+    mostrarToast('No se puede borrar: alguno tiene documentos asociados. Fusiona primero los clientes o mueve sus documentos.', 'err');
+    return;
+  }
+
+  if(!(await confirmarAccion(`¿Borrar ${ids.length} cliente(s) sin documentos? No se puede deshacer.`))) return;
   const {error} = await sb.from('entidades').delete().in('id', ids);
   if(error){ mostrarToast('Error al borrar: '+errText(error)); return; }
   ids.forEach(id=>{ const i = clientes.findIndex(c=>c.id===id); if(i>=0) clientes.splice(i,1); });
   renderClientesTable();
   actualizarSeleccionClientes();
+  mostrarToast(`${ids.length} cliente(s) eliminado(s)`, 'ok');
 }
 
 // ============ Posibles duplicados de clientes (revisión humana) ============
