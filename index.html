@@ -431,7 +431,7 @@ table{border-collapse:collapse;width:100%;}
 .drawer-head .code{color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;font-size:12px;}
 .close-x{font-size:20px;color:var(--ink-soft);padding:4px 8px;}
 .close-x:hover{color:var(--ink);}
-.drawer-body{padding:18px 22px;}
+.drawer-body{padding:18px 22px;}@media(max-width:768px){.drawer-body{padding:14px 14px;}}
 .block{margin-bottom:20px;}
 .block h4{font-size:11.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-soft);margin-bottom:10px;}
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;}
@@ -2788,7 +2788,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.98</div>
+        <div class="sub" id="version-badge">V3.99</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4725,11 +4725,11 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </div>
       <div class="block">
         <h4>Trabajos de este cliente</h4>
-        <table class="tbl" id="c-jobs-tbl"><tr><th>Código</th><th>Fecha</th><th>Estado</th><th class="num">Precio</th></tr></table>
+        <div style="overflow-x:auto;"><table class="tbl" id="c-jobs-tbl" style="min-width:0;width:100%;"><tr><th>Código</th><th>Fecha</th><th>Estado</th><th class="num">Precio</th></tr></table></div>
       </div>
       <div class="block">
         <h4>Todos los documentos</h4>
-        <table class="tbl" id="c-docs-tbl"><tr><th>Tipo</th><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th></tr></table>
+        <div style="overflow-x:auto;"><table class="tbl" id="c-docs-tbl" style="min-width:0;width:100%;"><tr><th>Tipo</th><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th></tr></table></div>
         <div class="two-col-note">Aquí aparecerán los documentos reales que subas y vincules a este cliente.</div>
       </div>
     </div>
@@ -12985,21 +12985,52 @@ function openClientDrawer(name){
     if(d.type!=='gasto') porAnio[a].total += (d.total||d.importe||0);
   });
   const aniosOrdenados = Object.entries(porAnio).sort((a,b)=> String(b[0]).localeCompare(String(a[0])));
-  document.getElementById('c-anios-tbl').innerHTML = '<tr><th>Año</th><th>Documentos</th><th class="num">Facturado</th></tr>' +
-    (aniosOrdenados.length ? aniosOrdenados.map(([a,v])=>`<tr><td class="mono">${a}</td><td>${v.n}</td><td class="num">${euro(v.total)}</td></tr>`).join('') : '<tr><td colspan="3" class="empty">Sin actividad todavía</td></tr>');
+  const aniosTbl = document.getElementById('c-anios-tbl');
+  if(isMob && aniosOrdenados.length){
+    aniosTbl.closest('div').innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+      aniosOrdenados.map(([a,v])=>`<div style="flex:1;min-width:80px;padding:8px 12px;background:var(--concrete-2);border-radius:10px;text-align:center;"><div style="font-size:13px;font-weight:700;">${a}</div><div style="font-size:11px;color:var(--ink-soft);">${v.n} docs</div><div style="font-size:12px;font-weight:700;">${euro(v.total)}</div></div>`).join('') + '</div>';
+  } else {
+    aniosTbl.innerHTML = '<tr><th>Año</th><th>Documentos</th><th class="num">Facturado</th></tr>' +
+      (aniosOrdenados.length ? aniosOrdenados.map(([a,v])=>`<tr><td class="mono">${a}</td><td>${v.n}</td><td class="num">${euro(v.total)}</td></tr>`).join('') : '<tr><td colspan="3" class="empty">Sin actividad todavía</td></tr>');
+  }
 
   const cJobs = jobs.filter(j=>j.client===name);
-  document.getElementById('c-jobs-tbl').innerHTML = '<tr><th>Código</th><th>Fecha</th><th>Estado</th><th class="num">Precio</th></tr>' +
-    (cJobs.length ? cJobs.map(j=>`<tr onclick="closeClientDrawer();openJobDrawer('${j.code}')"><td class="mono">${j.code}</td><td>${j.date}</td><td>${pill(j.state)}</td><td class="num">${j.price}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">Sin trabajos registrados</td></tr>');
+  const isMob = window.innerWidth<=768;
+  const jobsTbl = document.getElementById('c-jobs-tbl');
+  if(isMob && cJobs.length){
+    // Modo cards en móvil
+    jobsTbl.closest('div').innerHTML = cJobs.map(j=>`
+      <div onclick="closeClientDrawer();openJobDrawer('${j.code}')" style="padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:pointer;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="mono" style="font-size:13px;font-weight:700;">${j.code}</span>${pill(j.state)}
+        </div>
+        <div style="font-size:12px;color:var(--ink-soft);margin-top:3px;">${j.scheduledDate?formatFechaCorta(j.scheduledDate):j.date} · <b>${j.price}</b></div>
+      </div>`).join('');
+  } else {
+    jobsTbl.innerHTML = '<tr><th>Código</th><th>Fecha</th><th>Estado</th><th class="num">Precio</th></tr>' +
+      (cJobs.length ? cJobs.map(j=>`<tr onclick="closeClientDrawer();openJobDrawer('${j.code}')"><td class="mono">${j.code}</td><td>${j.scheduledDate?formatFechaCorta(j.scheduledDate):j.date}</td><td>${pill(j.state)}</td><td class="num">${j.price}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">Sin trabajos registrados</td></tr>');
+  }
 
   const docsOrdenados = cDocs.slice().sort((a,b)=> new Date(b.dateRaw||0) - new Date(a.dateRaw||0));
-  document.getElementById('c-docs-tbl').innerHTML = '<tr><th>Tipo</th><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th></tr>' +
-    (docsOrdenados.length ? docsOrdenados.map(d=>{
-      // mismo estado real que en Facturas/Albaranes/Presupuestos — no el campo "status"
-      // (borrador/no-borrador), que aquí siempre decía "Pendiente" sin relación con el cobro.
-      const estadoLabel = d.type==='gasto' ? (d.status||'—') : (ESTADOS_DOCUMENTO.find(o=>o[0]===(d.estado_cobro||'pendiente_enviar'))?.[1] || d.estado_cobro || '—');
-      return `<tr onclick="closeClientDrawer();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td>${tipoDocEtiqueta(d.type)}</td><td class="mono">${d.num||d.numero||'—'}</td><td>${d.dateLabel||formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td><td>${estadoLabel}</td></tr>`;
-    }).join('') : '<tr><td colspan="5" class="empty">Sin documentos todavía</td></tr>');
+  const docsTbl = document.getElementById('c-docs-tbl');
+  if(isMob && docsOrdenados.length){
+    docsTbl.closest('div').innerHTML = docsOrdenados.map(d=>{
+      const estadoLabel = d.type==='gasto'?(d.status||'—'):(ESTADOS_DOCUMENTO.find(o=>o[0]===(d.estado_cobro||'pendiente_enviar'))?.[1]||d.estado_cobro||'—');
+      return `<div onclick="closeClientDrawer();openDocumentViewer('${d.id}')" style="padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:pointer;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;font-weight:700;">${tipoDocEtiqueta(d.type)} ${d.num||d.numero||''}</span>
+          <span style="font-size:12px;font-weight:700;">${d.amountLabel}</span>
+        </div>
+        <div style="font-size:12px;color:var(--ink-soft);margin-top:3px;">${formatFechaCorta(d.dateRaw)||d.dateLabel||'—'} · ${estadoLabel}</div>
+      </div>`;
+    }).join('');
+  } else {
+    docsTbl.innerHTML = '<tr><th>Tipo</th><th>Nº</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th></tr>' +
+      (docsOrdenados.length ? docsOrdenados.map(d=>{
+        const estadoLabel = d.type==='gasto'?(d.status||'—'):(ESTADOS_DOCUMENTO.find(o=>o[0]===(d.estado_cobro||'pendiente_enviar'))?.[1]||d.estado_cobro||'—');
+        return `<tr onclick="closeClientDrawer();openDocumentViewer('${d.id}')" style="cursor:pointer;"><td>${tipoDocEtiqueta(d.type)}</td><td class="mono">${d.num||d.numero||'—'}</td><td>${formatFechaCorta(d.dateRaw)||d.dateLabel||'—'}</td><td class="num">${d.amountLabel}</td><td>${estadoLabel}</td></tr>`;
+      }).join('') : '<tr><td colspan="5" class="empty">Sin documentos todavía</td></tr>');
+  }
   document.getElementById('client-overlay').classList.add('active');
   cargarDireccionesCliente(c.id);
 }
