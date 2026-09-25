@@ -2792,7 +2792,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.09</div>
+        <div class="sub" id="version-badge">V4.10</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12327,37 +12327,40 @@ function sincronizarBusquedaClientes(v){
 function toggleDocsEnCard(id, btn){
   const card = btn.closest('.cliente-card');
   if(!card) return;
-  // Toggle si ya existe
   let panel = card.nextElementSibling;
   if(panel && panel.classList.contains('cli-docs-expand')){
     const open = panel.style.display!=='none';
-    panel.style.display = open?'none':'block';
-    btn.innerHTML = `📄 ${btn.dataset.n} <span style="font-size:10px;">${open?'▾':'▴'}</span>`;
+    panel.style.display = open?'none':'';
+    btn.querySelector('span').textContent = open?'▾':'▴';
     return;
   }
-  // Crear panel primera vez
   const docs = Object.values(documentosRealesById||{})
     .filter(d=>d.entidad_id===id)
     .sort((a,b)=>new Date(b.dateRaw||0)-new Date(a.dateRaw||0));
   panel = document.createElement('div');
   panel.className = 'cli-docs-expand';
-  panel.style.cssText = 'margin:0 0 8px;';
   panel.onclick = e=>e.stopPropagation();
-  panel.innerHTML = docs.length ? docs.map(d=>`
-    <div onclick="openDocumentViewer('${d.id}')" style="
-      display:flex;align-items:center;gap:10px;
-      background:var(--paper);border:1px solid var(--line);
-      border-radius:10px;margin:4px 0;padding:10px 12px;cursor:pointer;">
-      <span style="font-size:18px;flex:0 0 auto;">${TIPO_DOC_ICONO[d.type]||'📄'}</span>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:700;">${tipoDocEtiqueta(d.type,false)} ${d.numero||'—'}</div>
-        <div style="font-size:11px;color:var(--ink-soft);">${formatFechaCorta(d.dateRaw)||'—'}</div>
-      </div>
-      <span style="font-size:13px;font-weight:700;white-space:nowrap;">${d.amountLabel}</span>
-    </div>`).join('')
-    : '<div style="padding:8px 4px;color:var(--ink-soft);font-size:12px;">Sin documentos</div>';
+  if(!docs.length){
+    panel.innerHTML = '<div style="padding:4px 10px 10px;color:var(--ink-soft);font-size:12px;">Sin documentos asociados</div>';
+  } else {
+    // Usar la misma estructura que factura-card-movil pero sin checkbox/estado
+    panel.innerHTML = docs.map(d=>{
+      const ICO = TIPO_DOC_ICONO[d.type]||'📄';
+      const tipoNum = tipoDocEtiqueta(d.type,false)+' '+(d.numero||'—');
+      const fecha = formatFechaCorta(d.dateRaw)||'—';
+      return `<div class="factura-card-movil" style="grid-template-columns:1fr auto;grid-template-areas:'meta total' 'meta total';padding:12px 14px;margin:0 0 6px;" onclick="openDocumentViewer('${d.id}')">
+        <div class="fc-meta" style="grid-area:meta;display:flex;flex-direction:column;gap:3px;">
+          <span style="font-size:13px;font-weight:700;">${ICO} ${tipoNum}</span>
+          <span style="font-size:11px;color:var(--ink-soft);">${fecha}</span>
+        </div>
+        <div class="fc-total-block" style="grid-area:total;text-align:right;">
+          <span class="fc-total-valor">${d.amountLabel||'—'}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
   card.after(panel);
-  btn.innerHTML = `📄 ${btn.dataset.n} <span style="font-size:10px;">▴</span>`;
+  btn.querySelector('span').textContent = '▴';
 }
 function renderClientesMovil(clientesFiltrados){
   const lista = document.getElementById('clientes-lista-movil');
