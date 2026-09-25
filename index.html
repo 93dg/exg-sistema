@@ -2703,7 +2703,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.77</div>
+        <div class="sub" id="version-badge">V3.78</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2768,6 +2768,38 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="kpi"><div class="lbl">Margen mes</div><div class="val green" id="kpi-margen-mes">0,00 €</div></div>
       </div>
 
+      <!-- NOTIFICACIONES: panel plegable, por encima de Documentos -->
+      <div class="panel" id="panel-notificaciones" style="margin-bottom:12px;">
+        <div class="panel-head" onclick="toggleNotifPanel()" style="cursor:pointer;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <h3 style="margin:0;">🔔 Notificaciones</h3>
+            <span class="count" id="notif-count" style="display:none;"></span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
+            <button class="btn sm" onclick="marcarTodasLeidasNotif()">✓ Leer todo</button>
+            <button class="btn sm" onclick="cargarNotificaciones()">↻</button>
+            <span id="notif-chevron" style="color:var(--ink-soft);font-size:16px;">▾</span>
+          </div>
+        </div>
+        <div id="notif-body" style="display:none;">
+          <div class="tabla-escritorio-solo" style="padding:0;overflow-x:auto;">
+            <table class="tbl" style="width:100%;">
+              <thead><tr>
+                <th style="width:125px;text-align:left;">Fecha / Hora</th>
+                <th style="text-align:left;">Cambio realizado</th>
+                <th style="width:130px;text-align:left;">Elemento</th>
+                <th style="width:70px;"></th>
+              </tr></thead>
+              <tbody id="notif-tbody"></tbody>
+            </table>
+          </div>
+          <div class="lista-movil-solo" id="notif-lista-movil" style="padding:8px 0;"></div>
+          <div style="padding:12px 14px;text-align:center;display:none;" id="notif-empty">
+            <span style="color:var(--ink-soft);font-size:13px;">Sin notificaciones</span>
+          </div>
+        </div>
+      </div>
+
       <div class="panel">
         <div class="doc-toolbar">
           <div class="doc-toolbar-title">
@@ -2829,32 +2861,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div style="padding:10px;text-align:center;display:none;" id="control-docs-cargar-mas-movil-wrap">
             <button class="btn" onclick="controlDocsMostrarMas()">Cargar más</button>
           </div>
-        </div>
-      </div>
-
-      <!-- NOTIFICACIONES DE CAMBIOS -->
-      <div class="panel" id="panel-notificaciones" style="margin-bottom:12px;">
-        <div class="panel-head" style="justify-content:space-between;align-items:center;">
-          <h3>🔔 Notificaciones <span class="count" id="notif-count" style="display:none;"></span></h3>
-          <div style="display:flex;gap:6px;">
-            <button class="btn sm" onclick="marcarTodasLeidasNotif()">✓ Leer todo</button>
-            <button class="btn sm" onclick="cargarNotificaciones()">↻</button>
-          </div>
-        </div>
-        <div class="tabla-escritorio-solo" style="padding:0;overflow-x:auto;">
-          <table class="tbl" style="width:100%;">
-            <thead><tr>
-              <th style="width:125px;text-align:left;">Fecha / Hora</th>
-              <th style="text-align:left;">Cambio realizado</th>
-              <th style="width:130px;text-align:left;">Elemento</th>
-              <th style="width:70px;"></th>
-            </tr></thead>
-            <tbody id="notif-tbody"></tbody>
-          </table>
-        </div>
-        <div class="lista-movil-solo" id="notif-lista-movil" style="padding:8px 0;"></div>
-        <div style="padding:12px 14px;text-align:center;display:none;" id="notif-empty">
-          <span style="color:var(--ink-soft);font-size:13px;">Sin notificaciones</span>
         </div>
       </div>
 
@@ -10291,12 +10297,24 @@ async function cargarNotificaciones(){
   renderNotificaciones(data);
 }
 
+function toggleNotifPanel(){
+  const body = document.getElementById('notif-body');
+  const chev = document.getElementById('notif-chevron');
+  const open = body.style.display==='none';
+  body.style.display = open ? '' : 'none';
+  if(chev) chev.textContent = open ? '▴' : '▾';
+}
 function renderNotificaciones(lista){
   const noLeidas = lista.filter(n=>!n.leida).length;
   const badge = document.getElementById('notif-count');
   if(badge){ badge.textContent=noLeidas; badge.style.display=noLeidas?'':'none'; }
   const empty = document.getElementById('notif-empty');
-
+  // Si hay notificaciones, abrir el panel automáticamente
+  if(lista.length){
+    const body=document.getElementById('notif-body');
+    const chev=document.getElementById('notif-chevron');
+    if(body&&body.style.display==='none'){ body.style.display=''; if(chev) chev.textContent='▴'; }
+  }
   if(!lista.length){
     if(empty) empty.style.display='';
     document.getElementById('notif-tbody').innerHTML='';
