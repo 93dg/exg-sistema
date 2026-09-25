@@ -277,9 +277,11 @@ table{border-collapse:collapse;width:100%;}
   .cli-pend-sugerencias .btn { padding:4px 10px; font-size:11.5px; height:26px; }
   /* Colapso de paneles pendientes — controlado por clase open */
   #pendientes-revision-body, #posibles-duplicados-body,
-  #pend-identidad-body, #dup-clientes-body { display:none; }
+  #pend-identidad-body, #dup-clientes-body,
+  #nombres-sospechosos-body, #sin-actividad-body { display:none; }
   #pendientes-revision-body.open, #posibles-duplicados-body.open,
-  #pend-identidad-body.open, #dup-clientes-body.open { display:block; }
+  #pend-identidad-body.open, #dup-clientes-body.open,
+  #nombres-sospechosos-body.open, #sin-actividad-body.open { display:block; }
 }
 @media (min-width:769px){
   #clientes-lista-movil-wrap { display:none; }
@@ -2799,7 +2801,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.22</div>
+        <div class="sub" id="version-badge">V4.23</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3399,12 +3401,23 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
 
       <!-- Pendientes de revisión: una línea plegable -->
-      <div class="panel" id="panel-pendientes-revision" style="margin-bottom:8px;display:none;">
-        <div class="panel-head" onclick="toggleCliPanel('pendientes-revision-body')" style="cursor:pointer;padding:10px 14px;">
-          <h3 style="font-size:13px;margin:0;">📋 Datos incompletos (<span id="pendientes-revision-count">0</span>)</h3>
+      <div class="panel" id="panel-nombres-sospechosos" style="margin-bottom:8px;display:none;">
+        <div class="panel-head" onclick="toggleCliPanel('nombres-sospechosos-body')" style="cursor:pointer;padding:10px 14px;">
+          <h3 style="font-size:13px;margin:0;">📍 Nombres sospechosos (<span id="nombres-sospechosos-count">0</span>)</h3>
           <span style="color:var(--ink-soft);">▾</span>
         </div>
-        <div id="pendientes-revision-body"></div>
+        <div id="nombres-sospechosos-body"></div>
+      </div>
+      <div class="panel" id="panel-sin-actividad" style="margin-bottom:8px;display:none;">
+        <div class="panel-head" onclick="toggleCliPanel('sin-actividad-body')" style="cursor:pointer;padding:10px 14px;">
+          <h3 style="font-size:13px;margin:0;">🗑 Sin actividad (<span id="sin-actividad-count">0</span>)</h3>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="btn" style="font-size:11px;padding:3px 8px;height:24px;" onclick="event.stopPropagation();seleccionarTodosSinActividad()">Sel. todos</button>
+            <button class="btn" style="font-size:11px;padding:3px 8px;height:24px;color:var(--red);" onclick="event.stopPropagation();borrarPendientesSeleccionados()">🗑 Borrar sel.</button>
+            <span style="color:var(--ink-soft);">▾</span>
+          </div>
+        </div>
+        <div id="sin-actividad-body"></div>
       </div>
       <div class="panel" id="panel-posibles-duplicados" style="margin-bottom:8px;display:none;">
         <div class="panel-head" onclick="toggleCliPanel('posibles-duplicados-body')" style="cursor:pointer;padding:10px 14px;">
@@ -12760,54 +12773,12 @@ async function revisarClientesAuto(forzar=false){
     renderClientesTable();
   }
 
-    // ── 5. Panel pendientes: agrupado por tipo ───────────────────────────────
-  const falsos = entidades.filter(e=>(e.clase_nombre||'')==='direccion');
-  // Usar datos en memoria (evita límite de filas de Supabase)
-  const conDocReal = new Set(
-    Object.values(documentosRealesById||{})
-      .filter(d=>(parseFloat(d.importe)||0)>0 || d.num || d.numero || d.dateRaw || d.fecha_devengo)
-      .map(d=>d.entidad_id)
-  );
-  const sinDocReal = entidades.filter(e=>!conDocReal.has(e.id) && (e.clase_nombre||'')!=='direccion');
-  const panelPend=document.getElementById('panel-pendientes-revision');
-  const bodyPend=document.getElementById('pendientes-revision-body');
-  const countPend=document.getElementById('pendientes-revision-count');
-  const totalPend = falsos.length + sinDocReal.length;
-  if(totalPend && panelPend){
-    panelPend.style.display='';
-    countPend.textContent=totalPend;
-    bodyPend.classList.remove('open');
-    const mkId = e => 'rpend-'+e.id;
-    const seccion = (titulo, items, conBorrar) => !items.length?'': `
-      <div style="padding:10px 14px 6px;font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between;">
-        <span>${titulo} (${items.length})</span>
-        <div style="display:flex;gap:6px;">
-          <button class="btn" style="font-size:11px;padding:3px 8px;height:24px;" onclick="(function(){const chks=document.querySelectorAll('.rpend-chk[data-grupo=\'${titulo}\']');const allOn=[...chks].every(c=>c.checked);chks.forEach(c=>c.checked=!allOn);})()">Sel. todos</button>
-          ${conBorrar?`<button class="btn" style="font-size:11px;padding:3px 8px;height:24px;color:var(--red);" onclick="borrarPendientesSeleccionados('${titulo}')">🗑 Borrar sel.</button>`:''}
-        </div>
-      </div>
-      ${items.map(e=>`
-      <div class="cli-pend-item" style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-top:1px solid var(--line);">
-        <input type="checkbox" class="rpend-chk" data-id="${e.id}" data-nombre="${svgEsc(e.nombre||'')}" data-grupo="${titulo}" style="margin-top:3px;flex-shrink:0;">
-        <div style="flex:1;min-width:0;">
-          <div class="cli-pend-nombre">${svgEsc(e.nombre||'')}</div>
-          <div class="cli-pend-sugerencias" style="margin-top:6px;">
-            ${conBorrar?`<button class="btn" style="color:var(--red);" onclick="borrarClienteSinDocs('${e.id}','${(e.nombre||'').replace(/'/g,"\'")}')">🗑 Borrar</button>`:''}
-            <button class="btn" onclick="openClientDrawer('${(e.nombre||'').replace(/'/g,"\'")}')">Ver ficha</button>
-          </div>
-        </div>
-      </div>`).join('')}`;
-    bodyPend.innerHTML =
-      seccion('Nombres sospechosos', falsos, false) +
-      seccion('Sin actividad', sinDocReal, true);
-  } else if(panelPend){ panelPend.style.display='none'; }
+    // ── 5. Panel pendientes: poblar paneles separados ──────────────────────
+  actualizarPanelesSinActividad();
   await cargarCasosRevision();
-  const partes=[corregidos?`${corregidos} correcciones`:'',casosNuevos?`${casosNuevos} posibles duplicados`:'',totalPend?`${totalPend} pendientes`:''].filter(Boolean);
+  const partes=[corregidos?`${corregidos} correcciones`:'',casosNuevos?`${casosNuevos} posibles duplicados`:''].filter(Boolean);
   mostrarToast(partes.join(' · ')||'✓ Sin cambios','ok');
-}
-// Cargar y mostrar los casos pendientes desde BD
-async function borrarPendientesSeleccionados(grupo){
-  const chks = Array.from(document.querySelectorAll(`.rpend-chk[data-grupo="${grupo}"]:checked`));
+}ySelectorAll(`.rpend-chk[data-grupo="${grupo}"]:checked`));
   if(!chks.length){ mostrarToast('Selecciona al menos uno','err'); return; }
   const items = chks.map(c=>({id:c.dataset.id, nombre:c.dataset.nombre}));
   if(!(await confirmarAccion(`¿Borrar ${items.length} cliente(s) sin actividad? No se puede deshacer.`))) return;
@@ -12825,6 +12796,78 @@ async function borrarPendientesSeleccionados(grupo){
   renderClientesTable();
   mostrarToast(`${ok} eliminado(s)${err?` · ${err} errores`:''}`, ok>0?'ok':'err');
   revisarClientesAuto(true);
+}
+// Pobla los paneles de "Nombres sospechosos" y "Sin actividad" — se llama
+// en revisarClientesAuto Y en cargarDatosReales para que persistan al recargar
+function actualizarPanelesSinActividad(){
+  if(!window.entidades || !window.documentosRealesById) return;
+
+  // Falsos clientes (nombre parece dirección)
+  const falsos = window.entidades.filter(e=>(e.clase_nombre||'')==='direccion');
+  const panelFalsos = document.getElementById('panel-nombres-sospechosos');
+  const bodyFalsos  = document.getElementById('nombres-sospechosos-body');
+  const countFalsos = document.getElementById('nombres-sospechosos-count');
+  if(panelFalsos){
+    panelFalsos.style.display = falsos.length?'':'none';
+    if(countFalsos) countFalsos.textContent = falsos.length;
+    if(bodyFalsos && falsos.length) bodyFalsos.innerHTML = falsos.map(e=>`
+      <div class="cli-pend-item" style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-top:1px solid var(--line);">
+        <div style="flex:1;min-width:0;">
+          <div class="cli-pend-nombre">${svgEsc(e.nombre||'')}</div>
+          <div class="cli-pend-problema">El nombre parece una dirección — revisar qué cliente real corresponde</div>
+          <div class="cli-pend-sugerencias" style="margin-top:6px;">
+            <button class="btn" onclick="openClientDrawer('${(e.nombre||'').replace(/'/g,"\'")}')">Ver ficha</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  // Sin actividad: sin documentos con importe/número/fecha
+  const conDocReal = new Set(
+    Object.values(window.documentosRealesById||{})
+      .filter(d=>(parseFloat(d.importe)||0)>0 || d.num || d.numero || d.dateRaw)
+      .map(d=>d.entidad_id)
+  );
+  const sinAct = window.entidades.filter(e=>!conDocReal.has(e.id) && (e.clase_nombre||'')!=='direccion');
+  const panelSin = document.getElementById('panel-sin-actividad');
+  const bodySin  = document.getElementById('sin-actividad-body');
+  const countSin = document.getElementById('sin-actividad-count');
+  if(panelSin){
+    panelSin.style.display = sinAct.length?'':'none';
+    if(countSin) countSin.textContent = sinAct.length;
+    if(bodySin && sinAct.length) bodySin.innerHTML = sinAct.map(e=>`
+      <div class="cli-pend-item" style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-top:1px solid var(--line);">
+        <input type="checkbox" class="rpend-chk" data-id="${e.id}" data-nombre="${svgEsc(e.nombre||'')}" style="margin-top:3px;flex-shrink:0;">
+        <div style="flex:1;min-width:0;">
+          <div class="cli-pend-nombre">${svgEsc(e.nombre||'')}</div>
+          <div class="cli-pend-sugerencias" style="margin-top:6px;">
+            <button class="btn" style="color:var(--red);" onclick="borrarClienteSinDocs('${e.id}','${(e.nombre||'').replace(/'/g,"\'")}')">🗑 Borrar</button>
+            <button class="btn" onclick="openClientDrawer('${(e.nombre||'').replace(/'/g,"\'")}')">Ver ficha</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+}
+function seleccionarTodosSinActividad(){
+  const chks = document.querySelectorAll('.rpend-chk');
+  const allOn = [...chks].every(c=>c.checked);
+  chks.forEach(c=>c.checked=!allOn);
+}
+async function borrarPendientesSeleccionados(){
+  const chks = Array.from(document.querySelectorAll('.rpend-chk:checked'));
+  if(!chks.length){ mostrarToast('Selecciona al menos uno','err'); return; }
+  if(!(await confirmarAccion(`¿Borrar ${chks.length} cliente(s) sin actividad? No se puede deshacer.`))) return;
+  if(!sb) return;
+  let ok=0;
+  for(const chk of chks){
+    const id=chk.dataset.id;
+    await sb.from('documentos_economicos').delete().eq('entidad_id',id);
+    const {error} = await sb.from('entidades').delete().eq('id',id);
+    if(!error){ const i=clientes.findIndex(c=>c.id===id); if(i>=0) clientes.splice(i,1); ok++; }
+  }
+  renderClientesTable();
+  mostrarToast(`${ok} eliminado(s)`,'ok');
+  actualizarPanelesSinActividad();
 }
 async function borrarClienteSinDocs(id, nombre){
   if(!(await confirmarAccion(`¿Borrar "${nombre}"? No tiene documentos reales. No se puede deshacer.`))) return;
