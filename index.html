@@ -2804,7 +2804,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.30</div>
+        <div class="sub" id="version-badge">V4.31</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8717,20 +8717,8 @@ async function comprobarPropagacionesPendientes(){
   if(!data||!data.length) return;
   const reales = data.filter(k=>(k.pendiente_en||[]).length);
   if(!reales.length) return;
-  // Registrar como notificación en sistema_notificaciones si existe
-  if(typeof registrarNotificacion==='function'){
-    for(const k of reales){
-      await registrarNotificacion({
-        mensaje_original: `Propagación pendiente: ${k.patron}`,
-        decision_sistema: `Este patrón aprendido en ${k.seccion_origen} aún no se ha aplicado en: ${k.pendiente_en.join(', ')}`,
-        accion_realizada: 'Pendiente de implementar',
-        elemento_tipo: 'conocimiento',
-        elemento_nombre: k.patron,
-        seccion: 'sistema',
-        origen: 'motor_propagacion'
-      });
-    }
-  }
+  // Las propagaciones pendientes se loguean en consola, no en el panel de notificaciones
+  console.info('Motor EXG: propagaciones pendientes →', reales.map(k=>k.patron));
   return reales;
 }
 
@@ -11074,13 +11062,16 @@ function renderNotificaciones(lista){
     movil.innerHTML = lista.map(n => {
       const dt = new Date(n.created_at);
       const fechaHora = dt.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      const tituloNotif = n.mensaje_original ? svgEsc(n.mensaje_original.slice(0,80)) : svgEsc(n.accion_realizada||'Acción realizada');
+      const subtituloNotif = n.decision_sistema ? svgEsc(n.decision_sistema.slice(0,90)) : '';
+      const etiquetaBtn = n.elemento_tipo==='albaran' ? '📄 Abrir albarán' : n.elemento_tipo==='trabajo' ? '💼 Abrir trabajo' : n.elemento_nombre ? svgEsc(n.elemento_nombre.slice(0,30)) : 'Ver';
       return `<div class="notif-card ${n.leida?'':'no-leida'}">
-        <div class="nc-hora">${fechaHora}${n.origen?' · '+svgEsc(n.origen):''}</div>
-        <div class="nc-accion">${svgEsc(n.accion_realizada||'Sin descripción')}</div>
-        ${n.decision_sistema?`<div class="nc-decision">${svgEsc(n.decision_sistema.slice(0,100))}</div>`:''}
+        <div class="nc-hora">${fechaHora}</div>
+        <div class="nc-accion">${tituloNotif}</div>
+        ${subtituloNotif?`<div class="nc-decision">${subtituloNotif}</div>`:''}
         <div class="nc-links">
-          <button class="btn sm" onclick="abrirDetalleNotif('${n.id}')">🔍 Ver detalle</button>
-          ${n.elemento_id&&n.seccion?`<button class="btn sm primary" onclick="irAElementoNotif('${n.id}')">↗ ${svgEsc(n.elemento_nombre||'Ver elemento')}</button>`:''}
+          ${n.elemento_id?`<button class="btn sm primary" onclick="irAElementoNotif('${n.id}')">${etiquetaBtn}</button>`:''}
+          <button class="btn sm" onclick="abrirDetalleNotif('${n.id}')">Detalle</button>
         </div>
       </div>`;
     }).join('');
@@ -11121,11 +11112,16 @@ async function irAElementoNotif(id){
   } else if(n.elemento_tipo==='cliente' && n.elemento_nombre){
     openClientDrawer(n.elemento_nombre);
   } else if(n.elemento_tipo==='albaran' && n.elemento_id){
-    // Navegar a albaranes y abrir el editor directamente
-    const btnAlb = document.querySelector('[data-view="albaranes"]');
-    if(btnAlb) btnAlb.click();
-    await new Promise(r=>setTimeout(r,600));
-    openDocumentViewer(n.elemento_id);
+    // Si el documento ya está en caché, abrir el popup directamente sin navegar
+    if(documentosRealesById[n.elemento_id]){
+      openDocumentViewer(n.elemento_id);
+    } else {
+      // Cargar la sección de albaranes en background para poblar la caché, luego abrir popup
+      const btnAlb = document.querySelector('[data-view="albaranes"]');
+      if(btnAlb) btnAlb.click();
+      await new Promise(r=>setTimeout(r,800));
+      openDocumentViewer(n.elemento_id);
+    }
   } else if(n.elemento_tipo==='trabajo' && n.elemento_id){
     abrirTrabajoDesdeId?.(n.elemento_id);
   }
