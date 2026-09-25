@@ -734,6 +734,13 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
   .ie-items tbody td{
     padding:6px 0;border-bottom:none;display:flex;flex-direction:column;gap:3px;
   }
+  /* Fecha + Cantidad en la misma fila para ahorrar scroll */
+  .ie-items tbody tr:not(.colapsada) td[data-label="Fecha"],
+  .ie-items tbody tr:not(.colapsada) td[data-label="Cantidad / horas"]{
+    display:inline-flex;flex-direction:column;gap:3px;vertical-align:top;
+  }
+  .ie-items tbody tr:not(.colapsada) td[data-label="Fecha"]{ width:55%;padding-right:6px; }
+  .ie-items tbody tr:not(.colapsada) td[data-label="Cantidad / horas"]{ width:45%; }
   .ie-items tbody td[data-label]::before{
     content:attr(data-label);font-size:11px;text-transform:uppercase;letter-spacing:0.03em;
     color:var(--ink-soft);font-weight:600;
@@ -2805,7 +2812,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.38</div>
+        <div class="sub" id="version-badge">V4.39</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11110,21 +11117,7 @@ async function irAElementoNotif(id){
     }
     openDocumentViewer(n.elemento_id);
     // Scroll a la primera línea nueva tras renderizar
-    // Scroll a línea naranja: esperar hasta que el editor la renderice (máx 3s)
-    (function intentarScroll(intentos){
-      const primeraLinea = document.querySelector('#ie-items-body tr.linea-nueva');
-      if(primeraLinea){
-        const editor = document.querySelector('.invoice-editor');
-        if(editor){
-          const top = primeraLinea.getBoundingClientRect().top - editor.getBoundingClientRect().top + editor.scrollTop - 80;
-          editor.scrollTo({top: Math.max(0,top), behavior:'smooth'});
-        } else {
-          primeraLinea.scrollIntoView({behavior:'smooth', block:'center'});
-        }
-      } else if(intentos > 0){
-        setTimeout(()=>intentarScroll(intentos-1), 200);
-      }
-    })(15);
+    // El scroll a la primera línea naranja lo gestiona openDocumentViewer internamente
     return;
   }
 
@@ -14200,7 +14193,7 @@ function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva){
   if(esNueva) tr.classList.add('linea-nueva');
   const comboId = 'combo-'+id;
   tr.innerHTML = `
-    <td class="ie-linea-resumen-td" onclick="document.getElementById('${id}').classList.remove('colapsada')"></td>
+    <td class="ie-linea-resumen-td" onclick="document.getElementById('${id}').classList.toggle('colapsada'); actualizarResumenLinea('${id}')"></td>
     <td data-label="Fecha"><input type="date" class="ie-linea-fecha search-box mono" style="width:100%;padding:4px;" value="${fecha ?? ''}" oninput="actualizarResumenLinea('${id}')"></td>
     <td data-label="Cantidad / horas"><input type="number" class="ie-qty" value="${qty ?? 1}" min="0" step="0.01" oninput="recalcTotals()"></td>
     <td data-label="Unidad"><select class="search-box ie-unidad" style="width:100%;min-width:0;padding:4px;">${UNIDADES.map(u=>`<option value="${u}" ${unidad===u?'selected':''}>${u}</option>`).join('')}</select></td>
@@ -17483,13 +17476,25 @@ function openDocumentViewer(id){
     return b.fecha.localeCompare(a.fecha);
   });
   itemsOrdenados.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, i.unidad||undefined, i.fecha, i.nuevo||false));
-  // Colapsar todas las líneas excepto las nuevas (naranjas)
+  // Colapsar todas las líneas excepto las nuevas (naranjas) y hacer scroll a la primera naranja
   setTimeout(()=>{
     document.querySelectorAll('#ie-items-body tr').forEach(tr=>{
       if(!tr.classList.contains('linea-nueva')) tr.classList.add('colapsada');
       actualizarResumenLinea(tr.id);
     });
-  }, 50);
+    if(hayLineasNuevas){
+      // El editor ya está renderizado aquí — hacemos scroll directamente
+      const primeraLinea = document.querySelector('#ie-items-body tr.linea-nueva');
+      const editor = document.querySelector('.invoice-editor');
+      if(primeraLinea && editor){
+        // Esperamos 1 frame más para que el layout se estabilice
+        requestAnimationFrame(()=>{
+          const top = primeraLinea.getBoundingClientRect().top - editor.getBoundingClientRect().top + editor.scrollTop - 60;
+          editor.scrollTo({top: Math.max(0, top), behavior:'smooth'});
+        });
+      }
+    }
+  }, 300);
   // Banner verificación si hay líneas pendientes
   const bannerEl = document.getElementById('ie-banner-nuevas') || (() => {
     const b = document.createElement('div');
