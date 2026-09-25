@@ -2788,7 +2788,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.99</div>
+        <div class="sub" id="version-badge">V4.00</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11949,12 +11949,13 @@ async function cargarIdentidadPendiente(){
     const hasEv = caso.aviso_nueva_evidencia;
     const nomA = (caso.a.nombre||'').slice(0,18);
     const nomB = (caso.b.nombre||'').slice(0,18);
-    return `<div class="cli-pend-item">
+    const casoEsc=JSON.stringify(caso).replace(/"/g,'&quot;');
+    return `<div class="cli-pend-item" data-caso="${casoEsc}">
       <div class="cli-pend-nombre">${caso.a.nombre} ↔ ${caso.b.nombre}</div>
       <div class="cli-pend-problema">Conflicto en ${caso.campo}: «${caso.valor_a||'—'}» / «${caso.valor_b||'—'}»</div>
       ${hasEv ? `<div style="font-size:11.5px;color:var(--green);margin:2px 0 4px;">✓ Evidencia: usar <b>${caso.sugerido}</b></div>` : ''}
       <div class="cli-pend-sugerencias">
-        <button class="btn primary" onclick='resolverCasoIdentidadPendiente(${JSON.stringify(caso)})'>⟲ Fusionar</button>
+        <button class="btn primary" data-caso='resolver' onclick='resolverCasoIdentidadPendiente(this)'>⟲ Fusionar</button>
         <button class="btn" onclick='descartarCasoIdentidad("${caso.id}")'>✕ Descartar</button>
         <button class="btn" onclick='openClientDrawer("${caso.a.nombre.replace(/"/g,"&quot;")}")'>✏️ Editar</button>
       </div>
@@ -11968,7 +11969,16 @@ async function descartarCasoIdentidad(id){
   mostrarToast('Caso descartado.', 'ok');
   cargarIdentidadPendiente();
 }
-async function resolverCasoIdentidadPendiente(caso){
+async function resolverCasoIdentidadPendiente(btnOrCaso){
+  let caso;
+  if(btnOrCaso && typeof btnOrCaso === 'object' && btnOrCaso.nodeType){
+    // Llamada nueva: btn element → leer data-caso del contenedor
+    const item=btnOrCaso.closest('.cli-pend-item');
+    try{ caso=JSON.parse((item?.dataset?.caso||'{}').replace(/&quot;/g,'"')); }catch(e){ console.error(e); return; }
+  } else {
+    caso=btnOrCaso; // compatibilidad con llamadas directas antiguas
+  }
+  if(!caso?.a||!caso?.b){ mostrarToast('Error: datos incompletos'); return; }
   await abrirComparacionFusion(caso.a, caso.b);
   // preselecciona el valor sugerido por la evidencia en el campo en conflicto
   if(fusionEnCurso && caso.campo){
@@ -12118,13 +12128,16 @@ async function confirmarFusionDesdeComparacion(){
     window.__casoIdentidadPendienteId = null;
   }
   mostrarToast('Clientes fusionados.', 'ok');
+  // ── REACTIVIDAD INMEDIATA: quitar duplicado del array en memoria ──
+  const idElim = docsA >= docsB ? b.id : a.id;
+  if(window.clientes) window.clientes.splice(0,window.clientes.length,...window.clientes.filter(cl=>cl.id!==idElim));
   cerrarComparacionFusion();
-  // Limpiar checkboxes y barra de selección
   document.querySelectorAll('.clientes-sel-chk:checked').forEach(cb=>cb.checked=false);
   actualizarSeleccionClientes();
+  renderClientesTable(); // render inmediato
   cargarDuplicadosClientes();
   cargarIdentidadPendiente();
-  if(typeof cargarDatosReales==='function') await cargarDatosReales();
+  if(typeof cargarDatosReales==='function') cargarDatosReales(); // sync en background
 }
 // ============ FIN FUSIÓN MÚLTIPLE ============
 
@@ -12611,25 +12624,43 @@ async function revisarClientesAuto(forzar=false){
   }
 
   // ── 4. Actualizar UI inmediatamente ─────────────────────────────────────
+  const claseMapLocal = {'persona':'Particular','empresa':'Empresa','organismo':'Entidad','obra':'Particular','nombre_parcial':'Particular','dudoso_con_nif':'Particular','direccion':'Particular'};
   if(corregidos>0){
-    const claseMapLocal = {'persona':'Particular','empresa':'Empresa','organismo':'Entidad','obra':'Particular','nombre_parcial':'Particular','dudoso_con_nif':'Particular','direccion':'Particular'};
     for(const e of entidades){
       const cli=clientes.find(x=>x.id===e.id);
       if(cli){
-        cli.name=e.nombre||cli.name;
-        cli.nif=e.nif||'';
-        cli.poblacion=e.poblacion||'';
-        cli.provincia=e.provincia||'';
-        cli.cp=e.cp||'';
-        if(e.clase_nombre) cli.type=claseMapLocal[e.clase_nombre]||cli.type;
-        cli.clase_nombre=e.clase_nombre||cli.clase_nombre;
+        cli.name=e.nombre||cli.name; cli.nif=e.nif||''; cli.poblacion=e.poblacion||'';
+        cli.provincia=e.provincia||''; cli.cp=e.cp||'';
+        if(e.clase_nombre){ cli.type=claseMapLocal[e.clase_nombre]||cli.type; cli.clase_nombre=e.clase_nombre; }
       }
     }
     renderClientesTable();
   }
-  await cargarCasosRevision(); // cargar panel de pendientes desde BD
 
-  const partes=[corregidos?`${corregidos} correcciones automáticas`:'',casosNuevos?`${casosNuevos} casos nuevos a revisar`:''].filter(Boolean);
+  // ── 5. Panel pendientes: falsos clientes y urgentes ─────────────────────
+  const falsos = entidades.filter(e=>(e.clase_nombre||'')==='direccion');
+  const panelPend = document.getElementById('panel-pendientes-revision');
+  const bodyPend = document.getElementById('pendientes-revision-body');
+  const countPend = document.getElementById('pendientes-revision-count');
+  if(falsos.length && panelPend){
+    panelPend.style.display='';
+    countPend.textContent=falsos.length;
+    bodyPend.classList.remove('open');
+    bodyPend.innerHTML=falsos.map(e=>`
+      <div class="cli-pend-item">
+        <div class="cli-pend-nombre">⚠ ${svgEsc(e.nombre)}</div>
+        <div class="cli-pend-problema">El nombre parece una dirección — revisar qué cliente real corresponde a sus documentos</div>
+        <div class="cli-pend-sugerencias">
+          <button class="btn" onclick="openClientDrawer('${(e.nombre||'').replace(/'/g,"\\'")}')">✏️ Ver ficha</button>
+        </div>
+      </div>`).join('');
+  } else if(panelPend && !falsos.length){
+    panelPend.style.display='none';
+  }
+
+  await cargarCasosRevision(); // cargar panel de duplicados desde BD
+
+  const partes=[corregidos?`${corregidos} correcciones`:'',casosNuevos?`${casosNuevos} posibles duplicados`:'',falsos.length?`${falsos.length} nombres sospechosos`:''].filter(Boolean);
   mostrarToast(partes.join(' · ')||'✓ Sin cambios','ok');
 }
 
