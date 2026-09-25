@@ -12602,6 +12602,7 @@ async function revisarClientesAuto(forzar=false){
   }
   function resetBtn(){ if(btnRev){ btnRev.innerHTML=textoOrig; btnRev.disabled=false; } }
   setProgreso(5, 'Cargando…');
+  try {
 
   // ── 1. Cargar datos ──────────────────────────────────────────────────────
   const {data: entidades} = await sb.from('entidades')
@@ -12640,8 +12641,9 @@ async function revisarClientesAuto(forzar=false){
     if(idx_e%20===0) setProgreso(15+Math.round(idx_e/entidades.length*50), `Analizando ${idx_e}/${entidades.length}…`);
     const h=hashEntidad(e);
     const sinCambios = !forzar && cacheMap[e.id]===h;
+    if(sinCambios) continue; // sin cambios: saltar inmediatamente
 
-    if(!sinCambios){
+    if(true){  // reemplaza el if(!sinCambios) anterior
       const patch={};
 
       // Normalizar nombre y razón social
@@ -12811,6 +12813,11 @@ async function revisarClientesAuto(forzar=false){
   resetBtn();
   const partes=[corregidos?`${corregidos} correcciones`:'',casosNuevos?`${casosNuevos} posibles duplicados`:''].filter(Boolean);
   mostrarToast(partes.join(' · ')||'✓ Sin cambios','ok');
+  } catch(err){
+    resetBtn();
+    console.error('Error en Revisar:', err);
+    mostrarToast('Error al revisar: '+err.message,'err');
+  }
 }
 async function borrarPendientesSeleccionados(grupo){
   const chks = Array.from(document.querySelectorAll(`.rpend-chk[data-grupo="${grupo}"]:checked`));
