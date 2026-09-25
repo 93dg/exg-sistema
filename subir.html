@@ -115,7 +115,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver">Subir S3.0 · Sistema V4.02</div>
+    <div class="ver">Subir S3.1 · Sistema V4.28</div>
   </div>
 </header>
 
@@ -206,22 +206,64 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 
   // ---------- Historial (modelo: 1 mensaje = 1 o varios adjuntos) ----------
   function leerHistorial(){
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || "null") || migrarViejoSinLotes(); }
+    catch(e){ return []; }
+  }
+  function migrarViejoSinLotes(){
+    // Formato antiguo: una entrada por archivo, sin lote_id guardado localmente
     try {
-      const actual = JSON.parse(localStorage.getItem(LS_KEY) || "null");
-      if (actual) return actual;
-      // Migración desde el formato antiguo (una entrada por archivo)
       const viejo = JSON.parse(localStorage.getItem(LS_KEY_OLD) || "[]");
-      const porLote = {};
+      if (viejo.length === 0) return [];
+      const porClaveProvisional = {};
       viejo.forEach(h => {
-        const clave = h.lote_id || ("solo-" + h.documento_id);
-        if (!porLote[clave]) porLote[clave] = { msg_id: clave, nota: h.nota || null, created_at: h.created_at, kind: h.kind === "texto" ? "texto" : "multimedia", attachments: [] };
-        if (h.kind !== "texto") porLote[clave].attachments.push({ documento_id: h.documento_id, kind: h.kind, file_url: h.file_url, storage_path: h.storage_path });
-        else porLote[clave].documento_id = h.documento_id;
+        const clave = "solo-" + h.documento_id; // se reagrupará de verdad contra Supabase al arrancar
+        porClaveProvisional[clave] = { msg_id: clave, nota: h.nota || null, created_at: h.created_at, kind: h.kind === "texto" ? "texto" : "multimedia", attachments: h.kind !== "texto" ? [{ documento_id: h.documento_id, kind: h.kind, file_url: h.file_url, storage_path: h.storage_path }] : [], documento_id: h.kind === "texto" ? h.documento_id : undefined };
       });
-      const migrado = Object.values(porLote);
+      const migrado = Object.values(porClaveProvisional);
       guardarHistorial(migrado);
       return migrado;
     } catch(e){ return []; }
+  }
+
+  // Se ejecuta una vez al arrancar: agrupa de verdad contra el lote_id real de Supabase,
+  // por si el historial local quedó con mensajes separados que en realidad son el mismo envío.
+  async function repararAgrupacionHistorial(){
+    const lista = leerHistorial();
+    if (lista.length === 0) return;
+    const idsPorMsg = [];
+    lista.forEach(m => {
+      const ids = m.kind === "texto" ? (m.documento_id ? [m.documento_id] : []) : (m.attachments || []).map(a => a.documento_id);
+      ids.forEach(id => idsPorMsg.push(id));
+    });
+    const idsUnicos = [...new Set(idsPorMsg)].filter(Boolean);
+    if (idsUnicos.length === 0) return;
+    let mapaLote = {};
+    try {
+      const resp = await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=in.(${idsUnicos.join(",")})&select=id,lote_id`, { headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY } });
+      const filas = await resp.json();
+      if (Array.isArray(filas)) filas.forEach(f => { mapaLote[f.id] = f.lote_id; });
+    } catch(e){ return; }
+
+    const porLoteReal = {};
+    let huboCambio = false;
+    lista.forEach(m => {
+      if (m.kind === "texto"){
+        const clave = (m.documento_id && mapaLote[m.documento_id]) || m.msg_id;
+        if (clave !== m.msg_id) huboCambio = true;
+        if (!porLoteReal[clave]) porLoteReal[clave] = { ...m, msg_id: clave };
+        return;
+      }
+      (m.attachments || []).forEach(a => {
+        const clave = (a.documento_id && mapaLote[a.documento_id]) || m.msg_id;
+        if (clave !== m.msg_id) huboCambio = true;
+        if (!porLoteReal[clave]) porLoteReal[clave] = { msg_id: clave, nota: m.nota, created_at: m.created_at, kind: "multimedia", attachments: [] };
+        porLoteReal[clave].attachments.push(a);
+      });
+    });
+    if (huboCambio){
+      const reagrupado = Object.values(porLoteReal).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+      guardarHistorial(reagrupado);
+    }
   }
   function guardarHistorial(lista){ try { localStorage.setItem(LS_KEY, JSON.stringify(lista.slice(0,200))); } catch(e){} }
   function añadirAlHistorial(msg){ guardarHistorial([msg, ...leerHistorial()]); }
@@ -662,7 +704,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   detalle.addEventListener("click", (e) => { if (e.target === detalle) detalle.classList.remove("activo"); });
 
   renderPendientes();
-  cargarFeedInicial();
+  repararAgrupacionHistorial().finally(cargarFeedInicial);
 })();
 </script>
 
