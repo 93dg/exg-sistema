@@ -2725,7 +2725,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.81</div>
+        <div class="sub" id="version-badge">V3.82</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5802,6 +5802,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     }
     if(btn.dataset.view==='backup') cargarPapelera();
     if(btn.dataset.view==='control') cargarNotificaciones();
+    if(btn.dataset.view==='clientes') cargarCasosRevision();
     if(btn.dataset.view==='facturas'){
       renderFacturasKPIs();
     }
@@ -11438,6 +11439,16 @@ async function confirmarFusionDesdeComparacion(){
       if(error){ mostrarToast('Error al fusionar: '+errText(error)); return; }
     }
     mostrarToast(`${clientes.length} clientes fusionados en uno.`, 'ok');
+    // Marcar caso de revisión como resuelto
+    const casoItem = window.__casoRevisionBtn?.closest('.cli-pend-item');
+    if(casoItem){
+      const casoId = casoItem.dataset.casoId;
+      if(casoId&&sb) sb.from('clientes_revision_casos').update({estado:'resuelto',resuelto_at:new Date().toISOString()}).eq('id',casoId).then(()=>{});
+      casoItem.remove();
+      const body=document.getElementById('posibles-duplicados-body');
+      if(body&&!body.querySelector('.cli-pend-item')) document.getElementById('panel-posibles-duplicados').style.display='none';
+      window.__casoRevisionBtn=null;
+    }
     cerrarComparacionFusion();
     // ── ACTUALIZACIÓN REACTIVA INMEDIATA ──
     // Quitar los clientes fusionados del array en memoria y re-render
@@ -11738,25 +11749,26 @@ function provinciaDeCP(cp){
 }
 
 async function revisarClientesAuto(forzar=false){
-  mostrarToast('Analizando y corrigiendo clientes…');
+  mostrarToast('Corrigiendo y analizando clientes…');
   if(!sb) return;
 
-  const CACHE_KEY = 'clientes_revision_cache_v3'; // v3: siempre normaliza NIF/nombre
-  let cache = {};
-  try { cache = JSON.parse(localStorage.getItem(CACHE_KEY)||'{}'); } catch(e){}
-  if(forzar){ cache = {}; }
-
+  // ── 1. Cargar datos ──────────────────────────────────────────────────────
   const {data: entidades} = await sb.from('entidades')
     .select('id,nombre,nif,poblacion,provincia,cp,tipo,clase_nombre,direccion').limit(600);
   if(!entidades) return;
 
+  // Cargar caché de revisión (qué clientes se analizaron y su hash)
+  const {data: cacheRows} = await sb.from('clientes_revision_cache').select('entidad_id,hash_datos');
+  const cacheMap = {};
+  (cacheRows||[]).forEach(r=>{ cacheMap[r.entidad_id]=r.hash_datos; });
+
   // Mapa población → provincia aprendida de los propios datos
-  const mapPoblProv = {}, mapPoblCp = {};
+  const mapPoblProv={}, mapPoblCp={};
   for(const e of entidades){
-    if(e.poblacion && e.provincia){
-      const k = e.poblacion.trim().toUpperCase();
-      mapPoblProv[k] = e.provincia.trim().toUpperCase();
-      if(e.cp && !mapPoblCp[k]) mapPoblCp[k] = e.cp;
+    if(e.poblacion&&e.provincia){
+      const k=e.poblacion.trim().toUpperCase();
+      mapPoblProv[k]=e.provincia.trim().toUpperCase();
+      if(e.cp&&!mapPoblCp[k]) mapPoblCp[k]=e.cp;
     }
   }
   Object.entries(POBLACION_DATOS).forEach(([k,v])=>{
@@ -11764,139 +11776,161 @@ async function revisarClientesAuto(forzar=false){
     if(v.cp&&v.cp.length===5&&!mapPoblCp[k]) mapPoblCp[k]=v.cp;
   });
 
-  let corregidos = 0;
-  const pendientes = [];
+  // ── 2. CORRECCIONES AUTOMÁTICAS — silenciosas, sin pendientes ───────────
+  let corregidos=0;
+  const clientesNuevosOModificados=[];
 
   for(const e of entidades){
-    const h = hashEntidad(e);
-    // Siempre normalizar (el hash solo evita repetir detección de pendientes, no las correcciones)
-    const yaRevisado = !forzar && cache[e.id] && cache[e.id].hash === h && cache[e.id].ok;
+    const h=hashEntidad(e);
+    const sinCambios = !forzar && cacheMap[e.id]===h;
 
-    const patch = {};
+    if(!sinCambios){
+      const patch={};
 
-    // Normalizar nombre (mayúsculas + forma jurídica canónica)
-    const nomNorm = normRazonSocial(e.nombre);
-    if(nomNorm && nomNorm !== e.nombre) patch.nombre = nomNorm;
+      // Normalizar nombre y razón social
+      const nomNorm=normRazonSocial(e.nombre);
+      if(nomNorm&&nomNorm!==e.nombre) patch.nombre=nomNorm;
 
-    // Normalizar NIF
-    const nifNorm = normNIF(e.nif);
-    if(nifNorm && nifNorm !== (e.nif||'').trim()) patch.nif = nifNorm;
+      // Normalizar NIF: sin puntos, guiones ni espacios
+      const nifNorm=normNIF(e.nif);
+      if(nifNorm&&nifNorm!==(e.nif||'').trim()) patch.nif=nifNorm;
 
-    // Normalizar dirección
-    const dirNorm = e.direccion ? normDireccion(e.direccion) : null;
-    if(dirNorm && dirNorm !== (e.direccion||'').trim()) patch.direccion = dirNorm;
+      // Normalizar dirección
+      const dirNorm=e.direccion?normDireccion(e.direccion):null;
+      if(dirNorm&&dirNorm!==(e.direccion||'').trim()) patch.direccion=dirNorm;
 
-    // Deducir provincia+CP desde población (aprendido)
-    const pobKey = ((patch.poblacion||e.poblacion)||'').trim().toUpperCase();
-    if(!e.provincia && pobKey && mapPoblProv[pobKey]) patch.provincia = mapPoblProv[pobKey];
-    if(!e.cp && pobKey && mapPoblCp[pobKey]) patch.cp = mapPoblCp[pobKey];
+      // Deducir provincia+CP desde población
+      const pobKey=((patch.poblacion||e.poblacion)||'').trim().toUpperCase();
+      if(!e.provincia&&pobKey&&mapPoblProv[pobKey]) patch.provincia=mapPoblProv[pobKey];
+      if(!e.cp&&pobKey&&mapPoblCp[pobKey]) patch.cp=mapPoblCp[pobKey];
 
-    // Deducir provincia desde CP
-    if(!e.provincia && !patch.provincia && e.cp){
-      const prov = provinciaDeCP(e.cp);
-      if(prov) patch.provincia = prov;
-    }
-
-    // Normalizar CP (5 dígitos)
-    if(e.cp){ const cpL=String(e.cp).replace(/[^0-9]/g,'').padStart(5,'0').slice(0,5); if(cpL!==String(e.cp).trim()) patch.cp=cpL; }
-
-    // Normalizar textos a mayúsculas
-    if(e.poblacion && e.poblacion!==e.poblacion.toUpperCase()) patch.poblacion=e.poblacion.toUpperCase();
-    if(e.provincia && e.provincia!==e.provincia.toUpperCase()) patch.provincia=e.provincia.toUpperCase();
-
-    if(Object.keys(patch).length){
-      const {error} = await sb.from('entidades').update(patch).eq('id',e.id);
-      if(!error){ corregidos++; Object.assign(e, patch); }
-    }
-
-    // Guardar en caché y detectar pendientes
-    const h2 = hashEntidad(e);
-    const memCli = clientes.find(x=>x.id===e.id);
-    const tieneActividad = memCli && ((memCli.facturado||0)+(memCli.enB||0))>0;
-    if(!yaRevisado || Object.keys(patch).length){
-      const prob = [];
-      if(!e.nif) prob.push('Sin NIF');
-      if(tieneActividad){
-        if(!e.poblacion) prob.push('Sin población');
-        if(!e.provincia) prob.push('Sin provincia');
-        if(!e.cp) prob.push('Sin CP');
+      // Deducir provincia desde CP
+      if(!e.provincia&&!patch.provincia&&e.cp){
+        const prov=provinciaDeCP(e.cp);
+        if(prov) patch.provincia=prov;
       }
-      cache[e.id] = {hash:h2, ok:prob.length===0, problemas:prob, nombre:e.nombre};
-      if(prob.length) pendientes.push({id:e.id, nombre:e.nombre, problemas:prob});
-    } else {
-      // Ya revisado sin cambios: usar pendientes de caché si tenía
-      if(cache[e.id]?.problemas?.length) pendientes.push({id:e.id, nombre:e.nombre, problemas:cache[e.id].problemas});
-    }
-  }
-  localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
 
-  // ── DETECTAR DUPLICADOS AGRUPADOS ──
-  // En vez de pares A↔B, agrupa todas las variantes del mismo nombre base
+      // Normalizar CP a 5 dígitos
+      if(e.cp){ const cpL=String(e.cp).replace(/[^0-9]/g,'').padStart(5,'0').slice(0,5); if(cpL!==String(e.cp).trim()) patch.cp=cpL; }
+
+      // Normalizar textos a mayúsculas
+      if(e.poblacion&&e.poblacion!==e.poblacion.toUpperCase()) patch.poblacion=e.poblacion.toUpperCase();
+      if(e.provincia&&e.provincia!==e.provincia.toUpperCase()) patch.provincia=e.provincia.toUpperCase();
+
+      if(Object.keys(patch).length){
+        await sb.from('entidades').update(patch).eq('id',e.id);
+        corregidos++;
+        Object.assign(e,patch);
+      }
+
+      // Actualizar caché
+      const h2=hashEntidad(e);
+      await sb.from('clientes_revision_cache')
+        .upsert({entidad_id:e.id, hash_datos:h2, revisado_at:new Date().toISOString()});
+      clientesNuevosOModificados.push(e);
+    }
+    // Si sin cambios, no tocamos nada
+  }
+
+  // ── 3. DETECCIÓN DE CASOS ACCIONABLES — solo para clientes nuevos/modificados ─
+  if(forzar) clientesNuevosOModificados.push(...entidades); // forzar = re-analizar todos
+
+  // Cargar casos ya existentes para no duplicar
+  const {data:casosExistentes} = await sb.from('clientes_revision_casos')
+    .select('hash_grupo,estado').eq('estado','pendiente');
+  const hashsYaEnCola=new Set((casosExistentes||[]).map(c=>c.hash_grupo).filter(Boolean));
+
+  // Detectar grupos de posibles duplicados
   function normBase(n){
     return (n||'').toUpperCase()
       .replace(/\b(S\.?L\.?U?\.?|S\.?A\.?U?\.?|C\.?B\.?|S\.?C\.?P\.?|S\.?A\.?L\.?|S\.?L\.?L\.|EXCMO\.?|EXMO\.?)\b/g,'')
       .replace(/[^A-ZÁÉÍÓÚÜÑ0-9 ]/g,'').replace(/\s+/g,' ').trim();
   }
-  const grupos = {};
+  const grupos={};
   for(const e of entidades){
-    const base = normBase(e.nombre);
-    if(!base || base.length < 4) continue;
-    if(!grupos[base]) grupos[base] = [];
-    grupos[base].push({id:e.id, nombre:e.nombre});
+    const base=normBase(e.nombre);
+    if(!base||base.length<4) continue;
+    if(!grupos[base]) grupos[base]=[];
+    grupos[base].push({id:e.id,nombre:e.nombre});
   }
-  const posiblesDuplicados = Object.values(grupos).filter(g=>g.length>1);
 
-  // Recargar datos en background
-  if(corregidos>0 && typeof cargarDatosReales==='function'){
-    cargarDatosReales();
-    // Actualizar también el array en memoria inmediatamente
+  let casosNuevos=0;
+  for(const [base,grupo] of Object.entries(grupos)){
+    if(grupo.length<2) continue;
+    // Alguno del grupo tiene que ser nuevo/modificado para generar caso
+    const tieneNuevo = forzar || grupo.some(g=>clientesNuevosOModificados.find(e=>e.id===g.id));
+    if(!tieneNuevo) continue;
+    const ids=grupo.map(g=>g.id).sort();
+    const hashG=ids.join('|');
+    if(hashsYaEnCola.has(hashG)) continue; // ya está en cola
+    await sb.from('clientes_revision_casos').insert({
+      tipo:'duplicado_grupo',
+      ids_involucrados:ids,
+      nombres:grupo.map(g=>g.nombre),
+      descripcion:`${grupo.length} variantes del mismo nombre`,
+      hash_grupo:hashG
+    });
+    casosNuevos++;
+  }
+
+  // ── 4. Actualizar UI inmediatamente ─────────────────────────────────────
+  if(corregidos>0){
     for(const e of entidades){
-      const cli = clientes.find(x=>x.id===e.id);
+      const cli=clientes.find(x=>x.id===e.id);
       if(cli){ cli.name=e.nombre||cli.name; cli.nif=e.nif||''; cli.poblacion=e.poblacion||''; cli.provincia=e.provincia||''; cli.cp=e.cp||''; }
     }
     renderClientesTable();
   }
+  await cargarCasosRevision(); // cargar panel de pendientes desde BD
 
-  // Mostrar resultados
-  const panel=document.getElementById('panel-pendientes-revision');
-  const body=document.getElementById('pendientes-revision-body');
-  const countEl=document.getElementById('pendientes-revision-count');
-  if(pendientes.length){
-    panel.style.display=''; countEl.textContent=pendientes.length;
-    body.classList.remove('open');
-    body.innerHTML = pendientes.map(p=>`
-      <div class="cli-pend-item">
-        <div class="cli-pend-nombre">${svgEsc(p.nombre)}</div>
-        <div class="cli-pend-problema">${p.problemas.join(' · ')}</div>
-        <span style="color:var(--orange);font-weight:700;font-size:13px;cursor:pointer;" onclick="openClientDrawer('${(p.nombre||'').replace(/'/g,"\'")}')">+ Añadir datos</span>
-      </div>`).join('');
-  } else { panel.style.display='none'; }
+  const partes=[corregidos?`${corregidos} correcciones automáticas`:'',casosNuevos?`${casosNuevos} casos nuevos a revisar`:''].filter(Boolean);
+  mostrarToast(partes.join(' · ')||'✓ Sin cambios','ok');
+}
+
+// Cargar y mostrar los casos pendientes desde BD
+async function cargarCasosRevision(){
+  if(!sb) return;
+  const {data:casos} = await sb.from('clientes_revision_casos')
+    .select('*').eq('estado','pendiente').order('created_at',{ascending:false});
 
   const panelDup=document.getElementById('panel-posibles-duplicados');
   const bodyDup=document.getElementById('posibles-duplicados-body');
   const countDup=document.getElementById('posibles-duplicados-count');
-  if(posiblesDuplicados.length && panelDup){
-    panelDup.style.display=''; countDup.textContent=posiblesDuplicados.length;
-    bodyDup.classList.remove('open');
-    bodyDup.innerHTML = posiblesDuplicados.map(grupo=>{
-      const nombres = grupo.map(g=>svgEsc(g.nombre)).join(' · ');
-      const ids = grupo.map(g=>g.id);
-      return `<div class="cli-pend-item">
-        <div class="cli-pend-nombre">${nombres}</div>
-        <div class="cli-pend-problema">${grupo.length} variantes del mismo nombre</div>
-        <div class="cli-pend-sugerencias">
-          <button class="btn primary" onclick="abrirFusionGrupo(${JSON.stringify(ids)})">⟲ Fusionar todo</button>
-          <button class="btn" onclick="this.closest('.cli-pend-item').remove()">✕ Son distintos</button>
-        </div>
-      </div>`;
-    }).join('');
-  } else if(panelDup){ panelDup.style.display='none'; }
 
-  const msg=[corregidos?`${corregidos} corregidos`:'',pendientes.length?`${pendientes.length} pendientes`:'',posiblesDuplicados.length?`${posiblesDuplicados.length} grupos similares`:''].filter(Boolean).join(' · ');
-  mostrarToast(msg||'✓ Todo en orden','ok');
+  if(!casos||!casos.length){
+    if(panelDup) panelDup.style.display='none';
+    return;
+  }
+  panelDup.style.display='';
+  countDup.textContent=casos.length;
+  bodyDup.classList.remove('open');
+  bodyDup.innerHTML=casos.map(caso=>{
+    const nombres=(caso.nombres||[]).join(' · ');
+    const ids=caso.ids_involucrados||[];
+    return `<div class="cli-pend-item" data-caso-id="${caso.id}">
+      <div class="cli-pend-nombre">${svgEsc(nombres)}</div>
+      <div class="cli-pend-problema">${svgEsc(caso.descripcion||'')}</div>
+      <div class="cli-pend-sugerencias">
+        <button class="btn primary" onclick="abrirFusionGrupo(${JSON.stringify(ids)},this)">⟲ Fusionar</button>
+        <button class="btn" onclick="descartarCasoRevision('${caso.id}',this)">✕ Son distintos</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-async function abrirFusionGrupo(ids){
+async function descartarCasoRevision(casoId,btn){
+  if(!sb) return;
+  btn?.closest('.cli-pend-item')?.remove();
+  await sb.from('clientes_revision_casos').update({estado:'descartado',resuelto_at:new Date().toISOString()}).eq('id',casoId);
+  const body=document.getElementById('posibles-duplicados-body');
+  if(body&&!body.querySelector('.cli-pend-item')){
+    document.getElementById('panel-posibles-duplicados').style.display='none';
+  }
+}
+
+async function abrirFusionGrupo(ids, btn){
+  // Cuando se pulse desde el panel de pendientes, guardar el caso para marcarlo resuelto tras fusión
+  window.__casoRevisionBtn = btn;
   if(!sb||!ids||ids.length<2) return;
   const {data} = await sb.from('entidades').select('*').in('id',ids);
   if(data&&data.length>=2){
