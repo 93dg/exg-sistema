@@ -2799,7 +2799,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.21</div>
+        <div class="sub" id="version-badge">V4.22</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12760,45 +12760,72 @@ async function revisarClientesAuto(forzar=false){
     renderClientesTable();
   }
 
-  // ── 5. Panel pendientes: falsos clientes + sin docs reales ──────────────
-  const falsos = entidades.filter(e=>(e.clase_nombre||'')=='direccion');
-  const {data:docsDatos} = await sb.from('documentos_economicos')
-    .select('entidad_id,numero,fecha_devengo,importe');
+    // ── 5. Panel pendientes: agrupado por tipo ───────────────────────────────
+  const falsos = entidades.filter(e=>(e.clase_nombre||'')==='direccion');
+  // Usar datos en memoria (evita límite de filas de Supabase)
   const conDocReal = new Set(
-    (docsDatos||[]).filter(d=>(parseFloat(d.importe)||0)>0||d.numero||d.fecha_devengo)
+    Object.values(documentosRealesById||{})
+      .filter(d=>(parseFloat(d.importe)||0)>0 || d.num || d.numero || d.dateRaw || d.fecha_devengo)
       .map(d=>d.entidad_id)
   );
-  const sinDocReal = entidades.filter(e=>!conDocReal.has(e.id)&&(e.clase_nombre||'')!=='direccion');
-  const pendItems = [
-    ...falsos.map(e=>({e,
-      problema:'El nombre parece una dirección — revisar qué cliente real corresponde',
-      accion:`<button class="btn" onclick="openClientDrawer('${(e.nombre||'').replace(/'/g,"\\'")}')">✏️ Ver ficha</button>`
-    })),
-    ...sinDocReal.map(e=>({e,
-      problema:'Sin documentos reales asociados — posible duplicado o cliente sin actividad',
-      accion:`<button class="btn" style="color:var(--red);" onclick="borrarClienteSinDocs('${e.id}','${(e.nombre||'').replace(/'/g,"\\'")}')">🗑 Borrar</button>
-              <button class="btn" onclick="openClientDrawer('${(e.nombre||'').replace(/'/g,"\\'")}')">Ver ficha</button>`
-    }))
-  ];
+  const sinDocReal = entidades.filter(e=>!conDocReal.has(e.id) && (e.clase_nombre||'')!=='direccion');
   const panelPend=document.getElementById('panel-pendientes-revision');
   const bodyPend=document.getElementById('pendientes-revision-body');
   const countPend=document.getElementById('pendientes-revision-count');
-  if(pendItems.length&&panelPend){
+  const totalPend = falsos.length + sinDocReal.length;
+  if(totalPend && panelPend){
     panelPend.style.display='';
-    countPend.textContent=pendItems.length;
+    countPend.textContent=totalPend;
     bodyPend.classList.remove('open');
-    bodyPend.innerHTML=pendItems.map(({e,problema,accion})=>`
-      <div class="cli-pend-item">
-        <div class="cli-pend-nombre">⚠ ${svgEsc(e.nombre)}</div>
-        <div class="cli-pend-problema">${problema}</div>
-        <div class="cli-pend-sugerencias">${accion}</div>
-      </div>`).join('');
+    const mkId = e => 'rpend-'+e.id;
+    const seccion = (titulo, items, conBorrar) => !items.length?'': `
+      <div style="padding:10px 14px 6px;font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between;">
+        <span>${titulo} (${items.length})</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn" style="font-size:11px;padding:3px 8px;height:24px;" onclick="(function(){const chks=document.querySelectorAll('.rpend-chk[data-grupo=\'${titulo}\']');const allOn=[...chks].every(c=>c.checked);chks.forEach(c=>c.checked=!allOn);})()">Sel. todos</button>
+          ${conBorrar?`<button class="btn" style="font-size:11px;padding:3px 8px;height:24px;color:var(--red);" onclick="borrarPendientesSeleccionados('${titulo}')">🗑 Borrar sel.</button>`:''}
+        </div>
+      </div>
+      ${items.map(e=>`
+      <div class="cli-pend-item" style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-top:1px solid var(--line);">
+        <input type="checkbox" class="rpend-chk" data-id="${e.id}" data-nombre="${svgEsc(e.nombre||'')}" data-grupo="${titulo}" style="margin-top:3px;flex-shrink:0;">
+        <div style="flex:1;min-width:0;">
+          <div class="cli-pend-nombre">${svgEsc(e.nombre||'')}</div>
+          <div class="cli-pend-sugerencias" style="margin-top:6px;">
+            ${conBorrar?`<button class="btn" style="color:var(--red);" onclick="borrarClienteSinDocs('${e.id}','${(e.nombre||'').replace(/'/g,"\'")}')">🗑 Borrar</button>`:''}
+            <button class="btn" onclick="openClientDrawer('${(e.nombre||'').replace(/'/g,"\'")}')">Ver ficha</button>
+          </div>
+        </div>
+      </div>`).join('')}`;
+    bodyPend.innerHTML =
+      seccion('Nombres sospechosos', falsos, false) +
+      seccion('Sin actividad', sinDocReal, true);
   } else if(panelPend){ panelPend.style.display='none'; }
   await cargarCasosRevision();
-  const partes=[corregidos?`${corregidos} correcciones`:'',casosNuevos?`${casosNuevos} posibles duplicados`:'',pendItems.length?`${pendItems.length} pendientes`:''].filter(Boolean);
+  const partes=[corregidos?`${corregidos} correcciones`:'',casosNuevos?`${casosNuevos} posibles duplicados`:'',totalPend?`${totalPend} pendientes`:''].filter(Boolean);
   mostrarToast(partes.join(' · ')||'✓ Sin cambios','ok');
 }
 // Cargar y mostrar los casos pendientes desde BD
+async function borrarPendientesSeleccionados(grupo){
+  const chks = Array.from(document.querySelectorAll(`.rpend-chk[data-grupo="${grupo}"]:checked`));
+  if(!chks.length){ mostrarToast('Selecciona al menos uno','err'); return; }
+  const items = chks.map(c=>({id:c.dataset.id, nombre:c.dataset.nombre}));
+  if(!(await confirmarAccion(`¿Borrar ${items.length} cliente(s) sin actividad? No se puede deshacer.`))) return;
+  if(!sb) return;
+  let ok=0, err=0;
+  for(const {id,nombre} of items){
+    await sb.from('documentos_economicos').delete().eq('entidad_id',id);
+    const {error} = await sb.from('entidades').delete().eq('id',id);
+    if(error){ err++; } else {
+      const i = clientes.findIndex(c=>c.id===id);
+      if(i>=0) clientes.splice(i,1);
+      ok++;
+    }
+  }
+  renderClientesTable();
+  mostrarToast(`${ok} eliminado(s)${err?` · ${err} errores`:''}`, ok>0?'ok':'err');
+  revisarClientesAuto(true);
+}
 async function borrarClienteSinDocs(id, nombre){
   if(!(await confirmarAccion(`¿Borrar "${nombre}"? No tiene documentos reales. No se puede deshacer.`))) return;
   if(!sb) return;
