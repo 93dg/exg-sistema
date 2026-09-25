@@ -125,7 +125,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver">Subir S2.1 · Sistema V3.91</div>
+    <div class="ver">Subir S2.2 · Sistema V3.92</div>
   </div>
 </header>
 
@@ -520,16 +520,22 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     if (!div) return;
     const h = leerHistorial().find(x => x.documento_id === documentoId);
     if (!h) return;
-    const cuerpo = div.querySelector(".msg-cuerpo");
-    const valorActual = h.kind === "texto" ? (h.nota || "") : (h.nota || "");
-    const wrap = document.createElement("div");
-    wrap.className = "msg-editar-wrap";
-    wrap.innerHTML = `<input class="msg-editar-input" value="${valorActual.replace(/"/g,'&quot;')}"><button type="button" class="msg-editar-guardar">Guardar</button>`;
-    cuerpo.appendChild(wrap);
-    const input = wrap.querySelector("input");
-    input.focus();
-    wrap.querySelector(".msg-editar-guardar").addEventListener("click", async () => {
-      const nuevoTexto = input.value.trim();
+    const textoEl = div.querySelector(".msg-texto");
+    if (textoEl.isContentEditable) return;
+
+    const valorActual = h.nota || "";
+    textoEl.textContent = valorActual;
+    textoEl.contentEditable = "true";
+    textoEl.style.outline = "1.5px solid var(--orange)";
+    textoEl.style.borderRadius = "8px";
+    textoEl.style.padding = "4px 6px";
+    textoEl.focus();
+    document.execCommand && document.execCommand("selectAll", false, null);
+
+    const guardar = async () => {
+      textoEl.contentEditable = "false";
+      textoEl.style.outline = ""; textoEl.style.padding = "";
+      const nuevoTexto = textoEl.textContent.trim();
       try {
         await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=eq.${documentoId}`, {
           method:"PATCH",
@@ -538,8 +544,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
         });
       } catch(e){}
       actualizarEnHistorial(documentoId, { nota: nuevoTexto || null });
-      div.querySelector(".msg-texto").textContent = h.kind === "texto" ? nuevoTexto : (nuevoTexto ? `"${nuevoTexto}"` : (h.kind === "audio" ? "Audio" : "Foto"));
-      wrap.remove();
+      textoEl.textContent = h.kind === "texto" ? nuevoTexto : (nuevoTexto ? `"${nuevoTexto}"` : (h.kind === "audio" ? "Audio" : "Foto"));
       if (h.kind === "texto" && nuevoTexto){
         fetch(`${SUPABASE_URL}/functions/v1/procesar-entrada`, {
           method:"POST",
@@ -547,6 +552,11 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
           body: JSON.stringify({ documento_id: documentoId })
         }).then(() => actualizarPill(documentoId)).catch(() => {});
       }
+    };
+
+    textoEl.addEventListener("blur", guardar, { once: true });
+    textoEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter"){ e.preventDefault(); textoEl.blur(); }
     });
   }
   window.editarMensaje = editarMensaje;
