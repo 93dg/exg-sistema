@@ -2806,7 +2806,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.36</div>
+        <div class="sub" id="version-badge">V4.37</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3869,7 +3869,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <th class="num ord" onclick="ordenarTabla('tarifas-tbl',2,'num')">Precio particular ⇅</th>
               <th class="num ord" onclick="ordenarTabla('tarifas-tbl',3,'num')">Precio ayuntamiento ⇅</th>
               <th class="ord" onclick="ordenarTabla('tarifas-tbl',4,'text')">Actualizado ⇅</th>
-              <th>Notas</th>
               <th></th>
             </tr>
             <tbody id="tarifas-tbl"></tbody>
@@ -11115,10 +11114,14 @@ async function irAElementoNotif(id){
     setTimeout(()=>{
       const primeraLinea = document.querySelector('#ie-items-body tr.linea-nueva');
       if(primeraLinea){
-        // El popup tiene overflow:auto, hay que hacer scroll dentro del modal
-        const modal = primeraLinea.closest('.modal-body, .drawer-body, [style*="overflow"]') || document.querySelector('#invoice-editor-modal, #ni-form, .ie-paper-wrap');
-        primeraLinea.scrollIntoView({behavior:'smooth', block:'center'});
-        if(modal && modal.scrollTop !== undefined) modal.scrollTop = primeraLinea.offsetTop - 80;
+        // El contenedor con scroll es .invoice-editor (overflow-y:auto)
+        const editor = document.querySelector('.invoice-editor');
+        if(editor){
+          const top = primeraLinea.getBoundingClientRect().top - editor.getBoundingClientRect().top + editor.scrollTop - 80;
+          editor.scrollTo({top, behavior:'smooth'});
+        } else {
+          primeraLinea.scrollIntoView({behavior:'smooth', block:'center'});
+        }
       }
     }, 700);
     return;
@@ -13975,7 +13978,7 @@ const DOC_TYPES = {
   },
   albaran: {
     title:'ALBARÁN', button:'Crear albarán', numera:false, prefix:'A', seqRef:()=>proximoNumero('albaran'), hasIva:false,
-    hasFiscalHeader:false, hasPrecios:false, hasTotales:true, hasBaseIva:false, hasPayment:false, hasBank:false,
+    hasFiscalHeader:false, hasPrecios:true, hasTotales:true, hasBaseIva:false, hasPayment:false, hasBank:false,
     explain:'Justificante de entrega/trabajo realizado. No es un documento fiscal, así que no lleva IVA ni desglose.',
   },
 };
@@ -14016,7 +14019,6 @@ function renderTarifasTabla(){
       <td class="num">${Number(t.precioParticular||0).toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>
       <td class="num">${Number(t.precioAyuntamiento||0).toLocaleString('es-ES',{minimumFractionDigits:2})} €</td>
       <td style="font-size:12px;color:var(--ink-soft);white-space:nowrap;">${t.updatedAt||'—'}</td>
-      <td style="font-size:12px;color:var(--ink-soft);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${svgEsc(t.notas)}">${t.notas||'—'}</td>
       <td style="white-space:nowrap;">
         <button class="btn sm" onclick="editarTarifa('${t.id}')">Editar</button>
         <span style="cursor:pointer;color:var(--red);font-weight:800;margin-left:6px;" onclick="borrarTarifa('${t.id}')">✕</span>
