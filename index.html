@@ -340,8 +340,7 @@ table{border-collapse:collapse;width:100%;}
 /* Bloquear scroll del fondo cuando hay overlay abierto */
 body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 /* ======= LÍNEAS NUEVAS (motor de entradas, pendiente verificar) ======= */
-.linea-nueva { background: rgba(255,160,0,.13) !important; }
-.linea-nueva td { border-left: 3px solid var(--orange); }
+.linea-nueva { background: rgba(255,160,0,.18) !important; outline: 2px solid var(--orange); outline-offset: -1px; }
 /* ======= NOTIFICACIONES DE CAMBIOS ======= */
 .notif-card {
   background:var(--paper); border-radius:14px;
@@ -2806,7 +2805,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.37</div>
+        <div class="sub" id="version-badge">V4.38</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11111,19 +11110,21 @@ async function irAElementoNotif(id){
     }
     openDocumentViewer(n.elemento_id);
     // Scroll a la primera línea nueva tras renderizar
-    setTimeout(()=>{
+    // Scroll a línea naranja: esperar hasta que el editor la renderice (máx 3s)
+    (function intentarScroll(intentos){
       const primeraLinea = document.querySelector('#ie-items-body tr.linea-nueva');
       if(primeraLinea){
-        // El contenedor con scroll es .invoice-editor (overflow-y:auto)
         const editor = document.querySelector('.invoice-editor');
         if(editor){
           const top = primeraLinea.getBoundingClientRect().top - editor.getBoundingClientRect().top + editor.scrollTop - 80;
-          editor.scrollTo({top, behavior:'smooth'});
+          editor.scrollTo({top: Math.max(0,top), behavior:'smooth'});
         } else {
           primeraLinea.scrollIntoView({behavior:'smooth', block:'center'});
         }
+      } else if(intentos > 0){
+        setTimeout(()=>intentarScroll(intentos-1), 200);
       }
-    }, 700);
+    })(15);
     return;
   }
 
