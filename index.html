@@ -2731,7 +2731,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.84</div>
+        <div class="sub" id="version-badge">V3.85</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4051,6 +4051,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="client-tab" data-sub="criterios">Criterios</div>
         <div class="client-tab" data-sub="estandares">Estándares</div>
         <div class="client-tab" data-sub="historial">Historial de decisiones</div>
+        <div class="client-tab" data-sub="cambios-exg">⚡ Cambios EXG</div>
+        <div class="client-tab" data-sub="conocimiento-exg">🧠 Conocimiento EXG</div>
         <div class="client-tab" data-sub="oninicio">Prompt</div>
       </div>
 
@@ -4153,6 +4155,59 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="panel">
           <div class="panel-head"><h3>Historial de decisiones</h3><button class="btn" onclick="addDecision()">+ Añadir</button></div>
           <div class="panel-body" id="historial-list"></div>
+        </div>
+      </div>
+
+      <!-- ════ CAMBIOS EXG ════ -->
+      <div class="sub-view" id="sis-cambios-exg" style="display:none;">
+        <div class="panel">
+          <div class="panel-head" style="justify-content:space-between;">
+            <h3>⚡ Cambios EXG</h3>
+            <div style="display:flex;gap:6px;">
+              <select id="cambios-exg-filtro" class="search-box" style="height:32px;font-size:12px;" onchange="renderCambiosEXG()">
+                <option value="">Todos</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="ok">Completado</option>
+                <option value="parcial">Parcial</option>
+              </select>
+              <button class="btn sm" onclick="cargarCambiosEXG()">↻</button>
+            </div>
+          </div>
+          <div class="panel-body" style="padding:0;overflow-x:auto;">
+            <table class="tbl" style="width:100%;">
+              <thead><tr>
+                <th style="text-align:left;width:130px;">Fecha</th>
+                <th style="text-align:left;">Descripción</th>
+                <th style="width:100px;">Origen</th>
+                <th style="width:80px;">Versión</th>
+                <th style="width:80px;">Estado</th>
+                <th style="width:60px;"></th>
+              </tr></thead>
+              <tbody id="cambios-exg-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════ CONOCIMIENTO EXG ════ -->
+      <div class="sub-view" id="sis-conocimiento-exg" style="display:none;">
+        <div class="panel">
+          <div class="panel-head" style="justify-content:space-between;">
+            <h3>🧠 Conocimiento EXG</h3>
+            <div style="display:flex;gap:6px;">
+              <select id="conocimiento-exg-alcance" class="search-box" style="height:32px;font-size:12px;" onchange="renderConocimientoEXG()">
+                <option value="">Todos</option>
+                <option value="GLOBAL">Global</option>
+                <option value="COMPONENTE">Componente</option>
+                <option value="LOCAL">Local</option>
+              </select>
+              <button class="btn sm" onclick="cargarConocimientoEXG()">↻</button>
+            </div>
+          </div>
+          <div class="panel-body" id="conocimiento-exg-lista" style="padding:0;"></div>
+        </div>
+        <div style="padding:14px 0;">
+          <button class="btn primary" onclick="abrirNuevoConocimientoEXG()">+ Añadir conocimiento</button>
         </div>
       </div>
 
@@ -5948,15 +6003,17 @@ function renderFacturasKPIs(){
   });
 }
 
-function setupSubtabs(navId, prefix, mapping){
+function setupSubtabs(navId, prefix, mapping, opts){
+  const onSwitch = opts?.onSwitch || {};
   document.querySelectorAll('#'+navId+' .client-tab').forEach(tab=>{
     tab.addEventListener('click',()=>{
       document.querySelectorAll('#'+navId+' .client-tab').forEach(t=>t.classList.remove('active'));
       tab.classList.add('active');
       Object.keys(mapping).forEach(key=>{
-        document.getElementById(mapping[key]).style.display = (key===tab.dataset.sub) ? 'block' : 'none';
+        const el=document.getElementById(mapping[key]); if(el) el.style.display=(key===tab.dataset.sub)?'block':'none';
       });
       if(tab.dataset.sub==='facturas') renderFacturasKPIs();
+      if(onSwitch[tab.dataset.sub]) onSwitch[tab.dataset.sub]();
     });
   });
 }
@@ -6065,7 +6122,7 @@ function renderGastosPro(){
 }
 
 setupSubtabs('entradas-subtabs','entradas',{bandeja:'sub-bandeja',whatsapp:'sub-whatsapp'});
-setupSubtabs('sistema-subtabs','sis',{principios:'sis-principios',organizacion:'sis-organizacion',protocolos:'sis-protocolos',criterios:'sis-criterios',estandares:'sis-estandares',historial:'sis-historial',oninicio:'sis-oninicio'});
+setupSubtabs('sistema-subtabs','sis',{principios:'sis-principios',organizacion:'sis-organizacion',protocolos:'sis-protocolos',criterios:'sis-criterios',estandares:'sis-estandares',historial:'sis-historial','cambios-exg':'sis-cambios-exg','conocimiento-exg':'sis-conocimiento-exg',oninicio:'sis-oninicio'},{onSwitch:{'cambios-exg':()=>cargarCambiosEXG(),'conocimiento-exg':()=>cargarConocimientoEXG()}});
 /* ---------------- TABLAS ORDENABLES Y FILTRABLES POR AÑO/TRIMESTRE — reutilizable en cualquier tabla ---------------- */
 function poblarFiltroAniosChips(tbodyId, contenedorId){
   const tbody = document.getElementById(tbodyId);
@@ -8099,15 +8156,19 @@ function renderMejora(){
     const {seccion, cuerpo} = parsearReporte(m);
     const estado = m.estado || 'pendiente';
     const fecha = m.created_at ? new Date(m.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'}) : '—';
+    const estadoExg = m.estado || 'pendiente';
+    const estadoClass = ESTADO_CLASS[estadoExg] || 'pendiente';
+    const estadoLabel = ESTADO_LABEL[estadoExg] || estadoExg;
+    const tieneProtocolo = !!m.protocolo_exg;
     return `<tr onclick="abrirDetalleReporte('${m.id}')" style="cursor:pointer;">
-      <td>${cuerpo}${m.captura_url ? ` — <a href="${m.captura_url}" target="_blank" onclick="event.stopPropagation();">📷 captura</a>` : ''}</td>
-      <td>${seccion}</td>
-      <td>${fecha}</td>
-      <td><span class="pill ${estado==='revisado'?'terminado':'pendiente'}">${estado==='revisado'?'Revisado':'Pendiente'}</span> <button class="btn" style="padding:2px 6px;font-size:11px;" onclick="event.stopPropagation();anadirAReporte('${m.id}')" title="Añadir/dictar algo más a este reporte">+</button></td>
+      <td>${cuerpo}${tieneProtocolo?` <span style="font-size:10px;color:var(--orange);">EXG</span>`:''}${m.captura_url ? ` — <a href="${m.captura_url}" target="_blank" onclick="event.stopPropagation();">📷</a>` : ''}</td>
+      <td style="font-size:12px;">${seccion}</td>
+      <td style="font-size:12px;">${fecha}</td>
+      <td onclick="event.stopPropagation();">
+        <span class="pill ${estadoClass}" style="font-size:11px;cursor:pointer;" onclick="avanzarEstadoReporte('${m.id}')" title="Pulsa para avanzar estado">${estadoLabel}</span>
+      </td>
       <td style="white-space:nowrap;" onclick="event.stopPropagation();">
-        ${estado==='revisado'
-          ? `<button class="btn sm" onclick="reabrirReporte('${m.id}')">Reabrir</button>`
-          : `<button class="btn primary sm" onclick="marcarRevisado('${m.id}')">Revisado ✓</button>`}
+        <button class="btn" style="padding:2px 6px;font-size:11px;" onclick="anadirAReporte('${m.id}')">+</button>
         <span style="cursor:pointer;color:var(--red);font-weight:800;margin-left:6px;" onclick="borrarSistemaItem('${m.id}')">✕</span>
       </td>
     </tr>`;
@@ -8140,6 +8201,138 @@ async function addMejora(){
     if(error){ mostrarToast('Error al guardar: '+errText(error)); return; }
   }catch(err){ mostrarToast('Error de red al guardar: '+errText(err)); return; }
   loadSistema();
+}
+
+/* ════════════════════════════════════════════════════════════
+   CAMBIOS EXG — UI
+   ════════════════════════════════════════════════════════════ */
+let _cambiosEXGCache = [];
+let _conocimientoEXGCache = [];
+
+async function cargarCambiosEXG(){
+  if(!sb) return;
+  const {data} = await sb.from('cambios_exg').select('*').order('created_at',{ascending:false}).limit(100);
+  _cambiosEXGCache = data || [];
+  renderCambiosEXG();
+}
+
+function renderCambiosEXG(){
+  const filtro = document.getElementById('cambios-exg-filtro')?.value || '';
+  const tbody = document.getElementById('cambios-exg-tbody');
+  if(!tbody) return;
+  const lista = _cambiosEXGCache.filter(c=> !filtro || c.resultado===filtro);
+  if(!lista.length){ tbody.innerHTML='<tr><td colspan="6" class="empty">Sin cambios registrados</td></tr>'; return; }
+  tbody.innerHTML = lista.map(c=>{
+    const fecha = new Date(c.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    const estadoClass = c.resultado==='ok'?'cobrado':c.resultado==='parcial'?'pendiente_enviar':'pendiente';
+    const pendientes = (c.pendientes||[]).length ? `<br><span style="font-size:11px;color:var(--orange);">Pendiente: ${c.pendientes.join(', ')}</span>` : '';
+    return `<tr>
+      <td style="font-size:12px;">${fecha}</td>
+      <td style="text-align:left;font-size:13px;">${svgEsc(c.descripcion||'')}${pendientes}</td>
+      <td style="font-size:11px;"><span class="pill">${c.origen||'—'}</span></td>
+      <td style="font-size:12px;">${c.version_final||'—'}</td>
+      <td><span class="pill ${estadoClass}">${c.resultado||'pendiente'}</span></td>
+      <td>${c.conocimiento_id?`<span title="Generó conocimiento" style="color:var(--orange);">🧠</span>`:''}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function cargarConocimientoEXG(){
+  if(!sb) return;
+  const {data} = await sb.from('conocimiento_exg').select('*').eq('activo',true).order('created_at',{ascending:false});
+  _conocimientoEXGCache = data || [];
+  renderConocimientoEXG();
+}
+
+function renderConocimientoEXG(){
+  const filtroAlcance = document.getElementById('conocimiento-exg-alcance')?.value || '';
+  const lista = _conocimientoEXGCache.filter(k=> !filtroAlcance || k.alcance===filtroAlcance);
+  const cont = document.getElementById('conocimiento-exg-lista');
+  if(!cont) return;
+  if(!lista.length){ cont.innerHTML='<div style="padding:16px;color:var(--ink-soft);">Sin conocimiento registrado todavía</div>'; return; }
+  cont.innerHTML = lista.map(k=>{
+    const alcanceClass = k.alcance==='GLOBAL'?'cobrado':k.alcance==='COMPONENTE'?'pendiente_enviar':'pendiente';
+    const pendienteEn = (k.pendiente_en||[]).length ? `<div style="font-size:11px;color:var(--orange);margin-top:4px;">Pendiente en: ${k.pendiente_en.join(', ')}</div>` : '';
+    const aplicadoEn = (k.aplicado_en||[]).length ? `<div style="font-size:11px;color:var(--green);margin-top:2px;">Aplicado en: ${k.aplicado_en.join(', ')}</div>` : '';
+    const autoaplica = k.puede_autoaplicarse ? '<span style="font-size:11px;background:var(--concrete-2);padding:2px 6px;border-radius:4px;">Motor puede aplicarlo</span>' : '';
+    return `<div style="padding:12px 16px;border-bottom:1px solid var(--line);">
+      <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:4px;">
+        <span class="pill ${alcanceClass}" style="font-size:10px;flex-shrink:0;">${k.alcance}</span>
+        <span style="font-weight:700;font-size:13px;">${svgEsc(k.patron)}</span>
+        ${autoaplica}
+      </div>
+      ${k.descripcion?`<div style="font-size:12px;color:var(--ink-soft);margin-bottom:4px;">${svgEsc(k.descripcion)}</div>`:''}
+      ${k.condicion_deteccion?`<div style="font-size:11px;background:var(--concrete-2);padding:4px 8px;border-radius:6px;margin-bottom:4px;">Detectar: ${svgEsc(k.condicion_deteccion)}</div>`:''}
+      ${pendienteEn}${aplicadoEn}
+      <div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">v${k.version_regla||1} · ${k.veces_reutilizado||0} reutilizaciones · ${k.seccion_origen||'—'}</div>
+    </div>`;
+  }).join('');
+}
+
+async function abrirNuevoConocimientoEXG(){
+  const r = await pedirCampos('Nuevo conocimiento EXG', [
+    {id:'patron', label:'Patrón (título corto)', tipo:'text', requerido:true},
+    {id:'descripcion', label:'Descripción', tipo:'textarea', requerido:false},
+    {id:'alcance', label:'Alcance (LOCAL/COMPONENTE/GLOBAL)', tipo:'text', requerido:false},
+    {id:'condicion_deteccion', label:'Cómo detectarlo sin IA', tipo:'text', requerido:false},
+  ]);
+  if(!r||!sb) return;
+  await registrarConocimientoEXG({
+    patron: r.patron, descripcion: r.descripcion,
+    alcance: (r.alcance||'LOCAL').toUpperCase(),
+    condicionDeteccion: r.condicion_deteccion
+  });
+  cargarConocimientoEXG();
+  mostrarToast('Conocimiento registrado', 'ok');
+}
+
+/* ════════════════════════════════════════════════════════════
+   REPORTES — ciclo de vida EXG (estados extendidos)
+   ════════════════════════════════════════════════════════════ */
+const ESTADOS_REPORTE = ['pendiente','analizado','en_desarrollo','resuelto','aprendizaje_generado','descartado'];
+const ESTADO_LABEL = {
+  pendiente:'Pendiente', analizado:'Analizado', en_desarrollo:'En desarrollo',
+  resuelto:'Resuelto', aprendizaje_generado:'✓ Aprendizaje', descartado:'Descartado'
+};
+const ESTADO_CLASS = {
+  pendiente:'pendiente', analizado:'pendiente_enviar', en_desarrollo:'pendiente_enviar',
+  resuelto:'cobrado', aprendizaje_generado:'adjudicado', descartado:'anulado'
+};
+async function avanzarEstadoReporte(id){
+  const m = SISTEMA_CACHE.mejora.find(x=>x.id===id);
+  if(!m||!sb) return;
+  const idx = ESTADOS_REPORTE.indexOf(m.estado||'pendiente');
+  const siguiente = ESTADOS_REPORTE[Math.min(idx+1, ESTADOS_REPORTE.length-1)];
+  const nuevaData = {...m, estado: siguiente}; delete nuevaData.id; delete nuevaData.created_at;
+  await sb.from('sistema').update({data: nuevaData}).eq('id', id);
+  m.estado = siguiente;
+  renderMejora();
+}
+
+/* ════════════════════════════════════════════════════════════
+   ARRANQUE EXG — función para leer sistema al inicio
+   ════════════════════════════════════════════════════════════ */
+async function arranqueEXG(){
+  if(!sb) return;
+  // Leer reglas sagradas
+  const {data:reglas} = await sb.from('sistema').select('tipo,data').in('tipo',['arranque_exg','protocolo_chat_directo','decision']).limit(20);
+  // Leer conocimiento activo
+  const {data:conocimiento} = await sb.from('conocimiento_exg').select('patron,alcance,pendiente_en').eq('activo',true).limit(50);
+  // Leer cambios recientes
+  const {data:cambios} = await sb.from('cambios_exg').select('descripcion,version_final,resultado,pendientes').order('created_at',{ascending:false}).limit(10);
+  // Leer reportes pendientes
+  const {data:todosSistema} = await sb.from('sistema').select('tipo,data').eq('tipo','mejora').limit(20);
+  const reportesPendientes = (todosSistema||[]).filter(s=>(s.data?.estado||'pendiente')==='pendiente');
+  console.group('🚀 ARRANQUE EXG');
+  console.log('Reglas cargadas:', (reglas||[]).length);
+  console.log('Conocimiento activo:', (conocimiento||[]).length, 'patrones');
+  console.log('Cambios recientes:', (cambios||[]).length);
+  console.log('Reportes pendientes:', reportesPendientes.length);
+  if(reportesPendientes.length) console.warn('⚠ HAY', reportesPendientes.length, 'REPORTES PENDIENTES DE PROCESAR');
+  const pendientesPropagacion = (conocimiento||[]).filter(k=>(k.pendiente_en||[]).length);
+  if(pendientesPropagacion.length) console.warn('⚠ HAY', pendientesPropagacion.length, 'CONOCIMIENTOS CON PROPAGACIÓN PENDIENTE');
+  console.groupEnd();
+  return {reglas, conocimiento, cambios, reportesPendientes};
 }
 
 /* ---------------- REPORTAR FALLO (con dictado) ---------------- */
@@ -10626,6 +10819,8 @@ async function cargarDatosReales(){
   if(!sb) return;
   // Cargar notificaciones al inicio
   cargarNotificaciones();
+  // ARRANQUE EXG — leer sistema antes de trabajar
+  arranqueEXG();
   // Actualizar versión desde BD
   try{
     const {data:arr} = await sb.from('arranque').select('valor').eq('clave','web_version_actual').maybeSingle();
