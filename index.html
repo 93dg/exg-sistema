@@ -2788,7 +2788,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.94</div>
+        <div class="sub" id="version-badge">V3.95</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12336,15 +12336,17 @@ function normNIF(n){
   if(!n) return null;
   return n.trim().toUpperCase().replace(/[\s\-\.]/g,'').slice(0,9);
 }
-const FJ = [ // formas jurídicas → orden: más largo primero para evitar solapamiento
-  [/S\.?\s*L\.?\s*U\.?(?=\s|$|,)/gi,'S.L.U.'],
-  [/S\.?\s*A\.?\s*U\.?(?=\s|$|,)/gi,'S.A.U.'],
-  [/S\.?\s*L\.?\s*L\.?(?=\s|$|,)/gi,'S.L.L.'],
-  [/S\.?\s*A\.?\s*L\.?(?=\s|$|,)/gi,'S.A.L.'],
-  [/S\.?\s*C\.?\s*P\.?(?=\s|$|,)/gi,'S.C.P.'],
-  [/S\.?\s*L\.?(?=\s|$|,)/gi,'S.L.'],
-  [/S\.?\s*A\.?(?=\s|$|,)/gi,'S.A.'],
-  [/C\.?\s*B\.?(?=\s|$|,)/gi,'C.B.'],
+const FJ = [ // formas jurídicas: tokens INDEPENDIENTES — no detecta dentro de palabras
+  // (?<!\w) = no precedido por letra/número → descarta CARINSA, CARRIZOSA, DEHESA, etc.
+  // (?!\w)  = no seguido  por letra/número → descarta SARL, SLU como sufijo
+  [/(?<!\w)S\.?\s*L\.?\s*U\.?(?!\w)/gi,'S.L.U.'],
+  [/(?<!\w)S\.?\s*A\.?\s*U\.?(?!\w)/gi,'S.A.U.'],
+  [/(?<!\w)S\.?\s*L\.?\s*L\.?(?!\w)/gi,'S.L.L.'],
+  [/(?<!\w)S\.?\s*A\.?\s*L\.?(?!\w)/gi,'S.A.L.'],
+  [/(?<!\w)S\.?\s*C\.?\s*P\.?(?!\w)/gi,'S.C.P.'],
+  [/(?<!\w)S\.?\s*L\.?(?!\w)/gi,'S.L.'],
+  [/(?<!\w)S\.?\s*A\.?(?!\w)/gi,'S.A.'],
+  [/(?<!\w)C\.?\s*B\.?(?!\w)/gi,'C.B.'],
 ];
 function normRazonSocial(n){
   if(!n) return n;
@@ -12352,8 +12354,7 @@ function normRazonSocial(n){
   r = r.replace(/,\s*(S\.?L\.?|S\.?A\.?|C\.?B\.?|S\.?C\.?P\.?)/gi,' $1'); // quitar coma antes de forma jurídica
   FJ.forEach(([re,rep])=>{ r = r.replace(re, rep); });
   r = r.replace(/\.{2,}/g,'.'); // eliminar puntos dobles/triples
-  r = r.replace(/\s+\.([A-Z])/g,' $1'); // quitar espacio+punto antes de letra (p.ej. " .S.L.")
-  r = r.replace(/^\./,''); // quitar punto inicial
+  r = r.replace(/^\./,'');        // quitar punto inicial si lo hubiera
   return r.trim();
 }
 function normDireccion(d){
@@ -12487,8 +12488,9 @@ async function revisarClientesAuto(forzar=false){
 
       // Auto-clasificar tipo basado en razón social y datos
       const nomUp=(patch.nombre||e.nombre||'').toUpperCase();
-      const esSociedad=/\b(S\.?L\.?U?\.?|S\.?A\.?U?\.?|S\.?L\.?|S\.?A\.?|C\.?B\.?|S\.?C\.?P\.?|S\.?L\.?L\.?)$|SOCIEDAD|COOPERATIVA|COMUNIDAD (DE BIENES|DE PROPIETARIOS)/i.test(nomUp);
-      const esAyuntamiento=/\bAYUNTAMIENTO|EXCMO\.?|EXMO\.?|DIPUTACION|JUNTA DE|CONSEJERIA|MINISTERIO|CONSORCIO|MANCOMUNIDAD/i.test(nomUp);
+      // Forma jurídica como token independiente: (?<!\w) garantiza que no está dentro de una palabra
+      const esSociedad=/(?<!\w)(S\.?L\.?U?\.?|S\.?A\.?U?\.?|S\.?L\.?|S\.?A\.?|C\.?B\.?|S\.?C\.?P\.)(?!\w)|SOCIEDAD|COOPERATIVA/i.test(nomUp);
+      const esAyuntamiento=/AYUNTAMIENTO|EXCMO\.?|EXMO\.?|DIPUTACION|JUNTA DE|CONSEJERIA|MINISTERIO|CONSORCIO|MANCOMUNIDAD/i.test(nomUp);
       if(esAyuntamiento && e.tipo!=='ayuntamiento') patch.tipo='ayuntamiento';
       else if(esSociedad && e.tipo==='particular') patch.tipo='empresa';
 
@@ -12884,7 +12886,10 @@ let clientDrawerAbiertoId = null;
 async function guardarContactoCliente(){
   const statusEl = document.getElementById('c-contacto-status');
   if(!sb || !clientDrawerAbiertoId){ statusEl.textContent = 'No se pudo guardar.'; return; }
+  const nombreRaw = (document.getElementById('c-nombre-input')?.value||'').trim();
+  const nombreNorm = nombreRaw ? normRazonSocial(nombreRaw) : null;
   const payload = {
+    ...(nombreNorm ? {nombre: nombreNorm} : {}),
     nif: document.getElementById('c-nif').value.trim() || null,
     email: document.getElementById('c-email').value.trim() || null,
     telefono: document.getElementById('c-telefono').value.trim() || null,
@@ -12895,13 +12900,14 @@ async function guardarContactoCliente(){
   const {error} = await sb.from('entidades').update(payload).eq('id', clientDrawerAbiertoId);
   if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color='var(--red)'; return; }
   const c = clientes.find(x=>x.id===clientDrawerAbiertoId);
-  if(c) Object.assign(c, payload);
+  if(c){ const oldName=c.name; Object.assign(c, payload); if(payload.nombre) c.name=payload.nombre; if(payload.nombre&&oldName!==payload.nombre) renderClientesTable(); }
   statusEl.textContent = 'Guardado ✓'; statusEl.style.color='var(--green)';
 }
 function openClientDrawer(name){
   const c = clientes.find(x=>x.name===name) || clientes[0];
   document.getElementById('c-type').textContent = c.type;
   document.getElementById('c-name').textContent = c.name;
+  document.getElementById('c-nombre-input').value = c.name || '';
   document.getElementById('c-zone').textContent = c.zone;
   document.getElementById('c-tarifa').textContent = c.tarifa;
   const PRIO_LABEL = {alta:'Alta', media:'Media', baja:'Baja'};
