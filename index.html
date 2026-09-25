@@ -2731,7 +2731,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.85</div>
+        <div class="sub" id="version-badge">V3.86</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5000,12 +5000,27 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       <button class="close-x" onclick="cerrarDetalleReporte()">✕</button>
     </div>
     <div class="drawer-body">
-      <div class="field" style="margin-bottom:12px;"><div class="l">Reporte (puedes editarlo o añadir una corrección)</div>
-        <textarea class="search-box" style="width:100%;height:120px;" id="reporte-detalle-texto"></textarea>
+      <!-- Estado EXG -->
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+        <span id="reporte-detalle-estado-pill" class="pill pendiente" style="cursor:pointer;" onclick="avanzarEstadoReporte(reporteDetalleId);abrirDetalleReporte(reporteDetalleId)" title="Pulsa para avanzar estado">Pendiente</span>
+        <span id="reporte-detalle-seccion-badge" class="pill" style="font-size:11px;"></span>
+        <span id="reporte-detalle-fecha" style="font-size:11px;color:var(--ink-soft);margin-left:auto;"></span>
       </div>
-      <div id="reporte-detalle-captura"></div>
-      <div class="state-row" style="gap:8px;margin-top:10px;">
-        <button class="btn primary" style="flex:1;" onclick="guardarDetalleReporte()">Guardar cambios</button>
+      <!-- Texto editable -->
+      <div class="field" style="margin-bottom:12px;">
+        <div class="l">Reporte</div>
+        <textarea class="search-box" style="width:100%;height:100px;" id="reporte-detalle-texto"></textarea>
+      </div>
+      <div id="reporte-detalle-captura" style="margin-bottom:10px;"></div>
+      <!-- PROTOCOLO EXG -->
+      <div id="reporte-detalle-protocolo" style="display:none;margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:700;color:var(--orange);margin-bottom:4px;">⚡ PROTOCOLO EXG</div>
+        <pre id="reporte-detalle-protocolo-txt" style="font-size:11px;line-height:1.5;white-space:pre-wrap;background:var(--concrete-2);border-radius:6px;padding:10px;color:var(--ink-soft);max-height:160px;overflow-y:auto;"></pre>
+      </div>
+      <!-- Acciones -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+        <button class="btn primary" style="flex:1;" onclick="guardarDetalleReporte()">Guardar</button>
+        <button class="btn" onclick="avanzarEstadoReporte(reporteDetalleId);abrirDetalleReporte(reporteDetalleId)">→ Avanzar estado</button>
       </div>
       <div class="sub-t" id="reporte-detalle-status" style="margin-top:8px;"></div>
     </div>
@@ -8109,11 +8124,25 @@ function abrirDetalleReporte(id){
   const m = SISTEMA_CACHE.mejora.find(x=>x.id===id);
   if(!m) return;
   reporteDetalleId = id;
-  const {seccion} = parsearReporte(m);
-  document.getElementById('reporte-detalle-seccion').textContent = seccion;
-  document.getElementById('reporte-detalle-texto').value = m.texto || '';
+  const {seccion, cuerpo} = parsearReporte(m);
+  document.getElementById('reporte-detalle-seccion').textContent = 'Reporte';
+  document.getElementById('reporte-detalle-texto').value = cuerpo || '';
   document.getElementById('reporte-detalle-captura').innerHTML = m.captura_url ? `<button class="btn sm" onclick="verImagenGrande('${m.captura_url}')">📷 Ver captura</button>` : '';
   document.getElementById('reporte-detalle-status').textContent = '';
+  // Estado EXG
+  const estado = m.estado || 'pendiente';
+  const pill = document.getElementById('reporte-detalle-estado-pill');
+  if(pill){ pill.textContent = ESTADO_LABEL[estado]||estado; pill.className='pill '+(ESTADO_CLASS[estado]||'pendiente'); }
+  const secBadge = document.getElementById('reporte-detalle-seccion-badge');
+  if(secBadge) secBadge.textContent = seccion||'—';
+  const fechaEl = document.getElementById('reporte-detalle-fecha');
+  if(fechaEl && m.created_at) fechaEl.textContent = new Date(m.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+  // PROTOCOLO EXG
+  const protDiv = document.getElementById('reporte-detalle-protocolo');
+  const protTxt = document.getElementById('reporte-detalle-protocolo-txt');
+  if(m.protocolo_exg && protDiv && protTxt){
+    protDiv.style.display=''; protTxt.textContent=m.protocolo_exg;
+  } else if(protDiv){ protDiv.style.display='none'; }
   document.getElementById('reporte-detalle-overlay').classList.add('active');
 }
 function cerrarDetalleReporte(){ document.getElementById('reporte-detalle-overlay').classList.remove('active'); reporteDetalleId = null; }
@@ -8252,8 +8281,8 @@ function renderConocimientoEXG(){
   if(!lista.length){ cont.innerHTML='<div style="padding:16px;color:var(--ink-soft);">Sin conocimiento registrado todavía</div>'; return; }
   cont.innerHTML = lista.map(k=>{
     const alcanceClass = k.alcance==='GLOBAL'?'cobrado':k.alcance==='COMPONENTE'?'pendiente_enviar':'pendiente';
-    const pendienteEn = (k.pendiente_en||[]).length ? `<div style="font-size:11px;color:var(--orange);margin-top:4px;">Pendiente en: ${k.pendiente_en.join(', ')}</div>` : '';
-    const aplicadoEn = (k.aplicado_en||[]).length ? `<div style="font-size:11px;color:var(--green);margin-top:2px;">Aplicado en: ${k.aplicado_en.join(', ')}</div>` : '';
+    const pendienteEn = (k.pendiente_en||[]).length ? `<div style="font-size:11px;color:var(--orange);margin-top:4px;">⚠ Pendiente propagar en: ${k.pendiente_en.map(s=>`<button class="btn" style="font-size:10px;padding:1px 6px;margin:1px;" onclick="marcarPropagada('${k.id}','${s}');cargarConocimientoEXG()">${s} ✓</button>`).join('')}</div>` : '';
+    const aplicadoEn = (k.aplicado_en||[]).length ? `<div style="font-size:11px;color:var(--green);margin-top:2px;">✓ Aplicado en: ${k.aplicado_en.join(', ')}</div>` : '';
     const autoaplica = k.puede_autoaplicarse ? '<span style="font-size:11px;background:var(--concrete-2);padding:2px 6px;border-radius:4px;">Motor puede aplicarlo</span>' : '';
     return `<div style="padding:12px 16px;border-bottom:1px solid var(--line);">
       <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:4px;">
@@ -8326,6 +8355,7 @@ async function arranqueEXG(){
   console.group('🚀 ARRANQUE EXG');
   console.log('Reglas cargadas:', (reglas||[]).length);
   console.log('Conocimiento activo:', (conocimiento||[]).length, 'patrones');
+  setTimeout(comprobarPropagacionesPendientes, 3000); // comprobar propagaciones pendientes
   console.log('Cambios recientes:', (cambios||[]).length);
   console.log('Reportes pendientes:', reportesPendientes.length);
   if(reportesPendientes.length) console.warn('⚠ HAY', reportesPendientes.length, 'REPORTES PENDIENTES DE PROCESAR');
@@ -8399,6 +8429,90 @@ function toggleDictado(){
   dictadoActivo = true;
   micBtn.classList.add('recording');
 }
+
+
+/* ════════════════════════════════════════════════════════════
+   PROPAGACIÓN EXG — detecta dónde aplica cada conocimiento
+   ════════════════════════════════════════════════════════════ */
+
+// Mapa de componentes compartidos: si una sección tiene algo, las demás también deberían tenerlo
+const COMPONENTES_EXG = {
+  'tabla_documentos':    ['facturas','albaranes','presupuestos','proformas','gastos','centro_control'],
+  'filtros_dd':          ['facturas','albaranes','presupuestos','clientes','centro_control'],
+  'tarjetas_movil':      ['facturas','albaranes','presupuestos','clientes','centro_control'],
+  'sticky_header':       ['clientes','facturas','albaranes','presupuestos'],
+  'acciones_seleccion':  ['clientes','facturas','albaranes','presupuestos'],
+  'busqueda_texto':      ['facturas','albaranes','presupuestos','clientes','centro_control','correo'],
+  'normalizacion':       ['clientes','documentos_economicos','entidades'],
+  'barra_sel_movil':     ['clientes','facturas','albaranes','presupuestos'],
+};
+
+// Detecta en qué secciones se podría propagar un patrón dado
+function detectarPropagacion(patron, seccionOrigen, seccionesYaAplicadas){
+  const patronNorm = (patron||'').toLowerCase();
+  const pendientes = [];
+  for(const [componente, secciones] of Object.entries(COMPONENTES_EXG)){
+    // ¿Este patrón menciona este componente?
+    if(!patronNorm.includes(componente.replace(/_/g,' ')) && !componente.split('_').every(w=>patronNorm.includes(w))) continue;
+    for(const sec of secciones){
+      if(sec===seccionOrigen) continue;
+      if((seccionesYaAplicadas||[]).includes(sec)) continue;
+      if(!pendientes.includes(sec)) pendientes.push(sec);
+    }
+  }
+  return pendientes;
+}
+
+// Al registrar conocimiento, calcular automáticamente dónde debería propagarse
+async function registrarConocimientoConPropagacion(opts){
+  const pendienteEn = detectarPropagacion(opts.patron, opts.seccionOrigen, opts.aplicadoEn||[]);
+  const id = await registrarConocimientoEXG({...opts, pendienteEn});
+  if(pendienteEn.length){
+    console.log(`📢 Propagación detectada para "${opts.patron}":`, pendienteEn);
+    mostrarToast(`Patrón registrado. Pendiente propagar en: ${pendienteEn.join(', ')}`, 'ok');
+  }
+  return id;
+}
+
+// Comprobar si hay propagaciones pendientes y mostrarlas en el panel de notificaciones
+async function comprobarPropagacionesPendientes(){
+  if(!sb) return;
+  const {data} = await sb.from('conocimiento_exg')
+    .select('id,patron,pendiente_en,seccion_origen')
+    .eq('activo',true)
+    .not('pendiente_en','eq','{}');
+  if(!data||!data.length) return;
+  const reales = data.filter(k=>(k.pendiente_en||[]).length);
+  if(!reales.length) return;
+  // Registrar como notificación en sistema_notificaciones si existe
+  if(typeof registrarNotificacion==='function'){
+    for(const k of reales){
+      await registrarNotificacion({
+        mensaje_original: `Propagación pendiente: ${k.patron}`,
+        decision_sistema: `Este patrón aprendido en ${k.seccion_origen} aún no se ha aplicado en: ${k.pendiente_en.join(', ')}`,
+        accion_realizada: 'Pendiente de implementar',
+        elemento_tipo: 'conocimiento',
+        elemento_nombre: k.patron,
+        seccion: 'sistema',
+        origen: 'motor_propagacion'
+      });
+    }
+  }
+  return reales;
+}
+
+// Marcar una sección como ya propagada en un conocimiento
+async function marcarPropagada(conocimientoId, seccion){
+  if(!sb) return;
+  const {data} = await sb.from('conocimiento_exg').select('aplicado_en,pendiente_en').eq('id',conocimientoId).single();
+  if(!data) return;
+  const aplicadoEn = [...(data.aplicado_en||[]), seccion];
+  const pendienteEn = (data.pendiente_en||[]).filter(s=>s!==seccion);
+  await sb.from('conocimiento_exg').update({aplicado_en:aplicadoEn, pendiente_en:pendienteEn}).eq('id',conocimientoId);
+}
+/* ════════════════════════════════════════════════════════════
+   FIN PROPAGACIÓN EXG
+   ════════════════════════════════════════════════════════════ */
 
 // ════════════════════════════════════════════════════════════
 // SISTEMA EXG — CAMBIOS, CONOCIMIENTO Y CIERRE
