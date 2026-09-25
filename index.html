@@ -2731,7 +2731,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V3.86</div>
+        <div class="sub" id="version-badge">V3.87</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4206,8 +4206,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
           <div class="panel-body" id="conocimiento-exg-lista" style="padding:0;"></div>
         </div>
-        <div style="padding:14px 0;">
-          <button class="btn primary" onclick="abrirNuevoConocimientoEXG()">+ Añadir conocimiento</button>
+        <div style="padding:14px 0;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn primary" onclick="ejecutarMotorEXG()">⚡ Ejecutar motor offline</button>
+          <button class="btn" onclick="abrirNuevoConocimientoEXG()">+ Añadir conocimiento</button>
         </div>
       </div>
 
@@ -8293,7 +8294,10 @@ function renderConocimientoEXG(){
       ${k.descripcion?`<div style="font-size:12px;color:var(--ink-soft);margin-bottom:4px;">${svgEsc(k.descripcion)}</div>`:''}
       ${k.condicion_deteccion?`<div style="font-size:11px;background:var(--concrete-2);padding:4px 8px;border-radius:6px;margin-bottom:4px;">Detectar: ${svgEsc(k.condicion_deteccion)}</div>`:''}
       ${pendienteEn}${aplicadoEn}
-      <div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">v${k.version_regla||1} · ${k.veces_reutilizado||0} reutilizaciones · ${k.seccion_origen||'—'}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+        <div style="font-size:11px;color:var(--ink-soft);">v${k.version_regla||1} · ${k.veces_reutilizado||0} usos · ${k.seccion_origen||'—'}</div>
+        ${!k.puede_autoaplicarse&&k.descripcion?`<button class="btn sm" style="font-size:10px;padding:2px 8px;" onclick="copiarTexto(${JSON.stringify(k.descripcion||'')})">📋</button>`:''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -8356,6 +8360,11 @@ async function arranqueEXG(){
   console.log('Reglas cargadas:', (reglas||[]).length);
   console.log('Conocimiento activo:', (conocimiento||[]).length, 'patrones');
   setTimeout(comprobarPropagacionesPendientes, 3000); // comprobar propagaciones pendientes
+  // Motor EXG: ejecutar comprobaciones ligeras (no las correcciones completas) al arrancar
+  setTimeout(async()=>{
+    const pend = await comprobarPropagacionesPendientes();
+    if(pend&&pend.length) console.warn('Motor EXG: hay',pend.length,'propagaciones pendientes de aplicar');
+  }, 5000);
   console.log('Cambios recientes:', (cambios||[]).length);
   console.log('Reportes pendientes:', reportesPendientes.length);
   if(reportesPendientes.length) console.warn('⚠ HAY', reportesPendientes.length, 'REPORTES PENDIENTES DE PROCESAR');
@@ -8431,6 +8440,180 @@ function toggleDictado(){
 }
 
 
+
+/* ════════════════════════════════════════════════════════════
+   MOTOR EXG OFFLINE — aplica lo seguro, propone lo que no
+   ════════════════════════════════════════════════════════════ */
+
+// Catálogo de acciones que el motor puede aplicar o proponer
+const MOTOR_ACCIONES = {
+
+  // ── ACCIONES SEGURAS (datos, sin tocar código) ──────────────
+  'normalizar_nif': {
+    descripcion: 'Normaliza NIF de todos los clientes al formato canónico',
+    tipo: 'datos',
+    seguro: true,
+    ejecutar: async () => {
+      if(!sb) return {ok:false, msg:'Sin conexión'};
+      const {data} = await sb.from('entidades').select('id,nif').not('nif','is',null);
+      let corregidos=0;
+      for(const e of data||[]){
+        const norm = (e.nif||'').trim().toUpperCase().replace(/[\s\-\.]/g,'');
+        if(norm!==e.nif){ await sb.from('entidades').update({nif:norm}).eq('id',e.id); corregidos++; }
+      }
+      return {ok:true, msg:`${corregidos} NIFs normalizados`};
+    }
+  },
+
+  'normalizar_razon_social': {
+    descripcion: 'Normaliza razón social de todos los clientes (S.L., S.A., etc.)',
+    tipo: 'datos',
+    seguro: true,
+    ejecutar: async () => {
+      if(!sb) return {ok:false, msg:'Sin conexión'};
+      const {data} = await sb.from('entidades').select('id,nombre');
+      let corregidos=0;
+      for(const e of data||[]){
+        if(!e.nombre) continue;
+        const norm = normRazonSocial(e.nombre);
+        if(norm && norm!==e.nombre){ await sb.from('entidades').update({nombre:norm}).eq('id',e.id); corregidos++; }
+      }
+      return {ok:true, msg:`${corregidos} nombres normalizados`};
+    }
+  },
+
+  'clasificar_tipo_empresa': {
+    descripcion: 'Detecta S.L./S.A. y asigna tipo=empresa, Ayuntamientos tipo=ayuntamiento',
+    tipo: 'datos',
+    seguro: true,
+    ejecutar: async () => {
+      if(!sb) return {ok:false, msg:'Sin conexión'};
+      const {data} = await sb.from('entidades').select('id,nombre,tipo').eq('tipo','particular');
+      let corregidos=0;
+      for(const e of data||[]){
+        const n=(e.nombre||'').toUpperCase();
+        const esSoc=/\b(S\.?L\.?U?\.?|S\.?A\.?U?\.?|S\.?L\.?|S\.?A\.?|C\.?B\.?|S\.?C\.?P\.?)$/i.test(n)||/SOCIEDAD|COOPERATIVA/i.test(n);
+        const esAy=/AYUNTAMIENTO|EXCMO|DIPUTACION|JUNTA DE|MANCOMUNIDAD/i.test(n);
+        const tipoNuevo = esAy?'ayuntamiento':esSoc?'empresa':null;
+        if(tipoNuevo){ await sb.from('entidades').update({tipo:tipoNuevo}).eq('id',e.id); corregidos++; }
+      }
+      return {ok:true, msg:`${corregidos} tipos corregidos`};
+    }
+  },
+
+  'deducir_provincia_poblacion': {
+    descripcion: 'Completa provincia/CP desde la población usando datos existentes',
+    tipo: 'datos',
+    seguro: true,
+    ejecutar: async () => {
+      if(!sb) return {ok:false, msg:'Sin conexión'};
+      const {data} = await sb.from('entidades').select('id,nombre,poblacion,provincia,cp');
+      const mapPP={}, mapPCP={};
+      for(const e of data||[]){ if(e.poblacion&&e.provincia){ const k=e.poblacion.trim().toUpperCase(); mapPP[k]=e.provincia; if(e.cp&&!mapPCP[k]) mapPCP[k]=e.cp; } }
+      let corregidos=0;
+      for(const e of data||[]){
+        if(!e.poblacion) continue;
+        const k=e.poblacion.trim().toUpperCase();
+        const patch={};
+        if(!e.provincia&&mapPP[k]) patch.provincia=mapPP[k];
+        if(!e.cp&&mapPCP[k]) patch.cp=mapPCP[k];
+        if(Object.keys(patch).length){ await sb.from('entidades').update(patch).eq('id',e.id); corregidos++; }
+      }
+      return {ok:true, msg:`${corregidos} provincias/CP completados`};
+    }
+  },
+
+  // ── PROPUESTAS (código/UX — Claude implementa) ──────────────
+  'buscador_en_seccion': {
+    descripcion: 'Añadir buscador de texto a secciones que no lo tienen',
+    tipo: 'codigo',
+    seguro: false,
+    secciones_objetivo: ['trabajos','flota','empresa','tarifas','correo'],
+    propuesta: (seccion) => `Añadir input de búsqueda con oninput="filtrarTabla()" en el topbar/panel de filtros de la sección "${seccion}", siguiendo el mismo patrón que en Facturas (#fact-search) o Centro de Control (#control-search).`
+  },
+
+  'tarjetas_movil_en_seccion': {
+    descripcion: 'Añadir vista de tarjetas móvil a secciones que solo tienen tabla',
+    tipo: 'codigo',
+    seguro: false,
+    secciones_objetivo: ['trabajos','flota'],
+    propuesta: (seccion) => `Crear lista de tarjetas móviles para "${seccion}" siguiendo el mismo patrón que Albaranes (#alb-lista-movil / renderAlbaranesMovil), con .lista-movil-solo y .tabla-escritorio-solo para alternar según viewport.`
+  },
+
+  'sticky_header_movil': {
+    descripcion: 'Cabecero sticky con acciones de selección en secciones con listas',
+    tipo: 'codigo',
+    seguro: false,
+    secciones_objetivo: ['facturas','albaranes','presupuestos'],
+    propuesta: (seccion) => `Implementar cabecero sticky en "${seccion}" igual que en Clientes (#cli-sticky-bar): position:fixed; fila normal con filtros compactos; fila selección (display:none por defecto) con acciones masivas que aparece al marcar ítems.`
+  },
+};
+
+// Ejecutar motor: aplica lo seguro, genera propuestas para lo demás
+async function ejecutarMotorEXG(){
+  if(!sb) return;
+  mostrarToast('Motor EXG en ejecución…');
+  const resultados = [];
+
+  for(const [clave, accion] of Object.entries(MOTOR_ACCIONES)){
+    if(accion.tipo==='datos' && accion.seguro){
+      try{
+        const r = await accion.ejecutar();
+        resultados.push({clave, tipo:'datos', resultado:r.msg, ok:r.ok});
+        // Registrar en cambios_exg
+        if(r.ok && r.msg.match(/[1-9]/)){
+          await registrarCambioEXG({origen:'MOTOR_OFFLINE', descripcion:accion.descripcion+' — '+r.msg, resultado:'ok'});
+        }
+      }catch(e){ resultados.push({clave, tipo:'datos', resultado:'Error: '+e.message, ok:false}); }
+    } else if(accion.tipo==='codigo'){
+      // Generar propuestas para secciones pendientes del conocimiento
+      for(const sec of (accion.secciones_objetivo||[])){
+        resultados.push({clave, tipo:'propuesta', seccion:sec, propuesta:accion.propuesta(sec)});
+      }
+    }
+  }
+
+  // Guardar propuestas de código en conocimiento_exg
+  const propuestas = resultados.filter(r=>r.tipo==='propuesta');
+  for(const p of propuestas){
+    await registrarConocimientoEXG({
+      patron: p.clave.replace(/_/g,' '),
+      descripcion: p.propuesta,
+      alcance: 'COMPONENTE',
+      seccionOrigen: p.seccion,
+      pendienteEn: [p.seccion],
+      puedeAutoaplicarse: false,
+      requiereConfirmacion: true
+    });
+  }
+
+  // Recargar datos tras correcciones
+  if(resultados.some(r=>r.tipo==='datos'&&r.ok)) {
+    cargarDatosReales();
+    if(typeof renderClientesTable==='function') setTimeout(renderClientesTable,1000);
+  }
+
+  // Mostrar resumen
+  const dataOk = resultados.filter(r=>r.tipo==='datos'&&r.ok&&r.resultado.match(/[1-9]/));
+  const props = resultados.filter(r=>r.tipo==='propuesta');
+  const msg = [
+    dataOk.length?`${dataOk.length} correcciones de datos`:'',
+    props.length?`${props.length} propuestas de código generadas`:'',
+  ].filter(Boolean).join(' · ') || '✓ Sin cambios pendientes';
+  mostrarToast(msg, 'ok');
+
+  // Cargar la vista de conocimiento si está visible
+  if(document.getElementById('sis-conocimiento-exg')?.style.display!=='none') cargarConocimientoEXG();
+
+  return resultados;
+}
+/* ════════════════════════════════════════════════════════════
+   FIN MOTOR EXG OFFLINE
+   ════════════════════════════════════════════════════════════ */
+
+function copiarTexto(txt){
+  navigator.clipboard?.writeText(txt).then(()=>mostrarToast('Copiado','ok')).catch(()=>mostrarToast('No se pudo copiar'));
+}
 /* ════════════════════════════════════════════════════════════
    PROPAGACIÓN EXG — detecta dónde aplica cada conocimiento
    ════════════════════════════════════════════════════════════ */
