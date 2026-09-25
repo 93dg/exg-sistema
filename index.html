@@ -2792,7 +2792,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.08</div>
+        <div class="sub" id="version-badge">V4.09</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12327,34 +12327,37 @@ function sincronizarBusquedaClientes(v){
 function toggleDocsEnCard(id, btn){
   const card = btn.closest('.cliente-card');
   if(!card) return;
+  // Toggle si ya existe
   let panel = card.nextElementSibling;
   if(panel && panel.classList.contains('cli-docs-expand')){
     const open = panel.style.display!=='none';
     panel.style.display = open?'none':'block';
-    btn.querySelector('span').textContent = open?'▾':'▴';
+    btn.innerHTML = `📄 ${btn.dataset.n} <span style="font-size:10px;">${open?'▾':'▴'}</span>`;
     return;
   }
-  // Crear panel con los docs
+  // Crear panel primera vez
   const docs = Object.values(documentosRealesById||{})
     .filter(d=>d.entidad_id===id)
     .sort((a,b)=>new Date(b.dateRaw||0)-new Date(a.dateRaw||0));
   panel = document.createElement('div');
   panel.className = 'cli-docs-expand';
-  panel.style.cssText = 'background:var(--concrete-2);border-radius:0 0 12px 12px;margin:-8px 0 8px;padding:8px 12px;font-size:12px;';
+  panel.style.cssText = 'margin:0 0 8px;';
   panel.onclick = e=>e.stopPropagation();
-  if(!docs.length){
-    panel.innerHTML = '<span style="color:var(--ink-soft);">Sin documentos</span>';
-  } else {
-    panel.innerHTML = docs.map(d=>{
-      const url = d.archivo_url||(d.archivo_path?`https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${d.archivo_path}`:null);
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);cursor:pointer;" onclick="openDocumentViewer('${d.id}')">
-        <span><b>${tipoDocEtiqueta(d.type)}</b> ${d.numero||'—'} · ${formatFechaCorta(d.dateRaw)}</span>
-        <span style="font-weight:700;">${d.amountLabel}</span>
-      </div>`;
-    }).join('');
-  }
+  panel.innerHTML = docs.length ? docs.map(d=>`
+    <div onclick="openDocumentViewer('${d.id}')" style="
+      display:flex;align-items:center;gap:10px;
+      background:var(--paper);border:1px solid var(--line);
+      border-radius:10px;margin:4px 0;padding:10px 12px;cursor:pointer;">
+      <span style="font-size:18px;flex:0 0 auto;">${TIPO_DOC_ICONO[d.type]||'📄'}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;">${tipoDocEtiqueta(d.type,false)} ${d.numero||'—'}</div>
+        <div style="font-size:11px;color:var(--ink-soft);">${formatFechaCorta(d.dateRaw)||'—'}</div>
+      </div>
+      <span style="font-size:13px;font-weight:700;white-space:nowrap;">${d.amountLabel}</span>
+    </div>`).join('')
+    : '<div style="padding:8px 4px;color:var(--ink-soft);font-size:12px;">Sin documentos</div>';
   card.after(panel);
-  btn.querySelector('span').textContent = '▴';
+  btn.innerHTML = `📄 ${btn.dataset.n} <span style="font-size:10px;">▴</span>`;
 }
 function renderClientesMovil(clientesFiltrados){
   const lista = document.getElementById('clientes-lista-movil');
@@ -12388,7 +12391,7 @@ function renderClientesMovil(clientesFiltrados){
       <div class="cc-total-v">${totalFmt}</div>
       ${pendFmt || '<div></div>'}
       ${(detalles||ultimoTxt||pendIdentidad) ? `<div class="cc-extra">${detalles ? `<span style="font-size:11px;color:var(--ink-soft);">${svgEsc(detalles)}</span>` : ''}${ultimoTxt ? `<span style="font-size:11px;color:var(--ink-soft);">${ultimoTxt}</span>` : ''}${pendIdentidad}</div>` : ''}
-      ${docsLabel ? `<div style="text-align:right;font-size:12px;color:var(--ink-soft);padding-top:2px;cursor:pointer;" onclick="event.stopPropagation();toggleDocsEnCard('${cli.id}',this)">${docsLabel} <span style="font-size:10px;">▾</span></div>` : ''}
+      ${docsLabel ? `<div style="text-align:right;font-size:12px;color:var(--ink-soft);padding-top:2px;cursor:pointer;" onclick="event.stopPropagation();toggleDocsEnCard('${cli.id}',this)" data-n="${cli.numDocs||0}">${docsLabel} <span style="font-size:10px;">▾</span></div>` : ''}
     </div>`;
   }).join('');
 }
