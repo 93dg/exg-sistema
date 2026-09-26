@@ -2836,7 +2836,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.47</div>
+        <div class="sub" id="version-badge">V4.48</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -17522,31 +17522,30 @@ function openDocumentViewer(id){
       if(!tr.classList.contains('linea-nueva')) tr.classList.add('colapsada');
       actualizarResumenLinea(tr.id);
     });
-    if(hayLineasNuevas){
-      // El editor ya está renderizado aquí — hacemos scroll directamente
-      // Scroll al banner naranja (que está justo antes de las líneas nuevas)
-      const target = document.getElementById('ie-banner-nuevas') || document.querySelector('#ie-items-body tr.linea-nueva');
-      const editor = document.querySelector('.invoice-editor');
-      if(target && editor){
-        requestAnimationFrame(()=>{
-          const top = target.getBoundingClientRect().top - editor.getBoundingClientRect().top + editor.scrollTop - 20;
-          editor.scrollTo({top: Math.max(0, top), behavior:'smooth'});
-        });
-      }
-    }
+    // El scroll se hace después de que el banner sea visible (ver abajo)
   }, 300);
   // Banner verificación si hay líneas pendientes
   const bannerEl = document.getElementById('ie-banner-nuevas') || (() => {
     const b = document.createElement('div');
     b.id = 'ie-banner-nuevas';
-    b.style.cssText = 'display:none;margin:8px 0 4px;padding:8px 12px;background:rgba(255,160,0,.15);border-left:4px solid var(--orange);border-radius:6px;font-size:13px;display:flex;align-items:center;gap:10px;';
-    b.innerHTML = '<span>🟡 <b>Líneas añadidas por el motor</b> — revisa y confirma.</span><button class="btn sm primary" id="ie-btn-verificar">✓ Verificado</button>';
+    b.style.cssText = 'display:none;margin:8px 0 4px;padding:6px 10px;background:rgba(255,160,0,.15);border-left:3px solid var(--orange);border-radius:6px;font-size:12px;flex-direction:row;align-items:center;gap:8px;overflow:hidden;white-space:nowrap;';
+    b.innerHTML = '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;">🟡 <b>Motor añadió líneas</b> — revisa</span><button class="btn sm primary" style="flex-shrink:0;" id="ie-btn-verificar">✓ Ok</button>';
     const tb = document.getElementById('ie-items-body');
     tb.parentElement.parentElement.insertBefore(b, tb.parentElement);
     return b;
   })();
   if(hayLineasNuevas){
     bannerEl.style.display = 'flex';
+    // Scroll al banner ahora que es visible — usamos offsetTop acumulado para calcular posición real
+    setTimeout(()=>{
+      const editor = document.querySelector('.invoice-editor');
+      const banner = document.getElementById('ie-banner-nuevas');
+      if(editor && banner){
+        let top = 0, el = banner;
+        while(el && el !== editor){ top += el.offsetTop; el = el.offsetParent; }
+        editor.scrollTo({top: Math.max(0, top - 16), behavior:'smooth'});
+      }
+    }, 50);
     const btnV = document.getElementById('ie-btn-verificar');
     if(btnV) btnV.onclick = async () => {
       if(!sb||!editingDocId) return;
