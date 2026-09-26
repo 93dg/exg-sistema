@@ -171,10 +171,10 @@ table{border-collapse:collapse;width:100%;}
 .kpi-strip{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;}
 .kpi{
   background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
-  padding:10px 14px;flex:0 0 auto;min-width:0;
+  padding:7px 10px;flex:0 0 auto;min-width:0;
 }
-.kpi .lbl{font-size:11px;color:var(--ink-soft);margin-bottom:4px;white-space:nowrap;}
-.kpi .val{font-family:'IBM Plex Mono',monospace;font-size:21px;font-weight:600;}
+.kpi .lbl{font-size:10px;color:var(--ink-soft);margin-bottom:2px;white-space:nowrap;}
+.kpi .val{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;}
 .kpi .val.orange{color:var(--orange);}
 .kpi .val.red{color:var(--red);}
 .kpi .val.green{color:var(--green);}
@@ -2767,7 +2767,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.79</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.80</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2838,7 +2838,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.79</div>
+        <div class="sub" id="version-badge">V4.80</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2892,15 +2892,29 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="quickactions" id="control-quickactions"></div>
       </div>
 
-      <div class="kpi-strip">
-        <div class="kpi"><div class="lbl">Trabajos hoy</div><div class="val" id="kpi-trabajos-hoy">0</div></div>
-        <div class="kpi"><div class="lbl">Urgentes</div><div class="val orange" id="kpi-urgentes">0</div></div>
-        <div class="kpi"><div class="lbl">Sin planificar</div><div class="val red" id="kpi-sin-planificar">0</div></div>
+      <div class="kpi-strip" style="margin-bottom:12px;">
         <div class="kpi"><div class="lbl">Pendiente cobro</div><div class="val" id="kpi-pendiente-cobro">0,00 €</div></div>
         <div class="kpi"><div class="lbl">Facturado mes</div><div class="val green" id="kpi-facturado-mes">0,00 €</div></div>
         <div class="kpi"><div class="lbl">Cobrado mes</div><div class="val green" id="dash-cobrado">0,00 €</div></div>
         <div class="kpi"><div class="lbl">Gastos mes</div><div class="val" style="color:var(--red)" id="dash-gastos">0,00 €</div></div>
         <div class="kpi"><div class="lbl">Margen mes</div><div class="val green" id="kpi-margen-mes">0,00 €</div></div>
+        <div class="kpi" style="display:none;"><div class="lbl">Trabajos hoy</div><div class="val" id="kpi-trabajos-hoy">0</div></div>
+        <div class="kpi" style="display:none;"><div class="lbl">Urgentes</div><div class="val orange" id="kpi-urgentes">0</div></div>
+        <div class="kpi" style="display:none;"><div class="lbl">Sin planificar</div><div class="val red" id="kpi-sin-planificar">0</div></div>
+      </div>
+
+      <!-- ALERTAS Y RECORDATORIOS -->
+      <div class="panel" id="panel-alertas" style="margin-bottom:12px;">
+        <div class="panel-head" onclick="togglePanelCC('alertas')" style="cursor:pointer;justify-content:space-between;align-items:center;">
+          <h3 style="margin:0;">🔔 Alertas y recordatorios</h3>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button onclick="event.stopPropagation();cargarAlertasYRecordatorios()" class="btn sm">↻</button>
+            <span id="alertas-chevron" style="color:var(--ink-soft);font-size:16px;">▾</span>
+          </div>
+        </div>
+        <div id="alertas-body">
+          <div class="panel-body" id="alertas-list"></div>
+        </div>
       </div>
 
       <!-- NOTIFICACIONES: panel plegable, por encima de Documentos -->
@@ -2935,12 +2949,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
       </div>
 
-      <div class="panel">
-        <div class="doc-toolbar">
+      <div class="panel" id="panel-documentos" style="margin-bottom:12px;">
+        <div class="doc-toolbar" onclick="togglePanelCC('documentos')" style="cursor:pointer;">
           <div class="doc-toolbar-title">
             <span class="dt-ico">📑</span>
             <h3>Documentos</h3>
             <span class="dt-count" id="control-docs-count">0</span>
+            <span id="documentos-chevron" style="color:var(--ink-soft);font-size:16px;margin-left:auto;">▾</span>
           </div>
         </div>
         <div class="dd-filter-row">
@@ -3027,22 +3042,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
         </div>
 
-        <div>
-          <div class="panel">
-            <div class="panel-head"><h3>Alertas y recordatorios</h3><button class="btn sm" onclick="cargarAlertasYRecordatorios()">↻</button></div>
-            <div class="panel-body" id="alertas-list"></div>
-          </div>
 
-          <div class="panel">
-            <div class="panel-head"><h3>Maquinaria</h3></div>
-            <div class="panel-body">
-              <div class="econ-line"><span>Disponibles</span><span class="v green" id="dash-maq-disp">0</span></div>
-              <div class="econ-line"><span>Trabajando</span><span class="v" id="dash-maq-trab">0</span></div>
-              <div class="econ-line"><span>Averiadas</span><span class="v" style="color:var(--red)" id="dash-maq-aver">0</span></div>
-              <div class="econ-line"><span>En mantenimiento</span><span class="v" style="color:#8A6100" id="dash-maq-mant">0</span></div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -7731,6 +7731,15 @@ const alertas = [];
 document.getElementById('alertas-list').innerHTML = alertas.map(a=>`
   <div class="alert-row"><div class="alert-dot ${a.c}"></div><div><div class="t">${a.t}</div><div class="s">${a.s}</div></div></div>
 `).join('');
+
+function togglePanelCC(panel){
+  const body = document.getElementById(panel+'-body') || document.querySelector('#panel-'+panel+' .panel-body') || document.querySelector('#panel-'+panel+' .doc-toolbar + *');
+  const chev = document.getElementById(panel+'-chevron');
+  if(!body) return;
+  const oculto = body.style.display==='none';
+  body.style.display = oculto ? '' : 'none';
+  if(chev) chev.textContent = oculto ? '▾' : '▸';
+}
 
 async function cargarAlertasYRecordatorios(){
   if(!sb) return;
