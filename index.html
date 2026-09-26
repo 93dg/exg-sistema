@@ -2767,7 +2767,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.71</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.72</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2838,7 +2838,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.71</div>
+        <div class="sub" id="version-badge">V4.72</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3260,6 +3260,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="client-tab" data-sub="averias">Averías</div>
         <div class="client-tab" data-sub="documentacion">Documentación</div>
         <div class="client-tab" data-sub="repuestos">Repuestos</div>
+        <div class="client-tab" data-sub="historial">Historial</div>
       </div>
 
       <div class="sub-view" id="flota-maquinaria">
@@ -3320,6 +3321,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
         </div>
         <div class="two-col-note">Al registrar una pieza usada en una avería o mantenimiento, el stock se descuenta automáticamente y el coste se suma al histórico de la máquina.</div>
+      </div>
+      <div class="sub-view" id="flota-historial" style="display:none;">
+        <div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">Maquinaria y vehículos que ya no forman parte de la flota.</div>
+        <div id="flota-historial-cards"></div>
       </div>
     </div>
 
@@ -6106,7 +6111,7 @@ function setupSubtabs(navId, prefix, mapping, opts){
     });
   });
 }
-setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimiento:'flota-mantenimiento',averias:'flota-averias',documentacion:'flota-documentacion',repuestos:'flota-repuestos'});
+setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimiento:'flota-mantenimiento',averias:'flota-averias',documentacion:'flota-documentacion',repuestos:'flota-repuestos',historial:'flota-historial'});
 setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',cobros:'econ-cobros',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad',cierre:'econ-cierre'});
 setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',revisar:'gpro-revisar',efectivo:'gpro-efectivo',banco:'gpro-banco',recurrentes:'gpro-recurrentes',seguros:'gpro-seguros',prestamos:'gpro-prestamos',maquinas:'gpro-maquinas'});
 document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filters .chip-filter').forEach(chip=>{
@@ -7451,6 +7456,61 @@ async function cargarFlotaIncidencias(){
     }).join('') : '<div class="empty">Sin incidencias registradas</div>';
     document.getElementById('averias-count').textContent = data.length + ' registros';
   }catch(e){}
+}
+
+async function cargarHistorialFlota(){
+  if(!sb) return;
+  try{
+    const {data,error} = await sb.from('flota').select('*').eq('estado','vendida').order('created_at',{ascending:false});
+    if(error||!data) return;
+    const cont = document.getElementById('flota-historial-cards');
+    if(!cont) return;
+    cont.innerHTML = data.length ? data.map(m=>{
+      const compra = m.coste_compra ? formatEur(m.coste_compra) : '—';
+      const venta = m.precio_venta ? formatEur(m.precio_venta) : '—';
+      const result = (m.coste_compra && m.precio_venta) ? (m.precio_venta - m.coste_compra) : null;
+      const resultHtml = result !== null
+        ? `<span style="color:${result>=0?'var(--green)':'var(--red)'};font-weight:700;">${result>=0?'+':''}${formatEur(result)}</span>`
+        : '—';
+      return `<div style="background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;">
+          <div style="font-weight:700;font-size:15px;flex:1;">${m.nombre}</div>
+          <span class="pill cancelado pill-sm">Vendida</span>
+        </div>
+        <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">${m.tipo||''}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div style="text-align:center;background:var(--concrete);border-radius:8px;padding:8px 4px;">
+            <div style="font-size:10px;color:var(--ink-soft);margin-bottom:2px;">Coste compra</div>
+            <div style="font-weight:600;font-size:13px;">${compra}</div>
+          </div>
+          <div style="text-align:center;background:var(--concrete);border-radius:8px;padding:8px 4px;">
+            <div style="font-size:10px;color:var(--ink-soft);margin-bottom:2px;">Precio venta</div>
+            <div style="font-weight:600;font-size:13px;">${venta}</div>
+          </div>
+          <div style="text-align:center;background:var(--concrete);border-radius:8px;padding:8px 4px;">
+            <div style="font-size:10px;color:var(--ink-soft);margin-bottom:2px;">Resultado</div>
+            <div style="font-size:13px;">${resultHtml}</div>
+          </div>
+        </div>
+        ${m.notas_historial?`<div style="font-size:12px;color:var(--ink-soft);border-top:1px solid var(--line);padding-top:8px;">${m.notas_historial}</div>`:''}
+        <div style="margin-top:10px;display:flex;gap:8px;">
+          <button onclick="editarHistorialFlota('${m.id}','coste_compra')" style="flex:1;padding:6px;border-radius:8px;border:1px solid var(--line);background:transparent;font-size:12px;cursor:pointer;">✏️ Coste compra</button>
+          <button onclick="editarHistorialFlota('${m.id}','precio_venta')" style="flex:1;padding:6px;border-radius:8px;border:1px solid var(--line);background:transparent;font-size:12px;cursor:pointer;">✏️ Precio venta</button>
+        </div>
+      </div>`;
+    }).join('') : '<div class="empty">Sin maquinaria vendida</div>';
+  }catch(e){}
+}
+
+async function editarHistorialFlota(id, campo){
+  const label = campo==='coste_compra'?'Coste de compra':'Precio de venta';
+  const val = prompt(label+' (€):');
+  if(val===null) return;
+  const num = parseFloat(val.replace(',','.'));
+  if(isNaN(num)){ mostrarToast('Número no válido','error'); return; }
+  await sb.from('flota').update({[campo]:num}).eq('id',id);
+  cargarHistorialFlota();
+  mostrarToast(label+' guardado ✓','ok');
 }
 
 async function marcarIncidencia(id, nuevoEstado){
@@ -13317,7 +13377,7 @@ async function cargarEntidadesReales(){
   }catch(err){ console.error('No se pudieron cargar las entidades reales', err); }
 }
 cargarEntidadesReales();
-cargarAveriasReales(); cargarFlotaIncidencias();
+cargarAveriasReales(); cargarFlotaIncidencias(); cargarHistorialFlota();
 
 /* Facturas reales — se cargan desde Supabase (tabla documentos_economicos) */
 const facturasReales = [];
