@@ -367,6 +367,7 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
   display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;
   white-space:nowrap;
 }
+.pill-sm{font-size:9px!important;padding:2px 6px!important;}
 /* Tonos de estado — fuente única de verdad. Los nombres de clase siguen siendo el vocabulario de cada sección (facturas, licitaciones, máquinas...), pero el color de cada tono se define una sola vez aquí. */
 .pill.pendiente, .pill.recibido, .pill.borrador{background:var(--concrete-2);color:var(--ink-soft);}
 .pill.porconfirmar, .pill.encurso, .pill.mantenimiento, .pill.revisar, .pill.pendiente_cobrar, .pill.en_proceso{background:var(--yellow-soft);color:#8A6100;}
@@ -2766,7 +2767,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.68</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.69</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2837,7 +2838,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.68</div>
+        <div class="sub" id="version-badge">V4.69</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7428,6 +7429,28 @@ function renderBreakdownsTable(){
     </tr>`).join('') || '<tr><td colspan="8" class="empty">Sin averías registradas</td></tr>';
 }
 
+async function cargarFlotaIncidencias(){
+  if(!sb) return;
+  try{
+    const {data,error} = await sb.from('flota_incidencias').select('*,flota(nombre)').order('created_at',{ascending:false});
+    if(error||!data) return;
+    const tbody = document.getElementById('breakdowns-tbl');
+    if(!tbody) return;
+    // Añadir al final de la tabla existente
+    const extra = data.map(i=>`
+      <tr>
+        <td class="mono" style="color:var(--ink-soft);font-size:10px;">INC</td>
+        <td>${new Date(i.created_at).toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}</td>
+        <td>${i.flota?.nombre||'—'}</td>
+        <td>${i.descripcion||'—'}</td>
+        <td>—</td><td>—</td><td class="num">—</td>
+        <td>${i.tipo==='averia'?'<span class="pill encurso">Avería</span>':'<span class="pill porconfirmar">Mejora</span>'}</td>
+      </tr>`).join('');
+    if(extra) tbody.insertAdjacentHTML('beforeend', extra);
+    document.getElementById('averias-count').textContent = data.length + ' registros';
+  }catch(e){}
+}
+
 async function cargarAveriasReales(){
   if(!sb) return;
   try{
@@ -7605,7 +7628,7 @@ let jobs = [];
 const stateLabels = {posible:'Posible trabajo', pendiente:'Pendiente de fecha', planificado:'Planificado', porconfirmar:'Por confirmar con el cliente', confirmado:'Confirmado', encurso:'En curso', terminado:'Terminado', facturado:'Facturado', cobrado:'Cobrado', cancelado:'Cancelado'};
 const jobStates = ['posible','pendiente','planificado','porconfirmar','confirmado','encurso','terminado','facturado','cobrado','cancelado'];
 
-function pill(state){ return `<span class="pill ${state}">${stateLabels[state]||state}</span>`; }
+function pill(state,sm){ return `<span class="pill ${state}${sm?' pill-sm':''}">${stateLabels[state]||state}</span>`; }
 
 /* Centro de control - bandeja de decision (pendientes sin planificar) */
 const pendientes = jobs.filter(j=>j.state==='pendiente');
@@ -10924,7 +10947,7 @@ function renderFleetGrid(){
   document.getElementById('fleet-grid').innerHTML = fleet.map(m=>{
     const expandida = m.id && m.id === maquinaExpandidaId;
     return `<div class="machine-card ${expandida?'expanded':''}" onclick="toggleMaquinaExpandida('${m.id||''}')" style="cursor:pointer;">
-      <div class="top" style="align-items:flex-start;gap:4px;flex-wrap:wrap;"><div style="min-width:0;flex:1;"><div class="mname">${m.name}</div><div class="mtype">${m.type}</div></div>${pill(m.state)}</div>
+      <div class="top" style="align-items:flex-start;gap:4px;flex-wrap:wrap;"><div style="min-width:0;flex:1;"><div class="mname">${m.name}</div><div class="mtype">${m.type}</div></div>${pill(m.state,true)}</div>
       <div class="metrics"><div>Matrícula<b class="mono" style="font-size:11px;">${m.matricula||'—'}</b></div><div>Documentos<b>${(m.documentos||[]).length}</b></div></div>
       ${expandida ? `
       <div class="machine-card-expand" onclick="event.stopPropagation();">
@@ -13286,7 +13309,7 @@ async function cargarEntidadesReales(){
   }catch(err){ console.error('No se pudieron cargar las entidades reales', err); }
 }
 cargarEntidadesReales();
-cargarAveriasReales();
+cargarAveriasReales(); cargarFlotaIncidencias();
 
 /* Facturas reales — se cargan desde Supabase (tabla documentos_economicos) */
 const facturasReales = [];
