@@ -1,13 +1,13 @@
-// Service worker del sistema EXG — red primero siempre para el HTML principal (así se ve la última versión al momento),
-// y solo si no hay conexión se usa la copia guardada como último recurso.
-const CACHE_NAME = 'exg-shell-v3';
+// Service worker EXG — network first, auto-actualización sin intervención del usuario.
+// Cambia CACHE_NAME al hacer deploy para forzar reinstalación.
+const CACHE_NAME = 'exg-shell-v4';
 const SHELL_FILES = ['/exg-sistema/', '/exg-sistema/index.html'];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES))
   );
+  // NO llamar skipWaiting aquí — lo hacemos cuando la página nos lo pide
 });
 
 self.addEventListener('activate', (event) => {
@@ -17,6 +17,13 @@ self.addEventListener('activate', (event) => {
     )
   );
   self.clients.claim();
+});
+
+// La página nos pide que tomemos control ya (cuando detecta nueva versión)
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {
