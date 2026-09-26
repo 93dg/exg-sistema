@@ -2767,7 +2767,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.73</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.74</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2838,7 +2838,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.73</div>
+        <div class="sub" id="version-badge">V4.74</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4443,20 +4443,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
             <button class="btn primary" onclick="abrirNuevoDocEmpresa()">+ Nuevo documento</button>
           </div>
           </div>
-          <div class="panel">
-            <div class="panel-body" style="padding:0;">
-              <table class="tbl">
-                <tr>
-                  <th style="width:30px;"><input type="checkbox" id="empresa-docs-sel-todo" onchange="toggleSeleccionarTodoEmpresaDocs(this)"></th>
-                  <th class="ord" onclick="ordenarTabla('empresa-docs-tbl',1,'text')">Categoría ⇅</th>
-                  <th class="ord" onclick="ordenarTabla('empresa-docs-tbl',2,'text')">Documento ⇅</th>
-                  <th>Archivo</th>
-                  <th class="ord" onclick="ordenarTabla('empresa-docs-tbl',4,'text')">Caducidad ⇅</th>
-                </tr>
-                <tbody id="empresa-docs-tbl"></tbody>
-              </table>
-            </div>
-          </div>
+          <div id="empresa-docs-cards"></div>
         </div>
 
         <!-- ================= HISTÓRICO ================= -->
@@ -7998,9 +7985,9 @@ function diasHastaCaducidad(fecha){
 }
 let empresaDocExpandidoId = null;
 function renderDocsEmpresa(){
-  const tbody = document.getElementById('empresa-docs-tbl');
-  if(!tbody) return;
-  tbody.innerHTML = EMPRESA_DOCS.length ? EMPRESA_DOCS.map(d=>{
+  const cont = document.getElementById('empresa-docs-cards');
+  if(!cont) return;
+  cont.innerHTML = EMPRESA_DOCS.length ? EMPRESA_DOCS.map(d=>{
     const dias = diasHastaCaducidad(d.fecha_caducidad);
     let caducidadHtml = '—';
     if(d.fecha_caducidad){
@@ -8010,40 +7997,42 @@ function renderDocsEmpresa(){
       else caducidadHtml = fechaFmt;
     }
     const expandido = d.id === empresaDocExpandidoId;
-    const fila = `<tr onclick="toggleExpandirDocEmpresa('${d.id}')" style="cursor:pointer;">
-      <td onclick="event.stopPropagation();"><input type="checkbox" class="empresa-doc-sel-chk" data-id="${d.id}" onchange="actualizarSeleccionEmpresaDocs()"></td>
-      <td>${d.categoria}</td>
-      <td>${d.nombre}</td>
-      <td onclick="event.stopPropagation();">${d.archivo_url ? `<a href="${d.archivo_url}" target="_blank">📎 Ver archivo</a>` : '<span class="sub-t">Sin adjuntar</span>'}</td>
-      <td>${caducidadHtml}</td>
-    </tr>`;
-    const detalle = expandido ? `<tr><td colspan="5" style="background:var(--concrete);padding:14px 20px;" onclick="event.stopPropagation();">
-      <div style="margin-bottom:14px;">
-        <div class="l" style="margin-bottom:4px;">Lo importante del documento</div>
+    return `<div style="background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;" onclick="toggleExpandirDocEmpresa('${d.id}')">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;">
+        <div>
+          <div style="font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">${d.categoria}</div>
+          <div style="font-weight:600;font-size:14px;">${d.nombre}</div>
+        </div>
+        ${d.fecha_caducidad ? caducidadHtml : ''}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;" onclick="event.stopPropagation();">
+        ${d.archivo_url ? `<a href="${d.archivo_url}" target="_blank" style="font-size:12px;">📎 Ver archivo</a>` : '<span style="font-size:12px;color:var(--ink-soft);">Sin archivo</span>'}
+      </div>
+      ${expandido ? `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px;" onclick="event.stopPropagation();">
+        <div class="l" style="margin-bottom:6px;">Lo importante del documento</div>
         ${d.info_clave
-          ? `<pre style="white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:13px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin:0;">${d.info_clave}</pre>`
-          : `<div style="display:flex;align-items:center;gap:10px;">
-              <div class="two-col-note" style="margin:0;">Todavía no he leído este documento para sacar sus datos reales.</div>
+          ? `<pre style="white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:12px;background:var(--concrete);border-radius:8px;padding:10px;margin:0 0 12px;">${d.info_clave}</pre>`
+          : `<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+              <div class="two-col-note" style="margin:0;flex:1;">Sin leer todavía.</div>
               <button class="btn" id="btn-leer-${d.id}" onclick="pedirLeerDocEmpresa('${d.id}')">📖 Leer</button>
             </div>`}
-      </div>
-      <details>
-        <summary style="cursor:pointer;color:var(--ink-soft);font-size:12.5px;">Editar ficha (categoría, nombre, caducidad, archivo)</summary>
-        <div class="field-grid" style="margin-top:10px;">
-          <div class="field"><div class="l">Categoría</div><input class="search-box" style="width:100%;" id="ed-cat-${d.id}" value="${d.categoria}"></div>
-          <div class="field"><div class="l">Nombre</div><input class="search-box" style="width:100%;" id="ed-nom-${d.id}" value="${d.nombre}"></div>
-          <div class="field"><div class="l">Caducidad</div><input class="search-box" type="date" style="width:100%;" id="ed-cad-${d.id}" value="${d.fecha_caducidad||''}"></div>
-          <div class="field"><div class="l">Archivo</div><input type="file" class="search-box" style="width:100%;" id="ed-arch-${d.id}"></div>
-        </div>
-        <div class="state-row" style="gap:8px;margin-top:10px;">
-          <button class="btn primary" onclick="guardarDocEmpresaInline('${d.id}')">Guardar</button>
-          <button class="btn" style="color:var(--red);" onclick="borrarDocEmpresa('${d.id}')">Borrar</button>
-        </div>
-        <div class="sub-t" id="ed-status-${d.id}" style="margin-top:6px;"></div>
-      </details>
-    </td></tr>` : '';
-    return fila + detalle;
-  }).join('') : '<tr><td colspan="5" class="empty">Sin documentos todavía</td></tr>';
+        <details>
+          <summary style="cursor:pointer;color:var(--ink-soft);font-size:12px;">Editar ficha</summary>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+            <div class="field"><div class="l">Categoría</div><input class="search-box" style="width:100%;" id="ed-cat-${d.id}" value="${d.categoria}"></div>
+            <div class="field"><div class="l">Nombre</div><input class="search-box" style="width:100%;" id="ed-nom-${d.id}" value="${d.nombre}"></div>
+            <div class="field"><div class="l">Caducidad</div><input class="search-box" type="date" style="width:100%;" id="ed-cad-${d.id}" value="${d.fecha_caducidad||''}"></div>
+            <div class="field"><div class="l">Archivo</div><input type="file" class="search-box" style="width:100%;" id="ed-arch-${d.id}"></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn primary" style="flex:1;" onclick="guardarDocEmpresaInline('${d.id}')">Guardar</button>
+            <button class="btn" style="color:var(--red);" onclick="borrarDocEmpresa('${d.id}')">Borrar</button>
+          </div>
+          <div class="sub-t" id="ed-status-${d.id}" style="margin-top:6px;"></div>
+        </details>
+      </div>` : ''}
+    </div>`;
+  }).join('') : '<div class="empty">Sin documentos todavía</div>';
   renderAtencionDocsEmpresa();
 }
 function toggleExpandirDocEmpresa(id){
