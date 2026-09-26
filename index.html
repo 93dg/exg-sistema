@@ -2767,7 +2767,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.69</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.70</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2838,7 +2838,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.69</div>
+        <div class="sub" id="version-badge">V4.70</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3290,15 +3290,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
 
       <div class="sub-view" id="flota-averias" style="display:none;">
-        <div class="panel">
-          <div class="panel-head"><h3>Averías</h3><span class="count" id="averias-count">0 activas</span></div>
-          <div class="panel-body" style="padding:0;">
-            <table class="tbl">
-              <tr><th>Código</th><th>Fecha</th><th>Maquinaria</th><th>Síntoma</th><th>Reparó</th><th>Parada</th><th class="num">Coste piezas</th><th>Estado</th></tr>
-              <tbody id="breakdowns-tbl"></tbody>
-            </table>
-          </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-weight:700;font-size:15px;">Averías e incidencias</div>
+          <span class="count" id="averias-count">—</span>
         </div>
+        <div id="flota-incidencias-cards"></div>
       </div>
 
       <div class="sub-view" id="flota-documentacion" style="display:none;">
@@ -7434,19 +7430,17 @@ async function cargarFlotaIncidencias(){
   try{
     const {data,error} = await sb.from('flota_incidencias').select('*,flota(nombre)').order('created_at',{ascending:false});
     if(error||!data) return;
-    const tbody = document.getElementById('breakdowns-tbl');
-    if(!tbody) return;
-    // Añadir al final de la tabla existente
-    const extra = data.map(i=>`
-      <tr>
-        <td class="mono" style="color:var(--ink-soft);font-size:10px;">INC</td>
-        <td>${new Date(i.created_at).toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}</td>
-        <td>${i.flota?.nombre||'—'}</td>
-        <td>${i.descripcion||'—'}</td>
-        <td>—</td><td>—</td><td class="num">—</td>
-        <td>${i.tipo==='averia'?'<span class="pill encurso">Avería</span>':'<span class="pill porconfirmar">Mejora</span>'}</td>
-      </tr>`).join('');
-    if(extra) tbody.insertAdjacentHTML('beforeend', extra);
+    const cont = document.getElementById('flota-incidencias-cards');
+    if(!cont) return;
+    cont.innerHTML = data.length ? data.map(i=>`
+      <div style="background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;">
+          <div style="font-weight:600;font-size:14px;flex:1;">${i.flota?.nombre||'—'}</div>
+          ${i.tipo==='averia'?'<span class="pill encurso pill-sm">Avería</span>':'<span class="pill porconfirmar pill-sm">Mejora</span>'}
+        </div>
+        <div style="font-size:13px;color:var(--ink);margin-bottom:6px;">${i.descripcion||'—'}</div>
+        <div style="font-size:11px;color:var(--ink-soft);">${new Date(i.created_at).toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'})}</div>
+      </div>`).join('') : '<div class="empty">Sin incidencias registradas</div>';
     document.getElementById('averias-count').textContent = data.length + ' registros';
   }catch(e){}
 }
