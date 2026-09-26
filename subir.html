@@ -122,12 +122,10 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <div class="ver">Subir S3.2 · Sistema V4.62</div>
-      <button onclick="location.reload(true)" title="Actualizar" style="background:none;border:none;padding:2px 4px;cursor:pointer;color:var(--ink-soft);font-size:15px;line-height:1;">↻</button>
-    </div>
+    <div class="ver">Subir S3.2 · Sistema V4.62</div>
   </div>
 </header>
+<button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
 
 <main style="flex:1;display:flex;flex-direction:column;min-height:0;">
   <div id="feed"><div id="vacio">Haz una foto, sube un archivo, graba un audio o escribe abajo. El sistema lo clasifica solo.</div></div>
@@ -571,8 +569,20 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     const interp = filas.find(f => f.interpretacion)?.interpretacion || {};
     const elementoId = interp.elemento_id || null;
     const tipo = interp.elemento_tipo || 'albaran';
-    const enlace = elementoId ? `<button onclick="abrirEnlaceDesdeSubir('${elementoId}','${tipo}')" style="margin-top:10px;width:100%;padding:8px;border-radius:8px;background:var(--orange);color:#fff;border:none;font-size:14px;cursor:pointer;">Abrir en el sistema →</button>` : '';
-    alert(`✓ Solución aplicada:\n\n${label}${enlace ? '\n\n(Pulsa OK y luego el botón para abrirlo)' : ''}`);
+    let modal = document.getElementById('modal-solucion');
+    if (!modal){
+      modal = document.createElement('div');
+      modal.id = 'modal-solucion';
+      modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+      modal.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;max-width:360px;width:100%;"><div style="font-weight:700;font-size:16px;margin-bottom:10px;">✓ Solución aplicada</div><div id="modal-solucion-texto" style="font-size:14px;line-height:1.5;color:#444;margin-bottom:16px;"></div><div id="modal-solucion-btn"></div><button onclick="document.getElementById('modal-solucion').style.display='none'" style="margin-top:10px;width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;background:transparent;font-size:14px;cursor:pointer;">Cerrar</button></div>';
+      modal.addEventListener('click', e=>{ if(e.target===modal) modal.style.display='none'; });
+      document.body.appendChild(modal);
+    }
+    document.getElementById('modal-solucion-texto').textContent = label;
+    document.getElementById('modal-solucion-btn').innerHTML = elementoId
+      ? `<button onclick="abrirEnlaceDesdeSubir('${elementoId}','${tipo}')" style="width:100%;padding:10px;border-radius:8px;background:#c0522a;color:#fff;border:none;font-size:14px;cursor:pointer;">Abrir en el sistema →</button>`
+      : '';
+    modal.style.display = 'flex';
   }
 
   function abrirEnlaceDesdeSubir(elementoId, tipo){
@@ -616,7 +626,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
       const interp = filas.find(f => f.interpretacion)?.interpretacion;
       const linkedLabel = filas.find(f => f.linked_label)?.linked_label;
       const actionType = filas.find(f => f.action_type)?.action_type;
-      const esFlota = actionType === 'flota_incidencias' || (linkedLabel && linkedLabel.toLowerCase().includes('flota'));
+      const esFlota = actionType === 'flota_incidencia' || actionType === 'flota_incidencias' || (linkedLabel && linkedLabel.toLowerCase().includes('iveco'));
       const esVerificado = status === 'verificado';
 
       const msgDiv = feed.querySelector(`.msg[data-msg-id="${msgId}"]`);
