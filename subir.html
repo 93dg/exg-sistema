@@ -122,7 +122,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver">Subir S3.4 · Sistema V4.62</div>
+    <div class="ver">Subir S3.5 · Sistema V4.63</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -559,6 +559,51 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     }
   }
 
+  async function mostrarSolucionPorIds(docIdsStr){
+    const ids = docIdsStr.split(',').map(x=>x.trim()).filter(Boolean);
+    if(!ids.length) return;
+    const resp = await fetch(SUPABASE_URL+"/rest/v1/documentos?id=in.("+ids.join(",")+")"+"&select=id,linked_label,interpretacion,action_type", { headers:{ "Authorization":"Bearer "+SUPABASE_ANON_KEY, "apikey": SUPABASE_ANON_KEY } });
+    const filas = await resp.json();
+    const label = (filas.find(f => f.linked_label)||{}).linked_label || "—";
+    const interp = (filas.find(f => f.interpretacion)||{}).interpretacion || {};
+    const elementoId = interp.elemento_id || null;
+    const tipo = interp.elemento_tipo || "albaran";
+    let ov = document.getElementById("modal-solucion");
+    if (!ov){
+      ov = document.createElement("div");
+      ov.id = "modal-solucion";
+      ov.style.cssText = "display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;";
+      const box = document.createElement("div");
+      box.style.cssText = "background:#fff;border-radius:16px;padding:20px;max-width:360px;width:100%;";
+      const titulo = document.createElement("div");
+      titulo.style.cssText = "font-weight:700;font-size:16px;margin-bottom:10px;";
+      titulo.textContent = "✓ Solución aplicada";
+      const texto = document.createElement("div");
+      texto.id = "modal-solucion-texto";
+      texto.style.cssText = "font-size:14px;line-height:1.5;color:#444;margin-bottom:16px;";
+      const btnDiv = document.createElement("div");
+      btnDiv.id = "modal-solucion-btn";
+      const cerrar = document.createElement("button");
+      cerrar.textContent = "Cerrar";
+      cerrar.style.cssText = "margin-top:10px;width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;background:transparent;font-size:14px;cursor:pointer;";
+      cerrar.onclick = function(){ ov.style.display="none"; };
+      box.appendChild(titulo); box.appendChild(texto); box.appendChild(btnDiv); box.appendChild(cerrar);
+      ov.appendChild(box);
+      ov.addEventListener("click", function(e){ if(e.target===ov) ov.style.display="none"; });
+      document.body.appendChild(ov);
+    }
+    document.getElementById("modal-solucion-texto").textContent = label;
+    const btnDiv = document.getElementById("modal-solucion-btn");
+    btnDiv.innerHTML = "";
+    if (elementoId){
+      const btn = document.createElement("button");
+      btn.textContent = "Abrir en el sistema →";
+      btn.style.cssText = "width:100%;padding:10px;border-radius:8px;background:#c0522a;color:#fff;border:none;font-size:14px;cursor:pointer;";
+      btn.onclick = function(){ ov.style.display="none"; abrirEnlaceDesdeSubir(elementoId, tipo); };
+      btnDiv.appendChild(btn);
+    }
+    ov.style.display = "flex";
+  }
   async function mostrarSolucionEntrada(msgId){
     const m = leerHistorial().find(x => x.msg_id === msgId);
     if (!m) return;
@@ -659,9 +704,10 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
           // Verificado: mostrar botón "Ver solución"
           caja.style.background = "var(--green-soft)"; caja.style.color = "var(--green)";
           const elementoId = filas.find(f => f.interpretacion?.elemento_id)?.interpretacion?.elemento_id || null;
+          const docIds = filas.map(f=>f.id).join(',');
           caja.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <span style="flex:1;">✓ ${linkedLabel.replace('✓ ','').replace('verificado','').replace('Verificado','').trim().replace(/—\s*$/,'').trim()}</span>
-            <button onclick="mostrarSolucionEntrada('${msgId}')" style="flex-shrink:0;padding:3px 8px;border-radius:6px;border:1px solid var(--green);background:transparent;color:var(--green);font-size:11px;cursor:pointer;">Ver solución →</button>
+            <span style="flex:1;">✓ ${linkedLabel.replace('✓ ','').replace('verificado','').replace('Verificado','').trim().replace(/[—-]\s*$/,'').trim()}</span>
+            <button onclick="mostrarSolucionPorIds('${docIds}')" style="flex-shrink:0;padding:3px 8px;border-radius:6px;border:1px solid var(--green);background:transparent;color:var(--green);font-size:11px;cursor:pointer;">Ver solución →</button>
           </div>`;
         } else if (esFlota){
           caja.style.background = "var(--green-soft)"; caja.style.color = "var(--green)";
