@@ -770,15 +770,16 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .ie-lineas-resumen-chevron{color:var(--ink-soft);}
 #ni-lineas-panel.colapsado{display:none;}
   .ie-items tbody tr.colapsada > td:not(.ie-linea-resumen-td){display:none;}
-  /* LÍNEAS EDITOR MÓVIL — 3 filas: [Fecha·Cant·UD] [Concepto] [Precio·Total] */
-  .ie-items tbody tr:not(.colapsada) td{display:block;width:100%;box-sizing:border-box;padding:3px 0;}
-  /* Fila 1: Fecha + Cantidad + UD — forzar inline con width explícito */
-  .ie-items tbody tr:not(.colapsada) td[data-label="Fecha"]{display:inline-block !important;width:44%;vertical-align:top;padding-right:3px;box-sizing:border-box;}
-  .ie-items tbody tr:not(.colapsada) td[data-label="Cantidad"]{display:inline-block !important;width:27%;vertical-align:top;padding-right:3px;box-sizing:border-box;}
-  .ie-items tbody tr:not(.colapsada) td[data-label="UD"]{display:inline-block !important;width:29%;vertical-align:top;box-sizing:border-box;}
-  /* Fila 3: Precio + Importe */
-  .ie-items tbody tr:not(.colapsada) td[data-label="Precio"]{display:inline-block !important;width:49%;vertical-align:top;padding-right:4px;box-sizing:border-box;}
-  .ie-items tbody tr:not(.colapsada) td[data-label="Total"],.ie-items tbody tr:not(.colapsada) td.col-total{display:inline-block !important;width:51%;vertical-align:top;box-sizing:border-box;}
+  /* LÍNEAS EDITOR MÓVIL — flex divs internos, 3 filas */
+  .ie-items tbody tr:not(.colapsada) td{display:block;width:100%;box-sizing:border-box;padding:2px 0;}
+  .ie-items tbody tr:not(.colapsada) td.ie-fila-fcu,
+  .ie-items tbody tr:not(.colapsada) td.ie-fila-con,
+  .ie-items tbody tr:not(.colapsada) td.ie-fila-pt{display:block !important;width:100% !important;}
+  .ie-linea-row{display:flex;gap:6px;align-items:flex-start;width:100%;}
+  .ie-linea-col{flex:1;min-width:0;}
+  .ie-linea-col-lg{flex:2;}
+  .ie-linea-col-sm{flex:1;}
+  .ie-field-label{font-size:10px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:2px;font-weight:600;letter-spacing:0.04em;}
   .ie-items tbody tr.colapsada .del-row{display:none !important;} /* el borrado normal tenía !important y ganaba siempre al plegado */
   .ie-items tbody tr.colapsada .ie-linea-resumen-td{
     display:flex !important;flex-direction:row !important;align-items:center;gap:8px;padding:0;
@@ -2829,7 +2830,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.45</div>
+        <div class="sub" id="version-badge">V4.46</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13591,8 +13592,10 @@ function onClientChange(){
   // así que para cualquier cliente ya existente todo esto salía siempre vacío
   const entidad = clientes.find(c=>c.name===name) || {};
   const data = clientFiscalData[name]; // compatibilidad con clientes creados en esta sesión
-  document.getElementById('ni-client-fiscal').style.display = name ? 'flex' : 'none';
-  document.getElementById('ni-client-fiscal-2').style.display = name ? 'flex' : 'none';
+  const btnToggle = document.getElementById('btn-toggle-cliente');
+  if(btnToggle) btnToggle.textContent = '▶ Datos fiscales del cliente';
+  document.getElementById('ni-client-fiscal').style.display = 'none';
+  document.getElementById('ni-client-fiscal-2').style.display = 'none';
   document.getElementById('ni-client-nif').value = entidad.nif || (data ? data.nif : '') || '';
   document.getElementById('ni-client-addr').value = entidad.direccion || (data ? data.addr : '') || '';
   document.getElementById('ni-client-cp').value = entidad.cp || '';
@@ -14221,16 +14224,20 @@ function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva){
   const comboId = 'combo-'+id;
   tr.innerHTML = `
     <td class="ie-linea-resumen-td" onclick="document.getElementById('${id}').classList.toggle('colapsada'); actualizarResumenLinea('${id}')"></td>
-    <td data-label="Fecha"><div class="fecha-caja ie-fecha-caja"><span class="fecha-texto ie-fecha-texto">${fecha ? formatFechaCorta(fecha) : '—'}</span><input type="date" class="ie-linea-fecha" value="${fecha ?? ''}" oninput="this.previousElementSibling.textContent=this.value?formatFechaCorta(this.value):'—'; actualizarResumenLinea('${id}')"></div></td>
-    <td data-label="Cantidad"><input type="number" class="ie-qty" value="${qty ?? 1}" min="0" step="0.01" oninput="recalcTotals()"></td>
-    <td data-label="UD"><select class="search-box ie-unidad" style="width:100%;min-width:0;padding:4px;">${UNIDADES.map(u=>`<option value="${u}" ${unidad===u?'selected':''}>${u}</option>`).join('')}</select></td>
-    <td data-label="Concepto" style="position:relative;"><input type="text" class="ie-concept" name="concepto-${id}" autocomplete="new-password" placeholder="Ej. M³ de excavación en terreno de consistencia media" value="${concept ?? ''}"
+    <td class="ie-fila-fcu"><div class="ie-linea-row">
+      <div class="ie-linea-col ie-linea-col-lg"><div class="ie-field-label">FECHA</div><div class="fecha-caja ie-fecha-caja"><span class="fecha-texto ie-fecha-texto">${fecha ? formatFechaCorta(fecha) : '—'}</span><input type="date" class="ie-linea-fecha" value="${fecha ?? ''}" oninput="this.previousElementSibling.textContent=this.value?formatFechaCorta(this.value):'—'; actualizarResumenLinea('${id}')"></div></div>
+      <div class="ie-linea-col ie-linea-col-sm"><div class="ie-field-label">CANTIDAD</div><input type="number" class="ie-qty search-box" style="width:100%;padding:4px;" value="${qty ?? 1}" min="0" step="0.01" oninput="recalcTotals()"></div>
+      <div class="ie-linea-col ie-linea-col-sm"><div class="ie-field-label">UD</div><select class="search-box ie-unidad" style="width:100%;padding:4px;">${UNIDADES.map(u=>`<option value="${u}" ${unidad===u?'selected':''}>${u}</option>`).join('')}</select></div>
+    </div></td>
+    <td class="ie-fila-con"><div class="ie-field-label">CONCEPTO</div><div style="position:relative;"><input type="text" class="ie-concept" name="concepto-${id}" autocomplete="new-password" placeholder="Ej. M³ de excavación en terreno de consistencia media" value="${concept ?? ''}"
         oninput="suggestFromConcept(this); renderConceptCombo(this,'${comboId}'); actualizarResumenLinea('${id}')" onfocus="renderConceptCombo(this,'${comboId}')" onblur="setTimeout(()=>{const c=document.getElementById('${comboId}'); if(c) c.style.display='none';},150); sugerirPrecioHistorico(this,'${id}')">
       <div id="${comboId}" class="combo-list"></div>
       <div id="hist-${id}" class="sub-t" style="display:none;margin-top:2px;cursor:pointer;"></div>
-    </td>
-    <td data-label="Precio" class="col-precio"><input type="number" class="ie-price" value="${price ?? ''}" min="0" step="0.01" placeholder="0,00" oninput="recalcTotals()"></td>
-    <td data-label="Total" class="line-total mono col-total">0,00 €</td>
+    </div></td>
+    <td class="ie-fila-pt"><div class="ie-linea-row">
+      <div class="ie-linea-col"><div class="ie-field-label">PRECIO</div><input type="number" class="ie-price col-precio search-box" style="width:100%;padding:4px;" value="${price ?? ''}" min="0" step="0.01" placeholder="0,00" oninput="recalcTotals()"></div>
+      <div class="ie-linea-col"><div class="ie-field-label">TOTAL</div><div class="line-total mono col-total" style="padding:5px 0;font-size:15px;font-weight:700;">0,00 €</div></div>
+    </div></td>
     <td class="del-row" onclick="document.getElementById('${id}').remove(); recalcTotals();">✕<span class="del-row-label"> Quitar esta línea</span></td>
   `;
   tbody.appendChild(tr);
