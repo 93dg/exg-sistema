@@ -2766,7 +2766,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.58</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.59</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2837,7 +2837,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.58</div>
+        <div class="sub" id="version-badge">V4.59</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11140,15 +11140,20 @@ function toggleDatosCliente(){
   f2.style.display = abierto?'none':'flex';
   btn.textContent = (abierto?'▶':'▼')+' Datos fiscales del cliente';
 }
-async function verEntradaOriginal(entradaId){
-  if(!sb || !entradaId) return;
-  const {data:d} = await sb.from('documentos').select('transcripcion,nota,file_name,source,created_at').eq('id',entradaId).single();
-  if(!d) return mostrarToast('Entrada no encontrada','err');
-  const texto = d.transcripcion || d.nota || '(sin texto)';
-  const fecha = d.created_at ? formatFechaCorta(d.created_at.slice(0,10)) : '—';
-  const tipo = d.source || 'entrada';
-  mostrarModalGenerico(`📋 Entrada original (${tipo} · ${fecha})`,
-    `<div style="padding:8px;background:var(--concrete);border-radius:6px;font-size:13px;line-height:1.6;white-space:pre-wrap;max-height:60vh;overflow-y:auto;">${svgEsc(texto)}</div>`
+async function verEntradaOriginal(ids){
+  if(!sb || !ids) return;
+  const arr = Array.isArray(ids) ? ids : [ids];
+  const {data:docs} = await sb.from('documentos').select('id,transcripcion,nota,source,created_at').in('id',arr);
+  if(!docs||!docs.length) return mostrarToast('Entrada no encontrada','err');
+  docs.sort((a,b)=>a.id-b.id);
+  const html = docs.map(d=>{
+    const texto = d.transcripcion||d.nota||'(sin texto)';
+    const fecha = d.created_at ? formatFechaCorta(d.created_at.slice(0,10)) : '—';
+    const tipo = d.source||'entrada';
+    return `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--ink-soft);margin-bottom:4px;">${svgEsc(tipo)} · ${fecha}</div><div style="padding:8px;background:var(--concrete);border-radius:6px;font-size:13px;line-height:1.6;white-space:pre-wrap;">${svgEsc(texto)}</div></div>`;
+  }).join('');
+  mostrarModalGenerico(`📋 Entradas originales (${docs.length})`,
+    `<div style="max-height:60vh;overflow-y:auto;">${html}</div>`
   );
 }
 async function irAElementoNotif(id){
@@ -14233,7 +14238,7 @@ function sincronizarConceptoConNumero(){
 }
 
 const UNIDADES = ['ud','h','m³','m²','ml','km','día','servicio','transporte'];
-function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva, origenEntradaId){
+function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva, origenEntradaId, origenEntradaIds){
   const id = 'item'+(itemSeq++);
   const tbody = document.getElementById('ie-items-body');
   const tr = document.createElement('tr');
@@ -14258,7 +14263,7 @@ function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva, origen
     </div></td>
     <td class="ie-fila-del" style="padding:4px 0;">
       <div style="display:flex;gap:6px;align-items:stretch;flex-wrap:nowrap;">
-        ${origenEntradaId ? `<button type="button" class="btn sm" style="flex-shrink:0;padding:6px 10px;font-size:13px;color:var(--ink-soft);border:1px solid var(--line);border-radius:6px;background:transparent;" title="Ver entrada original" onclick="verEntradaOriginal(${origenEntradaId})">📋</button>` : ''}
+        ${(origenEntradaIds||origenEntradaId) ? `<button type="button" class="btn sm" style="flex-shrink:0;padding:6px 10px;font-size:13px;color:var(--ink-soft);border:1px solid var(--line);border-radius:6px;background:transparent;" title="Ver entradas originales" onclick="verEntradaOriginal(${JSON.stringify(origenEntradaIds||[origenEntradaId])})">📋</button>` : ''}
         <button type="button" class="del-row" style="flex:1;margin:0;padding:6px 10px;display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;border:1px solid var(--line);border-radius:6px;font-size:13px;color:var(--ink-soft);background:transparent;cursor:pointer;" onclick="document.getElementById('${id}').remove(); recalcTotals();">✕ Quitar línea</button>
       </div>
     </td>
@@ -17533,7 +17538,7 @@ function openDocumentViewer(id){
     if(!b.fecha) return -1;
     return b.fecha.localeCompare(a.fecha);
   });
-  itemsOrdenados.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, i.unidad||undefined, i.fecha, i.nuevo||false, i.origen_entrada_id||null));
+  itemsOrdenados.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, i.unidad||undefined, i.fecha, i.nuevo||false, i.origen_entrada_id||null, i.origen_entrada_ids||null));
   // Colapsar todas las líneas excepto las nuevas (naranjas) y hacer scroll a la primera naranja
   setTimeout(()=>{
     document.querySelectorAll('#ie-items-body tr').forEach(tr=>{
@@ -18403,7 +18408,7 @@ async function cargarDocumentosEconomicosReales(){
       if(documentosRealesById[doc.id]) return; // ya está (lo acabamos de guardar nosotros mismos)
       const entidad = clientes.find(c=>c.id===doc.entidad_id);
       const trabajo = jobs.find(j=>j.id===doc.trabajo_id);
-      const items = (doc.conceptos||[]).map(c=>({qty:c.cantidad, concept:c.descripcion, price:c.precio_unitario, machine:c.maquina, fecha:c.fecha, unidad:c.unidad, nuevo:c.nuevo||false, origen_entrada_id:c.origen_entrada_id||null}));
+      const items = (doc.conceptos||[]).map(c=>({qty:c.cantidad, concept:c.descripcion, price:c.precio_unitario, machine:c.maquina, fecha:c.fecha, unidad:c.unidad, nuevo:c.nuevo||false, origen_entrada_id:c.origen_entrada_id||null, origen_entrada_ids:c.origen_entrada_ids||null}));
       const dRaw = doc.fecha_devengo ? new Date(doc.fecha_devengo) : null;
       const dateLabel = formatFechaLabel(dRaw);
       const amountLabel = Number(doc.importe||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
