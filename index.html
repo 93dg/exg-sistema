@@ -2782,7 +2782,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.03</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.04</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2853,7 +2853,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.03</div>
+        <div class="sub" id="version-badge">V5.04</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3226,7 +3226,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         </div>
         <div id="trab-bar-buscar" style="display:none;padding:6px 14px;"><input class="search-box" id="trab-search" placeholder="Buscar cliente, zona, código…" oninput="renderTrabajosMovil()" style="width:100%;"><button onclick="toggleTrabBuscador()" style="background:none;border:none;font-size:16px;cursor:pointer;margin-left:6px;">✕</button></div>
       </div>
-      <div class="lista-movil-solo" id="trabajos-lista-movil" style="padding:8px 0;"></div>
+      <div class="lista-movil-solo" style="height:110px;flex-shrink:0;"></div>
+      <div class="lista-movil-solo" id="trabajos-lista-movil" style="padding:0 0 80px;"></div>
     </div>
 
     <!-- ================= ENTRADAS ================= -->
@@ -7841,21 +7842,31 @@ function renderTrabajosMovil(){
   else lista.sort((a,b)=>new Date(b.dateRaw||0)-new Date(a.dateRaw||0));
   const cont = document.getElementById('trabajos-lista-movil');
   if(!cont) return;
-  cont.style.paddingTop = '100px';
-  cont.innerHTML = lista.length ? lista.map(j=>`
-    <div onclick="openJobDrawer('${j.code}')" style="background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 8px;cursor:pointer;">
+
+  cont.innerHTML = lista.length ? lista.map(j=>{
+    const ddId = 'trab-estado-dd-'+j.code;
+    const estadoActual = j.state||'posible';
+    const estadoLabel = stateLabels[estadoActual]||estadoActual;
+    const estadoClass = estadoActual==='cobrado'?'cobrado':estadoActual==='facturado'?'pendiente_enviar':estadoActual==='terminado'?'pendiente':estadoActual==='posible'?'anulado':'pendiente';
+    return `<div style="background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 8px;cursor:pointer;" onclick="openJobDrawer('${j.code}')">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;">
         <div style="flex:1;">
           <div style="font-weight:700;font-size:14px;line-height:1.3;">${j.nombre||j.client||'Sin nombre'}</div>
           ${j.client&&j.client!=='—'?`<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${j.client}</div>`:''}
           <div style="font-size:11px;color:var(--ink-soft);margin-top:1px;">${j.zone||'Sin ubicación'}</div>
         </div>
-        ${pill(j.state,true)}
+        <div class="estado-cobro-dd" id="${ddId}" onclick="event.stopPropagation()">
+          <span class="pill ${estadoClass}" onclick="toggleEstadoCobroDropdown('${ddId}')" style="cursor:pointer;white-space:nowrap;">${estadoLabel}</span>
+          <div class="estado-cobro-menu">
+            ${jobStates.map(s=>`<span class="pill" onclick="changeJobState('${j.code}','${s}');toggleEstadoCobroDropdown('${ddId}');renderTrabajosMovil()">${stateLabels[s]||s}</span>`).join('')}
+          </div>
+        </div>
       </div>
       <div style="display:flex;align-items:center;justify-content:flex-end;margin-top:4px;">
         <span style="font-size:12px;font-weight:600;">${j.price||'—'}</span>
       </div>
-    </div>`).join('') : '<div class="empty">Sin trabajos</div>';
+    </div>`;
+  }).join('') : '<div class="empty">Sin trabajos</div>';
   // Chips de estado en el filtro móvil
   const chipsEl = document.getElementById('trab-filtros-estado-chips');
   if(chipsEl && !chipsEl.children.length){
