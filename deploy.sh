@@ -19,7 +19,7 @@ CHECK=$(curl -s -X POST "${SUPABASE_URL}/rest/v1/rpc/exg_verificar_deploy" \
   -H "apikey: ${SUPABASE_ANON_KEY}" -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
   -H "Content-Type: application/json" \
   -d "{\"p_caso_id\":\"${CASO_ID}\",\"p_version\":\"${VERSION}\"}")
-OK=$(echo "$CHECK" | grep -o '"ok":true' || true)
+OK=$(echo "$CHECK" | grep -oE '"ok":[[:space:]]*true' || true)
 if [ -z "$OK" ]; then
   echo "❌ EXG bloqueó el deploy: $CHECK"
   exit 1
