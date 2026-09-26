@@ -18644,7 +18644,21 @@ configurarOrdenDropdown('econ-facturas-tbody', 'fact-orden-chips', 'fact-orden-r
   ['total','Total',8,'num'], ['cobrado','Cobrado',9,'num'], ['estado','Estado',10,'text'],
   ['gestor','Gestor',11,'text'], ['calidad','Calidad',13,'text'],
 ]);
-cargarDocumentosEconomicosReales().then(()=>window.dispatchEvent(new Event('exg-datos-cargados')));
+cargarDocumentosEconomicosReales().then(()=>{
+  try{
+    const raw = localStorage.getItem('exg_goto');
+    if(!raw) return;
+    const obj = JSON.parse(raw);
+    if(Date.now()-(obj.ts||0)>30000){ localStorage.removeItem('exg_goto'); return; }
+    localStorage.removeItem('exg_goto');
+    if(obj.tipo==='albaran'){
+      openDocumentViewer(obj.id);
+    } else if(obj.tipo==='flota_incidencia'){
+      document.querySelector('[data-view="flota"]')?.click();
+      setTimeout(()=>{ document.querySelector('[data-subtab="mantenimiento"]')?.click(); mostrarToast('Incidencia en flota ✓','ok'); },400);
+    }
+  }catch(e){}
+});
 (function(){
   const vistaGuardada = localStorage.getItem('vista_activa');
   if(vistaGuardada){
@@ -18973,21 +18987,7 @@ window.addEventListener('load', ()=>{
   setTimeout(()=>intentarGoto(15), 1000);
 });
 // Navegación desde subir.html via localStorage
-window.addEventListener('exg-datos-cargados', ()=>{ console.log('[EXG] exg-datos-cargados disparado, localStorage:', localStorage.getItem('exg_goto'));
-  try{
-    const raw = localStorage.getItem('exg_goto');
-    if(!raw) return;
-    const obj = JSON.parse(raw);
-    if(Date.now() - (obj.ts||0) > 30000) { localStorage.removeItem('exg_goto'); return; }
-    localStorage.removeItem('exg_goto');
-    console.log('[EXG] abriendo albaran id:', obj.id); if(obj.tipo === 'albaran'){
-      openDocumentViewer(obj.id);
-    } else if(obj.tipo === 'flota_incidencia'){
-      document.querySelector('[data-view="flota"]')?.click();
-      setTimeout(()=>{ document.querySelector('[data-subtab="mantenimiento"]')?.click(); mostrarToast('Incidencia en flota ✓','ok'); }, 400);
-    }
-  }catch(e){}
-});
+
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.getRegistrations().then(regs=>{
