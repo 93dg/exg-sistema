@@ -2765,7 +2765,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.96</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.97</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2836,7 +2836,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.96</div>
+        <div class="sub" id="version-badge">V4.97</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2948,13 +2948,40 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
 
       <div class="panel" id="panel-documentos" style="margin-bottom:12px;">
-        <div class="doc-toolbar" onclick="togglePanelCC('documentos')" style="cursor:pointer;">
+        <div class="doc-toolbar tabla-escritorio-solo" onclick="togglePanelCC('documentos')" style="cursor:pointer;">
           <div class="doc-toolbar-title">
             <span class="dt-ico">📑</span>
             <h3>Documentos</h3>
             <span class="dt-count" id="control-docs-count">0</span>
             <span id="documentos-chevron" style="color:var(--ink-soft);font-size:16px;margin-left:auto;">▾</span>
           </div>
+        </div>
+        <div class="lista-movil-solo" style="padding:10px 14px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;justify-content:space-between;">
+          <div style="font-weight:700;font-size:15px;">📑 Documentos <span id="control-docs-count-m" style="font-size:12px;color:var(--ink-soft);font-weight:400;"></span></div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <div class="dd-filter" id="dd-cc-tipo">
+              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cc-tipo')">Tipo<span class="dd-caret">▾</span></button>
+              <div class="dd-filter-panel" style="min-width:180px;">
+                <label style="display:flex;align-items:center;gap:6px;padding:3px 0;"><input type="checkbox" checked data-tipo="factura" onchange="renderControlDocs()"> Factura</label>
+                <label style="display:flex;align-items:center;gap:6px;padding:3px 0;"><input type="checkbox" checked data-tipo="albaran" onchange="renderControlDocs()"> Albarán</label>
+                <label style="display:flex;align-items:center;gap:6px;padding:3px 0;"><input type="checkbox" checked data-tipo="presupuesto" onchange="renderControlDocs()"> Presupuesto</label>
+                <label style="display:flex;align-items:center;gap:6px;padding:3px 0;"><input type="checkbox" checked data-tipo="proforma" onchange="renderControlDocs()"> Proforma</label>
+              </div>
+            </div>
+            <div class="dd-filter" id="dd-cc-estado">
+              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-cc-estado')">Estado<span class="dd-caret">▾</span></button>
+              <div class="dd-filter-panel" style="min-width:180px;">
+                <label style="display:flex;align-items:center;gap:6px;padding:3px 0;"><input type="checkbox" checked data-estado="pendiente_enviar" onchange="renderControlDocs()"> Pend. enviar</label>
+                <label style="display:flex;align-items:center;gap:6px;padding:3px 0;"><input type="checkbox" checked data-estado="pendiente_cobrar" onchange="renderControlDocs()"> Pend. cobrar</label>
+                <label style="display:flex;align-items:center;gap:6px;padding:3px 0;"><input type="checkbox" checked data-estado="parcial" onchange="renderControlDocs()"> Cobro parcial</label>
+                <label style="display:flex;align-items:center;gap:6px;padding:3px 0;"><input type="checkbox" checked data-estado="borrador" onchange="renderControlDocs()"> Borrador</label>
+              </div>
+            </div>
+            <button type="button" class="cli-icon-btn" onclick="toggleCCDocBuscador()" title="Buscar"><svg width="15" height="15" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="4.5" stroke="currentColor" stroke-width="1.7"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+          </div>
+        </div>
+        <div class="lista-movil-solo" id="cc-doc-buscar" style="display:none;padding:6px 14px;border-bottom:1px solid var(--line);">
+          <input class="search-box" id="control-search-m" style="width:100%;" placeholder="Buscar por cliente, nº…" oninput="document.getElementById('control-search').value=this.value;renderControlDocs()">
         </div>
         <div id="documentos-body">
         <div class="dd-filter-row">
@@ -3140,12 +3167,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
     <!-- ================= TRABAJOS ================= -->
     <div class="view" id="view-trabajos">
-      <div class="topbar">
+      <!-- ESCRITORIO -->
+      <div class="topbar tabla-escritorio-solo">
         <div><h1>Trabajos</h1><div class="desc">Todos los trabajos de la empresa</div></div>
         <div class="quickactions"></div>
       </div>
-      <div class="filters" id="job-filters"></div>
-      <div class="panel">
+      <div class="filters tabla-escritorio-solo" id="job-filters"></div>
+      <div class="panel tabla-escritorio-solo">
         <div class="panel-body" style="padding:0;">
           <table class="tbl">
             <tr><th>Código</th><th>Cliente</th><th>Tipo</th><th>Zona</th><th>Maquinaria</th><th>Adjudicado a</th><th>Cobra</th><th>Fecha</th><th>Estado</th><th>Siguiente</th><th class="num">Precio</th></tr>
@@ -3153,6 +3181,35 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </table>
         </div>
       </div>
+      <!-- MÓVIL -->
+      <div class="lista-movil-solo" id="trab-sticky-bar">
+        <div id="trab-title-row"><h2>Trabajos</h2></div>
+        <div id="trab-bar-main">
+          <div id="trab-filtros-strip">
+            <div class="dd-filter" id="dd-trab-filtros">
+              <button type="button" class="dd-filter-btn" onclick="toggleDDGenerico('dd-trab-filtros')">Filtros<span class="dd-badge" id="trab-filtro-badge"></span><span class="dd-caret">▾</span></button>
+              <div class="dd-filter-panel" style="min-width:220px;max-height:60vh;overflow-y:auto;">
+                <p class="dd-section-label">Estado</p>
+                <div id="trab-filtros-estado-chips" style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0;"></div>
+              </div>
+            </div>
+            <div class="dd-filter dd-filter-orden" id="dd-trab-ord">
+              <button type="button" class="cli-icon-btn" onclick="toggleDDGenerico('dd-trab-ord')" title="Ordenar"><svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M2 4h8M2 8.5h5.5M2 13h3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M13 2v13M13 15l-2.5-2.5M13 15l2.5-2.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <div class="dd-filter-panel">
+                <div style="display:flex;flex-direction:column;gap:4px;padding:4px 0;">
+                  <div class="chip-filter active" data-trab-orden="fecha" onclick="setTrabOrden(this)">Fecha</div>
+                  <div class="chip-filter" data-trab-orden="cliente" onclick="setTrabOrden(this)">Cliente A-Z</div>
+                  <div class="chip-filter" data-trab-orden="precio" onclick="setTrabOrden(this)">Mayor precio</div>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="cli-icon-btn" onclick="renderTrabajosMovil()" title="Recargar"><svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M3.5 8.5A5 5 0 1 0 5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M3.5 3v2.5H6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button type="button" class="cli-icon-btn" onclick="toggleTrabBuscador()" title="Buscar"><svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="4.5" stroke="currentColor" stroke-width="1.7"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+          </div>
+        </div>
+        <div id="trab-bar-buscar" style="display:none;padding:6px 14px;"><input class="search-box" id="trab-search" placeholder="Buscar cliente, zona, código…" oninput="renderTrabajosMovil()" style="width:100%;"><button onclick="toggleTrabBuscador()" style="background:none;border:none;font-size:16px;cursor:pointer;margin-left:6px;">✕</button></div>
+      </div>
+      <div class="lista-movil-solo" id="trabajos-lista-movil" style="padding:8px 0;"></div>
     </div>
 
     <!-- ================= ENTRADAS ================= -->
@@ -7732,6 +7789,12 @@ document.getElementById('alertas-list').innerHTML = alertas.map(a=>`
   <div class="alert-row"><div class="alert-dot ${a.c}"></div><div><div class="t">${a.t}</div><div class="s">${a.s}</div></div></div>
 `).join('');
 
+function toggleCCDocBuscador(){
+  const b=document.getElementById('cc-doc-buscar');
+  b.style.display=b.style.display==='none'?'block':'none';
+  if(b.style.display==='block') document.getElementById('control-search-m')?.focus();
+}
+
 function togglePanelCC(panel){
   const body = document.getElementById(panel+'-body') || document.querySelector('#panel-'+panel+' .panel-body') || document.querySelector('#panel-'+panel+' .doc-toolbar + *');
   const chev = document.getElementById(panel+'-chevron');
@@ -7787,8 +7850,55 @@ function nextStateOf(state){
   return jobStates[idx+1];
 }
 
+function renderTrabajosMovil(){
+  const busq = (document.getElementById('trab-search')?.value||'').toLowerCase();
+  const filtroActivo = document.querySelector('#trab-filtros-estado-chips .chip-filter.active')?.dataset.trabEstado||'todos';
+  const orden = document.querySelector('[data-trab-orden]')?.dataset.trabOrden||'fecha';
+  let lista = jobs.filter(j=>{
+    if(filtroActivo!=='todos' && j.state!==filtroActivo) return false;
+    if(busq && !((j.client||'')+(j.zone||'')+(j.code||'')).toLowerCase().includes(busq)) return false;
+    return true;
+  });
+  if(orden==='cliente') lista.sort((a,b)=>(a.client||'').localeCompare(b.client||''));
+  else if(orden==='precio') lista.sort((a,b)=>(b.total||0)-(a.total||0));
+  else lista.sort((a,b)=>new Date(b.dateRaw||0)-new Date(a.dateRaw||0));
+  const cont = document.getElementById('trabajos-lista-movil');
+  if(!cont) return;
+  cont.innerHTML = lista.length ? lista.map(j=>`
+    <div onclick="openJobDrawer('${j.code}')" style="background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 8px;cursor:pointer;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;">
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:14px;">${j.client||'Sin cliente'}</div>
+          <div style="font-size:12px;color:var(--ink-soft);">${j.zone||'—'} · ${j.type||'—'}</div>
+        </div>
+        ${pill(j.state,true)}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+        <span style="font-size:11px;color:var(--ink-soft);">${j.code||'—'} · ${j.date||'—'}</span>
+        <span style="font-size:12px;font-weight:600;">${j.price||'—'}</span>
+      </div>
+    </div>`).join('') : '<div class="empty">Sin trabajos</div>';
+  // Chips de estado en el filtro móvil
+  const chipsEl = document.getElementById('trab-filtros-estado-chips');
+  if(chipsEl && !chipsEl.children.length){
+    chipsEl.innerHTML = ['todos',...filterStates.filter(s=>s!=='todos')].map(s=>`
+      <div class="chip-filter ${s==='todos'?'active':''}" data-trab-estado="${s}" onclick="document.querySelectorAll('#trab-filtros-estado-chips .chip-filter').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderTrabajosMovil();">${s==='todos'?'Todos':stateLabels[s]}</div>`).join('');
+  }
+}
+function setTrabOrden(el){
+  document.querySelectorAll('[data-trab-orden]').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  renderTrabajosMovil();
+}
+function toggleTrabBuscador(){
+  const b=document.getElementById('trab-bar-buscar');
+  b.style.display=b.style.display==='none'?'flex':'none';
+  if(b.style.display==='flex') document.getElementById('trab-search')?.focus();
+}
+
 function renderJobs(filter){
   const rows = jobs.filter(j=> filter==='todos' || j.state===filter);
+  renderTrabajosMovil();
   document.getElementById('trabajos-tbl').innerHTML = rows.map(j=>{
     const next = nextStateOf(j.state);
     const nextCell = next
