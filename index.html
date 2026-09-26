@@ -2782,7 +2782,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.16</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.17</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2853,7 +2853,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.16</div>
+        <div class="sub" id="version-badge">V5.17</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2928,7 +2928,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
         </div>
         <div id="alertas-body">
-          <div class="panel-body" id="alertas-list"></div>
+          <div class="panel-body" style="padding-bottom:0;">
+            <div id="alertas-list-atencion"></div>
+            <div id="alertas-list-bd"></div>
+            <div class="empty" id="alertas-empty" style="display:none;">Sin alertas pendientes</div>
+          </div>
         </div>
       </div>
 
@@ -7737,11 +7741,15 @@ function renderAtencion(){
     action:()=>{ document.querySelector('[data-view="trabajos"]').click(); openJobDrawer(j.code); }
   }));
   const atencion = atencionBase.concat(confirmar, weatherAlerts||[], retrasos);
-  document.getElementById('atencion-list').innerHTML = atencion.map((a,i)=>`
-    <div class="attention-row" onclick="atencionFns[${i}]()"><div class="sev ${a.sev}"></div><div><div class="t">${a.t}</div><div class="s">${a.s}</div></div></div>
-  `).join('');
+  const cont = document.getElementById('alertas-list-atencion');
+  if(cont){
+    cont.innerHTML = atencion.map((a,i)=>`<div class="alert-row" style="align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;" onclick="atencionFns[${i}]()">
+      <div class="alert-dot ${a.sev==='red'?'red':a.sev==='yellow'?'orange':'blue'}" style="margin-top:4px;flex-shrink:0;"></div>
+      <div style="flex:1;"><div class="t">${a.t}</div><div class="s" style="margin-top:2px;">${a.s}</div></div>
+    </div>`).join('');
+  }
   window.atencionFns = atencion.map(a=>a.action);
-  aplicarLimiteLista('atencion-list', 10);
+  if(typeof actualizarVacioAlertas==='function') actualizarVacioAlertas();
 }
 
 document.getElementById('control-tbl').innerHTML = pendientes.map((j,i)=>`
@@ -7803,27 +7811,15 @@ async function cargarAlertasYRecordatorios(){
       <div class="s" style="flex-shrink:0;font-size:10px;">${new Date(r.created_at).toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}</div>
     </div>`;
   }).join('');
-  // Fusionar "Requiere atención" (trabajos a confirmar, retrasos, clima) en el mismo listado
-  let htmlAtencion = '';
-  if(typeof atencionBase!=='undefined'){
-    const confirmar = (typeof jobs!=='undefined'?jobs:[]).filter(j=>j.state==='planificado').map(j=>({
-      sev:'yellow', t:`Confirmar ${j.code||j.nombre} antes de la fecha`, s:`${j.client} — avisar a ${j.worker||'quien lo haga'} y concretar lugar/hora`,
-      action:()=>{ document.querySelector('[data-view="trabajos"]').click(); closeDrawer(); openJobDrawer(j.code); }
-    }));
-    const retrasos = (typeof jobs!=='undefined'?jobs:[]).filter(j=>j.delayDays>=1).map(j=>({
-      sev: j.delayDays>=3 ? 'red' : 'yellow',
-      t: `${j.code||j.nombre} retrasado ${j.delayDays} día${j.delayDays>1?'s':''}`,
-      s: j.delayDays>=3 ? `${j.client} — retraso importante` : `${j.client} — retraso leve`,
-      action:()=>{ document.querySelector('[data-view="trabajos"]').click(); closeDrawer(); openJobDrawer(j.code); }
-    }));
-    const atencion = atencionBase.concat(confirmar, (typeof weatherAlerts!=='undefined'?weatherAlerts:[])||[], retrasos);
-    window.atencionFns = atencion.map(a=>a.action);
-    htmlAtencion = atencion.map((a,i)=>`<div class="alert-row" style="align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;" onclick="atencionFns[${i}]()">
-      <div class="alert-dot ${a.sev==='red'?'red':a.sev==='yellow'?'orange':'blue'}" style="margin-top:4px;flex-shrink:0;"></div>
-      <div style="flex:1;"><div class="t">${a.t}</div><div class="s" style="margin-top:2px;">${a.s}</div></div>
-    </div>`).join('');
-  }
-  cont.innerHTML = (html+htmlAtencion) || '<div class="empty">Sin alertas pendientes</div>';
+  document.getElementById('alertas-list-bd').innerHTML = html;
+  actualizarVacioAlertas();
+}
+function actualizarVacioAlertas(){
+  const bd = document.getElementById('alertas-list-bd');
+  const at = document.getElementById('alertas-list-atencion');
+  const vacio = (!bd || !bd.children.length) && (!at || !at.children.length);
+  const emptyEl = document.getElementById('alertas-empty');
+  if(emptyEl) emptyEl.style.display = vacio ? 'block' : 'none';
 }
 
 async function marcarRecordatorioResuelto(id){
