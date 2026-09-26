@@ -2782,7 +2782,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.99</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.01</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2853,7 +2853,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.99</div>
+        <div class="sub" id="version-badge">V5.01</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4719,7 +4719,8 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     <div class="drawer-head">
       <div>
         <div class="code" id="d-code">J-0284</div>
-        <h2 id="d-client" class="link-btn" onclick="closeDrawer();openClientDrawer(document.getElementById('d-client').textContent)">—</h2>
+        <div id="d-nombre-obra" style="font-size:16px;font-weight:700;margin:2px 0 1px;"></div>
+        <div id="d-client" class="link-btn" style="font-size:13px;color:var(--ink-soft);cursor:pointer;" onclick="closeDrawer();openClientDrawer(document.getElementById('d-client').textContent)">—</div>
       </div>
       <button class="close-x" onclick="closeDrawer()">✕</button>
     </div>
@@ -4731,14 +4732,18 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
     <div class="drawer-body">
       <div class="block">
         <h4>Estado</h4>
-        <div class="state-row" id="d-states"></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="dd-filter" id="dd-job-estado" style="position:relative;">
+            <div id="d-estado-pill" onclick="toggleDDGenerico('dd-job-estado')" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;"></div>
+            <div class="dd-filter-panel" style="min-width:220px;" id="dd-job-estado-panel">
+              <div id="d-states" style="display:flex;flex-direction:column;gap:4px;padding:4px 0;"></div>
+            </div>
+          </div>
+          <div id="d-delay-badge"></div>
+        </div>
         <div id="d-confirm-reminder" style="display:none;margin-top:10px;padding:10px 12px;background:var(--yellow-soft);border-radius:var(--radius);font-size:12.5px;color:#8A6100;">
           ⚠ Se acerca la fecha de este trabajo — hay que avisar al que lo vaya a hacer y confirmar con el cliente que sigue en pie, y quedar lugar y hora.
           <div style="margin-top:6px;"><button type="button" class="btn" style="padding:4px 10px;font-size:11.5px;" onclick="changeJobState(document.getElementById('d-code').textContent,'confirmado')">Marcar como confirmado</button></div>
-        </div>
-        <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button type="button" class="btn" style="padding:5px 11px;font-size:12px;" onclick="registrarRetraso(document.getElementById('d-code').textContent)">⏱ Registrar retraso</button>
-          <div id="d-delay-badge"></div>
         </div>
       </div>
 
@@ -7881,13 +7886,14 @@ function renderTrabajosMovil(){
   else lista.sort((a,b)=>new Date(b.dateRaw||0)-new Date(a.dateRaw||0));
   const cont = document.getElementById('trabajos-lista-movil');
   if(!cont) return;
+  cont.style.paddingTop = '140px';
   cont.innerHTML = lista.length ? lista.map(j=>`
     <div onclick="openJobDrawer('${j.code}')" style="background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 8px;cursor:pointer;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;">
         <div style="flex:1;">
           <div style="font-weight:700;font-size:14px;line-height:1.3;">${j.nombre||j.client||'Sin nombre'}</div>
-          ${j.client&&j.client!=='—'?`<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">${j.client}</div>`:''}
-          <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">📍 ${j.zone||'Sin ubicación'}</div>
+          ${j.client&&j.client!=='—'?`<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${j.client}</div>`:''}
+          <div style="font-size:11px;color:var(--ink-soft);margin-top:1px;">${j.zone||'Sin ubicación'}</div>
         </div>
         ${pill(j.state,true)}
       </div>
@@ -18981,10 +18987,16 @@ async function changeJobState(code, newState){
 function openJobDrawer(code){
   document.getElementById('d-code').textContent = code;
   const j = jobs.find(x=>x.code===code);
-  document.getElementById('d-client').textContent = j ? j.client : '—';
+  document.getElementById('d-client').textContent = j ? (j.client&&j.client!=='—' ? j.client : '') : '—';
+  const nombreEl = document.getElementById('d-nombre-obra');
+  if(nombreEl) nombreEl.textContent = j ? (j.nombre||j.client||'—') : '—';
   const current = j ? j.state : 'encurso';
+  // Pill de estado clicable
+  const pillEl = document.getElementById('d-estado-pill');
+  if(pillEl) pillEl.innerHTML = pill(current,true) + '<span style="font-size:11px;color:var(--ink-soft);margin-left:2px;">▾</span>';
+  // Lista de estados en el desplegable
   document.getElementById('d-states').innerHTML = jobStates.map(s=>`
-    <div class="state-btn ${s===current?'current':''}" onclick="changeJobState('${code}','${s}')" style="cursor:pointer;">${stateLabels[s]}</div>`).join('');
+    <div style="padding:6px 8px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:8px;${s===current?'background:var(--concrete-2);font-weight:700;':''}" onclick="changeJobState('${code}','${s}');toggleDDGenerico('dd-job-estado')">${pill(s,true)} ${stateLabels[s]}</div>`).join('');
 
   const reminder = document.getElementById('d-confirm-reminder');
   reminder.style.display = (current==='planificado' || current==='porconfirmar') ? 'block' : 'none';
