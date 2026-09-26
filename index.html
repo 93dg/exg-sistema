@@ -2767,7 +2767,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.74</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.75</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2838,7 +2838,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.74</div>
+        <div class="sub" id="version-badge">V4.75</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4120,7 +4120,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="quickactions"><span class="sub-t" id="sistema-updated-at">Última actualización: —</span></div>
       </div>
 
-      <div class="client-tabs" id="sistema-subtabs">
+      <div class="client-tabs" id="sistema-subtabs" style="overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;">
         <div class="client-tab active" data-sub="principios">Principios</div>
         <div class="client-tab" data-sub="organizacion">Organización</div>
         <div class="client-tab" data-sub="protocolos">Protocolos</div>
@@ -4249,19 +4249,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               <button class="btn sm" onclick="cargarCambiosEXG()">↻</button>
             </div>
           </div>
-          <div class="panel-body" style="padding:0;overflow-x:auto;">
-            <table class="tbl" style="width:100%;">
-              <thead><tr>
-                <th style="text-align:left;width:130px;">Fecha</th>
-                <th style="text-align:left;">Descripción</th>
-                <th style="width:100px;">Origen</th>
-                <th style="width:80px;">Versión</th>
-                <th style="width:80px;">Estado</th>
-                <th style="width:60px;"></th>
-              </tr></thead>
-              <tbody id="cambios-exg-tbody"></tbody>
-            </table>
-          </div>
+          <div class="panel-body" style="padding:8px;" id="cambios-exg-tbody"></div>
         </div>
       </div>
 
@@ -8407,19 +8395,25 @@ function renderCambiosEXG(){
   const tbody = document.getElementById('cambios-exg-tbody');
   if(!tbody) return;
   const lista = _cambiosEXGCache.filter(c=> !filtro || c.resultado===filtro);
-  if(!lista.length){ tbody.innerHTML='<tr><td colspan="6" class="empty">Sin cambios registrados</td></tr>'; return; }
+  if(!lista.length){ tbody.innerHTML='<div class="empty">Sin cambios registrados</div>'; return; }
   tbody.innerHTML = lista.map(c=>{
-    const fecha = new Date(c.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    const fecha = new Date(c.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});
     const estadoClass = c.resultado==='ok'?'cobrado':c.resultado==='parcial'?'pendiente_enviar':'pendiente';
-    const pendientes = (c.pendientes||[]).length ? `<br><span style="font-size:11px;color:var(--orange);">Pendiente: ${c.pendientes.join(', ')}</span>` : '';
-    return `<tr>
-      <td style="font-size:12px;">${fecha}</td>
-      <td style="text-align:left;font-size:13px;">${svgEsc(c.descripcion||'')}${pendientes}</td>
-      <td style="font-size:11px;"><span class="pill">${c.origen||'—'}</span></td>
-      <td style="font-size:12px;">${c.version_final||'—'}</td>
-      <td><span class="pill ${estadoClass}">${c.resultado||'pendiente'}</span></td>
-      <td>${c.conocimiento_id?`<span title="Generó conocimiento" style="color:var(--orange);">🧠</span>`:''}</td>
-    </tr>`;
+    const pendientes = (c.pendientes||[]).length ? `<div style="font-size:11px;color:var(--orange);margin-top:4px;">⚠ Pendiente: ${c.pendientes.join(', ')}</div>` : '';
+    return `<div style="background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;">
+        <div style="font-size:13px;flex:1;">${svgEsc(c.descripcion||'')}${pendientes}</div>
+        <span class="pill ${estadoClass} pill-sm">${c.resultado||'pendiente'}</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span class="pill pill-sm">${c.origen||'—'}</span>
+          <span style="font-size:11px;color:var(--ink-soft);">${c.version_final||'—'}</span>
+          ${c.conocimiento_id?'<span style="color:var(--orange);">🧠</span>':''}
+        </div>
+        <span style="font-size:11px;color:var(--ink-soft);">${fecha}</span>
+      </div>
+    </div>`;
   }).join('');
 }
 
