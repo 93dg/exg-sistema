@@ -2766,7 +2766,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.62</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.63</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2837,7 +2837,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.62</div>
+        <div class="sub" id="version-badge">V4.63</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18946,6 +18946,31 @@ function crearDocumentoDesdeTrabajo(tipo){
   openNewInvoiceModal({tipo, clientName: j.client, jobLabel: j.code+' — '+j.client});
 }
 
+// Navegación desde subir.html via hash #goto-tipo-id
+window.addEventListener('load', ()=>{
+  const hash = window.location.hash;
+  if(!hash.startsWith('#goto-')) return;
+  const parts = hash.slice(7).split('-');
+  const tipo = parts[0];
+  const id = parts.slice(1).join('-');
+  window.location.hash = '';
+  setTimeout(()=>{
+    if(tipo === 'albaran'){
+      // Abrir editor del albarán
+      const doc = (window._docCache||[]).find(d=>d.id===id);
+      if(doc) openDocumentViewer(doc);
+      else { document.querySelector('[data-view="facturas"]')?.click(); mostrarToast('Abre el albarán '+id.slice(0,8)+'…'); }
+    } else if(tipo === 'flota_incidencia'){
+      // Ir a sección flota > mantenimiento y resaltar
+      document.querySelector('[data-view="flota"]')?.click();
+      setTimeout(()=>{
+        document.querySelector('[data-subtab="mantenimiento"]')?.click() ||
+        document.querySelector('#flota-subtabs [data-tab="mantenimiento"]')?.click();
+        mostrarToast('Incidencia registrada en flota ✓','ok');
+      }, 300);
+    }
+  }, 600);
+});
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.getRegistrations().then(regs=>{
