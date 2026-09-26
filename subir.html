@@ -122,7 +122,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver">Subir S3.2 · Sistema V4.62</div>
+    <div class="ver">Subir S3.3 · Sistema V4.62</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -563,29 +563,49 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     const m = leerHistorial().find(x => x.msg_id === msgId);
     if (!m) return;
     const ids = m.kind === "texto" ? [m.documento_id] : m.attachments.map(a => a.documento_id);
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=in.(${ids.join(",")})&select=id,linked_label,interpretacion,action_type`, { headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey": SUPABASE_ANON_KEY } });
+    const resp = await fetch(SUPABASE_URL+"/rest/v1/documentos?id=in.("+ids.join(",")+")"+"&select=id,linked_label,interpretacion,action_type", { headers:{ "Authorization":"Bearer "+SUPABASE_ANON_KEY, "apikey": SUPABASE_ANON_KEY } });
     const filas = await resp.json();
-    const label = filas.find(f => f.linked_label)?.linked_label || '—';
-    const interp = filas.find(f => f.interpretacion)?.interpretacion || {};
+    const label = (filas.find(f => f.linked_label)||{}).linked_label || "—";
+    const interp = (filas.find(f => f.interpretacion)||{}).interpretacion || {};
     const elementoId = interp.elemento_id || null;
-    const tipo = interp.elemento_tipo || 'albaran';
-    let modal = document.getElementById('modal-solucion');
-    if (!modal){
-      modal = document.createElement('div');
-      modal.id = 'modal-solucion';
-      modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
-      modal.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;max-width:360px;width:100%;"><div style="font-weight:700;font-size:16px;margin-bottom:10px;">✓ Solución aplicada</div><div id="modal-solucion-texto" style="font-size:14px;line-height:1.5;color:#444;margin-bottom:16px;"></div><div id="modal-solucion-btn"></div><button onclick="document.getElementById('modal-solucion').style.display='none'" style="margin-top:10px;width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;background:transparent;font-size:14px;cursor:pointer;">Cerrar</button></div>';
-      modal.addEventListener('click', e=>{ if(e.target===modal) modal.style.display='none'; });
-      document.body.appendChild(modal);
+    const tipo = interp.elemento_tipo || "albaran";
+    let ov = document.getElementById("modal-solucion");
+    if (!ov){
+      ov = document.createElement("div");
+      ov.id = "modal-solucion";
+      ov.style.cssText = "display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;";
+      const box = document.createElement("div");
+      box.style.cssText = "background:#fff;border-radius:16px;padding:20px;max-width:360px;width:100%;";
+      const titulo = document.createElement("div");
+      titulo.style.cssText = "font-weight:700;font-size:16px;margin-bottom:10px;";
+      titulo.textContent = "✓ Solución aplicada";
+      const texto = document.createElement("div");
+      texto.id = "modal-solucion-texto";
+      texto.style.cssText = "font-size:14px;line-height:1.5;color:#444;margin-bottom:16px;";
+      const btnDiv = document.createElement("div");
+      btnDiv.id = "modal-solucion-btn";
+      const cerrar = document.createElement("button");
+      cerrar.textContent = "Cerrar";
+      cerrar.style.cssText = "margin-top:10px;width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;background:transparent;font-size:14px;cursor:pointer;";
+      cerrar.onclick = function(){ ov.style.display="none"; };
+      box.appendChild(titulo); box.appendChild(texto); box.appendChild(btnDiv); box.appendChild(cerrar);
+      ov.appendChild(box);
+      ov.addEventListener("click", function(e){ if(e.target===ov) ov.style.display="none"; });
+      document.body.appendChild(ov);
     }
-    document.getElementById('modal-solucion-texto').textContent = label;
-    document.getElementById('modal-solucion-btn').innerHTML = elementoId
-      ? `<button onclick="abrirEnlaceDesdeSubir('${elementoId}','${tipo}')" style="width:100%;padding:10px;border-radius:8px;background:#c0522a;color:#fff;border:none;font-size:14px;cursor:pointer;">Abrir en el sistema →</button>`
-      : '';
-    modal.style.display = 'flex';
+    document.getElementById("modal-solucion-texto").textContent = label;
+    const btnDiv = document.getElementById("modal-solucion-btn");
+    btnDiv.innerHTML = "";
+    if (elementoId){
+      const btn = document.createElement("button");
+      btn.textContent = "Abrir en el sistema →";
+      btn.style.cssText = "width:100%;padding:10px;border-radius:8px;background:#c0522a;color:#fff;border:none;font-size:14px;cursor:pointer;";
+      btn.onclick = function(){ abrirEnlaceDesdeSubir(elementoId, tipo); };
+      btnDiv.appendChild(btn);
+    }
+    ov.style.display = "flex";
   }
-
-  function abrirEnlaceDesdeSubir(elementoId, tipo){
+    function abrirEnlaceDesdeSubir(elementoId, tipo){
     const base = window.location.href.replace('subir.html','index.html');
     window.location.href = `${base}#goto-${tipo}-${elementoId}`;
   }
