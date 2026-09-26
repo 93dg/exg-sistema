@@ -18881,26 +18881,12 @@ function crearDocumentoDesdeTrabajo(tipo){
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('/exg-sistema/sw.js').then(reg=>{
-      // Cuando hay una nueva versión esperando, recargar automáticamente
-      reg.addEventListener('updatefound', ()=>{
-        const newWorker = reg.installing;
-        if(!newWorker) return;
-        newWorker.addEventListener('statechange', ()=>{
-          if(newWorker.state==='installed' && navigator.serviceWorker.controller){
-            // Hay versión nueva lista — pedirle al SW que tome control ya
-            newWorker.postMessage({type:'SKIP_WAITING'});
-          }
-        });
-      });
+    navigator.serviceWorker.getRegistrations().then(regs=>{
+      regs.forEach(reg=>reg.unregister());
     }).catch(()=>{});
-    // Cuando el SW activo cambia (nueva versión tomó control), recargar la página
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', ()=>{
-      if(refreshing) return;
-      refreshing = true;
-      window.location.reload();
-    });
+    if(window.caches){
+      caches.keys().then(names=>names.forEach(n=>caches.delete(n))).catch(()=>{});
+    }
   });
 }
 </script>
