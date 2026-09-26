@@ -2766,7 +2766,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.59</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.60</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2837,7 +2837,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.59</div>
+        <div class="sub" id="version-badge">V4.60</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11036,6 +11036,7 @@ async function cargarNotificaciones(){
   const {data, error} = await sb
     .from('sistema_notificaciones')
     .select('*')
+    .eq('verificado', false)
     .order('created_at', {ascending:false})
     .limit(50);
   if(error || !data) return;
@@ -11097,14 +11098,16 @@ function renderNotificaciones(lista){
     movil.innerHTML = lista.map(n => {
       const dt = new Date(n.created_at);
       const fechaHora = dt.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-      const tituloNotif = n.mensaje_original ? svgEsc(n.mensaje_original.slice(0,80)) : svgEsc(n.accion_realizada||'Acción realizada');
-      const subtituloNotif = n.decision_sistema ? svgEsc(n.decision_sistema.slice(0,90)) : '';
-      const etiquetaBtn = n.elemento_tipo==='albaran' ? '👁 Ver cambios' : n.elemento_tipo==='trabajo' ? '💼 Abrir trabajo' : n.elemento_nombre ? svgEsc(n.elemento_nombre.slice(0,30)) : 'Ver';
+      const accion = svgEsc((n.accion_realizada||'Acción del motor').slice(0,70));
+      const cliente = n.elemento_nombre ? svgEsc(n.elemento_nombre.slice(0,40)) : '';
+      const etiquetaBtn = n.elemento_tipo==='albaran' ? '👁 Ver cambios' : n.elemento_tipo==='trabajo' ? '💼 Abrir' : 'Ver';
       return `<div class="notif-card ${n.leida?'':'no-leida'}">
-        <div class="nc-hora">${fechaHora}</div>
-        <div class="nc-accion">${tituloNotif}</div>
-        ${subtituloNotif?`<div class="nc-decision">${subtituloNotif}</div>`:''}
-        <div class="nc-links">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+          <div class="nc-accion" style="flex:1;font-size:13px;font-weight:${n.leida?'400':'600'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${accion}</div>
+          <div class="nc-hora" style="flex-shrink:0;font-size:11px;color:var(--ink-soft);">${fechaHora}</div>
+        </div>
+        ${cliente?`<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${cliente}</div>`:''}
+        <div class="nc-links" style="margin-top:8px;">
           ${n.elemento_id?`<button class="btn sm primary" onclick="irAElementoNotif('${n.id}')">${etiquetaBtn}</button>`:''}
           <button class="btn sm" onclick="abrirDetalleNotif('${n.id}')">Detalle</button>
         </div>
