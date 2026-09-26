@@ -2767,7 +2767,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.78</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.79</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2838,7 +2838,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.78</div>
+        <div class="sub" id="version-badge">V4.79</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3029,7 +3029,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
         <div>
           <div class="panel">
-            <div class="panel-head"><h3>Alertas</h3></div>
+            <div class="panel-head"><h3>Alertas y recordatorios</h3><button class="btn sm" onclick="cargarAlertasYRecordatorios()">↻</button></div>
             <div class="panel-body" id="alertas-list"></div>
           </div>
 
@@ -7731,6 +7731,45 @@ const alertas = [];
 document.getElementById('alertas-list').innerHTML = alertas.map(a=>`
   <div class="alert-row"><div class="alert-dot ${a.c}"></div><div><div class="t">${a.t}</div><div class="s">${a.s}</div></div></div>
 `).join('');
+
+async function cargarAlertasYRecordatorios(){
+  if(!sb) return;
+  const cont = document.getElementById('alertas-list');
+  if(!cont) return;
+  const {data} = await sb.from('sistema')
+    .select('*')
+    .in('tipo',['recordatorio','alerta_cobro_pendiente','alerta_itv','alerta_documento_personal'])
+    .eq('data->>estado','pendiente')
+    .order('created_at',{ascending:false});
+  const items = data||[];
+  const html = items.map(r=>{
+    const d = r.data||{};
+    const color = r.tipo==='alerta_itv'?'orange':r.tipo==='alerta_cobro_pendiente'?'red':'blue';
+    const icono = r.tipo==='alerta_itv'?'🚗':r.tipo==='alerta_cobro_pendiente'?'💰':'🔔';
+    return `<div class="alert-row" style="align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);">
+      <div class="alert-dot ${color}" style="margin-top:4px;flex-shrink:0;"></div>
+      <div style="flex:1;">
+        <div class="t">${icono} ${d.titulo||r.tipo}</div>
+        ${d.descripcion||d.instruccion||d.accion?`<div class="s" style="margin-top:2px;">${d.descripcion||d.instruccion||d.accion}</div>`:''}
+        <div style="margin-top:6px;display:flex;gap:6px;">
+          <button onclick="marcarRecordatorioResuelto('${r.id}')" style="font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer;">✓ Resuelto</button>
+        </div>
+      </div>
+      <div class="s" style="flex-shrink:0;font-size:10px;">${new Date(r.created_at).toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}</div>
+    </div>`;
+  }).join('') || '<div class="empty">Sin alertas pendientes</div>';
+  cont.innerHTML = html;
+}
+
+async function marcarRecordatorioResuelto(id){
+  if(!sb) return;
+  await sb.from('sistema').update({'data': sb.rpc ? undefined : null}).eq('id',id);
+  // Actualizar el campo estado dentro del jsonb
+  const {data:row} = await sb.from('sistema').select('data').eq('id',id).single();
+  if(row) await sb.from('sistema').update({data:{...row.data, estado:'resuelto'}}).eq('id',id);
+  mostrarToast('Marcado como resuelto ✓','ok');
+  cargarAlertasYRecordatorios();
+}
 
 /* Trabajos tabla completa + filtros */
 function nextStateOf(state){
@@ -13392,7 +13431,7 @@ async function cargarEntidadesReales(){
   }catch(err){ console.error('No se pudieron cargar las entidades reales', err); }
 }
 cargarEntidadesReales();
-cargarAveriasReales(); cargarFlotaIncidencias(); cargarHistorialFlota();
+cargarAveriasReales(); cargarFlotaIncidencias(); cargarHistorialFlota(); cargarAlertasYRecordatorios();
 
 /* Facturas reales — se cargan desde Supabase (tabla documentos_economicos) */
 const facturasReales = [];
