@@ -2836,7 +2836,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.50</div>
+        <div class="sub" id="version-badge">V4.51</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11139,6 +11139,18 @@ function toggleDatosCliente(){
   f2.style.display = abierto?'none':'flex';
   btn.textContent = (abierto?'▶':'▼')+' Datos fiscales del cliente';
 }
+async function verEntradaOriginal(entradaId){
+  if(!sb || !entradaId) return;
+  const {data:d} = await sb.from('documentos').select('transcripcion,nota,file_name,source,created_at').eq('id',entradaId).single();
+  if(!d) return mostrarToast('Entrada no encontrada','err');
+  const texto = d.transcripcion || d.nota || '(sin texto)';
+  const fecha = d.created_at ? formatFechaCorta(d.created_at.slice(0,10)) : '—';
+  const tipo = d.source || 'entrada';
+  abrirModalGenerico(`📋 Entrada original (${tipo} · ${fecha})`,
+    `<div style="padding:8px;background:var(--concrete);border-radius:6px;font-size:13px;line-height:1.6;white-space:pre-wrap;max-height:60vh;overflow-y:auto;">${svgEsc(texto)}</div>`,
+    [{label:'Cerrar', accion:'cerrarModalGenerico()'}]
+  );
+}
 async function irAElementoNotif(id){
   const n = _notificacionesCache.find(x=>x.id===id);
   if(!n) return;
@@ -14221,7 +14233,7 @@ function sincronizarConceptoConNumero(){
 }
 
 const UNIDADES = ['ud','h','m³','m²','ml','km','día','servicio','transporte'];
-function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva){
+function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva, origenEntradaId){
   const id = 'item'+(itemSeq++);
   const tbody = document.getElementById('ie-items-body');
   const tr = document.createElement('tr');
@@ -14244,7 +14256,12 @@ function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva){
       <div class="ie-linea-col"><div class="ie-field-label">PRECIO</div><input type="number" class="ie-price col-precio search-box" style="width:100%;padding:4px;" value="${price ?? ''}" min="0" step="0.01" placeholder="0,00" oninput="recalcTotals()"></div>
       <div class="ie-linea-col"><div class="ie-field-label">TOTAL</div><div class="line-total mono col-total" style="padding:5px 0;font-size:15px;font-weight:700;">0,00 €</div></div>
     </div></td>
-    <td class="del-row" onclick="document.getElementById('${id}').remove(); recalcTotals();">✕<span class="del-row-label"> Quitar esta línea</span></td>
+    <td class="ie-fila-del" style="padding:4px 0;">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;">
+        ${origenEntradaId ? `<button type="button" class="btn sm" style="flex-shrink:0;font-size:11px;" onclick="verEntradaOriginal(${origenEntradaId})">📋 Ver entrada</button>` : ''}
+        <button type="button" class="del-row" style="flex:1;margin:0;display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;" onclick="document.getElementById('${id}').remove(); recalcTotals();">✕ <span>Quitar línea</span></button>
+      </div>
+    </td>
   `;
   tbody.appendChild(tr);
   recalcTotals();
@@ -17515,7 +17532,7 @@ function openDocumentViewer(id){
     if(!b.fecha) return -1;
     return b.fecha.localeCompare(a.fecha);
   });
-  itemsOrdenados.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, i.unidad||undefined, i.fecha, i.nuevo||false));
+  itemsOrdenados.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, i.unidad||undefined, i.fecha, i.nuevo||false, i.origen_entrada_id||null));
   // Colapsar todas las líneas excepto las nuevas (naranjas) y hacer scroll a la primera naranja
   setTimeout(()=>{
     document.querySelectorAll('#ie-items-body tr').forEach(tr=>{
