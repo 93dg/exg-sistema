@@ -49,6 +49,12 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 .msg-pill.revisar{background:var(--orange-soft);color:var(--orange);}
 .msg-pill.validado{background:var(--green-soft);color:var(--green);}
 .msg-pill.verificado{background:#e8f5e9;color:#2e7d32;}
+.msg.msg-plegado .msg-texto{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;color:var(--ink-soft);}
+.msg.msg-plegado .msg-interpretacion{display:none;}
+.msg.msg-plegado .msg-pie{display:none;}
+.msg.msg-plegado .msg-adjuntos{display:none;}
+.msg.msg-plegado{opacity:0.75;cursor:pointer;}
+.msg.msg-plegado .msg-meta{opacity:0.7;}
 .msg-pill.cargando{background:var(--concrete);color:var(--ink-soft);}
 .msg-acciones{flex:0 0 auto;display:flex;gap:4px;}
 .msg-icon-btn{width:26px;height:26px;border-radius:50%;border:none;background:var(--concrete);display:flex;align-items:center;justify-content:center;color:var(--ink-soft);}
@@ -116,7 +122,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver">Subir S3.1 · Sistema V4.28</div>
+    <div class="ver">Subir S3.2 · Sistema V4.61</div>
   </div>
 </header>
 
@@ -541,6 +547,36 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
       </div>`;
   }
 
+  function toggleMsgVerificado(div){
+    if (!div.classList.contains('msg-verificado')) return;
+    if (div.classList.contains('msg-plegado')){
+      div.classList.remove('msg-plegado');
+      div.classList.add('msg-expandido');
+    } else {
+      div.classList.add('msg-plegado');
+      div.classList.remove('msg-expandido');
+    }
+  }
+
+  async function mostrarSolucionEntrada(msgId){
+    const m = leerHistorial().find(x => x.msg_id === msgId);
+    if (!m) return;
+    const ids = m.kind === "texto" ? [m.documento_id] : m.attachments.map(a => a.documento_id);
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=in.(${ids.join(",")})&select=id,linked_label,interpretacion,action_type`, { headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey": SUPABASE_ANON_KEY } });
+    const filas = await resp.json();
+    const label = filas.find(f => f.linked_label)?.linked_label || '—';
+    const interp = filas.find(f => f.interpretacion)?.interpretacion || {};
+    const elementoId = interp.elemento_id || null;
+    const tipo = interp.elemento_tipo || 'albaran';
+    const enlace = elementoId ? `<button onclick="abrirEnlaceDesdeSubir('${elementoId}','${tipo}')" style="margin-top:10px;width:100%;padding:8px;border-radius:8px;background:var(--orange);color:#fff;border:none;font-size:14px;cursor:pointer;">Abrir en el sistema →</button>` : '';
+    alert(`✓ Solución aplicada:\n\n${label}${enlace ? '\n\n(Pulsa OK y luego el botón para abrirlo)' : ''}`);
+  }
+
+  function abrirEnlaceDesdeSubir(elementoId, tipo){
+    const base = window.location.href.replace('subir.html','index.html');
+    window.location.href = `${base}#goto-${tipo}-${elementoId}`;
+  }
+
   function reconstruirMensaje(div, m){
     div.innerHTML = construirContenidoMensaje(m);
     actualizarPill(m.msg_id);
@@ -552,6 +588,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     const div = document.createElement("div");
     div.className = "msg";
     div.dataset.msgId = m.msg_id;
+    div.addEventListener("click", function(e){ if(e.target.closest("button,input,a,select")) return; toggleMsgVerificado(div); });
     div.innerHTML = construirContenidoMensaje(m);
     if (alPrincipio) feed.insertBefore(div, feed.firstChild); else feed.appendChild(div);
     feed.scrollTop = feed.scrollHeight;
@@ -564,21 +601,39 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     const ids = m.kind === "texto" ? [m.documento_id] : m.attachments.map(a => a.documento_id);
     if (ids.length === 0) return;
     try {
-      const resp = await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=in.(${ids.join(",")})&select=id,status,interpretacion`, { headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY } });
+      const resp = await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=in.(${ids.join(",")})&select=id,status,interpretacion,linked_label,action_type`, { headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY } });
       const filas = await resp.json();
       if (!Array.isArray(filas) || filas.length === 0) return;
       const estados = filas.map(f => f.status || "pendiente");
-      const status = estados.includes("revisar") ? "revisar" : estados.every(s => s === "validado") ? "validado" : "pendiente";
+      const status = estados.includes("revisar") ? "revisar" : estados.every(s => s === "verificado") ? "verificado" : estados.every(s => s === "validado" || s === "verificado") ? "validado" : "pendiente";
       const pill = document.getElementById(`pill-${msgId}`);
       if (pill){ pill.className = "msg-pill " + status; pill.textContent = status === "pendiente" ? "Sin revisar" : status === "revisar" ? "Revisar" : status === "verificado" ? "✓ Verificado" : "Validado"; }
 
+      const fila0 = filas[0];
       const interp = filas.find(f => f.interpretacion)?.interpretacion;
-      if (interp){
-        const div = feed.querySelector(`.msg[data-msg-id="${msgId}"]`);
-        const cuerpo = div?.querySelector(".msg-cuerpo");
-        if (cuerpo){
-          let caja = cuerpo.querySelector(".msg-interpretacion");
-          if (!caja){ caja = document.createElement("div"); caja.className = "msg-interpretacion"; caja.style.cssText = "margin-top:6px;padding:8px 10px;border-radius:9px;font-size:12px;line-height:1.4;"; cuerpo.appendChild(caja); }
+      const linkedLabel = filas.find(f => f.linked_label)?.linked_label;
+      const actionType = filas.find(f => f.action_type)?.action_type;
+      const esFlota = actionType === 'flota_incidencias' || (linkedLabel && linkedLabel.toLowerCase().includes('flota'));
+      const esVerificado = status === 'verificado';
+
+      const msgDiv = feed.querySelector(`.msg[data-msg-id="${msgId}"]`);
+      const cuerpo = msgDiv?.querySelector(".msg-cuerpo");
+      if (cuerpo){
+        let caja = cuerpo.querySelector(".msg-interpretacion");
+        if (!caja){ caja = document.createElement("div"); caja.className = "msg-interpretacion"; caja.style.cssText = "margin-top:6px;padding:8px 10px;border-radius:9px;font-size:12px;line-height:1.4;"; cuerpo.appendChild(caja); }
+
+        if (esVerificado && linkedLabel){
+          // Verificado: mostrar botón "Ver solución"
+          caja.style.background = "var(--green-soft)"; caja.style.color = "var(--green)";
+          const elementoId = filas.find(f => f.interpretacion?.elemento_id)?.interpretacion?.elemento_id || null;
+          caja.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <span style="flex:1;">✓ ${linkedLabel.replace('✓ ','').replace('verificado','').replace('Verificado','').trim().replace(/—\s*$/,'').trim()}</span>
+            <button onclick="mostrarSolucionEntrada('${msgId}')" style="flex-shrink:0;padding:3px 8px;border-radius:6px;border:1px solid var(--green);background:transparent;color:var(--green);font-size:11px;cursor:pointer;">Ver solución →</button>
+          </div>`;
+        } else if (esFlota){
+          caja.style.background = "var(--green-soft)"; caja.style.color = "var(--green)";
+          caja.textContent = "→ Registrado en flota";
+        } else if (interp){
           if (interp.estado_resolucion === "resuelto"){
             caja.style.background = "var(--green-soft)"; caja.style.color = "var(--green)";
             caja.textContent = `${interp.trabajo_nombre}${interp.cliente_nombre ? ' — ' + interp.cliente_nombre : ''} · ${interp.concepto}${interp.horas ? ' · ' + interp.horas + 'h' : ''}${interp.maquina ? ' · ' + interp.maquina : ''} · ${interp.fecha}`;
@@ -586,6 +641,14 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
             caja.style.background = "var(--orange-soft)"; caja.style.color = "var(--orange)";
             caja.textContent = interp.estado_resolucion === "trabajo_no_encontrado" ? "No encuentro ese trabajo — edita para especificarlo" : "No sé a qué trabajo pertenece — nombra el cliente/obra";
           }
+        }
+      }
+
+      // Plegar mensajes verificados
+      if (esVerificado && msgDiv){
+        msgDiv.classList.add('msg-verificado');
+        if (!msgDiv.classList.contains('msg-expandido')){
+          msgDiv.classList.add('msg-plegado');
         }
       }
     } catch(e){}
