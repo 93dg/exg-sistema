@@ -2767,7 +2767,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.76</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V4.77</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2838,7 +2838,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V4.76</div>
+        <div class="sub" id="version-badge">V4.77</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4277,15 +4277,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
 
       <div class="sub-view" id="sis-oninicio" style="display:none;">
-        <div class="panel">
+        <div class="panel" style="margin-bottom:14px;">
           <div class="panel-head"><h3>Prompt de inicio de chat</h3><button class="btn" onclick="copiarPromptInicio()">📋 Copiar</button></div>
           <div class="panel-body">
-            <p class="two-col-note" style="margin-bottom:12px;">Pega esto al principio de cualquier chat nuevo (con o sin Daniel) que vaya a trabajar en el proyecto EXG — con una sola frase queda al tanto de todo.</p>
+            <p class="two-col-note" style="margin-bottom:12px;">Pega esto al principio de cualquier chat nuevo que vaya a trabajar en el proyecto EXG.</p>
             <div class="ie-paper" id="prompt-inicio-texto" style="white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:13px;padding:16px;">Lee toda la tabla "sistema" en Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) antes de tocar nada del proyecto EXG — ahí está todo lo que hace falta saber, incluida la web principal a leer y cómo decidimos.
 
 Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro chat en paralelo). Antes de cualquier cambio importante, comprueba "select max(updated_at) from sistema" — si es más reciente que la última vez que la leíste en esta conversación, reléela entera antes de seguir. Si no ha cambiado, no hace falta releer nada.</div>
           </div>
         </div>
+        <div id="prompts-sistema-lista"><div class="empty">Cargando prompts…</div></div>
       </div>
     </div>
 
@@ -6191,7 +6192,7 @@ function renderGastosPro(){
 }
 
 setupSubtabs('entradas-subtabs','entradas',{bandeja:'sub-bandeja',whatsapp:'sub-whatsapp'});
-setupSubtabs('sistema-subtabs','sis',{principios:'sis-principios',organizacion:'sis-organizacion',protocolos:'sis-protocolos',criterios:'sis-criterios',estandares:'sis-estandares',historial:'sis-historial','cambios-exg':'sis-cambios-exg','conocimiento-exg':'sis-conocimiento-exg',oninicio:'sis-oninicio'},{onSwitch:{'cambios-exg':()=>cargarCambiosEXG(),'conocimiento-exg':()=>cargarConocimientoEXG()}});
+setupSubtabs('sistema-subtabs','sis',{principios:'sis-principios',organizacion:'sis-organizacion',protocolos:'sis-protocolos',criterios:'sis-criterios',estandares:'sis-estandares',historial:'sis-historial','cambios-exg':'sis-cambios-exg','conocimiento-exg':'sis-conocimiento-exg',oninicio:'sis-oninicio'},{onSwitch:{'cambios-exg':()=>cargarCambiosEXG(),'conocimiento-exg':()=>cargarConocimientoEXG(),oninicio:()=>cargarPromptsSistema()}});
 /* ---------------- TABLAS ORDENABLES Y FILTRABLES POR AÑO/TRIMESTRE — reutilizable en cualquier tabla ---------------- */
 function poblarFiltroAniosChips(tbodyId, contenedorId){
   const tbody = document.getElementById(tbodyId);
@@ -8452,6 +8453,30 @@ function renderConocimientoEXG(){
         <div style="font-size:11px;color:var(--ink-soft);">v${k.version_regla||1} · ${k.veces_reutilizado||0} usos · ${k.seccion_origen||'—'}</div>
         ${!k.puede_autoaplicarse&&k.descripcion?`<button class="btn sm" style="font-size:10px;padding:2px 8px;" onclick="copiarTexto(${JSON.stringify(k.descripcion||'')})">📋</button>`:''}
       </div>
+    </div>`;
+  }).join('');
+}
+
+async function cargarPromptsSistema(){
+  if(!sb) return;
+  const {data} = await sb.from('prompts_sistema').select('*').eq('activo',true).order('seccion,created_at');
+  const cont = document.getElementById('prompts-sistema-lista');
+  if(!cont) return;
+  if(!data||!data.length){ cont.innerHTML='<div class="empty">Sin prompts guardados</div>'; return; }
+  // Agrupar por sección
+  const secciones = [...new Set(data.map(p=>p.seccion))];
+  cont.innerHTML = secciones.map(sec=>{
+    const items = data.filter(p=>p.seccion===sec);
+    return `<div style="margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink-soft);letter-spacing:.06em;margin-bottom:8px;">${sec}</div>
+      ${items.map(p=>`<div style="background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;">
+          <div style="font-weight:700;font-size:14px;flex:1;">${p.titulo}</div>
+          <button onclick="copiarTexto(${JSON.stringify(p.contenido)})" style="flex-shrink:0;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:transparent;font-size:11px;cursor:pointer;">📋 Copiar</button>
+        </div>
+        ${p.descripcion?`<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">${p.descripcion}</div>`:''}
+        <pre style="white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--concrete);border-radius:8px;padding:10px;margin:0;max-height:200px;overflow-y:auto;">${svgEsc(p.contenido)}</pre>
+      </div>`).join('')}
     </div>`;
   }).join('');
 }
