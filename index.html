@@ -2806,7 +2806,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.45</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.46</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2877,7 +2877,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.45</div>
+        <div class="sub" id="version-badge">V5.46</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6076,6 +6076,13 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
 });
 document.querySelectorAll('.mobile-tab-btn[data-view]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
+    // Si ya estás en Documentos (cualquiera de los 4 tipos) y vuelves a tocar el icono
+    // de abajo, en vez de recargar la misma vista se abre el selector de los 4 tipos —
+    // el mismo atajo que las pestañas de arriba, pero accesible desde la barra inferior.
+    if(btn.dataset.view==='facturas' && btn.classList.contains('active')){
+      toggleSelectorDocumentos();
+      return;
+    }
     document.querySelector(`.nav button[data-view="${btn.dataset.view}"]`)?.click();
   });
 });
@@ -6354,6 +6361,19 @@ function actualizarTabsDocumentos(vista){
   document.querySelectorAll('[data-docs-tabs] .docs-tab').forEach(b=>{
     b.classList.toggle('active', b.dataset.tab === vista);
   });
+}
+// Selector de los 4 tipos de documento, para cuando se toca el icono "Facturas"
+// de la barra inferior estando ya dentro de Documentos — mismo destino que las
+// pestañas de arriba, solo que accesible sin hacer scroll hasta ellas.
+function toggleSelectorDocumentos(){
+  mostrarModalGenerico('Documentos', `
+    <div class="docs-tabs" style="margin-bottom:0;">
+      <button class="docs-tab" onclick="cerrarModalGenerico();document.querySelector('.nav button[data-view=presupuestos]').click()">📋 Presupuesto</button>
+      <button class="docs-tab" onclick="cerrarModalGenerico();document.querySelector('.nav button[data-view=proformas]').click()">📑 Proforma</button>
+      <button class="docs-tab" onclick="cerrarModalGenerico();document.querySelector('.nav button[data-view=albaranes]').click()">📄 Albarán</button>
+      <button class="docs-tab" onclick="cerrarModalGenerico();document.querySelector('.nav button[data-view=facturas]').click()">🧾 Factura</button>
+    </div>
+  `);
 }
 function setModoPresProf(modo){
   presModo = modo==='proforma' ? 'proforma' : 'presupuesto';
