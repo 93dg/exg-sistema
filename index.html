@@ -2787,7 +2787,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.27</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.28</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2858,7 +2858,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.27</div>
+        <div class="sub" id="version-badge">V5.28</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14581,40 +14581,28 @@ function actualizarResumenLinea(id){
   const resumenTd = tr.querySelector('.ie-linea-resumen-td');
   if(resumenTd){
     resumenTd.innerHTML = `<span class="ie-resumen-fecha">${fecha ? formatFechaCorta(fecha) : '—'}</span><span class="ie-resumen-cant">${cantidad ?? ''}${unidad}</span><span class="ie-resumen-concepto">${concepto}</span><span class="ie-resumen-precio">${precio ? precio+'€' : ''}</span><span class="ie-resumen-total">${total}</span><span class="ie-resumen-chevron">▾</span>`;
-    ajustarLineaResumen(resumenTd, 11, 7);
+    resumenTd.style.setProperty('--ie-resumen-tam', tamañoPorLongitud(concepto, 22, 11, 7)+'px');
   }
 }
-// encoge el tamaño de TODA la línea de resumen (--ie-resumen-tam, heredado por todos sus
-// campos) en pasos, mirando solo si el concepto (el único campo de ancho variable) sigue
-// desbordando su hueco — si ni al tamaño mínimo cabe, se queda con "…", pero fecha/cantidad/
-// precio/total nunca se cortan, solo encogen junto con el concepto
-function ajustarLineaResumen(container, tamMax, tamMin){
-  if(!container) return;
-  requestAnimationFrame(()=>{
-    if(!container.isConnected) return;
-    const conceptoEl = container.querySelector('.ie-resumen-concepto');
-    if(!conceptoEl) return;
-    let tam = tamMax;
-    container.style.setProperty('--ie-resumen-tam', tam+'px');
-    while(conceptoEl.scrollWidth > conceptoEl.clientWidth && tam > tamMin){
-      tam -= 0.5;
-      container.style.setProperty('--ie-resumen-tam', tam+'px');
-    }
-  });
+// calcula el tamaño de letra directamente por la longitud del texto — SIN medir nada en el
+// DOM (nada de scrollWidth/clientWidth/rAF). Los 3 intentos anteriores con medición en vivo
+// no se reflejaban visualmente pese a comprobar el código varias veces; en vez de seguir
+// depurando a ciegas por qué esa medición no surtía efecto, se calcula el tamaño de antemano:
+// hasta maxChars caracteres, tamaño máximo; a partir de ahí se reduce proporcionalmente sin
+// bajar nunca de tamMin. Si ni al mínimo cabe, el texto se corta con "…" (CSS text-overflow).
+function tamañoPorLongitud(texto, maxChars, tamMax, tamMin){
+  const len = (texto || '').length;
+  if(len <= maxChars) return tamMax;
+  const tam = tamMax * (maxChars / len);
+  return Math.max(tamMin, Math.min(tamMax, Math.round(tam * 2) / 2));
 }
-// igual que ajustarLineaResumen pero para el propio input de CONCEPTO cuando la línea está
+// igual que tamañoPorLongitud pero para el propio input de CONCEPTO cuando la línea está
 // desplegada — el texto completo se ve sin tener que hacer scroll horizontal dentro de la caja
+// igual que tamañoPorLongitud pero para el propio input de CONCEPTO cuando la línea está
+// desplegada — mismo motivo: nada de medición en vivo, cálculo directo por longitud
 function ajustarInputConcepto(input){
   if(!input) return;
-  requestAnimationFrame(()=>{
-    if(!input.isConnected) return;
-    let tam = 15;
-    input.style.setProperty('--ie-concepto-tam', tam+'px');
-    while(input.scrollWidth > input.clientWidth && tam > 10){
-      tam -= 0.5;
-      input.style.setProperty('--ie-concepto-tam', tam+'px');
-    }
-  });
+  input.style.setProperty('--ie-concepto-tam', tamañoPorLongitud(input.value, 28, 15, 10)+'px');
 }
 // pliega o despliega TODAS las líneas a la vez — pensado para móvil, cuando hay muchas
 // líneas y hace falta bajar mucho para llegar al total; cada línea se puede desplegar
