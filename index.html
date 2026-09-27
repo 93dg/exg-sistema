@@ -1211,9 +1211,11 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
   .fc-total-block{
     grid-area:total;justify-self:end;align-self:center;text-align:right;
     padding-left:8px;flex:none;
-    display:flex;flex-direction:column;gap:0;
+    display:flex;flex-direction:row;align-items:flex-end;gap:10px;
   }
+  .fc-total-mini{display:flex;flex-direction:column;gap:0;}
   .fc-total-label{font-size:10.5px;color:var(--ink-soft);}
+  .fc-total-sub{font-size:12px;color:var(--ink-soft);white-space:nowrap;}
   .fc-total-valor{font-weight:800;font-size:15px;white-space:nowrap;}
 }
 @media(max-width:768px){
@@ -2820,7 +2822,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.62</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.63</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2897,7 +2899,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.62</div>
+        <div class="sub" id="version-badge">V5.63</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6735,8 +6737,7 @@ function renderizarFilaYCardFactura(doc, entidad, trabajo, alPrincipio){
       <div class="fc-meta">${metaHtml}</div>
       <div class="fc-gestor-wrap celda-gestor-movil-${doc.id}" onclick="event.stopPropagation();">${gestorMovilHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha)}</div>
       ${extraHtml}
-      ${ivaLineHtml(doc)}
-      <div class="fc-total-block"><span class="fc-total-label">Total</span><span class="fc-total-valor">${amountLabel}</span></div>`;
+      <div class="fc-total-block">${totalBlockHtml(doc)}</div>`;
     alPrincipio ? listaMovil.prepend(card) : listaMovil.appendChild(card);
   }
 }
@@ -18886,7 +18887,7 @@ function renderControlDocs(){
             <span class="fc-meta-ico">${ICO_CAL} ${fecha}</span>
           </div>
           ${extraHtml}
-          <div class="fc-total-block"><span class="fc-total-label">Total</span><span class="fc-total-valor">${d.amountLabel||'—'}</span></div>
+          <div class="fc-total-block">${totalBlockHtml(d)}</div>
         </div>`;
       }).join('');
     }
@@ -19105,6 +19106,26 @@ async function toggleEnviadoGestor(id){
 // Línea de IVA para las tarjetas de documento — porcentaje e importe real de IVA,
 // calculado igual que el resto de la app (doc.importe es el TOTAL con IVA incluido).
 // Vacía si el documento no tiene IVA (0% o sin dato).
+function totalBlockHtml(doc){
+  const total = Number(doc.importe||0);
+  const totalLabel = total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  const pct = doc.iva_pct;
+  const esIsp = (doc.tratamiento_iva||'normal')==='isp';
+  let ivaHtml = '';
+  let subtotalHtml = '';
+  if(esIsp){
+    subtotalHtml = `<div class="fc-total-mini"><span class="fc-total-label">Subtotal</span><span class="fc-total-sub">${totalLabel}</span></div>`;
+    ivaHtml = `<div class="fc-total-mini"><span class="fc-total-label">IVA</span><span class="fc-total-sub">ISP</span></div>`;
+  } else if(pct!=null && pct!=='' && Number(pct)!==0){
+    const base = total / (1 + Number(pct)/100);
+    const ivaImporte = total - base;
+    const baseLabel = base.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+    const ivaLabel = ivaImporte.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+    ivaHtml = `<div class="fc-total-mini"><span class="fc-total-label">IVA ${Number(pct)}%</span><span class="fc-total-sub">${ivaLabel}</span></div>`;
+    subtotalHtml = `<div class="fc-total-mini"><span class="fc-total-label">Subtotal</span><span class="fc-total-sub">${baseLabel}</span></div>`;
+  }
+  return `${ivaHtml}${subtotalHtml}<div class="fc-total-mini"><span class="fc-total-label">Total</span><span class="fc-total-valor">${totalLabel}</span></div>`;
+}
 function ivaLineHtml(doc){
   const pct = doc.iva_pct;
   const total = Number(doc.importe||0);
@@ -19145,8 +19166,7 @@ function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta
     <div class="fc-meta">${metaHtml}</div>
     <div class="fc-gestor-wrap celda-gestor-movil-${doc.id}" onclick="event.stopPropagation();">${gestorMovilHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha)}</div>
     ${extraHtml}
-    ${ivaLineHtml(doc)}
-    <div class="fc-total-block"><span class="fc-total-label">Total</span><span class="fc-total-valor">${amountLabel}</span></div>`;
+    <div class="fc-total-block">${totalBlockHtml(doc)}</div>`;
   lista.appendChild(card);
 }
 const ICO_DOC = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
