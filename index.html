@@ -170,6 +170,7 @@ table{border-collapse:collapse;width:100%;}
 /* ---------- KPI STRIP ---------- */
 .kpi-strip{display:flex;flex-wrap:nowrap;gap:0;margin-bottom:12px;border-bottom:1px solid var(--line);padding-bottom:8px;}
 .docs-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;}
+.fc-iva-info{font-size:12px;color:var(--ink-soft);}
 .docs-tab{padding:12px 6px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);font-weight:700;font-size:13px;cursor:pointer;text-align:center;color:var(--ink);}
 .docs-tab.active{background:var(--orange);color:#fff;border-color:var(--orange);}
 @media(max-width:768px){.docs-tab{font-size:12px;padding:10px 4px;}}
@@ -2818,7 +2819,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.56</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.57</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2895,7 +2896,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.56</div>
+        <div class="sub" id="version-badge">V5.57</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -19018,6 +19019,18 @@ async function toggleEnviadoGestor(id){
 // Construye una tarjeta móvil con el mismo diseño que Facturas — reutiliza todas las
 // clases fc-* y gestorMovilHtml ya existentes. Se llama desde el bucle de renderizado
 // de cada tipo de documento para poblar su propio lista-movil-solo.
+// Línea de IVA para las tarjetas de documento — porcentaje e importe real de IVA,
+// calculado igual que el resto de la app (doc.importe es el TOTAL con IVA incluido).
+// Vacía si el documento no tiene IVA (0% o sin dato).
+function ivaLineHtml(doc){
+  const pct = doc.iva_pct;
+  if((doc.tratamiento_iva||'normal')==='isp') return '<div class="fc-iva-info">IVA: ISP (inversión del sujeto pasivo)</div>';
+  if(pct==null || pct==='' || Number(pct)===0) return '';
+  const total = Number(doc.importe||0);
+  const base = total / (1 + Number(pct)/100);
+  const ivaImporte = total - base;
+  return `<div class="fc-iva-info">IVA ${Number(pct)}% · ${ivaImporte.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div>`;
+}
 function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta, entidad, trabajo, archivoUrl, calidadInfo){
   const lista = document.getElementById(listaId);
   if(!lista) return;
@@ -19042,6 +19055,7 @@ function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta
     <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
     ${obraHtml}
     <div class="fc-meta">${metaHtml}</div>
+    ${ivaLineHtml(doc)}
     <div class="fc-gestor-wrap celda-gestor-movil-${doc.id}" onclick="event.stopPropagation();">${gestorMovilHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha)}</div>
     ${extraHtml}
     <div class="fc-total-block"><span class="fc-total-label">Total</span><span class="fc-total-valor">${amountLabel}</span></div>`;
@@ -19328,6 +19342,7 @@ async function cargarDocumentosEconomicosReales(){
             <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
             ${obraHtml}
             <div class="fc-meta">${metaHtml}</div>
+            ${ivaLineHtml(doc)}
             <div class="fc-gestor-wrap celda-gestor-movil-${doc.id}" onclick="event.stopPropagation();">${gestorMovilHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha)}</div>
             ${extraHtml}
             <div class="fc-total-block"><span class="fc-total-label">Total</span><span class="fc-total-valor">${amountLabel}</span></div>`;
