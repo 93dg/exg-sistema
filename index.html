@@ -171,6 +171,7 @@ table{border-collapse:collapse;width:100%;}
 .kpi-strip{display:flex;flex-wrap:nowrap;gap:0;margin-bottom:12px;border-bottom:1px solid var(--line);padding-bottom:8px;}
 .docs-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;}
 .fc-iva-info{font-size:12px;color:var(--ink-soft);}
+.factura-card-movil.fc-pendiente-revision{background:#FFF4E5;border:2px solid var(--red);}
 .docs-tab{padding:12px 6px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);font-weight:700;font-size:13px;cursor:pointer;text-align:center;color:var(--ink);}
 .docs-tab.active{background:var(--orange);color:#fff;border-color:var(--orange);}
 @media(max-width:768px){.docs-tab{font-size:12px;padding:10px 4px;}}
@@ -2819,7 +2820,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.57</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.58</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2896,7 +2897,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.57</div>
+        <div class="sub" id="version-badge">V5.58</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -19331,6 +19332,11 @@ async function cargarDocumentosEconomicosReales(){
           const metaHtml = `<span class="fc-meta-ico">${ICO_DOC} Nº ${doc.numero||'—'}</span><span class="fc-meta-sep">|</span><span class="fc-meta-ico">${ICO_CAL} ${fechaCorta}</span>${cobradoNum ? '<span class="fc-meta-sep">|</span><span class="fc-meta-cobrado">Cobrado '+cobradoLabel+'</span>' : ''}`;
           const card = document.createElement('div');
           card.className = 'factura-card-movil';
+          // Marca visual (fondo naranja + borde rojo) para facturas sin número que ya no
+          // están en borrador/pendiente_enviar — no se sabe si les falta el número por un
+          // hueco real o porque nunca se les asignó, así que quedan a la vista para revisar,
+          // en el mismo formato de tarjeta de siempre, sin agruparlas aparte.
+          if(!doc.numero && !['borrador','pendiente_enviar'].includes(doc.estado_cobro)) card.classList.add('fc-pendiente-revision');
           card.id = 'mcard-'+doc.id;
           card.dataset.docId = doc.id;
           card.onclick = () => openDocumentViewer(doc.id);
