@@ -395,6 +395,8 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .pill.planificado, .pill.confirmado, .pill.presentado, .pill.enviado, .pill.trabajando, .pill.parcial, .pill.entregado{background:var(--blue-soft);color:var(--blue);}
 .pill.terminado, .pill.cobrado, .pill.disponible, .pill.validado, .pill.adjudicado{background:var(--green-soft);color:var(--green);}
 .pill.facturado{background:#E4DEF7;color:#5A3FA0;}
+.pill.rectificativa{background:#F7E4DE;color:#A0553F;}
+.pill.nula{background:var(--concrete-2);color:var(--ink-soft);text-decoration:line-through;}
 .pill.cancelado, .pill.descartado, .pill.urgente, .pill.averiada, .pill.noadjudicado{background:var(--red-soft);color:var(--red);}
 .pill.posible{background:var(--concrete-2);color:var(--ink-soft);border:1px dashed var(--ink-soft);}
 .pill.pendiente_enviar{background:#2B5C7A;color:#fff;}
@@ -2823,7 +2825,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.66</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.67</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2900,7 +2902,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.66</div>
+        <div class="sub" id="version-badge">V5.67</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6195,6 +6197,12 @@ function renderFacturasKPIs(){
     if(tr.style.display==='none') return;
     const tds = tr.querySelectorAll('td');
     if(tds.length < 11) return;
+    // Nula = documento que nunca fue una factura real (borrador de plantilla, error de
+    // creación...) -- se excluye por completo de las cuentas, como si no existiera. Una
+    // Rectificativa SÍ cuenta (resta en negativo): corrige una factura real que sí existió.
+    const pillEl = tds[10]?.querySelector('.pill, select');
+    const estadoActual = pillEl ? (pillEl.classList ? Array.from(pillEl.classList).find(c=>c!=='pill') : pillEl.value) : null;
+    if(estadoActual==='nula') return;
     // valores NUMÉRICOS internos de la fila (data-total / data-cobrado / data-num en la
     // celda Base); el texto "4.888,00 €" es solo para mostrar y nunca se vuelve a convertir
     const total = Number(tr.dataset.total)||0;
@@ -18911,7 +18919,7 @@ function renderControlDocs(){
    Facturas, Albaranes, Presupuestos y Proformas usan EXACTAMENTE el mismo
    desplegable, colores y nombres. Si se cambia un nombre o color aquí, se
    propaga solo a las cuatro secciones — no hay definiciones paralelas. */
-const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['pendiente_enviar','Listo para enviar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Cobro parcial'],['cobrado','Cobrado']];
+const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['pendiente_enviar','Listo para enviar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Cobro parcial'],['cobrado','Cobrado'],['rectificativa','Rectificativa'],['nula','Nula']];
 function estadoDocumentoSelect(tipo, id, actual, contexto){
   const act = actual || 'pendiente_enviar';
   const label = ESTADOS_DOCUMENTO.find(o=>o[0]===act)?.[1] || act;
