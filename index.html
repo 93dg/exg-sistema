@@ -2792,7 +2792,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.36</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.37</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2863,7 +2863,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.36</div>
+        <div class="sub" id="version-badge">V5.37</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14807,13 +14807,17 @@ function generarPDFDocumento(accion){
     doc.text(client, 32, yc);
     // NIF, dirección, código postal, población, provincia, teléfono y email: cada uno en su
     // propia línea y tomado de su campo real — nunca una línea construida a mano tipo
-    // "14290 FUENTE OBEJUNA (CÓRDOBA)" cuando esos datos ya están separados
-    if(nif){ yc += 4.3; doc.text('NIF: '+nif.toUpperCase(), 15, yc); }
-    if(addr){ yc += 4.3; doc.text(addr, 15, yc); }
-    if(cp || poblacion){ yc += 4.3; doc.text([cp, poblacion].filter(Boolean).join(' '), 15, yc); }
-    if(provincia){ yc += 4.3; doc.text(provincia, 15, yc); }
-    if(telefonoCliente){ yc += 4.3; doc.text('Tel: '+telefonoCliente, 15, yc); }
-    if(emailCliente){ yc += 4.3; doc.text(emailCliente, 15, yc); }
+    // "14290 FUENTE OBEJUNA (CÓRDOBA)" cuando esos datos ya están separados.
+    // Un albarán no lleva estos datos fiscales — todavía no hay IVA ni nada que los justifique,
+    // solo el nombre del cliente y la obra.
+    if(type !== 'albaran'){
+      if(nif){ yc += 4.3; doc.text('NIF: '+nif.toUpperCase(), 15, yc); }
+      if(addr){ yc += 4.3; doc.text(addr, 15, yc); }
+      if(cp || poblacion){ yc += 4.3; doc.text([cp, poblacion].filter(Boolean).join(' '), 15, yc); }
+      if(provincia){ yc += 4.3; doc.text(provincia, 15, yc); }
+      if(telefonoCliente){ yc += 4.3; doc.text('Tel: '+telefonoCliente, 15, yc); }
+      if(emailCliente){ yc += 4.3; doc.text(emailCliente, 15, yc); }
+    }
     doc.setFontSize(10);
     // Obra: columna propia a la derecha, a la altura de "Cliente:" — nunca comparte línea
     // ni se apila debajo del bloque de cliente, aunque el cliente tenga muchos datos
@@ -15004,7 +15008,7 @@ function togglePreview(){
       </div>
     </div>
     <div style="margin-bottom:16px;font-size:13px;">
-      <b>Cliente:</b> ${client}${nif ? ` — NIF: ${nif.toUpperCase()}` : ''}${addr ? `<br>${addr}` : ''}
+      <b>Cliente:</b> ${client}${type !== 'albaran' && nif ? ` — NIF: ${nif.toUpperCase()}` : ''}${type !== 'albaran' && addr ? `<br>${addr}` : ''}
     </div>
     <table class="ie-items" style="table-layout:fixed;">
       <colgroup>${items.some(i=>i.fecha)?'<col style="width:14%;">':''}<col style="width:8%;"><col style="width:${items.some(i=>i.fecha)?(cfg.hasPrecios?'54%':'66%'):(cfg.hasPrecios?'68%':'80%')};">${cfg.hasPrecios?'<col style="width:12%;">':''}<col style="width:12%;"></colgroup>
