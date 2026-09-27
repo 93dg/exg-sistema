@@ -2823,7 +2823,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.64</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.65</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2900,7 +2900,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.64</div>
+        <div class="sub" id="version-badge">V5.65</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3686,7 +3686,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             </div>
           </div>
           <div id="fact-bar-buscar" style="display:none;gap:8px;align-items:center;margin-top:8px;">
-            <input class="search-box" id="fact-search" style="flex:1;" placeholder="Buscar cliente, nº…" oninput="renderEconDocs('fact')">
+            <input class="search-box" id="fact-search" style="flex:1;" placeholder="Buscar cliente, nº…" oninput="renderEconDocsDebounced('fact')">
             <button type="button" class="cli-icon-btn" onclick="toggleBuscadorDocumentos('fact')" title="Cerrar" aria-label="Cerrar">✕</button>
           </div>
           <div class="panel" id="fact-revision-panel" style="display:none;margin-top:10px;"></div>
@@ -3797,7 +3797,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             </div>
           </div>
           <div id="alb-bar-buscar" style="display:none;gap:8px;align-items:center;margin-top:8px;">
-            <input class="search-box" id="alb-search" style="flex:1;" placeholder="Buscar cliente, nº…" oninput="renderEconDocs('alb')">
+            <input class="search-box" id="alb-search" style="flex:1;" placeholder="Buscar cliente, nº…" oninput="renderEconDocsDebounced('alb')">
             <button type="button" class="cli-icon-btn" onclick="toggleBuscadorDocumentos('alb')" title="Cerrar" aria-label="Cerrar">✕</button>
           </div>
           <div class="panel" id="alb-revision-panel" style="display:none;margin-top:10px;"></div>
@@ -3896,7 +3896,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             </div>
           </div>
           <div id="pres-bar-buscar" style="display:none;gap:8px;align-items:center;margin-top:8px;">
-            <input class="search-box" id="pres-search" style="flex:1;" placeholder="Buscar cliente, nº…" oninput="renderEconDocs('pres')">
+            <input class="search-box" id="pres-search" style="flex:1;" placeholder="Buscar cliente, nº…" oninput="renderEconDocsDebounced('pres')">
             <button type="button" class="cli-icon-btn" onclick="toggleBuscadorDocumentos('pres')" title="Cerrar" aria-label="Cerrar">✕</button>
           </div>
           <div class="panel" id="pres-revision-panel" style="display:none;margin-top:10px;"></div>
@@ -6502,6 +6502,16 @@ function renderEconDocs(prefijo){
   if(prefijo==='fact') filtrarTablaOrdenable('econ-facturas-tbody');
   else if(prefijo==='alb') filtrarPorAnioTrim('albaranes-tbody-standalone','alb');
   else if(prefijo==='pres') filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
+}
+// El buscador de documentos (Facturas/Albaranes/Presupuestos) disparaba un filtrado
+// completo de la tabla entera -- y en Facturas, ademas, un reordenamiento completo de
+// TODAS las tarjetas moviles -- en CADA tecla pulsada, sobre listas de más de 1000 filas.
+// Con esperar un poco a que la persona pare de escribir antes de filtrar, se nota mucho
+// menos al teclear, sin cambiar el resultado del filtro en absoluto.
+let _renderEconDocsTimer = null;
+function renderEconDocsDebounced(prefijo){
+  clearTimeout(_renderEconDocsTimer);
+  _renderEconDocsTimer = setTimeout(()=>renderEconDocs(prefijo), 250);
 }
 function filtrarPorAnioTrim(tbodyId, prefijo){
   const tbody = document.getElementById(tbodyId);
