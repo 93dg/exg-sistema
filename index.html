@@ -2820,7 +2820,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.59</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.60</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2897,7 +2897,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.59</div>
+        <div class="sub" id="version-badge">V5.60</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6668,6 +6668,77 @@ function aplicarOrdenGuardadoSiExiste(tbodyId, chipsId){
   tbody.dataset.ordCol = colIndex;
   tbody.dataset.ordDir = guardado.dir==='asc' ? 'desc' : 'asc';
   ordenarTabla(tbodyId, colIndex, tipo);
+}
+// Construye y coloca en el DOM la fila de escritorio Y la tarjeta móvil de UNA factura,
+// a partir de su objeto doc ya guardado (con entidad/trabajo ya resueltos). Si ya existía
+// una fila o tarjeta con ese id, las quita primero -- así sirve tanto para pintar una
+// factura nueva como para refrescarla tras editarla, sin dejar nunca una de las dos vistas
+// desactualizada (antes, al guardar una edición, solo se reconstruía la fila de escritorio
+// y la tarjeta móvil se quedaba con los datos viejos hasta recargar la página entera).
+function renderizarFilaYCardFactura(doc, entidad, trabajo, alPrincipio){
+  document.getElementById('docrow-'+doc.id)?.remove();
+  document.getElementById('mcard-'+doc.id)?.remove();
+
+  const totalNum = Number(doc.importe||0);
+  const amountLabel = totalNum.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  const gestorPill = gestorPillHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha);
+  const archivoUrlReal = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
+  const clienteHtml = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '<span class="pill mantenimiento">Falta cliente</span>';
+  const trabajoHtml = trabajo ? trabajo.code : '—';
+  const fechaCorta = formatFechaCorta(doc.fecha_devengo);
+  const archivoHtml = archivoUrlReal ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${archivoUrlReal}')">📎 Ver</a>` : '—';
+  const ivaPctDoc = doc.iva_pct != null ? Number(doc.iva_pct) : 21;
+  const baseNum2 = doc.tratamiento_iva==='isp' ? totalNum : totalNum / (1 + ivaPctDoc/100);
+  const ivaNum2 = totalNum - baseNum2;
+  const baseLabel = baseNum2.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  const ivaLabel = ivaNum2.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  const cobradoNum = doc.cobrado_importe != null ? Number(doc.cobrado_importe) : 0;
+  const cobradoLabel = cobradoNum.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+
+  const row = document.createElement('tr');
+  row.id = 'docrow-'+doc.id;
+  row.dataset.docId = doc.id;
+  row.onclick = () => toggleExpandirFacturaFila(doc.id);
+  row.dataset.fechaIso = doc.fecha_devengo || '';
+  row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : '';
+  row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : '';
+  row.dataset.total = totalNum;
+  row.dataset.cobrado = cobradoNum;
+  row.dataset.contabilidad = doc.contabilidad || 'oficial';
+  row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td class="col-texto" title="${(entidad?.name||'').replace(/"/g,'&quot;')}">${clienteHtml}</td><td class="mono col-texto" title="${(trabajo?.code||'').replace(/"/g,'&quot;')}">${trabajoHtml}</td><td class="num" data-num="${baseNum2}">${baseLabel}</td><td class="num" data-num="${ivaNum2}">${ivaLabel}</td><td class="num" data-num="${ivaPctDoc}">${ivaPctDoc}%</td><td class="num" data-num="${totalNum}">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" data-num="${cobradoNum}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-')}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
+  const tbodyFact = document.getElementById('econ-facturas-tbody');
+  if(tbodyFact) alPrincipio ? tbodyFact.prepend(row) : tbodyFact.appendChild(row);
+
+  const listaMovil = document.getElementById('econ-facturas-lista-movil');
+  if(listaMovil){
+    const c = calidadCorta(doc);
+    const fallosHtml = c.texto==='OK' ? '' : `<span class="fc-fallos" onclick="event.stopPropagation();abrirCalidadDetalle('${doc.id}')">${ICO_WARN} ${c.codigos.length||1} FALLO${(c.codigos.length||1)===1?'':'S'}</span>`;
+    const estadoHtml = estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-m-');
+    const verOriginalHtml = archivoUrlReal ? `<span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${archivoUrlReal}')">${ICO_CLIP} Original</span>` : '';
+    const extraHtml = (verOriginalHtml || fallosHtml) ? `<div class="fc-extra">${verOriginalHtml}${fallosHtml}</div>` : '';
+    const nombreObra = (trabajo && trabajo.code) || doc.obra_texto || '';
+    const obraHtml = nombreObra ? `<div class="fc-obra">${nombreObra}</div>` : '';
+    const metaHtml = `<span class="fc-meta-ico">${ICO_DOC} Nº ${doc.numero||'—'}</span><span class="fc-meta-sep">|</span><span class="fc-meta-ico">${ICO_CAL} ${fechaCorta}</span>${cobradoNum ? '<span class="fc-meta-sep">|</span><span class="fc-meta-cobrado">Cobrado '+cobradoLabel+'</span>' : ''}`;
+    const card = document.createElement('div');
+    card.className = 'factura-card-movil';
+    if(!doc.numero && !['borrador','pendiente_enviar'].includes(doc.estado_cobro)) card.classList.add('fc-pendiente-revision');
+    card.id = 'mcard-'+doc.id;
+    card.dataset.docId = doc.id;
+    card.onclick = () => openDocumentViewer(doc.id);
+    card.innerHTML = `
+      <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${doc.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
+      <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
+      <input type="checkbox" class="fc-check fact-sel-chk-espejo" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="sincCheckMovilFactura('${doc.id}', this.checked)">
+      <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}</div>
+      <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
+      ${obraHtml}
+      <div class="fc-meta">${metaHtml}</div>
+      ${ivaLineHtml(doc)}
+      <div class="fc-gestor-wrap celda-gestor-movil-${doc.id}" onclick="event.stopPropagation();">${gestorMovilHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha)}</div>
+      ${extraHtml}
+      <div class="fc-total-block"><span class="fc-total-label">Total</span><span class="fc-total-valor">${amountLabel}</span></div>`;
+    alPrincipio ? listaMovil.prepend(card) : listaMovil.appendChild(card);
+  }
 }
 function sincronizarListaMovilFacturas(){
   const tbody = document.getElementById('econ-facturas-tbody');
@@ -18626,7 +18697,11 @@ async function submitNewInvoice(ev, isDraft){
     try{ await sb.from('sistema_notificaciones').update({verificado:true, verificado_at:new Date().toISOString(), leida:true}).eq('elemento_id', editingDocId).eq('verificado', false); }catch(e){}
   }
 
-  documentosRealesById[savedId] = {...payload, id: savedId, type, iban, titular, payment, concepto_transferencia: concepto, ivaPct, items, num, client, job, dateRaw, dateLabel, amountLabel, status, base, iva, total, estado_cobro: payload.estado_cobro || estadoCobroPrevio};
+  // partir del documento previo conserva campos que este formulario no toca (archivo_path,
+  // archivo_url, enviado_gestor, obra_texto, cobrado_importe...) -- antes se perdían sin
+  // más al reeditar, quedando "undefined" en memoria hasta recargar la página
+  const docPrevioMem = editingDocId ? (documentosRealesById[editingDocId] || {}) : {};
+  documentosRealesById[savedId] = {...docPrevioMem, ...payload, id: savedId, type, iban, titular, payment, concepto_transferencia: concepto, ivaPct, items, num, client, job, dateRaw, dateLabel, amountLabel, status, base, iva, total, estado_cobro: payload.estado_cobro || estadoCobroPrevio};
   if(!editingDocId){
     const labelTipo = {factura:'Factura',albaran:'Albarán',proforma:'Proforma',presupuesto:'Presupuesto'}[type]||'Documento';
     aiRegistrarResultadoSiPendiente('documento', 'documentos_economicos', savedId, `${labelTipo}${num?' '+num:''} — ${client}`);
@@ -18641,22 +18716,14 @@ async function submitNewInvoice(ev, isDraft){
   }
 
   if(type==='factura'){
-    const row = document.createElement('tr');
-    row.id = 'docrow-'+savedId;
-    row.onclick = () => toggleExpandirFacturaFila(savedId);
-    row.dataset.fechaIso = dateRaw || '';
-    row.dataset.anio = dateRaw ? dateRaw.slice(0,4) : '';
-    row.dataset.trimestre = dateRaw ? String(Math.floor((Number(dateRaw.slice(5,7))-1)/3)+1) : '';
-    row.dataset.total = total;
-    row.dataset.cobrado = 0;
-    const fechaCorta = formatFechaCorta(dateRaw);
-    const baseCreada = ivaPct ? total / (1 + ivaPct/100) : total;
-    const ivaCreada = total - baseCreada;
-    const baseLabelCreada = baseCreada.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-    const ivaLabelCreada = ivaCreada.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-    row.innerHTML = `<td class="mono">${fechaCorta}</td><td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td class="num">${baseLabelCreada}</td><td class="num">${ivaLabelCreada}</td><td class="num">${ivaPct}%</td><td class="num" data-num="${total}">${amountLabel}</td><td class="num">0 €</td><td>${estadoPill}</td><td class="celda-gestor-${savedId}"><button class="btn sm" onclick="event.stopPropagation();toggleEnviadoGestor('${savedId}')">Marcar enviada</button></td><td>—</td>`;
-    document.getElementById('econ-facturas-tbody').prepend(row);
+    // fila de escritorio Y tarjeta móvil, siempre juntas -- antes solo se reconstruía la
+    // fila de escritorio al guardar una edición, y la tarjeta móvil se quedaba con los
+    // datos viejos hasta recargar la página entera. Con la función compartida, las dos
+    // vistas se actualizan a la vez, tanto al crear como al editar.
+    const entidadGuardada = clientes.find(c=>c.id===payload.entidad_id);
+    const trabajoGuardado = jobs.find(j=>j.id===payload.trabajo_id);
     documentosRealesById[savedId].origen_albaran_ids = payload.origen_albaran_ids || [];
+    renderizarFilaYCardFactura(documentosRealesById[savedId], entidadGuardada, trabajoGuardado, true);
     renderControlDocs();
     poblarFiltroAniosChips('econ-facturas-tbody','fact-filtro-anio-chips');
     document.querySelector('[data-view="facturas"]').click();
@@ -18907,6 +18974,21 @@ function editarCobrado(id){
     renderFacturasKPIs();
     celda.textContent = valor.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
     celda.onclick = (ev)=>{ ev.stopPropagation(); editarCobrado(id); };
+    // la tarjeta móvil muestra "Cobrado X€" dentro de su meta -- se reconstruye igual que
+    // al editar desde el formulario, sin mover la tarjeta de sitio (antes esto solo se veía
+    // tras recargar la página, la tarjeta se quedaba con el importe cobrado viejo)
+    if(doc){
+      const entidadC = clientes.find(c=>c.id===doc.entidad_id);
+      const trabajoC = jobs.find(j=>j.id===doc.trabajo_id);
+      const cardAnterior = document.getElementById('mcard-'+id);
+      const siguienteHermanoCard = cardAnterior?.nextSibling;
+      const siguienteHermanoFila = filaDoc?.nextSibling;
+      renderizarFilaYCardFactura(doc, entidadC, trabajoC, false);
+      const cardNueva = document.getElementById('mcard-'+id);
+      if(cardNueva && siguienteHermanoCard) siguienteHermanoCard.parentNode?.insertBefore(cardNueva, siguienteHermanoCard);
+      const filaDocNueva = document.getElementById('docrow-'+id);
+      if(filaDocNueva && siguienteHermanoFila) siguienteHermanoFila.parentNode?.insertBefore(filaDocNueva, siguienteHermanoFila);
+    }
   };
   input.addEventListener('blur', guardar);
   input.addEventListener('keydown', e=>{ if(e.key==='Enter') input.blur(); });
@@ -19286,74 +19368,7 @@ async function cargarDocumentosEconomicosReales(){
       const estadoPill = estadoDocumentoSelect(doc.tipo, doc.id, doc.estado_cobro, 'pres-');
       const estadoPillStandalone = estadoDocumentoSelect(doc.tipo, doc.id, doc.estado_cobro, 'pres2-');
       if(doc.tipo==='factura'){
-        const row = document.createElement('tr');
-        row.id = 'docrow-'+doc.id;
-        row.dataset.docId = doc.id;
-        row.onclick = () => toggleExpandirFacturaFila(doc.id);
-        row.dataset.fechaIso = doc.fecha_devengo || '';
-        row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : '';
-        row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : '';
-        row.dataset.total = totalNum;
-        row.dataset.cobrado = doc.cobrado_importe != null ? Number(doc.cobrado_importe) : 0;
-        row.dataset.contabilidad = doc.contabilidad || 'oficial';
-        const gestorPill = gestorPillHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha);
-        const archivoUrlReal = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
-        const clienteHtml = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '<span class="pill mantenimiento">Falta cliente</span>';
-        const trabajoHtml = trabajo ? trabajo.code : '—';
-        const fechaCorta = formatFechaCorta(doc.fecha_devengo);
-        const archivoHtml = archivoUrlReal ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();abrirVisorDesdeUrl('${archivoUrlReal}')">📎 Ver</a>` : '—';
-        const ivaPctDoc = doc.iva_pct != null ? Number(doc.iva_pct) : 21;
-        const baseNum2 = totalNum / (1 + ivaPctDoc/100);
-        const ivaNum2 = totalNum - baseNum2;
-        const baseLabel = baseNum2.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-        const ivaLabel = ivaNum2.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-        const cobradoNum = doc.cobrado_importe != null ? Number(doc.cobrado_importe) : 0;
-        const cobradoLabel = cobradoNum.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td class="col-texto" title="${(entidad?.name||doc.client||'').replace(/"/g,'&quot;')}">${clienteHtml}</td><td class="mono col-texto" title="${(trabajo?.code||doc.job||'').replace(/"/g,'&quot;')}">${trabajoHtml}</td><td class="num" data-num="${baseNum2}">${baseLabel}</td><td class="num" data-num="${ivaNum2}">${ivaLabel}</td><td class="num" data-num="${ivaPctDoc}">${ivaPctDoc}%</td><td class="num" data-num="${totalNum}">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" data-num="${cobradoNum}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-')}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
-        document.getElementById('econ-facturas-tbody')?.appendChild(row);
-        // MÓVIL: misma factura, presentación propia — reutiliza exactamente los mismos
-        // valores ya calculados arriba (nunca vuelve a leer/derivar nada)
-        const listaMovil = document.getElementById('econ-facturas-lista-movil');
-        if(listaMovil){
-          const c = calidadCorta(doc);
-          const fallosHtml = c.texto==='OK' ? '' : `<span class="fc-fallos" onclick="event.stopPropagation();abrirCalidadDetalle('${doc.id}')">${ICO_WARN} ${c.codigos.length||1} FALLO${(c.codigos.length||1)===1?'':'S'}</span>`;
-          // el ID del desplegable de estado tiene que ser DISTINTO al de la fila de escritorio
-          // (aunque esté oculta) — si no, un toque en móvil abre el desplegable escondido
-          const estadoHtml = estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-m-');
-          // VER ORIGINAL: solo si este documento tiene de verdad un archivo físico digitalizado
-          // propio — nunca se inventa uno para un documento nacido/gestionado en la web
-          const verOriginalHtml = archivoUrlReal ? `<span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${archivoUrlReal}')">${ICO_CLIP} Original</span>` : '';
-          // ORIGINAL/CALIDAD comparten SIEMPRE la misma celda de la rejilla ("extra") — si
-          // ninguno de los dos existe, la celda entera desaparece (grid-template-rows:auto no
-          // deja hueco), pero cuando existe SIEMPRE es la misma fila, nunca se mezcla con Gestor
-          const extraHtml = (verOriginalHtml || fallosHtml) ? `<div class="fc-extra">${verOriginalHtml}${fallosHtml}</div>` : '';
-          const nombreObra = (trabajo && trabajo.code) || doc.obra_texto || '';
-          const obraHtml = nombreObra ? `<div class="fc-obra">${nombreObra}</div>` : '';
-          const metaHtml = `<span class="fc-meta-ico">${ICO_DOC} Nº ${doc.numero||'—'}</span><span class="fc-meta-sep">|</span><span class="fc-meta-ico">${ICO_CAL} ${fechaCorta}</span>${cobradoNum ? '<span class="fc-meta-sep">|</span><span class="fc-meta-cobrado">Cobrado '+cobradoLabel+'</span>' : ''}`;
-          const card = document.createElement('div');
-          card.className = 'factura-card-movil';
-          // Marca visual (fondo naranja + borde rojo) para facturas sin número que ya no
-          // están en borrador/pendiente_enviar — no se sabe si les falta el número por un
-          // hueco real o porque nunca se les asignó, así que quedan a la vista para revisar,
-          // en el mismo formato de tarjeta de siempre, sin agruparlas aparte.
-          if(!doc.numero && !['borrador','pendiente_enviar'].includes(doc.estado_cobro)) card.classList.add('fc-pendiente-revision');
-          card.id = 'mcard-'+doc.id;
-          card.dataset.docId = doc.id;
-          card.onclick = () => openDocumentViewer(doc.id);
-          card.innerHTML = `
-            <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${doc.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
-            <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
-            <input type="checkbox" class="fc-check fact-sel-chk-espejo" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="sincCheckMovilFactura('${doc.id}', this.checked)">
-            <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}</div>
-            <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
-            ${obraHtml}
-            <div class="fc-meta">${metaHtml}</div>
-            ${ivaLineHtml(doc)}
-            <div class="fc-gestor-wrap celda-gestor-movil-${doc.id}" onclick="event.stopPropagation();">${gestorMovilHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha)}</div>
-            ${extraHtml}
-            <div class="fc-total-block"><span class="fc-total-label">Total</span><span class="fc-total-valor">${amountLabel}</span></div>`;
-          listaMovil.appendChild(card);
-        }
+        renderizarFilaYCardFactura(doc, entidad, trabajo);
       } else if(doc.tipo==='presupuesto' || doc.tipo==='proforma'){
         const clienteHtmlP = entidad ? `<span onclick="event.stopPropagation();openClientDrawer('${entidad.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${entidad.name}</span>` : '<span class="pill mantenimiento">Falta cliente</span>';
         const trabajoHtmlP = trabajo ? trabajo.code : '—';
