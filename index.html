@@ -2818,7 +2818,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.51</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.52</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2895,7 +2895,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.51</div>
+        <div class="sub" id="version-badge">V5.52</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -19533,9 +19533,19 @@ async function elegirDestinoMover(destino){
     const TIPOS={factura:'Facturas',albaran:'Albaranes',presupuesto:'Presupuestos',proforma:'Proformas',gasto:'Gastos'};
     const {error}=await sb.from('documentos_economicos').update({tipo:destino}).in('id',ids);
     if(error){ mostrarToast('Error: '+errText(error)); return; }
+    // Quitar del caché en memoria y de CUALQUIER fila/tarjeta donde estuvieran (con su tipo
+    // ANTERIOR, en tabla y en móvil) antes de recargar — cargarDatosReales() por sí solo NO
+    // sirve aquí: solo añade documentos que no reconoce, y uno que ya estaba en caché con
+    // otro tipo lo "reconoce" como ya presente y lo ignora, así que el movimiento nunca se
+    // reflejaba hasta recargar la página entera. Al borrar el caché de estos ids primero, la
+    // recarga los trata como nuevos y los coloca en su tipo correcto de verdad.
+    ids.forEach(id=>{
+      delete documentosRealesById[id];
+      ['docrow-','presrow-','albrow-','mcard-'].forEach(pref=>document.getElementById(pref+id)?.remove());
+    });
+    await cargarDocumentosEconomicosReales();
     mostrarToast(`${ids.length} archivo(s) movidos a ${TIPOS[destino]}`, 'ok');
     cerrarModalGenerico();
-    if(typeof cargarDatosReales==='function') cargarDatosReales();
     return;
   }
 
