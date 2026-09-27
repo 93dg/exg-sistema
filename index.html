@@ -2823,7 +2823,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.65</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.66</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2900,7 +2900,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.65</div>
+        <div class="sub" id="version-badge">V5.66</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6190,28 +6190,29 @@ document.querySelectorAll('.topbar').forEach(topbar=>{
 function renderFacturasKPIs(){
   const strip = document.getElementById('facturas-kpi-strip');
   if(!strip) return;
-  let facturado=0, cobrado=0, vencidas=0;
+  let facturado=0, subtotal=0, cobrado=0;
   document.querySelectorAll('#econ-facturas-tbody tr').forEach(tr=>{
     if(tr.style.display==='none') return;
     const tds = tr.querySelectorAll('td');
     if(tds.length < 11) return;
-    // valores NUMÉRICOS internos de la fila (data-total / data-cobrado); el texto "4.888,00 €"
-    // es solo para mostrar y nunca se vuelve a convertir en número
+    // valores NUMÉRICOS internos de la fila (data-total / data-cobrado / data-num en la
+    // celda Base); el texto "4.888,00 €" es solo para mostrar y nunca se vuelve a convertir
     const total = Number(tr.dataset.total)||0;
     const cob = Number(tr.dataset.cobrado)||0;
+    const base = Number(tds[5]?.dataset.num)||0;
     facturado += total;
+    subtotal += base;
     cobrado += cob;
-    if(tds[10].textContent.toLowerCase().includes('vencid')) vencidas++;
   });
   const pendiente = facturado - cobrado;
   const activoKpi = strip.querySelector('.kpi.active')?.dataset.kpi || '';
   strip.innerHTML = `
     <div class="kpi ${activoKpi==='todo'?'active':''}" data-kpi="todo" style="cursor:pointer;"><div class="lbl">Total facturado</div><div class="val">${facturado.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+    <div class="kpi" data-kpi="subtotal" style="cursor:default;"><div class="lbl">Subtotal facturado</div><div class="val">${subtotal.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
     <div class="kpi ${activoKpi==='cobrado'?'active':''}" data-kpi="cobrado" style="cursor:pointer;"><div class="lbl">Total cobrado</div><div class="val green">${cobrado.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
     <div class="kpi ${activoKpi==='pendiente'?'active':''}" data-kpi="pendiente" style="cursor:pointer;"><div class="lbl">Pendiente de cobro</div><div class="val orange">${pendiente.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
-    <div class="kpi ${activoKpi==='vencida'?'active':''}" data-kpi="vencida" style="cursor:pointer;"><div class="lbl">Facturas vencidas</div><div class="val red">${vencidas}</div></div>
   `;
-  strip.querySelectorAll('.kpi').forEach(card=>{
+  strip.querySelectorAll('.kpi[data-kpi]:not([data-kpi="subtotal"])').forEach(card=>{
     card.addEventListener('click', ()=>{
       const yaActiva = card.classList.contains('active');
       strip.querySelectorAll('.kpi').forEach(c=>c.classList.remove('active'));
