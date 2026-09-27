@@ -2819,7 +2819,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.72</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.73</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2896,7 +2896,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.72</div>
+        <div class="sub" id="version-badge">V5.73</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6211,6 +6211,7 @@ function renderFacturasKPIs(){
   strip.innerHTML = `
     <div class="kpi ${activoKpi==='todo'?'active':''}" data-kpi="todo" style="cursor:pointer;"><div class="lbl">Total facturado</div><div class="val">${facturado.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
     <div class="kpi" data-kpi="subtotal" style="cursor:default;"><div class="lbl">Subtotal facturado</div><div class="val">${subtotal.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+    <div class="kpi ${activoKpi==='cobrado'?'active':''}" data-kpi="cobrado" style="cursor:pointer;"><div class="lbl">Cobrado</div><div class="val green">${cobrado.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
     <div class="kpi ${activoKpi==='pendiente'?'active':''}" data-kpi="pendiente" style="cursor:pointer;"><div class="lbl">Pendiente de cobro</div><div class="val orange">${pendiente.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
   `;
   strip.querySelectorAll('.kpi[data-kpi]:not([data-kpi="subtotal"])').forEach(card=>{
@@ -6387,23 +6388,24 @@ document.querySelectorAll('#fact-filtro-trim-chips .chip-filter').forEach(chip=>
 function renderAlbaranesKPIs(){
   const strip = document.getElementById('albaranes-kpi-strip');
   if(!strip) return;
-  let total=0, cobradoEfectivo=0, enProceso=0, entregados=0;
+  let total=0, subtotal=0, cobrado=0;
   document.querySelectorAll('#albaranes-tbody-standalone tr').forEach(tr=>{
     const totalTr = parseFloat((tr.dataset.total)||'0')||0;
     total += totalTr;
-    // el desplegable de estado ya NO es un <select> — es el componente unificado
-    // (estadoDocumentoSelect), la píldora lleva la clase del propio estado.
-    const pillEl = tr.querySelector('.pill');
-    const v = pillEl ? Array.from(pillEl.classList).find(c=>c!=='pill') : null;
-    if(v==='cobrado') cobradoEfectivo += totalTr;
-    else if(v==='entregado') entregados++;
-    else enProceso++;
+    const docId = tr.id.replace(/^docrow-/, '');
+    const d = documentosRealesById[docId];
+    const pct = d?.iva_pct;
+    const esIsp = (d?.tratamiento_iva||'normal')==='isp';
+    const base = esIsp ? totalTr : (pct!=null && Number(pct)!==0 ? totalTr/(1+Number(pct)/100) : totalTr);
+    subtotal += base;
+    cobrado += Number(d?.cobrado_importe||0);
   });
+  const pendiente = total - cobrado;
   strip.innerHTML = `
     <div class="kpi"><div class="lbl">Total albaranes</div><div class="val">${total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div></div>
-    <div class="kpi"><div class="lbl">Cobrado en efectivo</div><div class="val green">${cobradoEfectivo.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div></div>
-    <div class="kpi"><div class="lbl">Entregados</div><div class="val">${entregados}</div></div>
-    <div class="kpi"><div class="lbl">En proceso</div><div class="val orange">${enProceso}</div></div>
+    <div class="kpi"><div class="lbl">Subtotal albaranes</div><div class="val">${subtotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div></div>
+    <div class="kpi"><div class="lbl">Cobrado</div><div class="val green">${cobrado.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div></div>
+    <div class="kpi"><div class="lbl">Pendiente de cobro</div><div class="val orange">${pendiente.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div></div>
   `;
 }
 /* ============ PRESUPUESTOS / PROFORMAS — un solo motor, dos secciones ============
@@ -6459,22 +6461,30 @@ function setModoPresProf(modo){
 function renderPresupuestosKPIs(){
   const strip = document.getElementById('presupuestos-kpi-strip');
   if(!strip) return;
-  let total=0, enviados=0, borradores=0;
+  let total=0, subtotal=0, aceptados=0, pendientes=0;
   document.querySelectorAll('#presupuestos-tbody-standalone tr').forEach(tr=>{
     if(tr.dataset.tipo!==presModo) return;
-    total += parseFloat((tr.dataset.total)||'0')||0;
+    const totalTr = parseFloat((tr.dataset.total)||'0')||0;
+    total += totalTr;
+    const docId = tr.id.replace(/^docrow-/, '');
+    const d = documentosRealesById[docId];
+    const pct = d?.iva_pct;
+    const esIsp = (d?.tratamiento_iva||'normal')==='isp';
+    const base = esIsp ? totalTr : (pct!=null && Number(pct)!==0 ? totalTr/(1+Number(pct)/100) : totalTr);
+    subtotal += base;
     // igual que en Albaranes: leer la píldora de estado real, no un índice de columna
     // fijo (el índice cambia si se añade/quita una columna, y llevaba tiempo apuntando
     // a la columna equivocada — nunca detectaba "borrador" de verdad).
     const pillEl = tr.querySelector('.pill');
     const v = pillEl ? Array.from(pillEl.classList).find(c=>c!=='pill') : null;
-    if(v==='borrador') borradores++;
-    else enviados++;
+    if(v==='borrador' || v==='pendiente_enviar') pendientes++;
+    else aceptados++;
   });
   strip.innerHTML = `
-    <div class="kpi"><div class="lbl">${presModo==='proforma'?'Total en proformas':'Total presupuestado'}</div><div class="val">${total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div></div>
-    <div class="kpi"><div class="lbl">Enviados</div><div class="val">${enviados}</div></div>
-    <div class="kpi"><div class="lbl">Borradores</div><div class="val orange">${borradores}</div></div>
+    <div class="kpi"><div class="lbl">${presModo==='proforma'?'Total en proformas':'Total presupuestado'}</div><div class="val">${total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+    <div class="kpi"><div class="lbl">Subtotal</div><div class="val">${subtotal.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+    <div class="kpi"><div class="lbl">Aceptados</div><div class="val green">${aceptados}</div></div>
+    <div class="kpi"><div class="lbl">Pendientes</div><div class="val orange">${pendientes}</div></div>
   `;
 }
 document.querySelectorAll('#alb-filtro-trim-chips .chip-filter, #pres-filtro-trim-chips .chip-filter').forEach(chip=>{
