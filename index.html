@@ -2792,7 +2792,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.33</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.34</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2863,7 +2863,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.33</div>
+        <div class="sub" id="version-badge">V5.34</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5736,7 +5736,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <div id="ie-isp-aviso" style="display:none;font-size:11px;color:var(--sub);padding:2px 0 6px;">Se añadirá la mención legal: "Inversión del sujeto pasivo. Art. 84.Uno.2º.f) de la Ley 37/1992 del IVA."</div>
           <div class="econ-line"><span>TOTAL</span><span class="v mono" id="ie-total">0,00 €</span></div>
         </div>
-        <button type="button" class="btn" style="margin-bottom:10px;" onclick="abrirPanelLineasPorDefecto(); addItemRow()">+ Añadir línea</button>
+        <button type="button" class="btn" style="margin-bottom:10px;" onclick="abrirPanelLineasPorDefecto(); añadirLineaArriba()">+ Añadir línea</button>
         <table class="ie-items">
           <thead><tr><th style="width:100px;">Fecha</th><th style="width:70px;">Cant.</th><th style="width:70px;">Ud.</th><th>Concepto de trabajo</th><th class="col-precio" style="width:110px;">Precio</th><th class="col-total" style="width:110px;">Total</th><th style="width:30px;"></th></tr></thead>
           <tbody id="ie-items-body"></tbody>
@@ -14536,6 +14536,13 @@ function sincronizarConceptoConNumero(){
 }
 
 const UNIDADES = ['ud','h','m³','m²','ml','km','día','servicio','transporte'];
+// pulsar "+ Añadir línea" crea la línea al final (addItemRow) y la mueve al principio de la
+// tabla — así se ve al momento, sin tener que hacer scroll hasta abajo para encontrarla
+function añadirLineaArriba(){
+  addItemRow();
+  const tbody = document.getElementById('ie-items-body');
+  if(tbody && tbody.lastElementChild) tbody.prepend(tbody.lastElementChild);
+}
 function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva, origenEntradaId, origenEntradaIds){
   const id = 'item'+(itemSeq++);
   const tbody = document.getElementById('ie-items-body');
@@ -17929,7 +17936,7 @@ function openDocumentViewer(id){
   const yaEmitido = doc.status !== 'Borrador';
   const cfgDoc = DOC_TYPES[doc.type];
   if(yaEmitido){
-    document.getElementById('ni-emitir').textContent = 'Guardar cambios';
+    document.getElementById('ni-emitir').textContent = 'Guardar';
     document.getElementById('ni-draft').style.display = 'none';
   } else {
     document.getElementById('ni-emitir').textContent = cfgDoc.button;
@@ -18101,7 +18108,7 @@ async function submitNewInvoice(ev, isDraft){
   // check de la base de datos; un documento recién creado, sea borrador o no, todavía no
   // se ha enviado ni cobrado, así que su estado_cobro de partida es siempre el mismo.
   const estadoCobroPrevio = editingDocId ? documentosRealesById[editingDocId]?.estado_cobro : null;
-  if(!editingDocId || !estadoCobroPrevio){
+  if(!editingDocId){
     payload.estado_cobro = 'pendiente_enviar';
   }
   if(convirtiendoDesde){
