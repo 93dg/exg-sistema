@@ -2792,7 +2792,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.38</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.39</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2863,7 +2863,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.38</div>
+        <div class="sub" id="version-badge">V5.39</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5736,7 +5736,11 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <div id="ie-isp-aviso" style="display:none;font-size:11px;color:var(--sub);padding:2px 0 6px;">Se añadirá la mención legal: "Inversión del sujeto pasivo. Art. 84.Uno.2º.f) de la Ley 37/1992 del IVA."</div>
           <div class="econ-line"><span>TOTAL</span><span class="v mono" id="ie-total">0,00 €</span></div>
         </div>
-        <button type="button" class="btn" style="margin-bottom:10px;" onclick="abrirPanelLineasPorDefecto(); añadirLineaArriba()">+ Añadir línea</button>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+          <button type="button" class="btn" onclick="abrirPanelLineasPorDefecto(); añadirLineaArriba()">+ Añadir línea</button>
+          <button type="button" class="btn sm" id="ie-revisar-btn" style="display:none;" onclick="revisarLineasDocumento()">🔍 Revisar</button>
+        </div>
+        <div id="ie-revision-panel" style="display:none;"></div>
         <table class="ie-items">
           <thead><tr><th style="width:100px;">Fecha</th><th style="width:70px;">Cant.</th><th style="width:70px;">Ud.</th><th>Concepto de trabajo</th><th class="col-precio" style="width:110px;">Precio</th><th class="col-total" style="width:110px;">Total</th><th style="width:30px;"></th></tr></thead>
           <tbody id="ie-items-body"></tbody>
@@ -14686,7 +14690,106 @@ function recalcTotals(){
   document.getElementById('ie-iva').textContent = formatMoneda(iva);
   document.getElementById('ie-total').textContent = formatMoneda(total);
   actualizarResumenLineas(document.querySelectorAll('#ie-items-body tr').length, base);
+  const btnRevisar = document.getElementById('ie-revisar-btn');
+  if(btnRevisar) btnRevisar.style.display = document.querySelectorAll('#ie-items-body tr').length ? '' : 'none';
   return {base, iva, total, tratamientoIva};
+}
+// ===== Revisar líneas — motor offline entrenado el 27/09/26 sobre el albarán A21 =====
+// Detecta: precio faltante (busca en tarifas), cantidad que no es múltiplo de 1/4 de hora,
+// y concepto sin "CON [MÁQUINA]" al final (la deduce con las reglas aprendidas ese día).
+// Nunca aplica nada solo: siempre muestra original/propuesto y espera "Aceptar".
+function tieneMaquinaAlFinal(concepto){
+  return /(CAMIÓN|MIXTA|GIRATORIA|NIVELADORA|MOTONIVELADORA|MARTILLO HIDRÁULICO)\s*$/i.test((concepto||'').trim());
+}
+function deducirMaquina(concepto, precio){
+  const c = (concepto||'').toUpperCase();
+  if(/TIERRA VEGETAL/.test(c)) return 'GIRATORIA';
+  if(/EXTENDID|NIVELACI[ÓO]N/.test(c)) return precio === 65 ? 'NIVELADORA' : (precio === 45 ? 'MIXTA' : null);
+  if(/RETIRADA|APORTE/.test(c)) return precio === 45 ? 'CAMIÓN' : null;
+  if(/REPERFILAD|REBAJE|CARGA/.test(c)) return precio === 65 ? 'GIRATORIA' : (precio === 45 ? 'MIXTA' : null);
+  if(precio === 45) return 'MIXTA';
+  if(precio === 65) return 'GIRATORIA';
+  return null;
+}
+async function buscarTarifaPorConcepto(concepto){
+  if(!sb) return null;
+  const {data} = await sb.from('tarifas').select('concepto,precio_particular,palabras_clave');
+  if(!data) return null;
+  const c = (concepto||'').toUpperCase();
+  const match = data.find(t => c.includes((t.concepto||'').toUpperCase()) || (t.palabras_clave||'').toUpperCase().split(',').some(p=>p.trim() && c.includes(p.trim())));
+  return match ? Number(match.precio_particular) : null;
+}
+async function revisarLineasDocumento(){
+  const panel = document.getElementById('ie-revision-panel');
+  if(!panel) return;
+  panel.style.display = '';
+  panel.innerHTML = '<div class="two-col-note">Revisando…</div>';
+  const filas = Array.from(document.querySelectorAll('#ie-items-body tr'));
+  const hallazgos = [];
+  for(const tr of filas){
+    const id = tr.id;
+    const fecha = tr.querySelector('.ie-linea-fecha')?.value || '';
+    const cantidad = Number(tr.querySelector('.ie-qty')?.value) || 0;
+    const precio = Number(tr.querySelector('.ie-price')?.value) || 0;
+    const concepto = tr.querySelector('.ie-concept')?.value || '';
+    const esServicio = tr.querySelector('.ie-unidad')?.value === 'servicio';
+    if(cantidad > 0 && precio === 0 && !esServicio){
+      const tarifa = await buscarTarifaPorConcepto(concepto);
+      hallazgos.push({ id, mensaje:`Falta precio — "${concepto}" (${fecha||'sin fecha'})`,
+        original:'Precio: 0 €', propuesto: tarifa!=null ? `Precio: ${tarifa} € (tarifa encontrada)` : 'Sin tarifa registrada — decidir a mano',
+        valorPropuesto: tarifa, campo:'precio' });
+    }
+    if(cantidad > 0 && Math.abs(Math.round(cantidad*4) - cantidad*4) > 0.001){
+      hallazgos.push({ id, mensaje:`Cantidad rara — "${concepto}" (${fecha||'sin fecha'})`,
+        original:`Cantidad: ${cantidad}`, propuesto:'No es múltiplo de un cuarto de hora — revisar a mano',
+        valorPropuesto:null, campo:'cantidad' });
+    }
+    if(concepto && !esServicio && !tieneMaquinaAlFinal(concepto)){
+      const maquina = deducirMaquina(concepto, precio);
+      hallazgos.push({ id, mensaje:`Falta máquina — "${concepto}" (${fecha||'sin fecha'}, ${precio}€)`,
+        original: concepto, propuesto: maquina ? `${concepto} CON ${maquina}` : 'No se pudo deducir — decidir a mano',
+        valorPropuesto: maquina ? `${concepto} CON ${maquina}` : null, campo:'concepto' });
+    }
+  }
+  if(!hallazgos.length){
+    panel.innerHTML = '<div class="two-col-note">✓ Sin hallazgos — precio, cantidad y máquina correctos en todas las líneas.</div>';
+    return;
+  }
+  panel.innerHTML = `
+    <div onclick="toggleRevisionPanel()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--concrete);border-radius:8px 8px 0 0;font-weight:700;">
+      <span>⚠ Revisión: ${hallazgos.length} hallazgo${hallazgos.length===1?'':'s'}</span><span id="ie-revision-chevron">▸</span>
+    </div>
+    <div id="ie-revision-cuerpo" style="display:none;border:1px solid var(--line);border-top:none;border-radius:0 0 8px 8px;padding:10px 12px;">
+      ${hallazgos.map((h,i)=>`
+        <div class="ie-revision-item" style="padding:10px 0;${i>0?'border-top:1px solid var(--line);':''}">
+          <div style="font-weight:600;margin-bottom:4px;">${svgEsc(h.mensaje)}</div>
+          <div style="font-size:13px;color:var(--ink-soft);">Original: ${svgEsc(h.original)}</div>
+          <div style="font-size:13px;margin-bottom:6px;">Propuesto: ${svgEsc(h.propuesto)}</div>
+          <div style="display:flex;gap:8px;">
+            ${h.valorPropuesto!=null ? `<button type="button" class="btn sm primary" onclick="aplicarHallazgoRevision('${h.id}','${h.campo}', this)" data-valor="${svgEsc(String(h.valorPropuesto)).replace(/"/g,'&quot;')}">✓ Aceptar</button>` : ''}
+            <button type="button" class="btn sm" onclick="document.getElementById('${h.id}')?.classList.remove('colapsada'); document.getElementById('${h.id}')?.scrollIntoView({behavior:'smooth',block:'center'}); actualizarResumenLinea('${h.id}');">✎ Editar a mano</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+function toggleRevisionPanel(){
+  const cuerpo = document.getElementById('ie-revision-cuerpo');
+  const chev = document.getElementById('ie-revision-chevron');
+  if(!cuerpo) return;
+  const abierto = cuerpo.style.display !== 'none';
+  cuerpo.style.display = abierto ? 'none' : 'block';
+  if(chev) chev.textContent = abierto ? '▸' : '▾';
+}
+function aplicarHallazgoRevision(id, campo, btn){
+  const tr = document.getElementById(id);
+  if(!tr) return;
+  const valor = btn.dataset.valor;
+  if(campo==='precio') tr.querySelector('.ie-price').value = valor;
+  else if(campo==='concepto') tr.querySelector('.ie-concept').value = valor;
+  recalcTotals();
+  btn.outerHTML = '<span style="color:var(--green);font-weight:600;">✓ Aplicado</span>';
 }
 // ===== Panel de líneas/conceptos — plegado por defecto en un documento existente =====
 function actualizarResumenLineas(n, total){
