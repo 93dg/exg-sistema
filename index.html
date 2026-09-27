@@ -2818,7 +2818,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.54</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.55</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2895,7 +2895,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.54</div>
+        <div class="sub" id="version-badge">V5.55</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11713,21 +11713,33 @@ async function mostrarRevisionTipoNotif(n){
       <div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">Carpeta original: …${(data.archivo_path||'').split('/').slice(-2).join('/')}</div>
       <button class="btn sm" style="margin-top:8px;" onclick="cerrarModalGenerico();abrirDocumentoParaVerlo('${data.id}')">Abrir documento</button>
     </div>
+    <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">¿Por qué? (para que el motor aprenda)</label>
+    <textarea id="motivo-clasificacion" class="search-box" style="width:100%;min-height:60px;resize:vertical;margin-bottom:10px;" placeholder="Ej: el documento dice ALBARÁN en el encabezado aunque estaba en la carpeta de facturas…"></textarea>
     <div style="display:flex;gap:8px;">
-      <button class="btn primary" onclick="aplicarMoverTipoNotif('${n.id}','${data.id}','${tipoSugerido}')">✓ Mover a ${TIPOS_LABEL[tipoSugerido]}</button>
-      <button class="btn" onclick="descartarComparacionNotif('${n.id}')">✕ Dejar como está</button>
+      <button class="btn primary" onclick="aplicarMoverTipoNotif('${n.id}','${data.id}','${tipoSugerido}','${data.tipo}')">✓ Mover a ${TIPOS_LABEL[tipoSugerido]}</button>
+      <button class="btn" onclick="descartarRevisionTipoNotif('${n.id}','${data.id}','${data.tipo}')">✕ Dejar como está</button>
     </div>
   `);
 }
-async function aplicarMoverTipoNotif(notifId, docId, nuevoTipo){
+async function aplicarMoverTipoNotif(notifId, docId, nuevoTipo, tipoAnterior){
+  const motivo = document.getElementById('motivo-clasificacion')?.value || null;
   const {error} = await sb.from('documentos_economicos').update({tipo: nuevoTipo}).eq('id', docId);
   if(error){ mostrarToast('Error: '+errText(error)); return; }
+  await sb.from('documentos_clasificacion_log').insert({documento_id: docId, decision:'movido', tipo_anterior: tipoAnterior, tipo_nuevo: nuevoTipo, motivo});
   delete documentosRealesById[docId];
   ['docrow-','presrow-','albrow-','mcard-'].forEach(pref=>document.getElementById(pref+docId)?.remove());
   await cargarDocumentosEconomicosReales();
   await sb.from('sistema_notificaciones').update({verificado:true, leida:true}).eq('id', notifId);
   cerrarModalGenerico();
   mostrarToast(`✓ Movido a ${TIPOS_LABEL[nuevoTipo]}`);
+  cargarNotificaciones?.();
+}
+async function descartarRevisionTipoNotif(notifId, docId, tipoAnterior){
+  const motivo = document.getElementById('motivo-clasificacion')?.value || null;
+  await sb.from('documentos_clasificacion_log').insert({documento_id: docId, decision:'dejado', tipo_anterior: tipoAnterior, tipo_nuevo: null, motivo});
+  await sb.from('sistema_notificaciones').update({verificado:true, leida:true}).eq('id', notifId);
+  cerrarModalGenerico();
+  mostrarToast('Dejado como está');
   cargarNotificaciones?.();
 }
 
