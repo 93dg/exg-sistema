@@ -2818,7 +2818,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.47</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.48</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2877,7 +2877,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   <button data-view="control" class="mobile-tab-btn active"><span class="mt-ico">◆</span><span class="mt-label">Control</span></button>
   <button id="mobile-tab-add" class="mobile-tab-btn mobile-tab-fab" onclick="toggleMobileAddMenu()"><span class="mt-ico">+</span></button>
   <button data-view="trabajos" class="mobile-tab-btn"><span class="mt-ico">▤</span><span class="mt-label">Trabajos</span></button>
-  <button data-view="facturas" class="mobile-tab-btn"><span class="mt-ico">🧾</span><span class="mt-label">Facturas</span></button>
+  <button data-view="facturas" class="mobile-tab-btn"><span class="mt-ico">🧾</span><span class="mt-label">Documentos</span></button>
 </div>
 
 <div id="mobile-add-backdrop" onclick="toggleMobileAddMenu()"></div>
@@ -2895,7 +2895,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.47</div>
+        <div class="sub" id="version-badge">V5.48</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2917,7 +2917,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="ayuntamiento"><span class="ico">⌂</span><span class="label"> Ayuntamiento</span></button>
       <button data-view="empresa" class="admin-only"><span class="ico">🏢</span><span class="label"> Empresa</span></button>
       <button data-view="proyectos"><span class="ico">✎</span><span class="label"> Proyectos</span></button>
-      <button data-view="facturas"><span class="ico">🗂️</span><span class="label"> Documentos</span></button>
+      <button onclick="abrirUltimoTipoDocumento()"><span class="ico">🗂️</span><span class="label"> Documentos</span></button>
       <!-- Presupuestos/Proformas/Albaranes: ya no aparecen como entradas propias en el menú
            (unificadas en "Documentos" con la barra de 4 pestañas dentro de cada vista), pero
            el botón sigue existiendo, oculto, porque las pestañas lo activan vía .click() -->
@@ -6058,6 +6058,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     document.getElementById('view-'+(VISTA_ALIAS[btn.dataset.view]||btn.dataset.view)).classList.add('active');
     if(btn.dataset.view==='presupuestos' || btn.dataset.view==='proformas') setModoPresProf(btn.dataset.view==='proformas' ? 'proforma' : 'presupuesto');
     if(['presupuestos','proformas','albaranes','facturas'].includes(btn.dataset.view)) actualizarTabsDocumentos(btn.dataset.view);
+    if(['presupuestos','proformas','albaranes','facturas'].includes(btn.dataset.view)) localStorage.setItem('ultimo_tipo_documento', btn.dataset.view);
     document.getElementById('app').classList.remove('mobile-nav-open');
     localStorage.setItem('vista_activa', btn.dataset.view);
     aiRegistrarEvento('navegacion', btn.dataset.view);
@@ -6099,6 +6100,10 @@ document.querySelectorAll('.mobile-tab-btn[data-view]').forEach(btn=>{
     // el mismo atajo que las pestañas de arriba, pero accesible desde la barra inferior.
     if(btn.dataset.view==='facturas' && btn.classList.contains('active')){
       toggleSelectorDocumentos();
+      return;
+    }
+    if(btn.dataset.view==='facturas'){
+      abrirUltimoTipoDocumento();
       return;
     }
     document.querySelector(`.nav button[data-view="${btn.dataset.view}"]`)?.click();
@@ -6379,6 +6384,13 @@ function actualizarTabsDocumentos(vista){
   document.querySelectorAll('[data-docs-tabs] .docs-tab').forEach(b=>{
     b.classList.toggle('active', b.dataset.tab === vista);
   });
+}
+// El menú lateral y el icono de la barra inferior son el mismo punto de
+// entrada a "Documentos" — en vez de ir siempre a Facturas por defecto,
+// abren el último de los 4 tipos que se visitó (recordado en localStorage).
+function abrirUltimoTipoDocumento(){
+  const vista = localStorage.getItem('ultimo_tipo_documento') || 'facturas';
+  document.querySelector(`.nav button[data-view="${vista}"]`)?.click();
 }
 // Selector de los 4 tipos de documento, para cuando se toca el icono "Facturas"
 // de la barra inferior estando ya dentro de Documentos — desplegable flotante
