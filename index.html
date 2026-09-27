@@ -803,7 +803,7 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
     display:flex !important;flex-direction:row !important;align-items:center;gap:6px;padding:6px 4px;flex-wrap:nowrap;overflow:hidden;
   }
   .ie-items .ie-resumen-fecha{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);flex-shrink:0;white-space:nowrap;}
-  .ie-items .ie-resumen-concepto{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .ie-items .ie-resumen-concepto{flex:1;font-size:var(--ie-resumen-tam,13px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
   .ie-items .ie-resumen-total{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;flex-shrink:0;white-space:nowrap;margin-left:auto;}
   .ie-items .ie-resumen-chevron{color:var(--ink-soft);flex-shrink:0;white-space:nowrap;}
   /* También la cabecera de línea expandida (resumen visible encima del contenido) */
@@ -2782,7 +2782,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.22</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.23</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2853,7 +2853,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.22</div>
+        <div class="sub" id="version-badge">V5.23</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14576,17 +14576,22 @@ function actualizarResumenLinea(id){
     ajustarTextoAncho(resumenTd.querySelector('.ie-resumen-concepto'), 13, 9);
   }
 }
-// encoge el font-size de un elemento en pasos hasta que su contenido quepa sin desbordar,
-// sin llegar nunca por debajo de tamañoMin (si aun así no cabe, se queda con "…" — la
-// caja mantiene siempre una letra legible en vez de cortar el texto a lo bruto)
+// encoge el tamaño de un elemento en pasos hasta que su contenido quepa sin desbordar,
+// sin llegar nunca por debajo de tamañoMin. Usa una variable CSS (--ie-resumen-tam) en vez
+// de font-size directo en el style, porque hay una regla de accesibilidad en la web que
+// intercepta cualquier style="font-size:Npx" puesto por JS y lo fuerza a un tamaño mayor
+// con !important — con la variable CSS ese patrón no se detecta y el encogido sí se ve.
 function ajustarTextoAncho(el, tamañoMax, tamañoMin){
   if(!el) return;
-  let tam = tamañoMax;
-  el.style.fontSize = tam + 'px';
-  while(el.scrollWidth > el.clientWidth && tam > tamañoMin){
-    tam -= 0.5;
-    el.style.fontSize = tam + 'px';
-  }
+  requestAnimationFrame(()=>{
+    if(!el.isConnected || !el.clientWidth) return;
+    let tam = tamañoMax;
+    el.style.setProperty('--ie-resumen-tam', tam+'px');
+    while(el.scrollWidth > el.clientWidth && tam > tamañoMin){
+      tam -= 0.5;
+      el.style.setProperty('--ie-resumen-tam', tam+'px');
+    }
+  });
 }
 // pliega o despliega TODAS las líneas a la vez — pensado para móvil, cuando hay muchas
 // líneas y hace falta bajar mucho para llegar al total; cada línea se puede desplegar
