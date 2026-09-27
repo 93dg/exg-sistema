@@ -2802,7 +2802,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.40</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.41</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2873,7 +2873,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.40</div>
+        <div class="sub" id="version-badge">V5.41</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11473,15 +11473,19 @@ async function irAElementoNotif(id){
   const n = _notificacionesCache.find(x=>x.id===id);
   if(!n) return;
 
-  // Albarán: popup directo, sin navegar a ninguna sección
-  if(n.elemento_tipo==='albaran' && n.elemento_id){
+  // Comparación entre dos documentos (posible duplicado/conversión albarán-proforma → factura):
+  // se muestran ambos documentos, abribles de verdad, con acción real en el sitio.
+  if(n.datos_cambio && n.datos_cambio.tipo_relacion === 'posible_conversion' && n.datos_cambio.documento_relacionado_id){
+    return mostrarComparacionNotif(n);
+  }
+
+  // Albarán/proforma/presupuesto/factura: popup directo, sin navegar a ninguna sección
+  if(['albaran','proforma','presupuesto','factura'].includes(n.elemento_tipo) && n.elemento_id){
     if(!documentosRealesById[n.elemento_id]){
       await cargarDocumentosEconomicosReales();
       await new Promise(r=>setTimeout(r,300));
     }
     openDocumentViewer(n.elemento_id);
-    // Scroll a la primera línea nueva tras renderizar
-    // El scroll a la primera línea naranja lo gestiona openDocumentViewer internamente
     return;
   }
 
@@ -11499,6 +11503,51 @@ async function irAElementoNotif(id){
   } else if(n.elemento_tipo==='trabajo' && n.elemento_id){
     abrirTrabajoDesdeId?.(n.elemento_id);
   }
+}
+
+// Modal de comparación entre dos documentos relacionados (posible duplicado/
+// conversión albarán-proforma → factura). Ambos documentos son abribles de
+// verdad (openDocumentViewer), y la decisión (enlazar / no son el mismo) se
+// toma aquí mismo, no en un botón que solo enseña texto.
+async function mostrarComparacionNotif(n){
+  if(!documentosRealesById[n.elemento_id] || !documentosRealesById[n.datos_cambio.documento_relacionado_id]){
+    await cargarDocumentosEconomicosReales();
+    await new Promise(r=>setTimeout(r,300));
+  }
+  const origen = documentosRealesById[n.elemento_id];
+  const relacionado = documentosRealesById[n.datos_cambio.documento_relacionado_id];
+  const fila = (doc, id) => !doc ? '<div class="empty">No se encuentra el documento</div>' : `
+    <div style="border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;">
+      <div style="font-weight:700;text-transform:capitalize;">${doc.type}${doc.num?' · '+doc.num:''}</div>
+      <div style="font-size:13px;color:var(--ink-soft);">${doc.client||''} · ${doc.dateLabel||''} · ${doc.amountLabel||''}</div>
+      <button class="btn sm" style="margin-top:8px;" onclick="cerrarModalGenerico();openDocumentViewer('${id}')">Abrir documento</button>
+    </div>`;
+  mostrarModalGenerico('¿Son el mismo movimiento?', `
+    ${fila(origen, n.elemento_id)}
+    <div style="text-align:center;color:var(--ink-soft);margin:4px 0;">↓</div>
+    ${fila(relacionado, n.datos_cambio.documento_relacionado_id)}
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button class="btn primary" onclick="enlazarDocumentosNotif('${n.id}','${n.elemento_id}','${n.datos_cambio.documento_relacionado_id}')">✓ Sí, enlazar</button>
+      <button class="btn" onclick="descartarComparacionNotif('${n.id}')">✕ No son el mismo</button>
+    </div>
+  `);
+}
+
+async function enlazarDocumentosNotif(notifId, idOrigen, idRelacionado){
+  const {error} = await sb.from('documentos_economicos').update({documento_siguiente_id: idRelacionado}).eq('id', idOrigen);
+  const {error: error2} = await sb.from('documentos_economicos').update({documento_anterior_id: idOrigen}).eq('id', idRelacionado);
+  if(error || error2){ mostrarToast('No se pudo enlazar: '+(error?.message||error2?.message)); return; }
+  await sb.from('sistema_notificaciones').update({verificado:true, leida:true}).eq('id', notifId);
+  cerrarModalGenerico();
+  mostrarToast('✓ Documentos enlazados');
+  cargarNotificaciones?.();
+}
+
+async function descartarComparacionNotif(notifId){
+  await sb.from('sistema_notificaciones').update({verificado:true, leida:true}).eq('id', notifId);
+  cerrarModalGenerico();
+  mostrarToast('Descartado — no se han tocado los documentos');
+  cargarNotificaciones?.();
 }
 
 function resaltarCambioEnDrawer(datos){
