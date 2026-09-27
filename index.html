@@ -2802,7 +2802,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.41</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.42</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2873,7 +2873,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.41</div>
+        <div class="sub" id="version-badge">V5.42</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11510,27 +11510,44 @@ async function irAElementoNotif(id){
 // verdad (openDocumentViewer), y la decisión (enlazar / no son el mismo) se
 // toma aquí mismo, no en un botón que solo enseña texto.
 async function mostrarComparacionNotif(n){
-  if(!documentosRealesById[n.elemento_id] || !documentosRealesById[n.datos_cambio.documento_relacionado_id]){
-    await cargarDocumentosEconomicosReales();
-    await new Promise(r=>setTimeout(r,300));
-  }
-  const origen = documentosRealesById[n.elemento_id];
-  const relacionado = documentosRealesById[n.datos_cambio.documento_relacionado_id];
-  const fila = (doc, id) => !doc ? '<div class="empty">No se encuentra el documento</div>' : `
+  const idA = n.elemento_id, idB = n.datos_cambio.documento_relacionado_id;
+  // Pedir los 2 documentos directamente por id, en vez de depender del caché
+  // general (documentosRealesById) — documentos antiguos o cargados en otro
+  // momento pueden no estar ahí todavía, y esto nunca falla por eso.
+  const {data, error} = await sb.from('documentos_economicos').select('*, entidades(nombre)').in('id', [idA, idB]);
+  if(error || !data){ mostrarModalGenerico('Error', '<div class="empty">No se pudo consultar los documentos.</div>'); return; }
+  const porId = Object.fromEntries(data.map(d=>[d.id, d]));
+  const fila = (id) => {
+    const doc = porId[id];
+    if(!doc) return '<div class="empty">No se encuentra el documento</div>';
+    const fecha = doc.fecha_devengo ? new Date(doc.fecha_devengo).toLocaleDateString('es-ES') : '';
+    const importe = Number(doc.importe||0).toLocaleString('es-ES',{minimumFractionDigits:2})+' €';
+    return `
     <div style="border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;">
-      <div style="font-weight:700;text-transform:capitalize;">${doc.type}${doc.num?' · '+doc.num:''}</div>
-      <div style="font-size:13px;color:var(--ink-soft);">${doc.client||''} · ${doc.dateLabel||''} · ${doc.amountLabel||''}</div>
-      <button class="btn sm" style="margin-top:8px;" onclick="cerrarModalGenerico();openDocumentViewer('${id}')">Abrir documento</button>
+      <div style="font-weight:700;text-transform:capitalize;">${doc.tipo}${doc.numero?' · '+doc.numero:''}</div>
+      <div style="font-size:13px;color:var(--ink-soft);">${doc.entidades?.nombre||''} · ${fecha} · ${importe}</div>
+      <button class="btn sm" style="margin-top:8px;" onclick="cerrarModalGenerico();abrirDocumentoParaVerlo('${id}')">Abrir documento</button>
     </div>`;
+  };
   mostrarModalGenerico('¿Son el mismo movimiento?', `
-    ${fila(origen, n.elemento_id)}
+    ${fila(idA)}
     <div style="text-align:center;color:var(--ink-soft);margin:4px 0;">↓</div>
-    ${fila(relacionado, n.datos_cambio.documento_relacionado_id)}
+    ${fila(idB)}
     <div style="display:flex;gap:8px;margin-top:14px;">
-      <button class="btn primary" onclick="enlazarDocumentosNotif('${n.id}','${n.elemento_id}','${n.datos_cambio.documento_relacionado_id}')">✓ Sí, enlazar</button>
+      <button class="btn primary" onclick="enlazarDocumentosNotif('${n.id}','${idA}','${idB}')">✓ Sí, enlazar</button>
       <button class="btn" onclick="descartarComparacionNotif('${n.id}')">✕ No son el mismo</button>
     </div>
   `);
+}
+
+// Abre un documento en el editor aunque todavía no esté en el caché en
+// memoria (documentosRealesById) — lo carga primero si hace falta.
+async function abrirDocumentoParaVerlo(id){
+  if(!documentosRealesById[id]){
+    await cargarDocumentosEconomicosReales();
+  }
+  if(!documentosRealesById[id]){ mostrarToast('No se encuentra este documento.'); return; }
+  openDocumentViewer(id);
 }
 
 async function enlazarDocumentosNotif(notifId, idOrigen, idRelacionado){
