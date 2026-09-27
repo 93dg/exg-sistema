@@ -2819,7 +2819,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.70</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.71</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2878,7 +2878,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   <button data-view="control" class="mobile-tab-btn active"><span class="mt-ico">◆</span><span class="mt-label">Control</span></button>
   <button id="mobile-tab-add" class="mobile-tab-btn mobile-tab-fab" onclick="toggleMobileAddMenu()"><span class="mt-ico">+</span></button>
   <button data-view="trabajos" class="mobile-tab-btn"><span class="mt-ico">▤</span><span class="mt-label">Trabajos</span></button>
-  <button data-view="facturas" class="mobile-tab-btn"><span class="mt-ico">🧾</span><span class="mt-label">Documentos</span></button>
+  <button data-view="documentos" class="mobile-tab-btn"><span class="mt-ico">🧾</span><span class="mt-label">Documentos</span></button>
 </div>
 
 <div id="mobile-add-backdrop" onclick="toggleMobileAddMenu()"></div>
@@ -2896,7 +2896,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.70</div>
+        <div class="sub" id="version-badge">V5.71</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -2918,12 +2918,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="ayuntamiento"><span class="ico">⌂</span><span class="label"> Ayuntamiento</span></button>
       <button data-view="empresa" class="admin-only"><span class="ico">🏢</span><span class="label"> Empresa</span></button>
       <button data-view="proyectos"><span class="ico">✎</span><span class="label"> Proyectos</span></button>
-      <button onclick="abrirUltimoTipoDocumento()"><span class="ico">🗂️</span><span class="label"> Documentos</span></button>
-      <!-- Presupuestos/Proformas/Albaranes/Facturas: ya no aparecen como entradas propias en el
-           menú (unificadas en "Documentos" con la barra de 4 pestañas dentro de cada vista), pero
-           los 4 botones siguen existiendo, ocultos, porque las pestañas y abrirUltimoTipoDocumento()
-           los activan vía .click() -- quitarle data-view al de "facturas" (como pasó en V5.48) deja
-           sin ningún objetivo real al que hacer clic, y Facturas deja de poder abrirse por ningún sitio -->
+      <button data-view="documentos"><span class="ico">🗂️</span><span class="label"> Documentos</span></button>
+      <!-- Presupuestos/Proformas/Albaranes/Facturas: unificados en "documentos" (V5.71) en una
+           sola lista con filtros de tipo/año/trimestre combinables. Las 4 vistas antiguas se
+           dejan ocultas, sin quitarles data-view, como red de seguridad -- no se borran del
+           todo por si algo del historico las referencia todavia. -->
       <button data-view="facturas" style="display:none;"><span class="ico">🧾</span><span class="label"> Facturas</span></button>
       <button data-view="presupuestos" style="display:none;"><span class="ico">📋</span><span class="label"> Presupuestos</span></button>
       <button data-view="proformas" style="display:none;"><span class="ico">📑</span><span class="label"> Proformas</span></button>
@@ -3924,7 +3923,62 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="two-col-note">Independiente en el menú, pero mismos datos que Economía → Gastos — lo que crees aquí se ve allí también.</div>
     </div>
 
+    <!-- ================= DOCUMENTOS — vista unificada (Presupuesto+Proforma+Albarán+Factura) ================= -->
+    <div class="view" id="view-documentos">
+      <div class="topbar">
+        <div><h1>Documentos</h1><div class="desc">Presupuestos, proformas, albaranes y facturas juntos — marca los tipos que quieras ver</div></div>
+      </div>
+
+      <div class="filters" id="docs-tipo-chips" style="margin-bottom:8px;">
+        <div class="chip-filter active" data-tipo="presupuesto">Presupuesto</div>
+        <div class="chip-filter active" data-tipo="proforma">Proforma</div>
+        <div class="chip-filter active" data-tipo="albaran">Albarán</div>
+        <div class="chip-filter active" data-tipo="factura">Factura</div>
+      </div>
+      <div class="filters" id="docs-anio-chips" style="margin-bottom:8px;"></div>
+      <div class="filters" id="docs-trim-chips" style="margin-bottom:16px;">
+        <div class="chip-filter active" data-trim="">Todos los trimestres</div>
+        <div class="chip-filter" data-trim="1">1º trimestre</div>
+        <div class="chip-filter" data-trim="2">2º trimestre</div>
+        <div class="chip-filter" data-trim="3">3º trimestre</div>
+        <div class="chip-filter" data-trim="4">4º trimestre</div>
+      </div>
+
+      <div class="kpi-strip" id="docs-kpi-strip" style="margin-bottom:16px;"></div>
+
+      <div class="panel">
+        <div class="panel-head" style="gap:8px;flex-wrap:wrap;">
+          <input class="search-box" id="docs-search" style="flex:1;min-width:160px;" placeholder="Buscar cliente, nº…" oninput="renderDocumentosUnificadoDebounced()">
+          <button type="button" class="cli-icon-btn" onclick="restablecerFiltrosDocs()" title="Restablecer"><svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M3.5 8.5A5 5 0 1 0 5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M3.5 3v2.5H6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+        <div class="panel-body" style="padding:0;">
+          <div style="overflow-x:auto;">
+          <table class="tbl tbl-tarjeta-movil" id="docs-table">
+            <thead><tr>
+              <th style="width:30px;"><input type="checkbox" id="docs-sel-todo" onchange="toggleSeleccionarTodoDoc(this,'docs-sel-chk')"></th>
+              <th class="ord" onclick="ordenarTablaDocs(1,'fecha')">Fecha ⇅</th>
+              <th class="ord" onclick="ordenarTablaDocs(2,'text')">Tipo ⇅</th>
+              <th class="ord" onclick="ordenarTablaDocs(3,'num')">Nº ⇅</th>
+              <th class="ord" onclick="ordenarTablaDocs(4,'text')">Cliente ⇅</th>
+              <th class="num ord" onclick="ordenarTablaDocs(5,'num')">Subtotal ⇅</th>
+              <th class="num ord" onclick="ordenarTablaDocs(6,'num')">IVA ⇅</th>
+              <th class="num ord" onclick="ordenarTablaDocs(7,'num')">Total ⇅</th>
+              <th class="ord" onclick="ordenarTablaDocs(8,'text')">Estado ⇅</th>
+              <th style="width:30px;"></th>
+            </tr></thead>
+            <tbody id="docs-tbody"></tbody>
+          </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="lista-movil-solo" id="docs-lista-movil-wrap">
+        <div id="docs-lista-movil"></div>
+      </div>
+    </div>
+
     <!-- ================= GASTOS — PROTOTIPO VISUAL ================= -->
+
     <div class="view" id="view-gastospro">
       <div class="topbar">
         <div><h1>Gastos</h1><div class="desc">Propuesta visual con datos ficticios — nada de esto está conectado todavía</div></div>
@@ -6098,6 +6152,9 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     if(btn.dataset.view==='facturas'){
       renderFacturasKPIs();
     }
+    if(btn.dataset.view==='documentos'){
+      renderDocumentosUnificado();
+    }
     if(btn.dataset.view==='archivos'){
       loadExplorer(typeof explorerPath!=='undefined' ? explorerPath : '');
     }
@@ -6119,23 +6176,6 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
 });
 document.querySelectorAll('.mobile-tab-btn[data-view]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
-    // Si ya estás en Documentos (cualquiera de los 4 tipos) y vuelves a tocar el icono
-    // de abajo, en vez de recargar la misma vista se abre el selector de los 4 tipos —
-    // el mismo atajo que las pestañas de arriba, pero accesible desde la barra inferior.
-    // "Ya estás dentro de Documentos" se comprueba mirando qué vista está realmente
-    // activa (facturas/albaranes/presupuestos — esta última sirve también a proformas),
-    // no la clase .active del propio icono: esa solo se marca cuando la vista activa es
-    // literalmente "facturas", nunca para las otras 3, así que comprobarla ahí perdía el
-    // desplegable al tocar el icono estando en Proforma/Presupuesto/Albarán.
-    const yaEnDocumentos = ['view-facturas','view-albaranes','view-presupuestos'].some(id=>document.getElementById(id)?.classList.contains('active'));
-    if(btn.dataset.view==='facturas' && yaEnDocumentos){
-      toggleSelectorDocumentos();
-      return;
-    }
-    if(btn.dataset.view==='facturas'){
-      abrirUltimoTipoDocumento();
-      return;
-    }
     document.querySelector(`.nav button[data-view="${btn.dataset.view}"]`)?.click();
   });
 });
@@ -6782,6 +6822,180 @@ function sincronizarListaMovilFacturas(){
     lista.appendChild(card); // conserva el mismo orden que el tbody
   });
 }
+// ===================== DOCUMENTOS — vista unificada =====================
+// Une presupuesto/proforma/albaran/factura en una sola lista, con los 4 tipos como
+// filtros de marcar-varios (no como pestañas exclusivas) y Año/Trimestre siempre visibles,
+// igual que el filtro de tipo, en vez de escondidos dentro de "Filtros". Las 4 cajas de
+// arriba se adaptan solas a lo que haya marcado: si hay facturas/albaranes de por medio
+// suman Cobrado/Pendiente en euros; si solo hay presupuestos/proformas, cuentan cuantos
+// estan Aceptados/Enviados en vez de un importe, porque esos no se "cobran".
+let _docsOrdenCol = 1, _docsOrdenDir = 'desc';
+function tiposDocsSeleccionados(){
+  return new Set(Array.from(document.querySelectorAll('#docs-tipo-chips .chip-filter.active')).map(c=>c.dataset.tipo));
+}
+function poblarFiltroAniosDocs(){
+  const cont = document.getElementById('docs-anio-chips');
+  if(!cont) return;
+  const activos = new Set(Array.from(cont.querySelectorAll('.chip-filter.active')).map(c=>c.dataset.anio).filter(Boolean));
+  const anios = [...new Set(Object.values(documentosRealesById).map(d=>d.fecha_devengo ? d.fecha_devengo.slice(0,4) : null).filter(Boolean))].sort().reverse();
+  const soloTodos = activos.size===0;
+  cont.innerHTML = `<div class="chip-filter ${soloTodos?'active':''}" data-anio="">Todos los años</div>` +
+    anios.map(a=>`<div class="chip-filter ${activos.has(a)?'active':''}" data-anio="${a}">${a}</div>`).join('');
+  cont.querySelectorAll('.chip-filter').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      if(chip.dataset.anio===''){
+        cont.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
+        chip.classList.add('active');
+      } else {
+        cont.querySelector('.chip-filter[data-anio=""]')?.classList.remove('active');
+        chip.classList.toggle('active');
+        if(!cont.querySelector('.chip-filter.active')) cont.querySelector('.chip-filter[data-anio=""]')?.classList.add('active');
+      }
+      renderDocumentosUnificado();
+    });
+  });
+}
+function restablecerFiltrosDocs(){
+  document.querySelectorAll('#docs-tipo-chips .chip-filter').forEach(c=>c.classList.add('active'));
+  document.querySelectorAll('#docs-anio-chips .chip-filter').forEach(c=>c.classList.toggle('active', c.dataset.anio===''));
+  document.querySelectorAll('#docs-trim-chips .chip-filter').forEach(c=>c.classList.toggle('active', c.dataset.trim===''));
+  const s = document.getElementById('docs-search'); if(s) s.value = '';
+  renderDocumentosUnificado();
+}
+let _docsRenderTimer = null;
+function renderDocumentosUnificadoDebounced(){
+  clearTimeout(_docsRenderTimer);
+  _docsRenderTimer = setTimeout(renderDocumentosUnificado, 250);
+}
+function ordenarTablaDocs(colIndex, tipo){
+  _docsOrdenDir = (_docsOrdenCol===colIndex && _docsOrdenDir==='asc') ? 'desc' : 'asc';
+  _docsOrdenCol = colIndex;
+  renderDocumentosUnificado();
+}
+function renderDocsKPIs(filtrados){
+  const strip = document.getElementById('docs-kpi-strip');
+  if(!strip) return;
+  const tiposConDinero = new Set(['factura','albaran']); // se cobran de verdad
+  const hayTiposDeDinero = filtrados.some(d=>tiposConDinero.has(d.tipo));
+  let total=0, subtotal=0, cobradoDinero=0, aceptados=0;
+  filtrados.forEach(d=>{
+    const importe = Number(d.importe||0);
+    const pct = d.iva_pct;
+    const esIsp = (d.tratamiento_iva||'normal')==='isp';
+    const base = esIsp ? importe : (pct!=null && Number(pct)!==0 ? importe/(1+Number(pct)/100) : importe);
+    total += importe;
+    subtotal += base;
+    if(tiposConDinero.has(d.tipo)) cobradoDinero += Number(d.cobrado_importe||0);
+    else if((d.estado_cobro||'')==='cobrado' || (d.estado||'')==='enviado' || (d.estado||'')==='aceptado') aceptados++;
+  });
+  const pendiente = total - cobradoDinero;
+  strip.innerHTML = hayTiposDeDinero ? `
+    <div class="kpi"><div class="lbl">Total</div><div class="val">${total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+    <div class="kpi"><div class="lbl">Subtotal</div><div class="val">${subtotal.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+    <div class="kpi"><div class="lbl">Cobrado</div><div class="val green">${cobradoDinero.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+    <div class="kpi"><div class="lbl">Pendiente</div><div class="val orange">${pendiente.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+  ` : `
+    <div class="kpi"><div class="lbl">Total</div><div class="val">${total.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+    <div class="kpi"><div class="lbl">Subtotal</div><div class="val">${subtotal.toLocaleString('es-ES',{minimumFractionDigits:2})} €</div></div>
+    <div class="kpi"><div class="lbl">Aceptados/Enviados</div><div class="val green">${aceptados}</div></div>
+    <div class="kpi"><div class="lbl">Documentos</div><div class="val">${filtrados.length}</div></div>
+  `;
+}
+function renderDocumentosUnificado(){
+  const tbody = document.getElementById('docs-tbody');
+  const lista = document.getElementById('docs-lista-movil');
+  if(!tbody || !lista) return;
+  const tiposSel = tiposDocsSeleccionados();
+  const aniosSel = new Set(Array.from(document.querySelectorAll('#docs-anio-chips .chip-filter.active')).map(c=>c.dataset.anio).filter(Boolean));
+  const trimsSel = new Set(Array.from(document.querySelectorAll('#docs-trim-chips .chip-filter.active')).map(c=>c.dataset.trim).filter(Boolean));
+  const q = (document.getElementById('docs-search')?.value||'').trim().toLowerCase();
+
+  let filtrados = Object.values(documentosRealesById).filter(d=>{
+    if(!tiposSel.has(d.tipo)) return false;
+    const anio = d.fecha_devengo ? d.fecha_devengo.slice(0,4) : '';
+    if(aniosSel.size && !aniosSel.has(anio)) return false;
+    const trim = d.fecha_devengo ? String(Math.floor((Number(d.fecha_devengo.slice(5,7))-1)/3)+1) : '';
+    if(trimsSel.size && !trimsSel.has(trim)) return false;
+    if(q){
+      const texto = `${d.client||''} ${d.numero||''} ${d.job||''}`.toLowerCase();
+      if(!texto.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const tipoOrden = {'presupuesto':0,'proforma':1,'albaran':2,'factura':3};
+  filtrados.sort((a,b)=>{
+    let va, vb;
+    if(_docsOrdenCol===1){ va=a.fecha_devengo||''; vb=b.fecha_devengo||''; }
+    else if(_docsOrdenCol===2){ va=tipoOrden[a.tipo]||0; vb=tipoOrden[b.tipo]||0; }
+    else if(_docsOrdenCol===3){ va=a.numero||''; vb=b.numero||''; }
+    else if(_docsOrdenCol===4){ va=(a.client||'').toLowerCase(); vb=(b.client||'').toLowerCase(); }
+    else if(_docsOrdenCol===7){ va=Number(a.importe||0); vb=Number(b.importe||0); }
+    else { va=a.fecha_devengo||''; vb=b.fecha_devengo||''; }
+    if(va<vb) return _docsOrdenDir==='asc'?-1:1;
+    if(va>vb) return _docsOrdenDir==='asc'?1:-1;
+    return 0;
+  });
+
+  renderDocsKPIs(filtrados);
+
+  const etiquetaTipo = {presupuesto:'Presupuesto',proforma:'Proforma',albaran:'Albarán',factura:'Factura'};
+  tbody.innerHTML = '';
+  lista.innerHTML = '';
+  filtrados.forEach(d=>{
+    const entidad = clientes.find(c=>c.id===d.entidad_id);
+    const trabajo = jobs.find(j=>j.id===d.trabajo_id);
+    const fechaCorta = formatFechaCorta(d.fecha_devengo);
+    const totalNum = Number(d.importe||0);
+    const totalLabel = totalNum.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+    const pct = d.iva_pct;
+    const esIsp = (d.tratamiento_iva||'normal')==='isp';
+    const baseNum = esIsp ? totalNum : (pct!=null && Number(pct)!==0 ? totalNum/(1+Number(pct)/100) : totalNum);
+    const ivaNum = totalNum - baseNum;
+    const baseLabel = baseNum.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+    const ivaLabel = esIsp ? 'ISP' : ivaNum.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+    const estadoTxt = ESTADOS_DOCUMENTO.find(e=>e[0]===d.estado_cobro)?.[1] || d.estado_cobro || '—';
+
+    const row = document.createElement('tr');
+    row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="docs-sel-chk" data-id="${d.id}"></td><td class="mono">${fechaCorta}</td><td><span class="pill facturado" style="font-size:10.5px;">${etiquetaTipo[d.tipo]||d.tipo}</span></td><td class="mono">${d.numero||'—'}</td><td class="col-texto">${entidad?entidad.name:'—'}</td><td class="num" data-num="${baseNum}">${baseLabel}</td><td class="num">${ivaLabel}</td><td class="num" data-num="${totalNum}">${totalLabel}</td><td>${estadoTxt}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${d.id}')">🗑</span></td>`;
+    row.onclick = () => openDocumentViewer(d.id);
+    tbody.appendChild(row);
+
+    const archivoUrlReal = d.archivo_url || (d.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${d.archivo_path}` : null);
+    const card = document.createElement('div');
+    card.className = 'factura-card-movil';
+    card.id = 'dcard-'+d.id;
+    card.onclick = () => openDocumentViewer(d.id);
+    const nombreObra = (trabajo && trabajo.code) || d.obra_texto || '';
+    card.innerHTML = `
+      <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${d.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
+      <div class="fc-estado-wrap"><span class="pill facturado">${etiquetaTipo[d.tipo]||d.tipo}</span></div>
+      <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
+      ${nombreObra ? `<div class="fc-obra">${nombreObra}</div>` : ''}
+      <div class="fc-meta"><span class="fc-meta-ico">${ICO_DOC} Nº ${d.numero||'—'}</span><span class="fc-meta-sep">|</span><span class="fc-meta-ico">${ICO_CAL} ${fechaCorta}</span><span class="fc-meta-sep">|</span><span class="fc-meta-ico">${estadoTxt}</span></div>
+      ${archivoUrlReal ? `<div class="fc-extra"><span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${archivoUrlReal}')">${ICO_CLIP} Original</span></div>` : ''}
+      ${totalBlockHtml(d)}`;
+    lista.appendChild(card);
+  });
+}
+document.querySelectorAll('#docs-tipo-chips .chip-filter').forEach(chip=>{
+  chip.addEventListener('click', ()=>{ chip.classList.toggle('active'); renderDocumentosUnificado(); });
+});
+document.querySelectorAll('#docs-trim-chips .chip-filter').forEach(chip=>{
+  const cont = document.getElementById('docs-trim-chips');
+  chip.addEventListener('click', ()=>{
+    if(chip.dataset.trim===''){
+      cont.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+    } else {
+      cont.querySelector('.chip-filter[data-trim=""]')?.classList.remove('active');
+      chip.classList.toggle('active');
+      if(!cont.querySelector('.chip-filter.active')) cont.querySelector('.chip-filter[data-trim=""]')?.classList.add('active');
+    }
+    renderDocumentosUnificado();
+  });
+});
+
 function formatFechaCorta(dateRaw){
   if(!dateRaw) return '—';
   const d = new Date(dateRaw);
@@ -19494,6 +19708,8 @@ async function cargarDocumentosEconomicosReales(){
     aplicarOrdenGuardadoSiExiste('presupuestos-tbody-standalone','pres-orden-chips');
     calcularTotalesClientes();
     renderGastosPro();
+    poblarFiltroAniosDocs();
+    renderDocumentosUnificado();
   }catch(err){ console.error('No se pudieron cargar los documentos reales', err); }
 }
 // Datos maestros de la empresa: única fuente de verdad para IBAN/titular al pasar a factura.
