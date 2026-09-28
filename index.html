@@ -2961,7 +2961,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.97</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.98</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3039,7 +3039,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.97</div>
+        <div class="sub" id="version-badge">V5.98</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5510,7 +5510,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <option>Dietas</option><option>Comidas</option><option>Alojamientos</option><option>Peajes y parking</option>
           <option>Seguros</option><option>Impuestos y tasas</option><option>Gestoría/profesionales</option><option>Telefonía/internet</option>
           <option>Software/suscripciones</option><option>Oficina</option><option>Suministros</option><option>Comisiones bancarias</option>
-          <option>Financiación</option><option>Otros</option>
+          <option>Financiación</option><option>Vertedero y residuos</option><option>Otros</option>
         </select>
       </div>
       <div style="display:flex;gap:10px;margin-bottom:12px;">
@@ -6559,15 +6559,16 @@ function rutaDeUrlPublica(url){
   const m = String(url).match(/\/object\/public\/[^/]+\/([^?#]+)/);
   try{ return m ? decodeURIComponent(m[1]) : ''; }catch(e){ return ''; }
 }
-async function tamanoPdfGuardado(ruta){
+async function tamanoPdfGuardado(ruta, faltaEsVacio){
   try{
     const r = await fetch(urlPublicaGastoCorreo(ruta), {method: 'HEAD', cache: 'no-store'});
-    if(!r.ok) return null;
+    if(r.status === 404) return faltaEsVacio ? 0 : null;   // el archivo no está: para reparar cuenta como vacío
+    if(!r.ok) return null;                                  // error temporal: no se sabe, NO se da por bueno
     const len = r.headers.get('content-length');
     return len === null ? null : Number(len);
   }catch(e){ return null; }   // sin red para comprobar: no se da por roto
 }
-async function pdfCorreoVacio(ruta){ return (await tamanoPdfGuardado(ruta)) === 0; }
+async function pdfCorreoVacio(ruta){ return (await tamanoPdfGuardado(ruta, true)) === 0; }
 async function verificarPdfGuardado(ruta, esperado){
   const real = await tamanoPdfGuardado(ruta);
   if(real !== null && real !== esperado) throw new Error(`El PDF se ha guardado incompleto (${real} de ${esperado} bytes)`);
@@ -6609,6 +6610,7 @@ async function asegurarPdfCorreoYMostrar(url){
 }
 // En segundo plano y una sola vez: recupera TODOS los PDF vacíos y lo deja apuntado en "sistema".
 let _reparandoPdfs = false;
+var PDF_REINTENTO_MS = 600;
 async function repararTodosPdfsCorreo(){
   if(!sb || _reparandoPdfs || _gastosCorreoBuscando || !puedeEditar('gastospro')) return;
   _reparandoPdfs = true;
@@ -6628,12 +6630,20 @@ async function repararTodosPdfsCorreo(){
       desde += 500;
     }
     decir('Comprobando los PDF guardados…');
-    const vacios = [];
-    for(let i = 0; i < filas.length; i += 8){
-      const lote = filas.slice(i, i + 8);
-      const r = await Promise.all(lote.map(f => pdfCorreoVacio(f.storage_path)));
-      lote.forEach((f, j) => { if(r[j]) vacios.push(f); });
+    // Un archivo que no se pudo comprobar (error temporal) NO se da por bueno: se reintenta hasta 3 veces.
+    const tam = new Map(); let pendientesComprobar = filas.slice();
+    for(let ronda = 0; ronda < 3 && pendientesComprobar.length; ronda++){
+      if(ronda) await new Promise(r => setTimeout(r, PDF_REINTENTO_MS * ronda));
+      const otra = [];
+      for(let i = 0; i < pendientesComprobar.length; i += 4){
+        const lote = pendientesComprobar.slice(i, i + 4);
+        const r = await Promise.all(lote.map(f => tamanoPdfGuardado(f.storage_path, true)));
+        lote.forEach((f, j) => { tam.set(f.storage_path, r[j]); if(r[j] === null) otra.push(f); });
+      }
+      pendientesComprobar = otra;
     }
+    const sinComprobar = pendientesComprobar.length;
+    const vacios = filas.filter(f => tam.get(f.storage_path) === 0);
     let hechos = 0, fallos = 0, ultimo = '', idx = 0;
     const trabajador = async () => {
       while(idx < vacios.length){
@@ -6643,10 +6653,12 @@ async function repararTodosPdfsCorreo(){
       }
     };
     await Promise.all([trabajador(), trabajador(), trabajador()]);
-    if(!fallos){
+    if(!fallos && !sinComprobar){
       await sb.from('sistema').insert({tipo: 'pdfs_correo_reparados', data: {fecha: new Date().toISOString(), reparados: hechos, revisados: filas.length}});
       decir(vacios.length ? `✓ ${hechos} PDF recuperados del correo.` : '');
-    }else decir(`Se recuperaron ${hechos} PDF y ${fallos} no se pudieron (${ultimo}). Se reintentará la próxima vez.`);
+    }else{
+      decir(`Recuperado${hechos === 1 ? '' : 's'} ${hechos} PDF.` + (fallos ? ` ${fallos === 1 ? '1 no se pudo recuperar' : fallos + ' no se pudieron recuperar'} (${ultimo}).` : '') + (sinComprobar ? ` ${sinComprobar === 1 ? '1 no se ha podido comprobar' : sinComprobar + ' no se han podido comprobar'}.` : '') + ' Se reintentará la próxima vez.');
+    }
   }catch(e){ console.warn('Reparar PDFs del correo:', e); }
   finally{ _reparandoPdfs = false; }
 }
@@ -7059,7 +7071,7 @@ async function cargarPlantillasGasto(){
 // ===================== REVISOR — una a una: He entendido / Propongo / Confirmar · Editar · Descartar · Después =====================
 // Cada PDF de la cola sale como una tarjeta con una propuesta. La propuesta viene de la plantilla del proveedor
 // (el motor la lee solo) o de gastos_correo.propuesta (la escribe Claude leyendo el PDF). Nada se crea hasta pulsar Confirmar.
-const GASTO_CATEGORIAS = ['Combustible','Reparaciones y averías','Repuestos','Neumáticos','Aceites y lubricantes','Herramientas','Alquiler de maquinaria','Transporte','Materiales','Subcontratas','Personal','Seguridad Social','Dietas','Comidas','Alojamientos','Peajes y parking','Seguros','Impuestos y tasas','Gestoría/profesionales','Telefonía/internet','Software/suscripciones','Oficina','Suministros','Comisiones bancarias','Financiación','Otros'];
+const GASTO_CATEGORIAS = ['Combustible','Reparaciones y averías','Repuestos','Neumáticos','Aceites y lubricantes','Herramientas','Alquiler de maquinaria','Transporte','Materiales','Subcontratas','Personal','Seguridad Social','Dietas','Comidas','Alojamientos','Peajes y parking','Seguros','Impuestos y tasas','Gestoría/profesionales','Telefonía/internet','Software/suscripciones','Oficina','Suministros','Comisiones bancarias','Financiación','Vertedero y residuos','Otros'];
 const REV_DESTINOS = {gasto: 'Gasto de la empresa', dudoso: 'Dudoso (lo decides luego)', ayuntamiento: 'Ayuntamiento', documentacion: 'Documentación (banco, legal…)', justificante_pago: 'Justificante de pago', descartar: 'Descartar'};
 let _revisor = null, _revisando = false;
 function eurRev(n){ return Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €'; }
@@ -7114,7 +7126,7 @@ function payloadGastoDesdePropuesta(fila, prop, proveedorId){
     tipo: 'gasto', estado: 'emitido', numero: d.numero || null, fecha_devengo: d.fecha || null, entidad_id: proveedorId, importe: Number(d.total),
     concepto: d.concepto || ('Gasto — ' + ((d.proveedor && d.proveedor.nombre) || '')), categoria: d.categoria || null, contabilidad: d.contabilidad || 'oficial',
     iva_pct: d.pct_principal != null ? d.pct_principal : (d.iva_pct != null ? d.iva_pct : null), tratamiento_iva: d.tratamiento_iva || 'normal', desglose_iva: desglose,
-    forma_pago: d.forma_pago || null, recurrencia: d.recurrencia || null, cuenta_origen: d.cuenta_origen || null,
+    forma_pago: d.forma_pago || null, recurrencia: d.recurrencia || null, cuenta_origen: d.cuenta_origen || null, obra_texto: d.obra_texto || null,
     archivo_path: fila.storage_path, archivo_url: url, justificante_url: url, estado_justificante: 'completo',
     metodo_extraccion: prop.origen === 'plantilla' && !prop.editada ? 'reglas' : 'manual', confianza_extraccion: d.confianza || (prop.origen === 'plantilla' ? 'alta' : 'media'), firma_plantilla: d.firma || null,
     relacion_actividad: prop.destino === 'dudoso' ? 'dudosa' : 'relacionada',
