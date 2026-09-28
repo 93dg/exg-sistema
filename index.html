@@ -2964,7 +2964,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.99</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.100</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3042,7 +3042,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.99</div>
+        <div class="sub" id="version-badge">V5.100</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5513,7 +5513,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <option>Dietas</option><option>Comidas</option><option>Alojamientos</option><option>Peajes y parking</option>
           <option>Seguros</option><option>Impuestos y tasas</option><option>Gestoría/profesionales</option><option>Telefonía/internet</option>
           <option>Software/suscripciones</option><option>Oficina</option><option>Suministros</option><option>Comisiones bancarias</option>
-          <option>Financiación</option><option>Vertedero y residuos</option><option>Otros</option>
+          <option>Financiación</option><option>Vertedero y residuos</option><option>Alquileres</option><option>Otros</option>
         </select>
       </div>
       <div style="display:flex;gap:10px;margin-bottom:12px;">
@@ -7074,8 +7074,8 @@ async function cargarPlantillasGasto(){
 // ===================== REVISOR — una a una: He entendido / Propongo / Confirmar · Editar · Descartar · Después =====================
 // Cada PDF de la cola sale como una tarjeta con una propuesta. La propuesta viene de la plantilla del proveedor
 // (el motor la lee solo) o de gastos_correo.propuesta (la escribe Claude leyendo el PDF). Nada se crea hasta pulsar Confirmar.
-const GASTO_CATEGORIAS = ['Combustible','Reparaciones y averías','Repuestos','Neumáticos','Aceites y lubricantes','Herramientas','Alquiler de maquinaria','Transporte','Materiales','Subcontratas','Personal','Seguridad Social','Dietas','Comidas','Alojamientos','Peajes y parking','Seguros','Impuestos y tasas','Gestoría/profesionales','Telefonía/internet','Software/suscripciones','Oficina','Suministros','Comisiones bancarias','Financiación','Vertedero y residuos','Otros'];
-const REV_DESTINOS = {gasto: 'Gasto de la empresa', dudoso: 'Dudoso (lo decides luego)', adjunto: 'Adjunto de su factura', ayuntamiento: 'Ayuntamiento', documentacion: 'Empresa → Documentos', justificante_pago: 'Justificante de pago', descartar: 'Descartar'};
+const GASTO_CATEGORIAS = ['Combustible','Reparaciones y averías','Repuestos','Neumáticos','Aceites y lubricantes','Herramientas','Alquiler de maquinaria','Transporte','Materiales','Subcontratas','Personal','Seguridad Social','Dietas','Comidas','Alojamientos','Peajes y parking','Seguros','Impuestos y tasas','Gestoría/profesionales','Telefonía/internet','Software/suscripciones','Oficina','Suministros','Comisiones bancarias','Financiación','Vertedero y residuos','Alquileres','Otros'];
+const REV_DESTINOS = {gasto: 'Gasto de la empresa', dudoso: 'Dudoso (lo decides luego)', adjunto: 'Adjunto de su factura', ayuntamiento: 'Ayuntamiento (nuevo expediente)', documentacion: 'Empresa → Documentos', justificante_pago: 'Justificante de pago', descartar: 'Descartar'};
 let _revisor = null, _revisando = false;
 function eurRev(n){ return Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €'; }
 function fechaRev(iso){ return iso ? String(iso).split('-').reverse().join('/') : '—'; }
@@ -7091,7 +7091,8 @@ function textosPropuesta(prop){
   else if(prop.destino === 'dudoso') propongo = `Mandarla a Dudosos${prop.motivo ? ': ' + prop.motivo.charAt(0).toLowerCase() + prop.motivo.slice(1) : ''}. No contará ni se enviará al gestor hasta que decidas.`;
   else if(prop.destino === 'revisar') propongo = `No la doy por buena${prop.motivo ? ': ' + prop.motivo : ''}. Mírala tú o descártala.`;
   else if(prop.destino === 'descartar') propongo = 'Descartarla. Queda apuntada en la cola, no se borra.';
-  else if(prop.destino === 'adjunto') propongo = 'Pegarlo como adjunto a su factura: aparecerá en su tarjeta de Gastos, con su Ver PDF.';
+  else if(prop.destino === 'adjunto') propongo = 'Pegarlo como adjunto a su factura o expediente: aparecerá en su tarjeta, con su Ver PDF.';
+  else if(prop.destino === 'ayuntamiento') propongo = 'Crear un expediente en Ayuntamiento con este documento como archivo principal.';
   else if(prop.destino === 'documentacion') propongo = 'Guardarlo en Empresa → Documentos, con su ficha y su archivo.';
   else propongo = `Anotarla como ${REV_DESTINOS[prop.destino] || prop.destino}. Queda apuntada y la coloco yo en su sitio.`;
   return {propongo};
@@ -7188,8 +7189,13 @@ function renderRevisorGastos(){
   const filasDatos = [['Proveedor', d.proveedor && d.proveedor.nombre], ['NIF del proveedor', d.proveedor && d.proveedor.nif], ['Nº', d.numero], ['Fecha', d.fecha ? fechaRev(d.fecha) : null],
     ['Subtotal', d.base != null ? eurRev(d.base) : null], ['IVA', d.iva != null ? eurRev(d.iva) + textoIvaRev(d.desglose) : null], ['Total', d.total ? eurRev(d.total) : null],
     ['Categoría', d.categoria], ['Forma de pago', d.forma_pago], ['Concepto', d.concepto]].filter(x => x[1]);
+  if(prop.destino === 'ayuntamiento'){
+    if(d.titulo) filasDatos.push(['Expediente', d.titulo]);
+    if(d.estado) filasDatos.push(['Estado', (typeof stateLabels !== 'undefined' && stateLabels[d.estado]) || d.estado]);
+    if(d.descripcion) filasDatos.push(['Descripción', d.descripcion]);
+  }
   if(prop.destino === 'adjunto'){
-    if(Array.isArray(d.adjunto_a) && d.adjunto_a.length) filasDatos.push(['Se pega a', d.adjunto_a.map(x => 'factura ' + x.numero).join(' y ')]);
+    if(Array.isArray(d.adjunto_a) && d.adjunto_a.length) filasDatos.push(['Se pega a', d.adjunto_a.map(x => x.expediente ? 'expediente «' + x.expediente + '»' : 'factura ' + x.numero).join(' y ')]);
     if(d.adjunto_tipo) filasDatos.push(['Tipo', d.adjunto_tipo]);
     if(d.adjunto_nombre) filasDatos.push(['Nombre', d.adjunto_nombre]);
   }
@@ -7276,26 +7282,49 @@ async function aplicarPropuestaRevisor(it){
       clasificacion: {destino: prop.destino, origen: prop.origen, confianza: prop.datos.confianza || null, numero: prop.datos.numero || null, total: prop.datos.total}}).eq('id', fila.id);
     if(eq) throw new Error(eq.message);
   }else if(prop.destino === 'adjunto'){
-    const objetivos = Array.isArray(prop.datos && prop.datos.adjunto_a) ? prop.datos.adjunto_a.filter(o => o && o.numero) : [];
-    if(!objetivos.length) throw new Error('No sé a qué factura pegarlo. Pulsa Editar o Descartar');
-    // primero se comprueba que TODAS las facturas existen; si falta alguna no se toca nada
+    const objetivos = Array.isArray(prop.datos && prop.datos.adjunto_a) ? prop.datos.adjunto_a.filter(o => o && (o.numero || o.expediente)) : [];
+    if(!objetivos.length) throw new Error('No sé a qué factura o expediente pegarlo. Pulsa Editar o Descartar');
+    // primero se comprueba que TODOS los destinos existen; si falta alguno no se toca nada
     const destinos = [];
     for(const o of objetivos){
-      const {data: gs, error: eg} = await sb.from('documentos_economicos').select('id,numero,adjuntos').eq('tipo', 'gasto').eq('numero', o.numero);
-      if(eg) throw new Error(eg.message);
-      if(!gs || !gs.length) throw new Error(`Confirma primero la factura ${o.numero}: todavía no está guardada como gasto`);
-      gs.forEach(g => { if(!destinos.some(x => x.id === g.id)) destinos.push(g); });
+      if(o.numero){
+        const {data: gs, error: eg} = await sb.from('documentos_economicos').select('id,numero,adjuntos').eq('tipo', 'gasto').eq('numero', o.numero);
+        if(eg) throw new Error(eg.message);
+        if(!gs || !gs.length) throw new Error(`Confirma primero la factura ${o.numero}: todavía no está guardada como gasto`);
+        gs.forEach(g => { if(!destinos.some(x => x.id === g.id)) destinos.push({...g, tabla: 'documentos_economicos'}); });
+      }else{
+        const {data: es, error: ee} = await sb.from('expedientes').select('id,titulo,adjuntos').ilike('titulo', '%' + o.expediente + '%');
+        if(ee) throw new Error(ee.message);
+        if(!es || !es.length) throw new Error(`Confirma primero el expediente «${o.expediente}»: todavía no está creado en Ayuntamiento`);
+        if(es.length > 1) throw new Error(`Hay ${es.length} expedientes que encajan con «${o.expediente}» y no sé cuál elegir. Pulsa Editar o Descartar`);
+        if(!destinos.some(x => x.id === es[0].id)) destinos.push({...es[0], tabla: 'expedientes'});
+      }
     }
     const adj = {nombre: prop.datos.adjunto_nombre || fila.nombre_archivo, tipo: prop.datos.adjunto_tipo || 'Documento', path: fila.storage_path, url: urlPublicaGastoCorreo(fila.storage_path), fecha: fila.fecha_correo ? String(fila.fecha_correo).slice(0, 10) : null, origen: 'correo'};
     for(const g of destinos){
       const lista = Array.isArray(g.adjuntos) ? g.adjuntos : [];
       if(lista.some(a => a.path === adj.path)) continue;   // ya estaba pegado: no se duplica
       const nueva = [...lista, adj];
-      const {error: ea} = await sb.from('documentos_economicos').update({adjuntos: nueva}).eq('id', g.id);
+      const {error: ea} = await sb.from(g.tabla).update({adjuntos: nueva}).eq('id', g.id);
       if(ea) throw new Error(ea.message);
-      if(documentosRealesById[g.id]) documentosRealesById[g.id].adjuntos = nueva;
+      if(g.tabla === 'documentos_economicos' && documentosRealesById[g.id]) documentosRealesById[g.id].adjuntos = nueva;
+      if(g.tabla === 'expedientes' && typeof expedientesById !== 'undefined' && expedientesById[g.id]){ expedientesById[g.id].adjuntos = nueva; if(typeof renderExpedientesTabla === 'function') renderExpedientesTabla(); }
     }
-    const {error: ec} = await sb.from('gastos_correo').update({estado: 'clasificado', clasificacion: {destino: 'adjunto', origen: prop.origen, gasto_ids: destinos.map(g => g.id)}}).eq('id', fila.id);
+    const {error: ec} = await sb.from('gastos_correo').update({estado: 'clasificado', clasificacion: {destino: 'adjunto', origen: prop.origen, gasto_ids: destinos.filter(g => g.tabla === 'documentos_economicos').map(g => g.id), expediente_ids: destinos.filter(g => g.tabla === 'expedientes').map(g => g.id)}}).eq('id', fila.id);
+    if(ec) throw new Error(ec.message);
+  }else if(prop.destino === 'ayuntamiento'){
+    const d = prop.datos || {};
+    if(!d.titulo) throw new Error('Falta el título del expediente. Pulsa Editar o Descartar');
+    const {data: ya, error: ey} = await sb.from('expedientes').select('id').eq('archivo_path', fila.storage_path).limit(1);
+    if(ey) throw new Error(ey.message);
+    let expId = ya && ya[0] && ya[0].id;
+    if(!expId){
+      const {data: nuevo, error: en} = await sb.from('expedientes').insert({titulo: d.titulo, descripcion: d.descripcion || null, fecha: d.fecha || null, estado: d.estado || 'posible', archivo_path: fila.storage_path}).select().single();
+      if(en) throw new Error(en.message);
+      expId = nuevo.id;
+      if(typeof expedientesById !== 'undefined'){ expedientesById[expId] = nuevo; if(typeof renderExpedientesTabla === 'function') renderExpedientesTabla(); }
+    }
+    const {error: ec} = await sb.from('gastos_correo').update({estado: 'clasificado', clasificacion: {destino: 'ayuntamiento', origen: prop.origen, expediente_id: expId}}).eq('id', fila.id);
     if(ec) throw new Error(ec.message);
   }else if(prop.destino === 'documentacion'){
     const d = prop.datos || {};
@@ -7339,7 +7368,7 @@ async function confirmarRevisor(){
     await aplicarPropuestaRevisor(it);
     if(it.prop.plId && it.prop.destino === 'gasto') R.confirmadosGrupo.add(it.prop.plId);
     R.items.shift(); R.hechas++;
-    R.aviso = ({gasto: '✓ Guardada como gasto.', dudoso: '✓ Guardada en Dudosos.', adjunto: '✓ Pegado a su factura.', documentacion: '✓ Guardado en Empresa → Documentos.'})[it.prop.destino] || '✓ Anotada.';
+    R.aviso = ({gasto: '✓ Guardada como gasto.', dudoso: '✓ Guardada en Dudosos.', adjunto: '✓ Pegado a su factura o expediente.', ayuntamiento: '✓ Expediente creado en Ayuntamiento.', documentacion: '✓ Guardado en Empresa → Documentos.'})[it.prop.destino] || '✓ Anotada.';
   }catch(e){ R.error = 'No se ha podido guardar: ' + (e.message || e); }
   finally{ _revisando = false; }
   renderRevisorGastos();
@@ -16084,25 +16113,28 @@ const expedientesById = {};
 function renderExpedientesTabla(){
   const rows = Object.values(expedientesById).sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
   const urlArchivo = e => e.archivo_path ? 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/'+encodeURI(e.archivo_path) : '';
-  const originalHtml = e => urlArchivo(e) ? `<span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${urlArchivo(e)}')">${ICO_CLIP} Original</span>` : '';
+  const originalHtml = e => urlArchivo(e) ? `<span class="fc-ver-original" data-url="${escHtml(urlArchivo(e))}">${ICO_CLIP} Original</span>` : '';
+  const adjuntosHtml = e => (Array.isArray(e.adjuntos) ? e.adjuntos : []).map(a => `<span class="fc-ver-original" data-url="${escHtml(a.url || '')}">${ICO_CLIP} ${escHtml(a.nombre || a.tipo || 'Documento')}</span>`).join('');
+  const archivosHtml = e => `<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-start;">${originalHtml(e)}${adjuntosHtml(e)}</div>`;
   const botonTrabajo = e => e.estado==='adjudicado' ? `<button class="btn primary" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();crearDocumentoDesdeExpediente('${e.id}')">Crear trabajo</button>` : '';
   document.getElementById('expedientes-tbl').innerHTML = rows.map(e=>`
-    <tr><td class="mono">${e.titulo||'Sin título'}</td><td>Ayuntamiento de Fuente Obejuna</td><td>${e.descripcion||'—'}</td><td class="num">${e.fecha||'—'}</td><td class="num">—</td>
+    <tr><td class="mono">${escHtml(e.titulo||'Sin título')}</td><td>Ayuntamiento de Fuente Obejuna</td><td>${escHtml(e.descripcion||'—')}</td><td class="num">${escHtml(e.fecha||'—')}</td><td class="num">—</td>
     <td>${pill(e.estado)}</td>
-    <td>${originalHtml(e)}</td>
+    <td>${archivosHtml(e)}</td>
     <td>${botonTrabajo(e)}</td></tr>
   `).join('') || '<tr><td colspan="8" class="empty">Sin expedientes todavía</td></tr>';
   const lista = document.getElementById('expedientes-lista-movil');
   if(lista) lista.innerHTML = rows.map(e=>`
     <div class="exp-card-movil">
       <div>${pill(e.estado)}</div>
-      <div class="exp-titulo">${e.titulo||'Sin título'}</div>
-      <div class="exp-sub">Ayuntamiento de Fuente Obejuna${e.fecha ? ' · '+e.fecha : ''}</div>
-      ${e.descripcion ? `<div class="exp-desc">${e.descripcion}</div>` : ''}
-      ${urlArchivo(e) ? `<div class="fc-extra">${originalHtml(e)}</div>` : ''}
+      <div class="exp-titulo">${escHtml(e.titulo||'Sin título')}</div>
+      <div class="exp-sub">Ayuntamiento de Fuente Obejuna${e.fecha ? ' · '+escHtml(e.fecha) : ''}</div>
+      ${e.descripcion ? `<div class="exp-desc">${escHtml(e.descripcion)}</div>` : ''}
+      ${(urlArchivo(e) || (e.adjuntos && e.adjuntos.length)) ? `<div class="fc-extra">${archivosHtml(e)}</div>` : ''}
       ${e.estado==='adjudicado' ? `<div>${botonTrabajo(e)}</div>` : ''}
     </div>
   `).join('') || '<div class="empty" style="padding:16px;">Sin expedientes todavía</div>';
+  document.querySelectorAll('#expedientes-tbl [data-url], #expedientes-lista-movil [data-url]').forEach(el => { el.onclick = ev => { ev.stopPropagation(); abrirVisorDesdeUrl(el.dataset.url); }; });
 }
 async function cargarExpedientesReales(){
   if(!sb) return;
