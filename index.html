@@ -1090,6 +1090,7 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .exp-card-movil .exp-desc{font-size:13px;line-height:1.4;}
 .gcor-estado{padding:10px 14px;font-size:13px;color:var(--ink-soft);border-bottom:1px solid var(--line, rgba(0,0,0,0.08));}
 .gcor-estado:empty{display:none;}
+.gcor-estado .btn{margin-left:8px;vertical-align:middle;}
 .gcor-item{padding:12px 14px;border-bottom:1px solid var(--line, rgba(0,0,0,0.08));display:flex;flex-direction:column;gap:4px;}
 .gcor-item .gcor-de{font-weight:700;font-size:14px;overflow-wrap:anywhere;}
 .gcor-item .gcor-asunto{font-size:13px;overflow-wrap:anywhere;}
@@ -2849,7 +2850,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.85</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.86</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2927,7 +2928,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.85</div>
+        <div class="sub" id="version-badge">V5.86</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6485,6 +6486,23 @@ async function procesarCorreoGasto(messageId, res){
   }
   return todoBien;
 }
+// Mensaje según el motivo real, con un botón para conectar aquí mismo (sin ir a Correo). Al terminar de
+// conectar, la búsqueda continúa sola (solo si se pidió hace menos de 3 minutos).
+var _reanudarBusquedaGastos = 0;
+function avisoGmailDesconectado(){
+  const estado = document.getElementById('gcor-estado');
+  if(!estado) return;
+  if(gmailMotivoFallo==='red'){ estado.textContent = 'No se pudo comprobar la conexión con Gmail. Prueba otra vez en un momento.'; return; }
+  estado.innerHTML = (gmailMotivoFallo==='caducado' ? 'La conexión con Gmail ha caducado.' : 'Gmail no está conectado.') +
+    ' <button type="button" class="btn sm primary" onclick="conectarGmailDesdeGastos()">Conectar Gmail</button>';
+}
+function conectarGmailDesdeGastos(){
+  _reanudarBusquedaGastos = Date.now();
+  connectGmail();
+}
+document.addEventListener('gmail-conectado', ()=>{
+  if(_reanudarBusquedaGastos && Date.now() - _reanudarBusquedaGastos < 180000){ _reanudarBusquedaGastos = 0; buscarGastosEnCorreo(); }
+});
 async function buscarGastosEnCorreo(){
   if(!sb || _gastosCorreoBuscando) return;
   if(!exigirNivel('gastospro','editar')) return;
@@ -6496,7 +6514,7 @@ async function buscarGastosEnCorreo(){
   let correos = 0;
   try{
     decir('Conectando con Gmail…');
-    if(!(await asegurarTokenGmail())){ decir('Gmail no está conectado. Conéctalo primero en Correo.'); return; }
+    if(!(await asegurarTokenGmail())){ avisoGmailDesconectado(); return; }
     decir('Cargando el lector de PDF…');
     await cargarPdfJs();
     const q = encodeURIComponent(`has:attachment filename:pdf -in:sent -in:trash -in:spam newer_than:${GASTOS_CORREO_DIAS}d`);
@@ -10169,14 +10187,22 @@ function guardarTokenGmail(access_token, expires_in){
   sessionStorage.setItem('gmail_token_expiry', String(gmailTokenExpiry));
 }
 
+// Por qué falló la última renovación: 'caducado' (Google ya no acepta el permiso guardado), 'sin_conexion'
+// (nunca se conectó) o 'red' (no se pudo preguntar). Antes se perdía y solo salía "no conectado".
+var gmailMotivoFallo = '';
 async function renovarTokenGmailServidor(){
   // pide un access_token nuevo a nuestra función de servidor, usando el refresh_token guardado — sin ventana de Google
+  gmailMotivoFallo = '';
   try{
     const {ok, data} = await llamarFuncionGmail({action:'refresh'});
-    if(!ok || !data || !data.access_token) return false;
+    if(!ok || !data || !data.access_token){
+      const msg = String((data && data.error) || '');
+      gmailMotivoFallo = /expired|revoked|invalid_grant/i.test(msg) ? 'caducado' : /No hay una conexi/i.test(msg) ? 'sin_conexion' : 'red';
+      return false;
+    }
     guardarTokenGmail(data.access_token, data.expires_in);
     return true;
-  }catch(e){ return false; }
+  }catch(e){ gmailMotivoFallo = 'red'; return false; }
 }
 
 async function initGmailAuth(){
@@ -10203,6 +10229,7 @@ async function initGmailAuth(){
         guardarTokenGmail(data.access_token, data.expires_in);
         showGmailConnected();
         loadGmailInbox();
+        document.dispatchEvent(new CustomEvent('gmail-conectado'));
       }catch(e){
         mostrarToast('Error de red al conectar: ' + (e && e.message ? e.message : e));
         document.getElementById('correo-auth-actions').innerHTML = '<button class="btn primary" id="correo-connect-btn" onclick="connectGmail()">Conectar con Gmail</button>';
