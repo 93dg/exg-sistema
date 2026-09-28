@@ -1,6 +1,6 @@
 // Service worker del sistema EXG — red primero siempre para el HTML principal (así se ve la última versión al momento),
 // y solo si no hay conexión se usa la copia guardada como último recurso.
-const CACHE_NAME = 'exg-shell-v2';
+const CACHE_NAME = 'exg-shell-v3';
 const SHELL_FILES = ['/exg-sistema/', '/exg-sistema/index.html'];
 
 self.addEventListener('install', (event) => {
@@ -23,6 +23,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.indexOf('/escaner/') !== -1) return;   // el motor del escáner (10 MB) se deja al caché normal del navegador
 
   event.respondWith(
     fetch(event.request, { cache: 'no-store' }).then((networkResp) => {

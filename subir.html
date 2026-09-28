@@ -106,7 +106,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 .btn-secundario.grabando{background:var(--red);border-color:var(--red);color:#fff;}
 .btn-secundario.grabando svg{color:#fff;animation:pulso 1s infinite;}
 @keyframes pulso{0%,100%{opacity:1;}50%{opacity:.5;}}
-#campo-camara,#campo-archivo,#campo-anadir{display:none;}
+#campo-camara,#campo-escaner,#campo-archivo,#campo-anadir{display:none;}
 
 #chat-bar{display:flex;gap:7px;align-items:center;}
 #chat-texto{flex:1;min-width:0;border:1.5px solid var(--line);border-radius:21px;padding:10px 15px;font-family:'Inter',sans-serif;font-size:16px;line-height:1.35;color:var(--ink);background:#fff;max-height:104px;overflow-y:auto;white-space:pre-wrap;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text;-webkit-appearance:none;}
@@ -126,7 +126,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.15 · Sistema …</div>
+    <div class="ver" id="ver-subir">Subir S3.16 · Sistema …</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -154,6 +154,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 
 <div id="control-inferior">
   <input id="campo-camara" type="file" accept="image/*" capture="environment">
+  <input id="campo-escaner" type="file" accept="image/*" capture="environment">
   <input id="campo-archivo" type="file" accept="image/*,application/pdf" multiple>
   <input id="campo-anadir" type="file" accept="image/*,application/pdf">
 
@@ -167,6 +168,10 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
         <circle cx="17.2" cy="9.4" r=".9" fill="#D8560F"/>
       </svg>
       Foto
+    </button>
+    <button type="button" class="btn-secundario" id="btn-escanear">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M8.5 9h7M8.5 12h7M8.5 15h4.5"/></svg>
+      Escanear
     </button>
     <button type="button" class="btn-secundario" id="btn-archivo">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" stroke-linejoin="round"/><path d="M14 3v5h5" stroke-linejoin="round"/></svg>
@@ -301,6 +306,15 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 
   btnFoto.addEventListener("click", () => campoCamara.click());
   btnArchivo.addEventListener("click", () => campoArchivo.click());
+  // Escanear: foto de un documento -> se detecta, se quita el fondo y se endereza (escaner/escaner.js, motor OpenCV que solo se descarga al primer toque)
+  const campoEscaner = document.getElementById("campo-escaner");
+  document.getElementById("btn-escanear").addEventListener("click", () => campoEscaner.click());
+  campoEscaner.addEventListener("change", () => {
+    const f = campoEscaner.files[0]; campoEscaner.value = "";
+    if (!f) return;
+    if (!window.EXGEscaner){ mostrarAviso("El escáner no ha cargado. Se añade la foto tal cual."); añadirArchivos([f]); return; }
+    window.EXGEscaner.abrir(f, { añadir: (archivo) => añadirArchivos([archivo]), aviso: mostrarAviso, repetir: () => campoEscaner.click() });
+  });
   campoCamara.addEventListener("change", async () => {
     const destino = campoCamara.dataset.destino;
     const f = campoCamara.files[0];
@@ -887,7 +901,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   window.abrirMenuAnadir = abrirMenuAnadir;
   // Versión del sistema desde BD (no hay que actualizarla a mano)
   fetch(SUPABASE_URL+"/rest/v1/arranque?clave=eq.web_version_actual&select=valor",{headers:{"Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY}})
-    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.15 · Sistema '+d[0].valor; }).catch(()=>{});
+    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.16 · Sistema '+d[0].valor; }).catch(()=>{});
   window.mostrarSolucionPorIds = mostrarSolucionPorIds;
   window.abrirEnlaceDesdeSubir = abrirEnlaceDesdeSubir;
   window.toggleMsgVerificado = toggleMsgVerificado;
@@ -999,5 +1013,6 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 })();
 </script>
 
+  <script src="escaner/escaner.js" defer></script>
 </body>
 </html>
