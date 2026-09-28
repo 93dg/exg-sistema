@@ -91,6 +91,9 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 .pend-item img{width:100%;height:100%;object-fit:cover;display:block;}
 .pend-item .pend-audio{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#fff;}
 .pend-item .pend-audio svg{width:34px;height:34px;}
+.pend-item .pend-doc{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#fff;padding:6px;text-align:center;box-sizing:border-box;}
+.pend-item .pend-doc svg{width:28px;height:28px;flex:0 0 auto;}
+.pend-item .pend-doc span{font-size:10px;line-height:1.15;max-width:100%;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all;}
 .pend-item .pend-borrar{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(27,31,36,0.82);border:none;color:#fff;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;}
 
 .acciones{display:flex;gap:9px;align-items:stretch;}
@@ -122,13 +125,13 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.10 · Sistema …</div>
+    <div class="ver" id="ver-subir">Subir S3.11 · Sistema …</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
 
 <main style="flex:1;display:flex;flex-direction:column;min-height:0;">
-  <div id="feed"><div id="vacio">Haz una foto, sube un archivo, graba un audio o escribe abajo. El sistema lo clasifica solo.</div></div>
+  <div id="feed"><div id="vacio">Haz una foto, sube o pega un archivo, graba un audio o escribe abajo. El sistema lo clasifica solo.</div></div>
 </main>
 
 <div id="detalle">
@@ -175,7 +178,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   </div>
 
   <div id="chat-bar">
-    <input type="text" id="chat-texto" placeholder="Escribe o dicta…" autocomplete="off">
+    <input type="text" id="chat-texto" placeholder="Escribe, dicta o pega…" autocomplete="off">
     <button type="button" id="btn-dictar" class="btn-circular" aria-label="Dictar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0" stroke-linecap="round"/><path d="M12 17.5V21" stroke-linecap="round"/></svg>
     </button>
@@ -304,6 +307,33 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     });
     renderPendientes();
   }
+  // ---------- Pegar archivos (Ctrl+V o "Pegar" en el móvil): igual que en WhatsApp o ChatGPT ----------
+  const EXT_POR_MIME = { "application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif", "image/gif": "gif" };
+  function archivosDelPortapapeles(dt){
+    if (!dt) return [];
+    let fs = Array.from(dt.files || []);
+    if (!fs.length && dt.items) fs = Array.from(dt.items).filter(i => i.kind === "file").map(i => i.getAsFile()).filter(Boolean);
+    return fs;
+  }
+  function nombrarArchivoPegado(f, n){
+    if (f.name && /\.[A-Za-z0-9]{2,5}$/.test(f.name)) return f;   // ya trae nombre con extensión
+    const ext = EXT_POR_MIME[f.type] || "";
+    const d = new Date(), z = x => String(x).padStart(2, "0");
+    const nombre = `pegado-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}${n > 0 ? "-" + (n + 1) : ""}${ext ? "." + ext : ""}`;
+    return new File([f], nombre, { type: f.type, lastModified: Date.now() });
+  }
+  function alPegar(ev){
+    const todos = archivosDelPortapapeles(ev.clipboardData);
+    if (!todos.length) return;                        // solo texto: se pega como siempre
+    if (document.getElementById("detalle").classList.contains("activo") || document.getElementById("menu-anadir").classList.contains("activo")) return;   // con una ventana abierta no se cuela en el mensaje nuevo
+    ev.preventDefault();
+    const validos = todos.filter(f => /^image\//.test(f.type) || f.type === "application/pdf");
+    if (!validos.length){ mostrarAviso("Solo se pueden pegar fotos y PDF."); return; }
+    if (validos.length < todos.length) mostrarAviso(`Se han pegado ${validos.length} de ${todos.length}: solo entran fotos y PDF.`);
+    añadirArchivos(validos.map((f, i) => nombrarArchivoPegado(f, i)));
+  }
+  document.addEventListener("paste", alPegar);
+  window.__pegar = { alPegar, nombrarArchivoPegado, archivosDelPortapapeles };   // solo para las pruebas
   function quitarPendiente(id){ pendientes = pendientes.filter(p => p.id !== id); renderPendientes(); }
   window.quitarPendiente = quitarPendiente;
 
@@ -313,7 +343,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     pendientesStrip.innerHTML = pendientes.map(p => {
       const cuerpo = p.kind === "audio"
         ? `<div class="pend-audio" onclick="reproducirPendiente('${p.id}')"><svg id="pico-${p.id}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0" stroke-linecap="round"/></svg><span class="play-badge"><svg viewBox="0 0 24 24" fill="white"><path d="M6 4l14 8-14 8z"/></svg></span></div>`
-        : `<img src="${p.previewUrl}" alt="">`;
+        : (/^image\//.test((p.file && p.file.type) || "image/") ? `<img src="${p.previewUrl}" alt="">` : `<div class="pend-doc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" stroke-linejoin="round"/><path d="M14 3v5h5" stroke-linejoin="round"/></svg><span>${String((p.file && p.file.name) || "PDF").replace(/[<>&"]/g, "")}</span></div>`);
       return `<div class="pend-item">${cuerpo}<button type="button" class="pend-borrar" onclick="event.stopPropagation();quitarPendiente('${p.id}')">✕</button></div>`;
     }).join("");
     btnEnviar.disabled = subiendo;
@@ -516,7 +546,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
         const icono = ICONO_TIPO[a.kind] || "📄";
         const badge = a.kind === "audio" ? `<span class="play-badge"><svg viewBox="0 0 24 24" fill="white"><path d="M6 4l14 8-14 8z"/></svg></span>` : "";
         const click = a.kind === "audio" ? `onclick="reproducirUrl('${a.file_url}','doc-${a.documento_id}')"` : `onclick="abrirDetalleAdjunto('${a.file_url}')"`;
-        return a.kind === "foto"
+        return (a.kind === "foto" && !/\.pdf($|\?)/i.test(a.file_url || ""))
           ? `<img class="msg-thumb" src="${a.file_url}" alt="" ${click}>`
           : `<div class="msg-thumb" ${click}>${icono}${badge}</div>`;
       }).join("");
@@ -746,7 +776,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   window.abrirMenuAnadir = abrirMenuAnadir;
   // Versión del sistema desde BD (no hay que actualizarla a mano)
   fetch(SUPABASE_URL+"/rest/v1/arranque?clave=eq.web_version_actual&select=valor",{headers:{"Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY}})
-    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.10 · Sistema '+d[0].valor; }).catch(()=>{});
+    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.11 · Sistema '+d[0].valor; }).catch(()=>{});
   window.mostrarSolucionPorIds = mostrarSolucionPorIds;
   window.abrirEnlaceDesdeSubir = abrirEnlaceDesdeSubir;
   window.toggleMsgVerificado = toggleMsgVerificado;
