@@ -1088,6 +1088,10 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .exp-card-movil .exp-acciones{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;}
 .perm-usuarios{margin:0;padding:12px 14px;border-bottom:1px solid var(--line, rgba(0,0,0,0.08));}
 .perm-usuarios .chip-filter{font-size:14px;padding:9px 22px;}
+.perm-masivo{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:10px 14px;background:var(--concrete-2);border-bottom:1px solid var(--line, rgba(0,0,0,0.08));}
+.perm-masivo-txt{font-size:13px;font-weight:700;color:var(--ink-soft);}
+.perm-masivo-btns{display:flex;gap:8px;flex-wrap:wrap;}
+.perm-masivo-btns .btn{min-height:40px;padding:8px 16px;font-size:14px;font-weight:700;}
 .perm-fila{display:flex;align-items:center;gap:10px;padding:8px 14px;min-height:56px;border-bottom:1px solid var(--line, rgba(0,0,0,0.08));}
 .perm-fila label{flex:1;min-width:0;display:flex;align-items:center;gap:14px;min-height:44px;cursor:pointer;}
 .perm-fila input[type=checkbox]{width:26px;height:26px;flex:0 0 26px;cursor:pointer;}
@@ -2836,7 +2840,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.81</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.82</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2914,7 +2918,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.81</div>
+        <div class="sub" id="version-badge">V5.82</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4838,6 +4842,14 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <div class="filters perm-usuarios" id="perm-usuarios">
             <div class="chip-filter active" data-user="rg" onclick="mostrarUsuarioPermisos('rg')">Rafa</div>
             <div class="chip-filter" data-user="mg" onclick="mostrarUsuarioPermisos('mg')">Manolo</div>
+          </div>
+          <div class="perm-masivo">
+            <span class="perm-masivo-txt">Poner todas las marcadas como:</span>
+            <div class="perm-masivo-btns">
+              <button type="button" class="btn sm" onclick="aplicarNivelATodas('lector')">Lector</button>
+              <button type="button" class="btn sm" onclick="aplicarNivelATodas('editor')">Editor</button>
+              <button type="button" class="btn sm" onclick="aplicarNivelATodas('admin')">Administrador</button>
+            </div>
           </div>
           <div id="permisos-tbl"></div>
         </div>
@@ -8695,6 +8707,21 @@ function alternarNivelPermiso(chk){
   const sel = document.querySelector(`#permisos-tbl select[data-user="${chk.dataset.user}"][data-key="${chk.dataset.key}"]`);
   if(sel){ sel.style.display = chk.checked ? '' : 'none'; if(chk.checked) sel.value = 'lector'; }
   actualizarBotonPermisos();
+}
+// Pone el mismo nivel a TODAS las secciones que ya tienen el check, del usuario que se está viendo.
+// Las que no tienen check no se tocan (siguen sin acceso). No guarda: hay que pulsar Guardar.
+function aplicarNivelATodas(nivel){
+  const user = document.querySelector('#perm-usuarios .chip-filter.active')?.dataset.user || 'rg';
+  const bloque = document.querySelector(`#permisos-tbl .perm-usuario[data-user="${user}"]`);
+  if(!bloque) return;
+  let n = 0;
+  bloque.querySelectorAll('input[type="checkbox"]:checked').forEach(chk=>{
+    const sel = bloque.querySelector(`select[data-key="${chk.dataset.key}"]`);
+    if(sel){ sel.value = nivel; n++; }
+  });
+  actualizarBotonPermisos();
+  const nombre = user==='rg' ? 'Rafa' : 'Manolo';
+  mostrarToast(n ? `${n} secciones de ${nombre} puestas como ${NIVELES_ETIQUETA[nivel]}. Pulsa Guardar para aplicarlo.` : `${nombre} no tiene ninguna sección marcada.`);
 }
 function mostrarUsuarioPermisos(user){
   document.querySelectorAll('#perm-usuarios .chip-filter').forEach(c=>c.classList.toggle('active', c.dataset.user===user));
