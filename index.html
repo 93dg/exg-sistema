@@ -1088,6 +1088,12 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .exp-card-movil .exp-titulo{font-size:16px;font-weight:800;line-height:1.25;}
 .exp-card-movil .exp-sub{font-size:12.5px;color:var(--ink-soft);}
 .exp-card-movil .exp-desc{font-size:13px;line-height:1.4;}
+.gcor-estado{padding:10px 14px;font-size:13px;color:var(--ink-soft);border-bottom:1px solid var(--line, rgba(0,0,0,0.08));}
+.gcor-estado:empty{display:none;}
+.gcor-item{padding:12px 14px;border-bottom:1px solid var(--line, rgba(0,0,0,0.08));display:flex;flex-direction:column;gap:4px;}
+.gcor-item .gcor-de{font-weight:700;font-size:14px;overflow-wrap:anywhere;}
+.gcor-item .gcor-asunto{font-size:13px;overflow-wrap:anywhere;}
+.gcor-item .gcor-meta{font-size:12px;color:var(--ink-soft);overflow-wrap:anywhere;}
 .exp-card-movil .exp-acciones{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;}
 .perm-usuarios{margin:0;padding:12px 14px;border-bottom:1px solid var(--line, rgba(0,0,0,0.08));}
 .perm-usuarios .chip-filter{font-size:14px;padding:9px 22px;}
@@ -2843,7 +2849,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.84</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.85</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2921,7 +2927,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.84</div>
+        <div class="sub" id="version-badge">V5.85</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4053,7 +4059,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
       <!-- POR REVISAR -->
       <div class="sub-view" id="gpro-revisar" style="display:none;">
-        <div class="panel"><div class="panel-body empty">Sin gastos por revisar todavía — esto se irá llenando cuando se registren gastos con factura pendiente, sin categorizar, o dudosos.</div></div>
+        <div class="panel">
+          <div class="panel-head" style="justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <h3>Del correo</h3>
+            <button class="btn primary" id="gcor-btn" onclick="buscarGastosEnCorreo()">Buscar en el correo</button>
+          </div>
+          <div class="panel-body" style="padding:0;">
+            <div id="gcor-estado" class="gcor-estado"></div>
+            <div id="gcor-lista"></div>
+          </div>
+        </div>
       </div>
 
       <!-- EFECTIVO -->
@@ -6306,7 +6321,7 @@ function setupSubtabs(navId, prefix, mapping, opts){
 }
 setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimiento:'flota-mantenimiento',averias:'flota-averias',documentacion:'flota-documentacion',repuestos:'flota-repuestos',historial:'flota-historial'});
 setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',cobros:'econ-cobros',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad',cierre:'econ-cierre'});
-setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',revisar:'gpro-revisar',efectivo:'gpro-efectivo',banco:'gpro-banco',recurrentes:'gpro-recurrentes',seguros:'gpro-seguros',prestamos:'gpro-prestamos',maquinas:'gpro-maquinas'});
+setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',revisar:'gpro-revisar',efectivo:'gpro-efectivo',banco:'gpro-banco',recurrentes:'gpro-recurrentes',seguros:'gpro-seguros',prestamos:'gpro-prestamos',maquinas:'gpro-maquinas'},{onSwitch:{revisar:()=>cargarColaGastosCorreo()}});
 document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filters .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     chip.parentElement.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
@@ -6317,6 +6332,240 @@ document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filter
 });
 function gastosProDocs(){
   return Object.values(documentosRealesById).filter(d=>d.type==='gasto' || d.tipo==='gasto');
+}
+// ===================== GASTOS DESDE EL CORREO — cola =====================
+// La web baja de Gmail los PDFs adjuntos, les saca el texto en el propio navegador (pdf.js, sin IA y
+// sin coste) y los deja en la tabla gastos_correo. Ahí se leen y se clasifican con Claude (método
+// EXG) y lo que se aprende se guarda como plantilla en conocimiento_motor, para que más adelante la
+// web lo lea sola. Nada de esto crea todavía gastos: solo llena la cola.
+const GASTOS_CORREO_DIAS = 90;          // hasta cuántos días atrás se busca
+const GASTOS_CORREO_MAX_POR_VEZ = 30;   // correos nuevos por pulsación (se puede pulsar otra vez)
+const PDFJS_VERSION = '3.11.174';
+let _pdfjsPromesa = null, _gastosCorreoBuscando = false;
+function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function cargarPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if(_pdfjsPromesa) return _pdfjsPromesa;
+  _pdfjsPromesa = new Promise((ok, ko)=>{
+    const sc = document.createElement('script');
+    sc.src = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.min.js`;
+    sc.onload = ()=>{ window.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.js`; ok(window.pdfjsLib); };
+    sc.onerror = ()=>{ _pdfjsPromesa = null; ko(new Error('No se pudo cargar el lector de PDF')); };
+    document.head.appendChild(sc);
+  });
+  return _pdfjsPromesa;
+}
+// Texto de un PDF respetando las líneas (cada renglón del PDF = una línea) y separando columnas con
+// doble espacio, que es lo que necesitan luego las reglas para encontrar "Total", "Base", "NIF"...
+async function extraerTextoPdf(bytes){
+  const lib = await cargarPdfJs();
+  const pdf = await lib.getDocument({data: bytes}).promise;
+  const partes = [];
+  for(let n=1; n<=Math.min(pdf.numPages, 15); n++){
+    const pagina = await pdf.getPage(n);
+    const contenido = await pagina.getTextContent();
+    const items = contenido.items.filter(it=>it.str && it.str.trim()!=='').map(it=>({t:it.str, x:it.transform[4], y:it.transform[5], w:it.width||0}));
+    items.sort((a,b)=>b.y-a.y);
+    const lineas = []; let actual = null;
+    for(const it of items){
+      if(!actual || Math.abs(it.y-actual.y)>3){ actual = {y:it.y, items:[]}; lineas.push(actual); }
+      actual.items.push(it);
+    }
+    lineas.forEach(l=>{
+      l.items.sort((a,b)=>a.x-b.x);
+      let txt = '', fin = null;
+      l.items.forEach(it=>{
+        if(fin!==null){ const hueco = it.x - fin; if(hueco > 1.5) txt += hueco > 12 ? '  ' : ' '; }
+        txt += it.t; fin = it.x + it.w;
+      });
+      partes.push(txt.trim());
+    });
+    partes.push('');
+  }
+  return {texto: partes.join('\n').replace(/\n{3,}/g,'\n\n').trim(), paginas: pdf.numPages};
+}
+function base64UrlABytes(b64){
+  const bin = atob(String(b64||'').replace(/-/g,'+').replace(/_/g,'/'));
+  const out = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function sha256Hex(bytes){
+  const h = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function nombreArchivoSeguro(n){
+  let x = String(n||'documento.pdf').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80) || 'documento.pdf';
+  return /\.pdf$/i.test(x) ? x : x+'.pdf';
+}
+async function gmailApi(ruta){
+  const url = 'https://gmail.googleapis.com/gmail/v1/users/me/'+ruta;
+  let res = await fetch(url, {headers:{Authorization:'Bearer '+gmailAccessToken}});
+  if(res.status===401 && await renovarTokenGmailServidor()) res = await fetch(url, {headers:{Authorization:'Bearer '+gmailAccessToken}});
+  if(!res.ok) throw new Error('Gmail respondió '+res.status);
+  return res.json();
+}
+function cabeceraGmail(msg, nombre){
+  return (msg.payload?.headers||[]).find(h=>h.name.toLowerCase()===nombre.toLowerCase())?.value || '';
+}
+// Partes del correo que son un PDF (a cualquier nivel de anidación: los adjuntos suelen ir dentro de multipart/mixed)
+function recogerPartesPdf(parte, acc){
+  acc = acc || [];
+  if(!parte) return acc;
+  const nombre = parte.filename || '';
+  const esPdf = (parte.mimeType||'').toLowerCase()==='application/pdf' || /\.pdf$/i.test(nombre);
+  if(esPdf && nombre && (parte.body?.attachmentId || parte.body?.data)) acc.push(parte);
+  (parte.parts||[]).forEach(p=>recogerPartesPdf(p, acc));
+  return acc;
+}
+// upsert: un PDF que antes falló (estado "error") se reintenta y esta fila lo sustituye; los que ya
+// entraron bien se saltan antes de llegar aquí, así nunca se pisa algo ya clasificado
+async function insertarColaGasto(fila){
+  const {error} = await sb.from('gastos_correo').upsert(fila, {onConflict:'gmail_message_id,gmail_part_id'});
+  if(error) throw new Error(error.message);
+}
+async function procesarCorreoGasto(messageId, res){
+  const msg = await gmailApi(`messages/${messageId}?format=full`);
+  const base = {
+    gmail_message_id: messageId,
+    remitente: cabeceraGmail(msg,'From'),
+    asunto: cabeceraGmail(msg,'Subject'),
+    fecha_correo: msg.internalDate ? new Date(Number(msg.internalDate)).toISOString() : null,
+  };
+  const partes = recogerPartesPdf(msg.payload);
+  // partes de este correo que ya entraron bien (las que fallaron, estado "error", se reintentan)
+  const {data: previas, error: errPrevias} = await sb.from('gastos_correo').select('gmail_part_id,estado').eq('gmail_message_id', messageId);
+  if(errPrevias) throw new Error(errPrevias.message);
+  const hechas = new Set((previas||[]).filter(p=>p.estado!=='error').map(p=>p.gmail_part_id));
+  if(!partes.length){
+    if(!hechas.has('')) await insertarColaGasto({...base, gmail_part_id:'', estado:'descartado', nota:'sin PDF adjunto'});
+    res.sinPdf++; return true;
+  }
+  let todoBien = true;
+  for(const parte of partes){
+    const fila = {...base, gmail_part_id: String(parte.partId || '0'), nombre_archivo: parte.filename};
+    if(hechas.has(fila.gmail_part_id)) continue;
+    try{
+      const b64 = parte.body.data || (await gmailApi(`messages/${messageId}/attachments/${parte.body.attachmentId}`)).data;
+      const bytes = base64UrlABytes(b64);
+      fila.tamano_bytes = bytes.length;
+      if(bytes.length > 20*1024*1024){
+        await insertarColaGasto({...fila, estado:'descartado', nota:'PDF demasiado grande (más de 20 MB)'});
+        res.grandes = (res.grandes||0)+1; continue;
+      }
+      fila.hash = await sha256Hex(bytes);
+      const {data: igual} = await sb.from('gastos_correo').select('id').eq('hash', fila.hash).neq('estado','error').limit(1);   // una fila en error no cuenta: el reintento se encontraría a sí mismo
+      if(igual && igual.length){
+        await insertarColaGasto({...fila, estado:'duplicado', nota:'mismo archivo que '+igual[0].id});
+        res.duplicados++; continue;
+      }
+      try{
+        const t = await extraerTextoPdf(bytes);
+        fila.paginas = t.paginas;
+        fila.texto_extraido = t.texto.slice(0, 60000);
+        fila.tiene_texto = t.texto.replace(/\s/g,'').length >= 40;   // menos que eso = casi seguro un escaneo/foto
+      }catch(e){
+        fila.tiene_texto = false; fila.nota = 'No se pudo leer el texto: '+(e.message||e);
+      }
+      if(!fila.tiene_texto) res.sinTexto++;
+      const anio = (fila.fecha_correo || new Date().toISOString()).slice(0,4);
+      const ruta = `EXCAVACIONES-GOMEZ/ECONOMIA/${anio}/GASTOS/CORREO/${messageId}_${fila.gmail_part_id}_${nombreArchivoSeguro(parte.filename)}`;
+      const {error: errSubida} = await sb.storage.from(DOC_BUCKET).upload(ruta, new Blob([bytes], {type:'application/pdf'}), {contentType:'application/pdf', upsert:true});
+      if(errSubida) throw new Error('No se pudo guardar el PDF: '+errSubida.message);
+      fila.storage_path = ruta;
+      if(fila.nota===undefined) fila.nota = null;   // si es un reintento, borra la nota del error anterior (el upsert solo actualiza las columnas que se envían)
+      fila.estado = 'pendiente';
+      await insertarColaGasto(fila);
+      res.nuevos++;
+    }catch(e){
+      todoBien = false; res.errores++; res.detalle.push((parte.filename||'PDF')+': '+(e.message||e));
+      // se apunta como "error" para verlo y reintentarlo en la próxima búsqueda (si ni esto se puede guardar, se reintenta igual porque no queda rastro)
+      try{ await insertarColaGasto({...base, gmail_part_id:fila.gmail_part_id, nombre_archivo:fila.nombre_archivo, estado:'error', nota:'No se pudo guardar: '+(e.message||e)}); }catch(_){}
+    }
+  }
+  return todoBien;
+}
+async function buscarGastosEnCorreo(){
+  if(!sb || _gastosCorreoBuscando) return;
+  if(!exigirNivel('gastospro','editar')) return;
+  _gastosCorreoBuscando = true;
+  const estado = document.getElementById('gcor-estado'), btn = document.getElementById('gcor-btn');
+  const decir = t => { if(estado) estado.textContent = t; };
+  if(btn) btn.disabled = true;
+  const res = {nuevos:0, duplicados:0, sinPdf:0, sinTexto:0, errores:0, yaEstaban:0, detalle:[]};
+  let correos = 0;
+  try{
+    decir('Conectando con Gmail…');
+    if(!(await asegurarTokenGmail())){ decir('Gmail no está conectado. Conéctalo primero en Correo.'); return; }
+    decir('Cargando el lector de PDF…');
+    await cargarPdfJs();
+    const q = encodeURIComponent(`has:attachment filename:pdf -in:sent -in:trash -in:spam newer_than:${GASTOS_CORREO_DIAS}d`);
+    let pagina = null;
+    while(correos < GASTOS_CORREO_MAX_POR_VEZ){
+      decir('Buscando correos…');
+      const lista = await gmailApi(`messages?q=${q}&maxResults=50${pagina ? '&pageToken='+pagina : ''}`);
+      const ids = (lista.messages||[]).map(m=>m.id);
+      if(!ids.length) break;
+      const {data: existentes, error: errEx} = await sb.from('gastos_correo').select('gmail_message_id,estado').in('gmail_message_id', ids);
+      if(errEx) throw new Error(errEx.message);
+      const conError = new Set((existentes||[]).filter(e=>e.estado==='error').map(e=>e.gmail_message_id));
+      const ya = new Set((existentes||[]).map(e=>e.gmail_message_id).filter(id=>!conError.has(id)));
+      for(const id of ids){
+        if(ya.has(id)){ res.yaEstaban++; continue; }
+        if(correos >= GASTOS_CORREO_MAX_POR_VEZ) break;
+        decir(`Leyendo correos… (${correos} revisados, ${res.nuevos} PDFs guardados)`);
+        // Los correos que fallan no gastan el cupo de cada pulsación (si no, unos pocos que fallen
+        // siempre bloquearían a todos los demás), y se vuelven a intentar en la siguiente búsqueda
+        try{ if(await procesarCorreoGasto(id, res)) correos++; }
+        catch(e){ res.errores++; res.detalle.push(String(e.message||e)); }
+      }
+      pagina = lista.nextPageToken;
+      if(!pagina) break;
+    }
+    if(!correos && !res.errores){ decir(`No hay correos nuevos con PDF en los últimos ${GASTOS_CORREO_DIAS} días.`); }
+    else{
+      decir(`Listo: ${res.nuevos} PDFs nuevos` + (res.sinTexto ? `, ${res.sinTexto} sin texto legible` : '') + (res.duplicados ? `, ${res.duplicados} repetidos` : '') + (res.errores ? `, ${res.errores} con error (se reintentan al buscar de nuevo)` : '') + '.' + (correos>=GASTOS_CORREO_MAX_POR_VEZ ? ' Pulsa otra vez para seguir con más.' : ''));
+    }
+    if(res.detalle.length) console.warn('Gastos desde el correo — errores:', res.detalle);
+  }catch(e){
+    decir('Error: '+(e.message||e));
+  }finally{
+    _gastosCorreoBuscando = false;
+    if(btn) btn.disabled = false;
+    await cargarColaGastosCorreo(true);
+  }
+}
+function urlPublicaGastoCorreo(ruta){ return 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/'+DOC_BUCKET+'/'+encodeURI(ruta); }
+async function cargarColaGastosCorreo(conservarEstado){
+  const cont = document.getElementById('gcor-lista');
+  if(!cont || !sb) return;
+  const {data, error} = await sb.from('gastos_correo')
+    .select('id,remitente,asunto,fecha_correo,nombre_archivo,storage_path,tiene_texto,paginas,estado,nota')
+    .in('estado', ['pendiente','clasificado','error'])
+    .order('fecha_correo', {ascending:false}).limit(200);
+  if(error){ cont.innerHTML = `<div class="empty" style="padding:16px;">No se pudo cargar: ${escHtml(error.message)}</div>`; return; }
+  const filas = data || [];
+  const pendientes = filas.filter(f=>f.estado==='pendiente').length;
+  const pest = document.querySelector('#gpro-subtabs .client-tab[data-sub="revisar"]');
+  if(pest) pest.textContent = 'Por revisar' + (pendientes ? ` (${pendientes})` : '');
+  const estado = document.getElementById('gcor-estado');
+  if(estado && !conservarEstado && !_gastosCorreoBuscando) estado.textContent = filas.length ? `${pendientes} pendientes de clasificar` : '';
+  cont.innerHTML = filas.length ? filas.map(f=>{
+    const fecha = f.fecha_correo ? formatFechaCorta(f.fecha_correo) : '—';
+    const etiqueta = f.estado==='clasificado' ? '<span class="tag" style="color:var(--green);border-color:var(--green);">Clasificado</span>'
+      : f.estado==='error' ? '<span class="tag" style="color:var(--red);border-color:var(--red);">Error</span>'
+      : '<span class="tag" style="color:var(--orange);border-color:var(--orange);">Pendiente</span>';
+    const aviso = f.tiene_texto===false ? ' · <b style="color:var(--red);">sin texto legible</b>' : '';
+    return `<div class="gcor-item">
+      <div>${etiqueta}</div>
+      <div class="gcor-de">${escHtml(f.remitente||'Remitente desconocido')}</div>
+      <div class="gcor-asunto">${escHtml(f.asunto||'(sin asunto)')}</div>
+      <div class="gcor-meta">${escHtml(fecha)} · ${escHtml(f.nombre_archivo||'')}${f.paginas?` · ${f.paginas} pág.`:''}${aviso}</div>
+      ${f.estado==='error' && f.nota ? `<div class="gcor-meta" style="color:var(--red);">${escHtml(f.nota)}</div>` : ''}
+      ${f.storage_path ? `<div><button class="btn sm" data-ruta="${escHtml(f.storage_path)}">Ver PDF</button></div>` : ''}
+    </div>`;
+  }).join('') : '<div class="empty" style="padding:16px;">Sin gastos por revisar.</div>';
+  cont.querySelectorAll('[data-ruta]').forEach(b=>{ b.onclick = ()=>abrirVisorDesdeUrl(urlPublicaGastoCorreo(b.dataset.ruta)); });
 }
 function renderGastosProResumen(){
   const per = document.querySelector('#gpro-resumen .chip-filter.active')?.dataset.per || 'trim';
@@ -8624,6 +8873,7 @@ const TABLA_NIVELES = {
   documentos:_NIV_ARCHIVOS, peticion_archivos:_NIV_ARCHIVOS,
   correo_estado:_NIV_CORREO, remitentes_bloqueados:_NIV_CORREO, sugerencias_estado:_NIV_CORREO,
   proyectos:{editar:['proyectos'], borrar:['proyectos']},
+  gastos_correo:{editar:['gastospro'], borrar:['gastospro']},
 };
 // Funciones de la base de datos que escriben. (documentos_economicos y avanzar/retroceder_fase se
 // comprueban en las propias funciones de Documentos porque la sección depende del tipo de documento.)
