@@ -114,7 +114,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 #chat-texto:focus{outline:none;border-color:var(--orange);}
 .btn-circular{-webkit-appearance:none;appearance:none;border:none;width:40px;height:40px;border-radius:50%;flex:0 0 40px;display:flex;align-items:center;justify-content:center;}
 .btn-circular svg{width:18px;height:18px;}
-#btn-dictar{background:var(--concrete);color:var(--ink);}
+#btn-dictar,#btn-pegar{background:var(--concrete);color:var(--ink);}
 #btn-dictar.escuchando{background:var(--red);color:#fff;}
 #btn-dictar.escuchando svg{animation:pulso 1s infinite;}
 #btn-enviar{background:var(--orange);color:#fff;}
@@ -126,7 +126,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.13 · Sistema …</div>
+    <div class="ver" id="ver-subir">Subir S3.14 · Sistema …</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -180,6 +180,9 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 
   <div id="chat-bar">
     <div id="chat-texto" contenteditable="true" role="textbox" aria-label="Mensaje" data-placeholder="Escribe, dicta o pega…" spellcheck="true" autocapitalize="sentences" enterkeyhint="send"></div>
+    <button type="button" id="btn-pegar" class="btn-circular" aria-label="Pegar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="5" width="12" height="16" rx="2" stroke-linejoin="round"/><path d="M9 5V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" stroke-linecap="round"/><path d="M9.5 12h5M9.5 15.5h5" stroke-linecap="round"/></svg>
+    </button>
     <button type="button" id="btn-dictar" class="btn-circular" aria-label="Dictar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0" stroke-linecap="round"/><path d="M12 17.5V21" stroke-linecap="round"/></svg>
     </button>
@@ -338,32 +341,102 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     else chatTexto.textContent += txt;
     chatTexto.dispatchEvent(new Event("input", { bubbles: true }));
   }
+  // Safari (iPhone incluido) no siempre entrega el archivo en clipboardData.files: convierte lo pegado en HTML con enlaces blob: o data:
+  // que se pueden leer. Se buscan ahí, y también dentro de la propia caja editable después de pegar.
+  function urlsDeMedios(html){
+    if (!html) return [];
+    let doc; try { doc = new DOMParser().parseFromString(html, "text/html"); } catch (e) { return []; }
+    return Array.from(doc.querySelectorAll("img[src], embed[src], object[data], a[href], iframe[src], source[src], video[src], audio[src]"))
+      .map(el => el.getAttribute("src") || el.getAttribute("data") || el.getAttribute("href") || "").filter(u => /^(blob:|data:)/i.test(u));
+  }
+  async function archivosDeUrls(urls){
+    const salida = [];
+    for (const u of urls){
+      try { const r = await fetch(u); const b = await r.blob(); if (/^image\//.test(b.type) || b.type === "application/pdf") salida.push(new File([b], "", { type: b.type })); } catch (e) {}
+    }
+    return salida;
+  }
+  function resumenPortapapeles(dt){
+    const tipos = dt && dt.types ? Array.from(dt.types) : [];
+    const nArch = dt && dt.files ? dt.files.length : 0;
+    return (tipos.length ? "tipos: " + tipos.join(", ") : "sin tipos") + (nArch ? "; archivos: " + nArch : "");
+  }
+  function avisarNoLlego(detalle){
+    const esIphone = /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+    mostrarAviso("Safari no ha entregado el archivo" + (esIphone ? " (iPhone)" : "") + (detalle ? " — " + detalle : "") + ". Usa Galería.");
+  }
+  function añadirPegados(archivos){
+    const validos = archivos.filter(f => /^image\//.test(f.type) || f.type === "application/pdf");
+    if (!validos.length) return false;
+    if (validos.length < archivos.length) mostrarAviso(`Se han pegado ${validos.length} de ${archivos.length}: solo entran fotos y PDF.`);
+    añadirArchivos(validos.map((f, i) => nombrarArchivoPegado(f, i)));
+    return true;
+  }
+  async function revisarLoPegadoEnLaCaja(resumen){
+    const urls = urlsDeMedios(chatTexto.innerHTML);
+    const raros = Array.from(chatTexto.querySelectorAll("img, embed, object, iframe, video, audio, source, a[href]")).map(el => el.tagName.toLowerCase() + ":" + String(el.getAttribute("src") || el.getAttribute("data") || el.getAttribute("href") || "").slice(0, 22));
+    Array.from(chatTexto.querySelectorAll("img, embed, object, iframe, video, audio, source, a[href^='blob:'], a[href^='data:']")).forEach(el => el.remove());
+    if (!chatTexto.textContent.trim()) chatTexto.innerHTML = "";
+    renderPendientes();
+    if (urls.length){ const f = await archivosDeUrls(urls); if (f.length && añadirPegados(f)) return; }
+    avisarNoLlego(resumen + (raros.length ? "; en la caja apareció " + raros.slice(0, 2).join(", ") : "; nada en la caja"));
+  }
   function alPegar(ev){
     const dt = ev.clipboardData, todos = archivosDelPortapapeles(dt);
     const enLaCaja = ev.target === chatTexto || chatTexto.contains(ev.target);
     const texto = (dt && dt.getData) ? (dt.getData("text/plain") || "") : "";
-    if (!todos.length){
-      if (enLaCaja && texto){ ev.preventDefault(); insertarTextoPlano(texto.replace(/\s*[\r\n]+\s*/g, " ")); return; }   // texto: siempre como texto plano
-      if (!texto && (enLaCaja || ev.target === document.body)){
-        // no ha llegado ni texto ni archivo: se avisa con lo que sí llegó, en vez de quedarse mudo
-        ev.preventDefault();
-        const tipos = dt && dt.types ? Array.from(dt.types).join(", ") : "";
-        const esIphone = /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
-        mostrarAviso(esIphone && !tipos
-          ? "El iPhone no deja pegar este archivo en una página web. Usa el botón Galería y elige el archivo."
-          : "No ha llegado ningún archivo al pegar" + (tipos ? " (tipos: " + tipos + ")" : "") + ". Usa el botón Galería.");
-      }
+    const html = (dt && dt.getData) ? (dt.getData("text/html") || "") : "";
+    const ventanaAbierta = document.getElementById("detalle").classList.contains("activo") || document.getElementById("menu-anadir").classList.contains("activo");
+    if (todos.length){
+      if (ventanaAbierta) return;   // con una ventana abierta no se cuela en el mensaje nuevo
+      ev.preventDefault();
+      if (!añadirPegados(todos)) mostrarAviso("Solo se pueden pegar fotos y PDF.");
       return;
     }
-    if (document.getElementById("detalle").classList.contains("activo") || document.getElementById("menu-anadir").classList.contains("activo")) return;   // con una ventana abierta no se cuela en el mensaje nuevo
-    ev.preventDefault();
-    const validos = todos.filter(f => /^image\//.test(f.type) || f.type === "application/pdf");
-    if (!validos.length){ mostrarAviso("Solo se pueden pegar fotos y PDF."); return; }
-    if (validos.length < todos.length) mostrarAviso(`Se han pegado ${validos.length} de ${todos.length}: solo entran fotos y PDF.`);
-    añadirArchivos(validos.map((f, i) => nombrarArchivoPegado(f, i)));
+    const urls = ventanaAbierta ? [] : urlsDeMedios(html);
+    if (urls.length){   // lo pegado trae imágenes o documentos como enlaces blob:/data: (así lo hace Safari)
+      ev.preventDefault();
+      archivosDeUrls(urls).then(f => { if (!(f.length && añadirPegados(f))) avisarNoLlego(resumenPortapapeles(dt) + "; enlaces ilegibles"); });
+      return;
+    }
+    if (enLaCaja && texto){ ev.preventDefault(); insertarTextoPlano(texto.replace(/\s*[\r\n]+\s*/g, " ")); return; }   // texto: siempre como texto plano
+    if (!texto && !ventanaAbierta){
+      if (enLaCaja){
+        // No ha llegado nada por el evento: se deja que el sistema pegue DENTRO de la caja editable y se mira lo que aparece
+        const resumen = resumenPortapapeles(dt);
+        setTimeout(() => revisarLoPegadoEnLaCaja(resumen), 180);
+      } else if (ev.target === document.body){
+        ev.preventDefault();
+        avisarNoLlego(resumenPortapapeles(dt));
+      }
+    }
   }
+  // Botón Pegar: lee el portapapeles directamente (en el iPhone pide una confirmación de "Pegar")
+  async function pegarConBoton(){
+    if (!navigator.clipboard || !navigator.clipboard.read){ mostrarAviso("Este navegador no deja leer el portapapeles con un botón. Usa Galería."); return; }
+    let items;
+    try { items = await navigator.clipboard.read(); }
+    catch (e) { mostrarAviso("No se ha podido leer el portapapeles (" + ((e && e.name) || "error") + "). Mantén pulsada la caja y toca Pegar, o usa Galería."); return; }
+    const tipos = []; const archivos = []; let htmlTxt = "", plano = "";
+    for (const it of items){
+      for (const t of it.types){
+        tipos.push(t);
+        try {
+          if (/^image\//.test(t) || t === "application/pdf") archivos.push(new File([await it.getType(t)], "", { type: t }));
+          else if (t === "text/html" && !htmlTxt) htmlTxt = await (await it.getType(t)).text();
+          else if (t === "text/plain" && !plano) plano = await (await it.getType(t)).text();
+        } catch (e) {}
+      }
+    }
+    if (archivos.length && añadirPegados(archivos)) return;
+    const urls = urlsDeMedios(htmlTxt);
+    if (urls.length){ const f = await archivosDeUrls(urls); if (f.length && añadirPegados(f)) return; }
+    if (plano.trim()){ chatTexto.value = (chatTexto.value + " " + plano.replace(/\s*[\r\n]+\s*/g, " ")).trim(); renderPendientes(); return; }
+    mostrarAviso("En el portapapeles solo hay: " + (tipos.join(", ") || "nada") + ". Safari no deja a una página web leer ese archivo. Usa Galería.");
+  }
+  document.getElementById("btn-pegar").addEventListener("click", pegarConBoton);
   document.addEventListener("paste", alPegar);
-  window.__pegar = { alPegar, nombrarArchivoPegado, archivosDelPortapapeles };   // solo para las pruebas
+  window.__pegar = { alPegar, nombrarArchivoPegado, archivosDelPortapapeles, pegarConBoton, urlsDeMedios };   // solo para las pruebas
   function quitarPendiente(id){ pendientes = pendientes.filter(p => p.id !== id); renderPendientes(); }
   window.quitarPendiente = quitarPendiente;
 
@@ -806,7 +879,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   window.abrirMenuAnadir = abrirMenuAnadir;
   // Versión del sistema desde BD (no hay que actualizarla a mano)
   fetch(SUPABASE_URL+"/rest/v1/arranque?clave=eq.web_version_actual&select=valor",{headers:{"Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY}})
-    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.13 · Sistema '+d[0].valor; }).catch(()=>{});
+    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.14 · Sistema '+d[0].valor; }).catch(()=>{});
   window.mostrarSolucionPorIds = mostrarSolucionPorIds;
   window.abrirEnlaceDesdeSubir = abrirEnlaceDesdeSubir;
   window.toggleMsgVerificado = toggleMsgVerificado;
