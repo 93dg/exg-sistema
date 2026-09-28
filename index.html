@@ -2850,7 +2850,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.87</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.88</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2928,7 +2928,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.87</div>
+        <div class="sub" id="version-badge">V5.88</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6339,8 +6339,10 @@ function gastosProDocs(){
 // sin coste) y los deja en la tabla gastos_correo. Ahí se leen y se clasifican con Claude (método
 // EXG) y lo que se aprende se guarda como plantilla en conocimiento_motor, para que más adelante la
 // web lo lea sola. Nada de esto crea todavía gastos: solo llena la cola.
-const GASTOS_CORREO_DIAS = 90;          // hasta cuántos días atrás se busca
-const GASTOS_CORREO_MAX_POR_VEZ = 30;   // correos nuevos por pulsación (se puede pulsar otra vez)
+const GASTOS_CORREO_PERIODO = '3y';                       // hasta cuándo atrás se busca (sintaxis de Gmail: 90d, 1y, 3y...)
+const GASTOS_CORREO_PERIODO_TXT = 'los últimos 3 años';
+const GASTOS_CORREO_FALLOS_SEGUIDOS = 10;                 // si fallan tantos correos seguidos, se para (conexión caída, sin espacio...)
+let _gastosCorreoParar = false, _pantallaEncendida = null;
 const PDFJS_VERSION = '3.11.174';
 let _pdfjsPromesa = null, _gastosCorreoBuscando = false;
 function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -6427,6 +6429,7 @@ async function insertarColaGasto(fila){
 }
 async function procesarCorreoGasto(messageId, res){
   const msg = await gmailApi(`messages/${messageId}?format=full`);
+  if(msg.internalDate) res.ultimaFecha = new Date(Number(msg.internalDate));
   const base = {
     gmail_message_id: messageId,
     remitente: cabeceraGmail(msg,'From'),
@@ -6503,25 +6506,31 @@ function conectarGmailDesdeGastos(){
 document.addEventListener('gmail-conectado', ()=>{
   if(_reanudarBusquedaGastos && Date.now() - _reanudarBusquedaGastos < 180000){ _reanudarBusquedaGastos = 0; buscarGastosEnCorreo(); }
 });
+// Un solo botón: busca hasta terminar (3 años atrás) y, mientras trabaja, ese mismo botón pasa a "Parar". Lo ya
+// guardado se salta, así que si se corta o se para, al volver a pulsar sigue por donde iba.
 async function buscarGastosEnCorreo(){
-  if(!sb || _gastosCorreoBuscando) return;
+  if(!sb) return;
+  const btn = document.getElementById('gcor-btn');
+  if(_gastosCorreoBuscando){ _gastosCorreoParar = true; if(btn) btn.textContent = 'Parando…'; return; }
   if(!exigirNivel('gastospro','editar')) return;
-  _gastosCorreoBuscando = true;
-  const estado = document.getElementById('gcor-estado'), btn = document.getElementById('gcor-btn');
+  _gastosCorreoBuscando = true; _gastosCorreoParar = false;
+  const estado = document.getElementById('gcor-estado');
   const decir = t => { if(estado) estado.textContent = t; };
-  if(btn) btn.disabled = true;
+  if(btn){ btn.textContent = 'Parar'; btn.disabled = false; }
+  try{ if(typeof navigator!=='undefined' && navigator.wakeLock) _pantallaEncendida = await navigator.wakeLock.request('screen'); }catch(e){}
   const res = {nuevos:0, duplicados:0, sinPdf:0, sinTexto:0, errores:0, yaEstaban:0, detalle:[]};
-  let correos = 0;
+  let revisados = 0, seguidos = 0, parado = false, abortado = false;
   try{
     decir('Conectando con Gmail…');
     if(!(await asegurarTokenGmail())){ avisoGmailDesconectado(); return; }
     decir('Cargando el lector de PDF…');
     await cargarPdfJs();
-    const q = encodeURIComponent(`has:attachment filename:pdf -in:sent -in:trash -in:spam newer_than:${GASTOS_CORREO_DIAS}d`);
+    const q = encodeURIComponent(`has:attachment filename:pdf -in:sent -in:trash -in:spam newer_than:${GASTOS_CORREO_PERIODO}`);
     let pagina = null;
-    while(correos < GASTOS_CORREO_MAX_POR_VEZ){
+    paginas: while(true){
+      await asegurarTokenGmail();   // renueva el acceso si ha pasado casi una hora
       decir('Buscando correos…');
-      const lista = await gmailApi(`messages?q=${q}&maxResults=50${pagina ? '&pageToken='+pagina : ''}`);
+      const lista = await gmailApi(`messages?q=${q}&maxResults=100${pagina ? '&pageToken='+pagina : ''}`);
       const ids = (lista.messages||[]).map(m=>m.id);
       if(!ids.length) break;
       const {data: existentes, error: errEx} = await sb.from('gastos_correo').select('gmail_message_id,estado').in('gmail_message_id', ids);
@@ -6529,27 +6538,33 @@ async function buscarGastosEnCorreo(){
       const conError = new Set((existentes||[]).filter(e=>e.estado==='error').map(e=>e.gmail_message_id));
       const ya = new Set((existentes||[]).map(e=>e.gmail_message_id).filter(id=>!conError.has(id)));
       for(const id of ids){
+        if(_gastosCorreoParar){ parado = true; break paginas; }
         if(ya.has(id)){ res.yaEstaban++; continue; }
-        if(correos >= GASTOS_CORREO_MAX_POR_VEZ) break;
-        decir(`Leyendo correos… (${correos} revisados, ${res.nuevos} PDFs guardados)`);
-        // Los correos que fallan no gastan el cupo de cada pulsación (si no, unos pocos que fallen
-        // siempre bloquearían a todos los demás), y se vuelven a intentar en la siguiente búsqueda
-        try{ if(await procesarCorreoGasto(id, res)) correos++; }
+        let bien = false;
+        try{ bien = await procesarCorreoGasto(id, res); }
         catch(e){ res.errores++; res.detalle.push(String(e.message||e)); }
+        revisados++;
+        seguidos = bien ? 0 : seguidos + 1;
+        const cuando = res.ultimaFecha ? ' · ' + res.ultimaFecha.toLocaleDateString('es-ES',{month:'long', year:'numeric'}) : '';
+        decir(`Leyendo correos${cuando}… ${revisados} revisados, ${res.nuevos} PDFs guardados`);
+        if(seguidos >= GASTOS_CORREO_FALLOS_SEGUIDOS){ abortado = true; break paginas; }
       }
       pagina = lista.nextPageToken;
       if(!pagina) break;
     }
-    if(!correos && !res.errores){ decir(`No hay correos nuevos con PDF en los últimos ${GASTOS_CORREO_DIAS} días.`); }
-    else{
-      decir(`Listo: ${res.nuevos} PDFs nuevos` + (res.sinTexto ? `, ${res.sinTexto} sin texto legible` : '') + (res.duplicados ? `, ${res.duplicados} repetidos` : '') + (res.errores ? `, ${res.errores} con error (se reintentan al buscar de nuevo)` : '') + '.' + (correos>=GASTOS_CORREO_MAX_POR_VEZ ? ' Pulsa otra vez para seguir con más.' : ''));
-    }
+    const resumen = `${res.nuevos} PDFs nuevos` + (res.sinTexto ? `, ${res.sinTexto} sin texto legible` : '') + (res.duplicados ? `, ${res.duplicados} repetidos` : '') + (res.errores ? `, ${res.errores} con error (se reintentan al buscar de nuevo)` : '');
+    if(abortado) decir(`Parado: ${seguidos} correos seguidos han fallado (${res.detalle[res.detalle.length-1] || 'sin detalle'}). Llevas ${resumen}. Revisa la conexión y pulsa otra vez: sigue donde lo dejó.`);
+    else if(parado) decir(`Parado. Llevas ${resumen}. Pulsa Buscar en el correo para seguir donde lo dejaste.`);
+    else if(!revisados && !res.errores) decir(`No hay correos nuevos con PDF en ${GASTOS_CORREO_PERIODO_TXT}.`);
+    else decir(`Listo: ${resumen}.`);
     if(res.detalle.length) console.warn('Gastos desde el correo — errores:', res.detalle);
   }catch(e){
     decir('Error: '+(e.message||e));
   }finally{
-    _gastosCorreoBuscando = false;
-    if(btn) btn.disabled = false;
+    _gastosCorreoBuscando = false; _gastosCorreoParar = false;
+    try{ if(_pantallaEncendida){ await _pantallaEncendida.release(); } }catch(e){}
+    _pantallaEncendida = null;
+    if(btn){ btn.textContent = 'Buscar en el correo'; btn.disabled = false; }
     await cargarColaGastosCorreo(true);
   }
 }
@@ -6563,7 +6578,8 @@ async function cargarColaGastosCorreo(conservarEstado){
     .order('fecha_correo', {ascending:false}).limit(200);
   if(error){ cont.innerHTML = `<div class="empty" style="padding:16px;">No se pudo cargar: ${escHtml(error.message)}</div>`; return; }
   const filas = data || [];
-  const pendientes = filas.filter(f=>f.estado==='pendiente').length;
+  const {count: totalPendientes} = await sb.from('gastos_correo').select('id', {count:'exact', head:true}).eq('estado','pendiente');
+  const pendientes = totalPendientes != null ? totalPendientes : filas.filter(f=>f.estado==='pendiente').length;
   const pest = document.querySelector('#gpro-subtabs .client-tab[data-sub="revisar"]');
   if(pest) pest.textContent = 'Por revisar' + (pendientes ? ` (${pendientes})` : '');
   const estado = document.getElementById('gcor-estado');
