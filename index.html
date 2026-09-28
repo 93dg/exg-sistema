@@ -1079,6 +1079,10 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
    ===================================================================================== */
 .tabla-escritorio-solo{display:block;}
 .lista-movil-solo{display:none;}
+.exp-card-movil{display:flex;flex-direction:column;gap:8px;padding:14px;background:var(--paper);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin:0 10px 10px 10px;}
+.exp-card-movil .exp-titulo{font-size:16px;font-weight:800;line-height:1.25;}
+.exp-card-movil .exp-sub{font-size:12.5px;color:var(--ink-soft);}
+.exp-card-movil .exp-desc{font-size:13px;line-height:1.4;}
 @media(max-width:768px){
   .tabla-escritorio-solo{display:none;}
   .lista-movil-solo{display:block;}
@@ -2819,7 +2823,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.73</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.74</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2896,7 +2900,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.73</div>
+        <div class="sub" id="version-badge">V5.74</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4084,10 +4088,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
       <div class="panel">
         <div class="panel-body" style="padding:0;">
+          <div class="tabla-escritorio-solo">
           <table class="tbl">
-            <tr><th>Expediente</th><th>Ayuntamiento</th><th>Descripción</th><th>Fecha límite</th><th class="num">Importe est.</th><th>Estado</th><th></th></tr>
+            <tr><th>Expediente</th><th>Ayuntamiento</th><th>Descripción</th><th>Fecha límite</th><th class="num">Importe est.</th><th>Estado</th><th>Archivo</th><th></th></tr>
             <tbody id="expedientes-tbl"></tbody>
           </table>
+          </div>
+          <div class="lista-movil-solo">
+            <div id="expedientes-lista-movil"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -14277,11 +14286,26 @@ async function marcarCampoNoDisponible(){
 const expedientesById = {};
 function renderExpedientesTabla(){
   const rows = Object.values(expedientesById).sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
+  const urlArchivo = e => e.archivo_path ? 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/'+encodeURI(e.archivo_path) : '';
+  const originalHtml = e => urlArchivo(e) ? `<span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${urlArchivo(e)}')">${ICO_CLIP} Original</span>` : '';
+  const botonTrabajo = e => e.estado==='adjudicado' ? `<button class="btn primary" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();crearDocumentoDesdeExpediente('${e.id}')">Crear trabajo</button>` : '';
   document.getElementById('expedientes-tbl').innerHTML = rows.map(e=>`
-    <tr><td class="mono">${e.titulo}</td><td>Ayuntamiento de Fuente Obejuna</td><td>${e.descripcion||'—'}</td><td class="num">${e.fecha||'—'}</td><td class="num">—</td>
+    <tr><td class="mono">${e.titulo||'Sin título'}</td><td>Ayuntamiento de Fuente Obejuna</td><td>${e.descripcion||'—'}</td><td class="num">${e.fecha||'—'}</td><td class="num">—</td>
     <td>${pill(e.estado)}</td>
-    <td>${e.estado==='adjudicado'?`<button class="btn primary" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();crearDocumentoDesdeExpediente('${e.id}')">Crear trabajo</button>`:''}</td></tr>
-  `).join('') || '<tr><td colspan="7" class="empty">Sin expedientes todavía</td></tr>';
+    <td>${originalHtml(e)}</td>
+    <td>${botonTrabajo(e)}</td></tr>
+  `).join('') || '<tr><td colspan="8" class="empty">Sin expedientes todavía</td></tr>';
+  const lista = document.getElementById('expedientes-lista-movil');
+  if(lista) lista.innerHTML = rows.map(e=>`
+    <div class="exp-card-movil">
+      <div>${pill(e.estado)}</div>
+      <div class="exp-titulo">${e.titulo||'Sin título'}</div>
+      <div class="exp-sub">Ayuntamiento de Fuente Obejuna${e.fecha ? ' · '+e.fecha : ''}</div>
+      ${e.descripcion ? `<div class="exp-desc">${e.descripcion}</div>` : ''}
+      ${urlArchivo(e) ? `<div class="fc-extra">${originalHtml(e)}</div>` : ''}
+      ${e.estado==='adjudicado' ? `<div>${botonTrabajo(e)}</div>` : ''}
+    </div>
+  `).join('') || '<div class="empty" style="padding:16px;">Sin expedientes todavía</div>';
 }
 async function cargarExpedientesReales(){
   if(!sb) return;
