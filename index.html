@@ -3078,7 +3078,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.04</div>
+        <div class="sub" id="version-badge">V6.05</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5630,6 +5630,10 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
 
 <!-- ================= AVISOS (sustituye a mostrarToast()) ================= -->
 <div id="toast-stack"></div>
+<div id="version-nueva-banner" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:99999;background:var(--asphalt);color:#fff;padding:12px 16px calc(env(safe-area-inset-bottom,0px) + 12px);display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-family:'Inter',sans-serif;box-shadow:0 -4px 14px rgba(0,0,0,.25);">
+  <span>🔄 Hay una versión nueva — esta pantalla lleva un rato abierta y se ha quedado atrasada.</span>
+  <button type="button" onclick="location.reload()" style="background:var(--orange);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;font-family:inherit;">Actualizar ahora</button>
+</div>
 
 <!-- ================= CONFIRMACIÓN (sustituye a confirm()) ================= -->
 <div class="overlay" id="confirmar-overlay" onclick="if(event.target===this) cerrarConfirmar(false)">
@@ -9306,6 +9310,31 @@ function calcularKPIsReales(){
 }
 
 /* ---------------- AVISOS Y CONFIRMACIÓN — sustituyen a mostrarToast()/confirm() nativos en toda la web ---------------- */
+// Si la pestaña se queda abierta mucho tiempo (o el móvil la deja congelada en segundo plano), esta
+// versión cargada en memoria puede quedarse muy atrás de la publicada. En vez de depender de que el
+// usuario se fije en el número de versión, se comprueba sola y avisa con un botón para recargar.
+function iniciarAvisoVersionNueva(){
+  const version = document.getElementById('version-badge')?.textContent;
+  if(!version) return;
+  let avisado = false;
+  async function comprobar(){
+    if(avisado) return;
+    try{
+      const resp = await fetch(location.pathname + '?v=' + Date.now(), {cache:'no-store'});
+      if(!resp.ok) return;
+      const html = await resp.text();
+      const m = html.match(/id="version-badge">([^<]+)</);
+      if(m && m[1] && m[1] !== version){
+        avisado = true;
+        const b = document.getElementById('version-nueva-banner');
+        if(b) b.style.display = 'flex';
+      }
+    }catch(e){ /* sin conexión: no se avisa, se reintentará */ }
+  }
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') comprobar(); });
+  setInterval(comprobar, 3 * 60 * 1000);
+  setTimeout(comprobar, 30 * 1000);
+}
 function mostrarToast(mensaje, tipo){
   const stack = document.getElementById('toast-stack');
   const el = document.createElement('div');
@@ -14073,6 +14102,8 @@ async function cargarDatosReales(){
   arranqueEXG();
   // La versión es solo la del propio archivo (el número fijo del HTML, que deploy.sh actualiza en cada publicación).
   // Antes también se sobreescribía con arranque.web_version_actual, una fila que nadie mantenía al día y podía enseñar un número viejo.
+  iniciarAvisoVersionNueva();
+  window.addEventListener('pageshow', (ev) => { if (ev.persisted) location.reload(); });
   try{
     const {data: trabajosReales} = await sb.from('trabajos').select('*, entidades(nombre)').order('created_at',{ascending:false});
     if(trabajosReales && trabajosReales.length){
