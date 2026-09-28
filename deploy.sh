@@ -31,8 +31,9 @@ python3 -c "
 import re, sys
 with open('index.html','r',encoding='utf-8') as f: c=f.read()
 c=re.sub(r'(<div class=\"sub\" id=\"version-badge\">)(V[\d.]+)(</div>)', r'\g<1>${VERSION}\3', c)
+c=re.sub(r'(<div id=\"version-float\"[^>]*>)(V[\d.]+)(</div>)', r'\g<1>${VERSION}\3', c)
 with open('index.html','w',encoding='utf-8') as f: f.write(c)
-print('HTML actualizado a ${VERSION}')
+print('HTML actualizado a ${VERSION} (version-badge y version-float)')
 "
 # Commit y push — si algo falla aquí, 'set -e' corta el script y version_final NUNCA se marca
 git add -A
