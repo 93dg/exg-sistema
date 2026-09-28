@@ -1086,12 +1086,11 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .exp-card-movil .exp-sub{font-size:12.5px;color:var(--ink-soft);}
 .exp-card-movil .exp-desc{font-size:13px;line-height:1.4;}
 .exp-card-movil .exp-acciones{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;}
-.perm-row{display:grid;grid-template-columns:1fr 78px 78px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line, rgba(0,0,0,0.08));}
+.perm-row{display:grid;grid-template-columns:minmax(0,1fr) 108px 108px;gap:6px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line, rgba(0,0,0,0.08));}
 .perm-row.perm-cab{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);background:var(--concrete-2);}
 .perm-row.perm-cab span:not(:first-child){text-align:center;}
 .perm-row .perm-nombre{font-size:15px;font-weight:600;}
-.perm-check{display:flex;justify-content:center;align-items:center;min-height:44px;cursor:pointer;}
-.perm-check input{width:24px;height:24px;cursor:pointer;}
+.perm-sel{width:100%;min-height:40px;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);padding:4px 2px;}
 .perm-grupo{padding:10px 14px 4px;font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);}
 #permisos-guardar-btn:disabled{opacity:.55;cursor:default;}
 @media(max-width:768px){
@@ -2834,7 +2833,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.78</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.79</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2912,7 +2911,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.78</div>
+        <div class="sub" id="version-badge">V5.79</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4836,7 +4835,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           <div class="perm-row perm-cab"><span>Sección</span><span>Rafa</span><span>Manolo</span></div>
           <div id="permisos-tbl"></div>
         </div>
-        <div class="two-col-note" style="margin-top:10px;">Marca lo que SÍ pueden ver y pulsa Guardar. Lo que no marques, no les aparece en el menú ni pueden abrirlo. Empresa, Sistema, Reportes, Conocimiento, Histórico y Configuración son siempre solo para Dani G, no aparecen aquí porque no se pueden ceder.</div>
+        <div class="two-col-note" style="margin-top:10px;">Elige el nivel de cada uno y pulsa Guardar. Sin acceso: la sección no les aparece ni pueden abrirla. Lector: solo ve, no crea ni edita. Editor: ve, crea y edita, pero no borra. Administrador: además borra. Por ahora los niveles se aplican en Documentos (Proyectos, Presupuestos, Proformas, Albaranes y Facturas); en el resto de secciones solo hay Sin acceso o Completo, hasta que se vayan aplicando. Empresa, Sistema, Reportes, Conocimiento, Histórico y Configuración son siempre solo para Dani G, no aparecen aquí porque no se pueden ceder.</div>
       </div>
     </div>
 
@@ -6948,6 +6947,7 @@ function abrirMenuAccionesMovil(docId, event){
   mostrarModalGenerico(tipoDocEtiqueta(doc.type)+' '+(doc.num||'')+' — '+doc.client, `<div style="display:flex;flex-direction:column;">${botones}</div>`);
 }
 async function avanzarFaseDocumento(id, tipoDestino){
+  if(!exigirNivelTipo(tipoDestino,'editar') || !exigirNivelDoc(id,'editar')) return;
   if(!sb) return;
   const {data: nuevoId, error} = await sb.rpc('avanzar_fase', {p_documento_origen_id: id, p_tipo_destino: tipoDestino, p_campos_extra: {}});
   if(error){ mostrarToast('Error: '+errText(error)); return; }
@@ -6978,6 +6978,7 @@ async function volverAFaseAnterior(id){
   openDocumentViewer(doc.documento_anterior_id);
 }
 async function duplicarDocumento(id){
+  if(!exigirNivelDoc(id,'editar')) return;
   const doc = documentosRealesById[id];
   if(!doc || !sb) return;
   const {data: original} = await sb.from('documentos_economicos').select('*').eq('id', id).single();
@@ -6996,6 +6997,7 @@ async function duplicarDocumento(id){
   openDocumentViewer(nuevo.id);
 }
 async function rectificarFactura(id){
+  if(!exigirNivelTipo('factura','editar')) return;
   const {data: original} = await sb.from('documentos_economicos').select('*').eq('id', id).single();
   if(!original) return;
   const rect = {...original};
@@ -7012,6 +7014,7 @@ async function rectificarFactura(id){
   openDocumentViewer(nueva.id);
 }
 async function convertirAlbaranEnFactura(id){
+  if(!exigirNivelTipo('factura','editar') || !exigirNivelDoc(id,'editar')) return;
   const {data: original} = await sb.from('documentos_economicos').select('*').eq('id', id).single();
   if(!original) return;
   const nueva = {
@@ -7028,6 +7031,7 @@ async function convertirAlbaranEnFactura(id){
   openDocumentViewer(doc.id);
 }
 async function crearFacturaDesdeDocumento(id){
+  if(!exigirNivelTipo('factura','editar') || !exigirNivelDoc(id,'editar')) return;
   const {data: original} = await sb.from('documentos_economicos').select('*').eq('id', id).single();
   if(!original) return;
   const nueva = {
@@ -7044,6 +7048,7 @@ async function crearFacturaDesdeDocumento(id){
   openDocumentViewer(doc.id);
 }
 async function crearAlbaranDesdeDocumento(id){
+  if(!exigirNivelTipo('albaran','editar') || !exigirNivelDoc(id,'editar')) return;
   const {data: original} = await sb.from('documentos_economicos').select('*').eq('id', id).single();
   if(!original) return;
   const nueva = {
@@ -7096,6 +7101,7 @@ function estadoConformidadSelect(id, actual){
   </div>`;
 }
 async function cambiarEstadoConformidad(id, valor, ddId){
+  if(!exigirNivelDoc(id,'editar')) return;
   if(!sb) return;
   const {error} = await sb.from('documentos_economicos').update({estado_conformidad: valor}).eq('id', id);
   if(error){ mostrarToast('Error: '+errText(error)); return; }
@@ -7600,6 +7606,7 @@ function renderProyectosKPIs(){
   `;
 }
 async function abrirNuevoProyecto(){
+  if(!exigirNivel('proyectos','editar')) return;
   const cliente = prompt('¿Cliente? (nombre; si ya existe se enlaza automáticamente)');
   if(!cliente || !cliente.trim()) return;
   const descripcion = prompt('¿Qué es el encargo? (breve descripción)');
@@ -7619,12 +7626,14 @@ async function abrirNuevoProyecto(){
   cargarProyectos();
 }
 async function cambiarEstadoProyecto(id, estado){
+  if(!exigirNivel('proyectos','editar')) return;
   if(!(await confirmarAccion(`¿Marcar este proyecto como "${estado}"?`))) return;
   const {error} = await sb.from('proyectos').update({estado, actualizado_at: new Date().toISOString()}).eq('id', id);
   if(error){ mostrarToast('Error: '+errText(error)); return; }
   cargarProyectos();
 }
 async function convertirProyecto(id, tipoDestino){
+  if(!exigirNivel('proyectos','editar') || !exigirNivelTipo(tipoDestino,'editar')) return;
   const proyecto = proyectosCache.find(p=>p.id===id);
   if(!proyecto) return;
   if(!(await confirmarAccion(`¿Convertir este proyecto en ${tipoDestino}? Se creará el documento real y el proyecto quedará marcado como formalizado.`))) return;
@@ -8412,9 +8421,8 @@ async function checkSession(){
 
       if(!esAdmin && (userLocal==='rg' || userLocal==='mg')){
         const {data: cfgRow} = await sb.from('sistema').select('*').eq('tipo','ui_config').limit(1).maybeSingle();
-        const permisos = cfgRow?.data?.permisos || {};
-        const permitidas = permitidasEfectivas(permisos[userLocal] || SECCIONES_CEDIBLES.map(s=>s.key), cfgRow?.data?.secciones); // por defecto, todo permitido salvo admin-only
-        aplicarPermisosUI(permitidas);
+        nivelesUsuario = nivelesEfectivos(cfgRow?.data, userLocal); // Lector/Editor/Administrador por sección
+        aplicarPermisosUI(Object.keys(nivelesUsuario).filter(k=>nivelesUsuario[k]!=='sin'));
       }
     }
   }catch(e){ console.error(e); }
@@ -8487,11 +8495,72 @@ function aplicarPermisosUI(permitidas){
     destino?.click();
   }
 }
-let permisosBase = '';
-function estadoPermisosActual(){
-  const por = u => Array.from(document.querySelectorAll(`#permisos-tbl input[data-user="${u}"]:checked`)).map(c=>c.dataset.key).sort();
-  return JSON.stringify({rg: por('rg'), mg: por('mg')});
+// ===================== NIVELES DE ACCESO =====================
+// Sin acceso: la sección no aparece. Lector: la ve, no crea ni edita. Editor: crea y edita,
+// no borra. Administrador: además borra. Dani G (esAdmin) siempre lo puede todo.
+// Por ahora los niveles se APLICAN solo en las secciones de Documentos; en el resto la
+// Configuración solo ofrece "Sin acceso" o "Completo" hasta que se vayan aplicando una a una.
+var nivelesUsuario = null; // null = Dani G (todo). Si no, {seccion: 'sin'|'lector'|'editor'|'admin'}
+const SECCIONES_CON_NIVELES = new Set(['proyectos','presupuestos','proformas','albaranes','facturas']);
+const SECCION_DE_TIPO = {proyecto:'proyectos', presupuesto:'presupuestos', proforma:'proformas', albaran:'albaranes', factura:'facturas'};
+const NIVELES_ETIQUETA = {sin:'Sin acceso', lector:'Lector', editor:'Editor', admin:'Administrador'};
+function nivelDe(sec){ return nivelesUsuario===null ? 'admin' : (nivelesUsuario[sec] || 'sin'); }
+function puedeEditar(sec){ const n = nivelDe(sec); return n==='editor' || n==='admin'; }
+function puedeBorrar(sec){ return nivelDe(sec)==='admin'; }
+// true = permitido. Las secciones sin niveles aplicados (o documentos de otro tipo, p.ej. gastos) no se controlan aquí.
+function exigirNivel(sec, accion){
+  if(!sec || !SECCIONES_CON_NIVELES.has(sec)) return true;
+  const ok = accion==='borrar' ? puedeBorrar(sec) : puedeEditar(sec);
+  if(!ok) mostrarToast(accion==='borrar' ? 'No tienes permiso para borrar en esta sección.' : 'Solo tienes permiso de lectura en esta sección.', 'err');
+  return ok;
 }
+function exigirNivelTipo(tipo, accion){ return exigirNivel(SECCION_DE_TIPO[tipo] || null, accion); }
+// Documento que la app no tiene cargado: no se sabe de qué sección es, así que solo se permite si
+// el usuario podría hacerlo en TODAS las secciones controladas (nunca se deja pasar por defecto).
+function puedeEnTodas(accion){
+  return [...SECCIONES_CON_NIVELES].every(sec => accion==='borrar' ? puedeBorrar(sec) : puedeEditar(sec));
+}
+function avisoNivel(accion){
+  mostrarToast(accion==='borrar' ? 'No tienes permiso para borrar en esta sección.' : 'Solo tienes permiso de lectura en esta sección.', 'err');
+}
+function exigirNivelDoc(id, accion){
+  const d = documentosRealesById[id];
+  if(!d){
+    const ok = puedeEnTodas(accion);
+    if(!ok) avisoNivel(accion);
+    return ok;
+  }
+  return exigirNivel(SECCION_DE_TIPO[d.tipo || d.type] || null, accion);
+}
+function exigirNivelDocs(ids, accion){
+  for(const id of ids){
+    const d = documentosRealesById[id];
+    const ok = d ? (() => { const sec = SECCION_DE_TIPO[d.tipo || d.type]; return !sec || !SECCIONES_CON_NIVELES.has(sec) || (accion==='borrar' ? puedeBorrar(sec) : puedeEditar(sec)); })() : puedeEnTodas(accion);
+    if(!ok){ avisoNivel(accion); return false; }
+  }
+  return true;
+}
+// Niveles reales de un usuario. Si aún no se guardaron niveles, se derivan de las casillas antiguas:
+// lo que estaba marcado pasa a Editor en Documentos y a Completo en el resto (que se comporta igual
+// que antes), y lo desmarcado a Sin acceso.
+function nivelesEfectivos(cfg, user){
+  const guardados = cfg?.niveles?.[user];
+  const permitidas = permitidasEfectivas(cfg?.permisos?.[user] || SECCIONES_CEDIBLES.map(s=>s.key), cfg?.secciones);
+  const res = {};
+  SECCIONES_CEDIBLES.forEach(s=>{
+    const g = guardados && guardados[s.key];
+    if(g && NIVELES_ETIQUETA[g]) res[s.key] = SECCIONES_CON_NIVELES.has(s.key) ? g : (g==='sin' ? 'sin' : 'admin');
+    else res[s.key] = permitidas.includes(s.key) ? (SECCIONES_CON_NIVELES.has(s.key) ? 'editor' : 'admin') : 'sin';
+  });
+  return res;
+}
+let permisosBase = '';
+function nivelesDesdePantalla(){
+  const niveles = {rg:{}, mg:{}};
+  document.querySelectorAll('#permisos-tbl select[data-user]').forEach(sel=>{ niveles[sel.dataset.user][sel.dataset.key] = sel.value; });
+  return niveles;
+}
+function estadoPermisosActual(){ return JSON.stringify(nivelesDesdePantalla()); }
 function actualizarBotonPermisos(){
   const btn = document.getElementById('permisos-guardar-btn');
   if(!btn) return;
@@ -8502,19 +8571,18 @@ function actualizarBotonPermisos(){
 async function cargarPermisos(){
   if(!sb) return;
   const {data} = await sb.from('sistema').select('*').eq('tipo','ui_config').limit(1).maybeSingle();
-  const permisos = data?.data?.permisos || {};
-  const todas = SECCIONES_CEDIBLES.map(s=>s.key);
-  const rg = permitidasEfectivas(permisos.rg || todas, data?.data?.secciones);
-  const mg = permitidasEfectivas(permisos.mg || todas, data?.data?.secciones);
+  const niv = {rg: nivelesEfectivos(data?.data,'rg'), mg: nivelesEfectivos(data?.data,'mg')};
+  const opciones = (sec, user) => {
+    const lista = SECCIONES_CON_NIVELES.has(sec.key) ? ['sin','lector','editor','admin'] : ['sin','admin'];
+    return `<select class="perm-sel" data-key="${sec.key}" data-user="${user}" onchange="actualizarBotonPermisos()">` +
+      lista.map(n=>`<option value="${n}" ${niv[user][sec.key]===n?'selected':''}>${n==='admin' && !SECCIONES_CON_NIVELES.has(sec.key) ? 'Completo' : NIVELES_ETIQUETA[n]}</option>`).join('') + `</select>`;
+  };
   let grupoAnterior = null;
   document.getElementById('permisos-tbl').innerHTML = SECCIONES_CEDIBLES.map(s=>{
     const cab = (s.grupo && s.grupo!==grupoAnterior) ? `<div class="perm-grupo">${s.grupo}</div>` : '';
     grupoAnterior = s.grupo || null;
     return cab + `
-    <div class="perm-row"><span class="perm-nombre">${s.grupo ? '&nbsp;&nbsp;' : ''}${s.label}</span>
-      <label class="perm-check"><input type="checkbox" data-key="${s.key}" data-user="rg" ${rg.includes(s.key)?'checked':''} onchange="actualizarBotonPermisos()"></label>
-      <label class="perm-check"><input type="checkbox" data-key="${s.key}" data-user="mg" ${mg.includes(s.key)?'checked':''} onchange="actualizarBotonPermisos()"></label>
-    </div>`;
+    <div class="perm-row"><span class="perm-nombre">${s.grupo ? '&nbsp;&nbsp;' : ''}${s.label}</span>${opciones(s,'rg')}${opciones(s,'mg')}</div>`;
   }).join('');
   permisosBase = estadoPermisosActual();
   actualizarBotonPermisos();
@@ -8523,10 +8591,11 @@ async function guardarPermisos(){
   if(!sb) return;
   const btn = document.getElementById('permisos-guardar-btn');
   if(btn){ btn.disabled = true; btn.textContent = 'Guardando…'; }
-  const por = u => Array.from(document.querySelectorAll(`#permisos-tbl input[data-user="${u}"]:checked`)).map(c=>c.dataset.key);
-  const rg = por('rg'), mg = por('mg');
+  const niveles = nivelesDesdePantalla();
+  const permitidasDe = u => Object.keys(niveles[u]).filter(k=>niveles[u][k]!=='sin');
   const {data: cfgRow} = await sb.from('sistema').select('*').eq('tipo','ui_config').limit(1).maybeSingle();
-  const nuevaData = {...(cfgRow?.data||{}), permisos: {rg, mg}, secciones: SECCIONES_CEDIBLES.map(x=>x.key)};
+  // "permisos" (lista de secciones permitidas) se sigue guardando igual que antes, y "niveles" es lo nuevo
+  const nuevaData = {...(cfgRow?.data||{}), permisos: {rg: permitidasDe('rg'), mg: permitidasDe('mg')}, secciones: SECCIONES_CEDIBLES.map(x=>x.key), niveles};
   const res = cfgRow
     ? await sb.from('sistema').update({data: nuevaData}).eq('id', cfgRow.id)
     : await sb.from('sistema').insert({tipo:'ui_config', data: nuevaData});
@@ -11940,6 +12009,7 @@ async function abrirDocumentoParaVerlo(id){
 }
 
 async function enlazarDocumentosNotif(notifId, idOrigen, idRelacionado){
+  if(!exigirNivelDoc(idOrigen,'editar') || !exigirNivelDoc(idRelacionado,'editar')) return;
   const {error} = await sb.from('documentos_economicos').update({documento_siguiente_id: idRelacionado}).eq('id', idOrigen);
   const {error: error2} = await sb.from('documentos_economicos').update({documento_anterior_id: idOrigen}).eq('id', idRelacionado);
   if(error || error2){ mostrarToast('No se pudo enlazar: '+(error?.message||error2?.message)); return; }
@@ -11984,6 +12054,7 @@ async function mostrarRevisionTipoNotif(n){
   `);
 }
 async function borrarDesdeRevisionTipo(notifId, docId, tipoAnterior){
+  if(!exigirNivelDoc(docId,'borrar')) return;
   if(!(await confirmarAccion('¿Borrar este documento? No se puede deshacer.'))) return;
   const motivo = document.getElementById('motivo-clasificacion')?.value || null;
   const doc = documentosRealesById[docId];
@@ -12084,6 +12155,7 @@ function toggleRevisionPanelGenerico(panelId){
   if(chev) chev.textContent = abierto ? '▸' : '▾';
 }
 async function aplicarMoverTipoRevision(id, nuevoTipo, panelId){
+  if(!exigirNivelDoc(id,'editar') || !exigirNivelTipo(nuevoTipo,'editar')) return;
   const {error} = await sb.from('documentos_economicos').update({tipo: nuevoTipo}).eq('id', id);
   if(error){ mostrarToast('Error: '+errText(error)); return; }
   delete documentosRealesById[id];
@@ -12838,6 +12910,7 @@ function actualizarSeleccionDoc(claseChk, btnId, countId){
   });
 }
 async function borrarUnDocumento(id){
+  if(!exigirNivelDoc(id,'borrar')) return;
   if(!(await confirmarAccion('¿Borrar este documento? No se puede deshacer.'))) return;
   if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
   const doc = documentosRealesById[id];
@@ -12857,6 +12930,7 @@ async function borrarUnDocumento(id){
 async function borrarDocumentosSeleccionados(claseChk){
   const marcados = Array.from(document.querySelectorAll('.'+claseChk+':checked'));
   if(!marcados.length) return;
+  if(!exigirNivelDocs(marcados.map(c=>c.dataset.id).filter(Boolean),'borrar')) return;
   if(!(await confirmarAccion(`¿Borrar ${marcados.length} documento(s)? No se puede deshacer.`))) return;
   if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
   const ids = marcados.map(c=>c.dataset.id).filter(Boolean);
@@ -18656,6 +18730,7 @@ function openDocumentViewer(id){
     const btnV = document.getElementById('ie-btn-verificar');
     if(btnV) btnV.onclick = async () => {
       if(!sb||!editingDocId) return;
+      if(!exigirNivelDoc(editingDocId,'editar')) return;
       const {data:docActual} = await sb.from('documentos_economicos').select('conceptos').eq('id',editingDocId).single();
       if(!docActual) return;
       const conceptosLimpios = (docActual.conceptos||[]).map(c=>{ const {nuevo:_, origen_entrada_id:__, ...resto}=c; return resto; });
@@ -18718,6 +18793,7 @@ function openDocumentViewer(id){
   setTimeout(sincronizarFechaTexto, 20);
 }
 async function deshacerConversion(){
+  if(!exigirNivelDoc(editingDocId,'borrar')) return;
   const doc = documentosRealesById[editingDocId];
   if(!doc || !sb) return;
   if(!(await confirmarAccion(`¿Deshacer esta factura y volver a dejarla como el albarán original? La factura "${doc.num}" se borrará.`))) return;
@@ -18733,6 +18809,8 @@ async function submitNewInvoice(ev, isDraft){
   if(ev) ev.preventDefault();
   if(!sb){ mostrarToast('Supabase no está conectado — no se puede guardar.'); return false; }
   const type = document.getElementById('ni-doctype').value;
+  if(!exigirNivelTipo(type,'editar')) return false;
+  if(editingDocId && !exigirNivelDoc(editingDocId,'editar')) return false;
   const cfg = DOC_TYPES[type];
   const client = document.getElementById('ni-client').value;
   if(!client){ mostrarToast('Elige un cliente.'); return false; }
@@ -19128,6 +19206,7 @@ document.addEventListener('click', (ev)=>{
   });
 });
 async function cambiarEstadoDocumento(tipo, id, valor, ddId){
+  if(!exigirNivelDoc(id,'editar')) return;
   if(!sb) return;
   const payload = {estado_cobro: valor};
   // COBRADO = cobrado entero, en TODOS los tipos de documento (no solo facturas)
@@ -19157,6 +19236,7 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   renderControlDocs();
 }
 function editarCobrado(id){
+  if(!exigirNivelDoc(id,'editar')) return;
   const celda = document.querySelector('.celda-cobrado-'+id);
   if(!celda || celda.querySelector('input')) return;
   const doc = documentosRealesById[id];
@@ -19278,6 +19358,7 @@ document.querySelectorAll('#econ-contabilidad-filter .chip-filter').forEach(el=>
 });
 
 async function toggleEnviadoGestor(id){
+  if(!exigirNivelDoc(id,'editar')) return;
   if(!sb) return;
   const doc = documentosRealesById[id];
   if(doc?.tipo==='gasto' && doc.estado_justificante!=='completo'){
@@ -19447,6 +19528,7 @@ function imprimirDocumento(id){
   setTimeout(()=> imprimirPDF(), 300);
 }
 function enviarAlGestorDoc(id){
+  if(!exigirNivelDoc(id,'editar')) return;
   const doc = documentosRealesById[id];
   if(!doc) return;
   if(doc.tipo==='gasto' && doc.estado_justificante!=='completo'){
@@ -19502,6 +19584,7 @@ async function enviarSeleccionadasAlGestor(claseChk){
   const marcados = Array.from(document.querySelectorAll('.'+claseChk+':checked'));
   if(!marcados.length) return;
   const ids = marcados.map(c=>c.dataset.id).filter(Boolean);
+  if(!exigirNivelDocs(ids,'editar')) return;
   const docs = ids.map(id=>documentosRealesById[id]).filter(Boolean);
   const email = getGestorEmail();
   if(!email) return;
@@ -19526,6 +19609,7 @@ async function enviarSeleccionadasAlGestor(claseChk){
   openComposeDrawer();
 }
 async function marcarTrimestreEnviado(){
+  if(!exigirNivelTipo('factura','editar')) return;
   const anio = document.getElementById('fact-filtro-anio-chips')?.querySelector('.chip-filter.active')?.dataset.anio || '';
   const trim = document.getElementById('fact-filtro-trim-chips')?.querySelector('.chip-filter.active')?.dataset.trim || '';
   if(!anio || !trim){ mostrarToast('Elige primero un año y un trimestre en los filtros de arriba.'); return; }
@@ -19941,6 +20025,7 @@ async function elegirDestinoMover(destino){
 
   // Secciones económicas: cambia el tipo dentro de documentos_economicos
   if(['factura','albaran','presupuesto','proforma','gasto'].includes(destino)){
+    if(!exigirNivelDocs(ids,'editar') || !exigirNivelTipo(destino,'editar')) return;
     const TIPOS={factura:'Facturas',albaran:'Albaranes',presupuesto:'Presupuestos',proforma:'Proformas',gasto:'Gastos'};
     const {error}=await sb.from('documentos_economicos').update({tipo:destino}).in('id',ids);
     if(error){ mostrarToast('Error: '+errText(error)); return; }
@@ -19999,6 +20084,7 @@ async function elegirDestinoMover(destino){
 
 async function confirmarMoverAEmpresa(){
   const ids=__moverIds;
+  if(!exigirNivelDocs(ids,'borrar')) return;
   const cat=document.getElementById('mover-emp-cat')?.value.trim();
   const nom=document.getElementById('mover-emp-nom')?.value.trim();
   if(!cat||!nom){ mostrarToast('Rellena categoría y nombre.'); return; }
@@ -20024,6 +20110,7 @@ async function confirmarMoverAEmpresa(){
 
 async function confirmarMoverAFlota(flotaId, flotaNombre){
   const ids=__moverIds;
+  if(!exigirNivelDocs(ids,'borrar')) return;
   const {data:maq}=await sb.from('flota').select('documentos').eq('id',flotaId).single();
   const docs=Array.isArray(maq?.documentos)?maq.documentos:[];
   let ok=0;
