@@ -2836,7 +2836,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.80</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.81</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2914,7 +2914,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.80</div>
+        <div class="sub" id="version-badge">V5.81</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4841,7 +4841,7 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
           </div>
           <div id="permisos-tbl"></div>
         </div>
-        <div class="two-col-note" style="margin-top:10px;">Marca lo que puede ver cada uno y pulsa Guardar. Lo que no marques no le aparece ni puede abrirlo. En Documentos, al marcar una sección eliges qué puede hacer: Lector (solo ve), Editor (ve, crea y edita, pero no borra) o Administrador (además borra). En el resto de secciones, marcada es acceso completo. Empresa, Sistema, Reportes, Conocimiento, Histórico y Configuración son siempre solo para Dani G, no aparecen aquí porque no se pueden ceder.</div>
+        <div class="two-col-note" style="margin-top:10px;">Marca lo que puede ver cada uno y pulsa Guardar. Lo que no marques no le aparece ni puede abrirlo. Al marcar una sección eliges qué puede hacer: Lector (solo ve), Editor (ve, crea y edita, pero no borra) o Administrador (además borra). En Centro de control, Mapa y Economía no hay botones propios de crear, editar o borrar, así que ahí el nivel no cambia nada: lo que se hace desde ellas depende de la sección a la que pertenece. Empresa, Sistema, Reportes, Conocimiento, Histórico y Configuración son siempre solo para Dani G, no aparecen aquí porque no se pueden ceder.</div>
       </div>
     </div>
 
@@ -6974,6 +6974,7 @@ async function avanzarFaseDocumento(id, tipoDestino){
   openDocumentViewer(nuevoId);
 }
 async function volverAFaseAnterior(id){
+  if(!exigirNivelDoc(id,'editar')) return;
   const doc = documentosRealesById[id];
   if(!doc || !doc.documento_anterior_id || !sb) return;
   if(!(await confirmarAccion(`¿Volver a ${tipoDocEtiqueta(documentosRealesById[doc.documento_anterior_id]?.tipo || '')}? Este documento (${tipoDocEtiqueta(doc.type)}) quedará en el historial del expediente, no se borra.`))) return;
@@ -8405,6 +8406,7 @@ function safeFetch(input, init){
 try{
   if(window.supabase){
     sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { fetch: safeFetch } });
+    instalarControlDeNiveles(sb);
   }
 }catch(err){ console.error('No se pudo inicializar Supabase', err); }
 
@@ -8426,6 +8428,7 @@ async function checkSession(){
       if(nombreEl) nombreEl.textContent = NOMBRES_USUARIO[userLocal] || data.session.user.email || 'Sesión iniciada';
 
       if(!esAdmin && (userLocal==='rg' || userLocal==='mg')){
+        nivelesUsuario = {}; // hasta que carguen sus permisos, solo lectura (nunca más de lo que les toca)
         const {data: cfgRow} = await sb.from('sistema').select('*').eq('tipo','ui_config').limit(1).maybeSingle();
         nivelesUsuario = nivelesEfectivos(cfgRow?.data, userLocal); // Lector/Editor/Administrador por sección
         aplicarPermisosUI(Object.keys(nivelesUsuario).filter(k=>nivelesUsuario[k]!=='sin'));
@@ -8507,8 +8510,14 @@ function aplicarPermisosUI(permitidas){
 // Por ahora los niveles se APLICAN solo en las secciones de Documentos; en el resto la
 // Configuración solo ofrece "Sin acceso" o "Completo" hasta que se vayan aplicando una a una.
 var nivelesUsuario = null; // null = Dani G (todo). Si no, {seccion: 'sin'|'lector'|'editor'|'admin'}
-const SECCIONES_CON_NIVELES = new Set(['proyectos','presupuestos','proformas','albaranes','facturas']);
-const SECCION_DE_TIPO = {proyecto:'proyectos', presupuesto:'presupuestos', proforma:'proformas', albaran:'albaranes', factura:'facturas'};
+// Los niveles valen para TODAS las secciones cedibles (SECCIONES_CEDIBLES). Tres secciones (Centro de
+// control, Mapa y Economía) no tienen botones propios de crear/editar/borrar: en ellas el nivel no
+// cambia nada, lo que se hace desde ahí (verificar documentos, registrar un gasto...) lo controla la
+// sección a la que pertenece.
+const SECCIONES_CON_NIVELES = new Set(SECCIONES_CEDIBLES.map(x=>x.key));
+// Secciones cuyos datos cuelgan de un cliente: borrar un cliente borra también todo esto
+const SECCIONES_DOCUMENTOS = ['proyectos','presupuestos','proformas','albaranes','facturas','gastospro'];
+const SECCION_DE_TIPO = {proyecto:'proyectos', presupuesto:'presupuestos', proforma:'proformas', albaran:'albaranes', factura:'facturas', gasto:'gastospro'};
 const NIVELES_ETIQUETA = {sin:'Sin acceso', lector:'Lector', editor:'Editor', admin:'Administrador'};
 function nivelDe(sec){ return nivelesUsuario===null ? 'admin' : (nivelesUsuario[sec] || 'sin'); }
 function puedeEditar(sec){ const n = nivelDe(sec); return n==='editor' || n==='admin'; }
@@ -8523,8 +8532,21 @@ function exigirNivel(sec, accion){
 function exigirNivelTipo(tipo, accion){ return exigirNivel(SECCION_DE_TIPO[tipo] || null, accion); }
 // Documento que la app no tiene cargado: no se sabe de qué sección es, así que solo se permite si
 // el usuario podría hacerlo en TODAS las secciones controladas (nunca se deja pasar por defecto).
-function puedeEnTodas(accion){
-  return [...SECCIONES_CON_NIVELES].every(sec => accion==='borrar' ? puedeBorrar(sec) : puedeEditar(sec));
+function puedeEnTodas(accion, secciones){
+  return (secciones || SECCIONES_DOCUMENTOS).every(sec => accion==='borrar' ? puedeBorrar(sec) : puedeEditar(sec));
+}
+// true si puede en AL MENOS UNA de esas secciones (recursos compartidos, p.ej. Entradas y Archivos)
+function exigirNivelAlguna(secciones, accion){
+  const ok = secciones.some(sec => accion==='borrar' ? puedeBorrar(sec) : puedeEditar(sec));
+  if(!ok) avisoNivel(accion);
+  return ok;
+}
+// Borrar un cliente borra también todos sus documentos: hace falta poder borrar en todas esas secciones
+function exigirBorrarCliente(){
+  if(nivelesUsuario===null) return true;
+  const ok = puedeBorrar('clientes') && puedeEnTodas('borrar', SECCIONES_DOCUMENTOS);
+  if(!ok) mostrarToast('Borrar un cliente borra también sus documentos: hace falta ser Administrador en Clientes, en todos los tipos de Documentos y en Gastos.', 'err');
+  return ok;
 }
 function avisoNivel(accion){
   mostrarToast(accion==='borrar' ? 'No tienes permiso para borrar en esta sección.' : 'Solo tienes permiso de lectura en esta sección.', 'err');
@@ -8549,17 +8571,104 @@ function exigirNivelDocs(ids, accion){
 // Niveles reales de un usuario. Si aún no se guardaron niveles, se derivan de las casillas antiguas:
 // lo que estaba marcado pasa a Editor en Documentos y a Completo en el resto (que se comporta igual
 // que antes), y lo desmarcado a Sin acceso.
+const SECCIONES_DE_DOCUMENTOS_INICIALES = new Set(['proyectos','presupuestos','proformas','albaranes','facturas']);
 function nivelesEfectivos(cfg, user){
   const guardados = cfg?.niveles?.[user];
   const permitidas = permitidasEfectivas(cfg?.permisos?.[user] || SECCIONES_CEDIBLES.map(s=>s.key), cfg?.secciones);
   const res = {};
   SECCIONES_CEDIBLES.forEach(s=>{
     const g = guardados && guardados[s.key];
-    if(g && NIVELES_ETIQUETA[g]) res[s.key] = SECCIONES_CON_NIVELES.has(s.key) ? g : (g==='sin' ? 'sin' : 'admin');
-    else res[s.key] = permitidas.includes(s.key) ? (SECCIONES_CON_NIVELES.has(s.key) ? 'editor' : 'admin') : 'sin';
+    if(g && NIVELES_ETIQUETA[g]) res[s.key] = g;
+    // marcado antes de haber niveles: Documentos ya se dio como Editor; el resto se comportaba como acceso
+    // completo, así que se queda en Administrador para que a Rafa y Manolo no les cambie nada
+    else res[s.key] = permitidas.includes(s.key) ? (SECCIONES_DE_DOCUMENTOS_INICIALES.has(s.key) ? 'editor' : 'admin') : 'sin';
   });
   return res;
 }
+
+// ===================== COMPROBACIÓN CENTRAL DE ESCRITURAS =====================
+// Cada escritura (insert/update/upsert/delete) a una tabla que pertenece a una sección se comprueba
+// aquí, venga de la función que venga: así no depende de acordarse de proteger cada botón.
+// editar = insert/update/upsert (Editor o Administrador). borrar = delete (solo Administrador).
+// Tablas compartidas por dos secciones dejan pasar a quien pueda en cualquiera de las dos.
+// Las tablas internas del sistema (notificaciones, filtros guardados, registros, conocimiento...) no
+// pertenecen a ninguna sección y no se controlan.
+const _NIV_FLOTA = {editar:['flota'], borrar:['flota']};
+const _NIV_CLIENTES = {editar:['clientes'], borrar:['clientes']};
+const _NIV_ARCHIVOS = {editar:['entradas','archivos'], borrar:['entradas','archivos']};
+const _NIV_CORREO = {editar:['correo'], borrar:['correo']};
+const TABLA_NIVELES = {
+  trabajos: {editar:['trabajos','planificacion'], borrar:['trabajos']},   // Planificación mueve fechas, no borra
+  flota:_NIV_FLOTA, averias:_NIV_FLOTA, flota_incidencias:_NIV_FLOTA,
+  entidades:_NIV_CLIENTES, entidad_direcciones:_NIV_CLIENTES, clientes_revision_casos:_NIV_CLIENTES,
+  cliente_conflictos:_NIV_CLIENTES, duplicados_clientes_pendientes:_NIV_CLIENTES, identidad_pendiente_casos:_NIV_CLIENTES,
+  expedientes:{editar:['ayuntamiento'], borrar:['ayuntamiento']},
+  tarifas:{editar:['tarifas'], borrar:['tarifas']},
+  documentos:_NIV_ARCHIVOS, peticion_archivos:_NIV_ARCHIVOS,
+  correo_estado:_NIV_CORREO, remitentes_bloqueados:_NIV_CORREO, sugerencias_estado:_NIV_CORREO,
+  proyectos:{editar:['proyectos'], borrar:['proyectos']},
+};
+// Funciones de la base de datos que escriben. (documentos_economicos y avanzar/retroceder_fase se
+// comprueban en las propias funciones de Documentos porque la sección depende del tipo de documento.)
+const RPC_NIVELES = {
+  fusionar_clientes_con_seleccion:{acc:'borrar', sec:['clientes']},
+  abrir_caso_identidad_pendiente:{acc:'editar', sec:['clientes']},
+  recuperar_de_papelera:{acc:'editar', sec:['backup']},
+  registrar_decision_correo:{acc:'editar', sec:['correo']},
+};
+function nivelPermite(secciones, accion){
+  return nivelesUsuario===null || secciones.some(sec => accion==='borrar' ? puedeBorrar(sec) : puedeEditar(sec));
+}
+// Avisar solo si la persona acaba de tocar algo (no por escrituras automáticas al cargar)
+var _ultimaInteraccion = 0, _ultimoAvisoNivel = 0;
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev, ()=>{ _ultimaInteraccion = Date.now(); }, true));
+function avisoNivelSiInteraccion(accion){
+  const ahora = Date.now();
+  if(ahora - _ultimaInteraccion < 2500 && ahora - _ultimoAvisoNivel > 2000){ _ultimoAvisoNivel = ahora; avisoNivel(accion); }
+}
+// Resultado que devuelve una escritura bloqueada: se puede seguir encadenando (.eq().select()...) y al
+// esperarlo da un error normal, que las funciones ya saben enseñar.
+function escrituraBloqueada(accion){
+  const res = {data:null, count:null, status:403, statusText:'Forbidden',
+    error:{message: accion==='borrar' ? 'Sin permiso para borrar en esta sección' : 'Solo tienes permiso de lectura en esta sección', code:'NIVEL_INSUFICIENTE', details:null, hint:null}};
+  const p = new Proxy(function(){}, {
+    get(_, prop){
+      if(prop==='then') return (ok, ko) => Promise.resolve(res).then(ok, ko);
+      if(prop==='catch') return f => Promise.resolve(res).catch(f);
+      if(prop==='finally') return f => Promise.resolve(res).finally(f);
+      return () => p;
+    },
+    apply(){ return p; }
+  });
+  avisoNivelSiInteraccion(accion);
+  return p;
+}
+function instalarControlDeNiveles(cliente){
+  if(!cliente || cliente.__nivelesInstalado) return;
+  cliente.__nivelesInstalado = true;
+  const desdeOriginal = cliente.from.bind(cliente);
+  cliente.from = function(tabla){
+    const constructor = desdeOriginal(tabla);
+    const regla = TABLA_NIVELES[tabla];
+    if(!regla) return constructor;
+    [['insert','editar'],['update','editar'],['upsert','editar'],['delete','borrar']].forEach(([metodo, accion])=>{
+      const original = constructor[metodo];
+      if(typeof original !== 'function') return;
+      constructor[metodo] = function(...args){
+        if(!nivelPermite(regla[accion], accion)) return escrituraBloqueada(accion);
+        return original.apply(constructor, args);
+      };
+    });
+    return constructor;
+  };
+  const rpcOriginal = cliente.rpc.bind(cliente);
+  cliente.rpc = function(nombre, ...args){
+    const regla = RPC_NIVELES[nombre];
+    if(regla && !nivelPermite(regla.sec, regla.acc)) return escrituraBloqueada(regla.acc);
+    return rpcOriginal(nombre, ...args);
+  };
+}
+
 let permisosBase = '';
 function nivelesDesdePantalla(){
   // sin check = "sin" (oculto). Con check: en Documentos el nivel del desplegable; en el resto, Completo
@@ -10238,6 +10347,7 @@ function renderLimpiezaCorreo(){
   </div>`;
 }
 async function limpiezaAccionGrupo(idx, accion){
+  if(!exigirNivel('correo', accion==='eliminar' ? 'borrar' : 'editar')) return;
   const g = correoLimpiezaResultado.grupos[idx];
   if(!g || !sb) return;
   await asegurarTokenGmail();
@@ -10321,6 +10431,7 @@ function toggleCorreoSelectAll(checked){
   renderCorreoInbox();
 }
 async function accionMasivaCorreo(accion){
+  if(!exigirNivel('correo', accion==='eliminar' ? 'borrar' : 'editar')) return;
   const ids = Array.from(correoSeleccionMulti);
   if(!ids.length) return;
   await asegurarTokenGmail();
@@ -10338,6 +10449,7 @@ async function accionMasivaCorreo(accion){
 }
 
 async function modificarLabelsGmail(messageId, addLabelIds, removeLabelIds){
+  if(!puedeEditar('correo')) return;
   await asegurarTokenGmail();
   await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`, {
     method:'POST', headers:{Authorization:'Bearer '+gmailAccessToken,'Content-Type':'application/json'},
@@ -10368,6 +10480,7 @@ async function archivarCorreoId(id){
   mostrarToast('Archivado.');
 }
 async function borrarCorreoId(id){
+  if(!exigirNivel('correo','borrar')) return;
   if(!(await confirmarAccion('¿Mover este correo a la papelera?'))) return;
   await asegurarTokenGmail();
   await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}/trash`, {method:'POST', headers:{Authorization:'Bearer '+gmailAccessToken}});
@@ -10764,6 +10877,7 @@ async function borrarCorreo(){
 }
 
 async function sendGmail(){
+  if(!exigirNivel('correo','editar')) return;
   const to = document.getElementById('mail-to').value.trim();
   const subject = document.getElementById('mail-subject').value.trim();
   const body = document.getElementById('mail-body').value;
@@ -10797,6 +10911,7 @@ let triageCurrentId = null;
 const SRC_ICON = {whatsapp:'💬', foto:'📷', pdf:'📄', llamada:'📞', audio:'🎙', texto:'💬'};
 
 async function subirDocumentoATriage(fileList){
+  if(!exigirNivel('entradas','editar')) return;
   if(!fileList || !fileList.length) return;
   if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
   for(const file of Array.from(fileList)){
@@ -10934,6 +11049,7 @@ function updateInboxSelectBar(){
 }
 
 async function borrarDocumento(id){
+  if(!exigirNivelAlguna(['entradas','archivos'],'borrar')) return {ok:false, error:{message:'Sin permiso para borrar en esta sección'}};
   if(!sb) return {ok:true};
   const d = documentosCache.find(x=>x.id===id);
   if(d && d.storage_path){
@@ -11548,7 +11664,8 @@ function sanitizeFileName(name){
   return clean + ext;
 }
 
-async function explorerUploadFiles(fileList){  if(!fileList || !fileList.length) return;
+async function explorerUploadFiles(fileList){
+  if(!exigirNivel('archivos','editar')) return;  if(!fileList || !fileList.length) return;
   if(!sb){ mostrarToast('Conecta Supabase primero.'); return; }
   const files = Array.from(fileList);
   const statusEl = document.getElementById('explorer-upload-status');
@@ -11587,6 +11704,7 @@ function explorerDrop(e){
 }
 
 async function explorerNewFolder(){
+  if(!exigirNivel('archivos','editar')) return;
   const r = await pedirCampos('Nueva carpeta', [{id:'name', label:'Nombre de la carpeta', requerido:true}]);
   if(!r) return;
   // Supabase Storage no tiene "carpetas" reales — se crean subiendo un archivo marcador dentro
@@ -11670,6 +11788,7 @@ async function pegarEnExplorer(){
   loadExplorer(explorerPath);
 }
 async function borrarSeleccionExplorer(){
+  if(!exigirNivel('archivos','borrar')) return;
   const marcados = Array.from(document.querySelectorAll('.explorer-sel-chk:checked'));
   if(!marcados.length) return;
   if(!(await confirmarAccion(`¿Borrar ${marcados.length} elemento(s)? No se puede deshacer.`))) return;
@@ -11696,6 +11815,7 @@ function explorerMove(fullPath, name){
 }
 
 async function explorerDelete(fullPath){
+  if(!exigirNivel('archivos','borrar')) return;
   if(!(await confirmarAccion('¿Borrar este archivo? No se puede deshacer.'))) return;
   const {error} = await sb.storage.from(DOC_BUCKET).remove([fullPath]);
   if(error){ mostrarToast('Error al borrar: '+error.message); return; }
@@ -11749,6 +11869,7 @@ function renderFleetGrid(){
   }).join('');
 }
 async function subirDocMaquina(id, input){
+  if(!exigirNivel('flota','editar')) return;
   const file = input.files[0];
   if(!file || !sb) return;
   const m = fleet.find(f=>f.id===id);
@@ -11767,6 +11888,7 @@ async function subirDocMaquina(id, input){
   renderFleetGrid();
 }
 async function borrarDocMaquina(id, path){
+  if(!exigirNivel('flota','borrar')) return;
   const m = fleet.find(f=>f.id===id);
   if(!m || !sb) return;
   if(!(await confirmarAccion('¿Borrar este documento?'))) return;
@@ -13007,6 +13129,7 @@ function actualizarSeleccionClientes(){
   setTimeout(ajustarSpacerClientes,30);
 }
 async function borrarClientesSeleccionados(){
+  if(!exigirBorrarCliente()) return;
   const marcados = Array.from(document.querySelectorAll('.clientes-sel-chk:checked'));
   if(!marcados.length) return;
   if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
@@ -13221,6 +13344,7 @@ function elegirValorFusionMultiple(campo, idx){
 }
 
 async function confirmarFusionDesdeComparacion(){
+  if(!exigirNivel('clientes','borrar')) return;
   if(!fusionEnCurso || !sb) return;
   if(fusionEnCurso.modo==='multiple'){
     const {clientes, docCounts, seleccion} = fusionEnCurso;
@@ -13921,6 +14045,7 @@ async function revisarClientesAuto(forzar=false){
   }
 }
 async function borrarPendientesSeleccionados(grupo){
+  if(!exigirBorrarCliente()) return;
   const chks = Array.from(document.querySelectorAll(`.rpend-chk[data-grupo="${grupo}"]:checked`));
   if(!chks.length){ mostrarToast('Selecciona al menos uno','err'); return; }
   const items = chks.map(c=>({id:c.dataset.id, nombre:c.dataset.nombre}));
@@ -13997,6 +14122,7 @@ function seleccionarTodosSinActividad(){
   chks.forEach(c=>c.checked=!allOn);
 }
 async function borrarPendientesSeleccionados(){
+  if(!exigirBorrarCliente()) return;
   const chks = Array.from(document.querySelectorAll('.rpend-chk:checked'));
   if(!chks.length){ mostrarToast('Selecciona al menos uno','err'); return; }
   if(!(await confirmarAccion(`¿Borrar ${chks.length} cliente(s) sin actividad? No se puede deshacer.`))) return;
@@ -14013,6 +14139,7 @@ async function borrarPendientesSeleccionados(){
   actualizarPanelesSinActividad();
 }
 async function borrarClienteSinDocs(id, nombre){
+  if(!exigirNivel('clientes','borrar')) return;
   if(!(await confirmarAccion(`¿Borrar "${nombre}"? No tiene documentos reales. No se puede deshacer.`))) return;
   if(!sb) return;
   // Borrar borradores vacíos primero
@@ -14245,6 +14372,7 @@ function usarClienteSugerido(id, inputNombreId, contenedorId){
 }
 
 async function borrarUnCliente(id, nombre){
+  if(!exigirBorrarCliente()) return;
   if(!id){ mostrarToast('Este cliente no está guardado todavía.'); return; }
   if(!(await confirmarAccion(`¿Borrar el cliente "${nombre}"? No se puede deshacer.`))) return;
   if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
@@ -18330,6 +18458,7 @@ document.getElementById('gasto-justificante')?.addEventListener('change', functi
 function cerrarRegistrarGasto(){ document.getElementById('gasto-overlay').classList.remove('active'); }
 
 async function guardarGasto(){
+  if(!exigirNivel('gastospro','editar')) return;
   const statusEl = document.getElementById('gasto-status');
   const concepto = document.getElementById('gasto-concepto').value.trim();
   const importe = Number(document.getElementById('gasto-importe').value);
@@ -20011,6 +20140,7 @@ async function cargarPapelera(){
   }).join('');
 }
 async function recuperarDePapelera(id){
+  if(!exigirNivel('backup','editar')) return;
   if(!sb) return;
   if(!confirm('¿Recuperar este elemento borrado?')) return;
   const {data, error} = await sb.rpc('recuperar_de_papelera', {p_id: id});
