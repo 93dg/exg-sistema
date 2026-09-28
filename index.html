@@ -1116,6 +1116,9 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .gasto-pie{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;}
 .gasto-pie .fc-ver-original{display:inline-flex;align-items:center;gap:6px;color:var(--blue,#3B6FA0);font-weight:600;font-size:12.5px;cursor:pointer;}
 .gasto-acciones{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+.gasto-consumo{font-size:12.5px;color:var(--ink-soft);overflow-wrap:anywhere;}
+.gasto-consumo b{color:var(--ink);}
+.rev-nota{font-size:12.5px;color:var(--orange);font-weight:600;}
 .rev-card{border:1px solid var(--line, rgba(0,0,0,0.1));border-radius:12px;padding:14px;margin:10px;background:var(--card, #fff);display:flex;flex-direction:column;gap:12px;}
 .rev-cab{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:12.5px;color:var(--ink-soft);flex-wrap:wrap;}
 .rev-de{font-size:13px;overflow-wrap:anywhere;}
@@ -2886,7 +2889,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.92</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.93</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2964,7 +2967,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.92</div>
+        <div class="sub" id="version-badge">V5.93</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4051,6 +4054,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="panel-body">
               <div class="bar-chart" id="gpro-chart-evolucion"></div>
             </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Combustible</h3></div>
+            <div class="panel-body" id="gpro-combustible" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
           <div class="panel">
             <div class="panel-head"><h3>Por proveedor</h3></div>
@@ -6763,6 +6770,7 @@ async function cargarColaGastosCorreo(conservarEstado){
 // sin coste. Solo se da algo por bueno si la suma del IVA cuadra con el total impreso y la factura va a
 // nombre del titular (regla_gastos); si no, va a "Por revisar" (no se lee bien) o a "Dudosos" (a otro NIF).
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function eurRevSeguro(n){ return Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €'; }
 function redondear2(n){ return Math.round((Number(n) + Number.EPSILON) * 100) / 100; }
 function parseNumeroGasto(s, formato){
   const t = String(s == null ? '' : s).trim().replace(/[^\d.,-]/g, '');
@@ -6829,6 +6837,77 @@ function extraerFilasIva(texto, cfg, formato){
   while((s = reSuelto.exec(restos))){ const v = parseNumeroGasto(s[2], formato); if(!isNaN(v)) sueltos.push(v); }
   return {filas, sueltos};
 }
+// ---------- líneas de la factura (albaranes): combustible por tipo y "otros" artículos ----------
+// Solo control INTERNO. Al gestor NO se le manda nada de esto: solo la factura.
+function extraerLineasConsumo(texto, cfg, formato){
+  if(!cfg || !cfg.regex) return [];
+  const re = new RegExp(cfg.regex, 'i');
+  const g = cfg.grupos || {fecha: 1, albaran: 2, descripcion: 3, cantidad: 4, precio: 5, importe: 7};
+  const comb = (cfg.combustibles || []).map(c => ({...c, re: new RegExp(c.patron, 'i')}));
+  const otros = (cfg.otros || []).map(c => ({...c, re: new RegExp(c.patron, 'i')}));
+  const def = cfg.otros_defecto || {subtipo: 'varios', etiqueta: 'Otros'};
+  const lineas = [];
+  String(texto).split(/\r?\n/).forEach(ln => {
+    const m = re.exec(ln.trim());
+    if(!m) return;
+    const desc = String(m[g.descripcion]).trim().replace(/\s+/g, ' ');
+    const l = {fecha: fechaGastoAISO(m[g.fecha]), albaran: m[g.albaran], descripcion: desc, cantidad: parseNumeroGasto(m[g.cantidad], formato),
+      precio: parseNumeroGasto(m[g.precio], formato), importe: parseNumeroGasto(m[g.importe], formato)};
+    if([l.cantidad, l.precio, l.importe].some(x => isNaN(x))) return;
+    const c = comb.find(x => x.re.test(desc));
+    if(c){ l.grupo = 'combustible'; l.tipo = c.tipo; l.etiqueta = c.etiqueta; }
+    else{ const o = otros.find(x => x.re.test(desc)); l.grupo = 'otros'; l.subtipo = o ? o.subtipo : def.subtipo; l.etiqueta = o ? o.etiqueta : def.etiqueta; }
+    lineas.push(l);
+  });
+  return lineas;
+}
+function resumirConsumo(lineas, totalFactura){
+  const suma = redondear2(lineas.reduce((s, l) => s + l.importe, 0));
+  const tipos = new Map(), arts = new Map(), subt = new Map();
+  lineas.forEach(l => {
+    if(l.grupo === 'combustible'){
+      const t = tipos.get(l.tipo) || {tipo: l.tipo, etiqueta: l.etiqueta, litros: 0, importe: 0, lineas: 0};
+      t.litros += l.cantidad; t.importe += l.importe; t.lineas++; tipos.set(l.tipo, t);
+    }else{
+      const clave = l.descripcion.toUpperCase();
+      const a = arts.get(clave) || {descripcion: l.descripcion, subtipo: l.subtipo, cantidad: 0, importe: 0};
+      a.cantidad += l.cantidad; a.importe += l.importe; arts.set(clave, a);
+      const st = subt.get(l.subtipo) || {subtipo: l.subtipo, etiqueta: l.etiqueta, importe: 0};
+      st.importe += l.importe; subt.set(l.subtipo, st);
+    }
+  });
+  const por_tipo = [...tipos.values()].map(t => ({...t, litros: redondear2(t.litros), importe: redondear2(t.importe), precio_medio: t.litros ? Math.round(t.importe / t.litros * 1000) / 1000 : null}))
+    .sort((a, b) => b.litros - a.litros);
+  const articulos = [...arts.values()].map(a => ({...a, cantidad: redondear2(a.cantidad), importe: redondear2(a.importe), precio_medio: a.cantidad ? redondear2(a.importe / a.cantidad) : null})).sort((a, b) => b.importe - a.importe);
+  return {
+    lineas_n: lineas.length, suma_lineas: suma, cuadra: totalFactura != null && Math.abs(suma - totalFactura) <= 0.02,
+    litros_total: redondear2(por_tipo.reduce((s, t) => s + t.litros, 0)), por_tipo,
+    otros: {importe: redondear2(articulos.reduce((s, a) => s + a.importe, 0)), articulos, por_subtipo: [...subt.values()].map(x => ({...x, importe: redondear2(x.importe)})).sort((a, b) => b.importe - a.importe)},
+  };
+}
+// Lo que se guarda en documentos_economicos.conceptos (una línea por tipo de combustible y una por artículo "otro")
+function conceptosDesdeConsumo(consumo){
+  const out = [];
+  consumo.por_tipo.forEach(t => out.push({cantidad: t.litros, unidad: 'l', descripcion: t.etiqueta, precio_unitario: t.precio_medio, importe: t.importe, grupo: 'combustible', tipo: t.tipo}));
+  consumo.otros.articulos.forEach(a => out.push({cantidad: a.cantidad, unidad: 'ud', descripcion: a.descripcion, precio_unitario: a.precio_medio, importe: a.importe, grupo: 'otros', subtipo: a.subtipo}));
+  return out;
+}
+// Resumen de combustible de un conjunto de gastos (para el panel del Resumen de Gastos): sale de los conceptos guardados
+function resumenCombustibleDeGastos(docs){
+  const tipos = new Map(); let otros = 0, nOtros = 0, facturas = 0; const arts = new Map();
+  docs.forEach(d => {
+    const cs = Array.isArray(d.conceptos) ? d.conceptos : [];
+    if(!cs.some(c => c.grupo === 'combustible')) return;
+    facturas++;
+    cs.forEach(c => {
+      if(c.grupo === 'combustible'){
+        const t = tipos.get(c.tipo) || {tipo: c.tipo, etiqueta: c.descripcion, litros: 0, importe: 0}; t.litros += Number(c.cantidad || 0); t.importe += Number(c.importe || 0); tipos.set(c.tipo, t);
+      }else if(c.grupo === 'otros'){ otros += Number(c.importe || 0); nOtros += Number(c.cantidad || 0); arts.set(c.descripcion, (arts.get(c.descripcion) || 0) + Number(c.importe || 0)); }
+    });
+  });
+  const lista = [...tipos.values()].map(t => ({...t, litros: redondear2(t.litros), importe: redondear2(t.importe)})).sort((a, b) => b.litros - a.litros);
+  return {facturas, litros: redondear2(lista.reduce((s, t) => s + t.litros, 0)), gastoCombustible: redondear2(lista.reduce((s, t) => s + t.importe, 0)), tipos: lista, otros: redondear2(otros), nOtros, articulos: [...arts.entries()].sort((a, b) => b[1] - a[1]).map(([nombre, importe]) => ({nombre, importe: redondear2(importe)}))};
+}
 // Devuelve: destino ('gasto' | 'dudoso' | 'revisar'), confianza, campos, problemas y motivo.
 function extraerGastoConPlantilla(texto, pl, regla){
   const formato = pl.formato_numero || 'auto';
@@ -6865,6 +6944,18 @@ function extraerGastoConPlantilla(texto, pl, regla){
     desglose: filas, total: suma, base, iva, pct_principal: principal ? principal.pct : null,
     litros: sumarCoincidencias(texto, pl.litros, formato),
   };
+  const avisos = [];
+  if(pl.lineas){
+    const lin = extraerLineasConsumo(texto, pl.lineas, formato);
+    if(lin.length){
+      const consumo = resumirConsumo(lin, suma);
+      consumo.litros_impresos = sumarCoincidencias(texto, pl.litros, formato);   // litros que la propia factura declara en "Impuestos especiales"
+      consumo.litros_cuadran = consumo.litros_impresos == null ? null : Math.abs(consumo.litros_total - consumo.litros_impresos) <= 0.1;
+      if(consumo.cuadra){ campos.consumo = consumo; campos.lineas = lin; }
+      else avisos.push(`El detalle de litros no cuadra con el total (las líneas suman ${eurRevSeguro(consumo.suma_lineas)})`);
+      if(consumo.cuadra && consumo.litros_cuadran === false) avisos.push('Los litros de las líneas no coinciden con los que declara la factura');
+    }else avisos.push('No he podido leer las líneas de la factura');
+  }
   const defecto = pl.defecto || {};
   if(fecha && defecto.concepto){
     const [y, mo] = fecha.split('-');
@@ -6878,7 +6969,7 @@ function extraerGastoConPlantilla(texto, pl, regla){
     else if(!validos.includes(normalizarParaBuscar(nifCliente))){ destino = 'dudoso'; motivo = `A nombre de otro NIF (${nifCliente})`; }
     else destino = 'gasto';
   }
-  return {plantilla: pl.firma || '', campos, problemas, destino, motivo, confianza: problemas.length ? 'baja' : confianza};
+  return {plantilla: pl.firma || '', campos, problemas, avisos, destino, motivo, confianza: problemas.length ? 'baja' : confianza};
 }
 
 // ---------- flujo: cargar plantillas ----------
@@ -6898,6 +6989,7 @@ const REV_DESTINOS = {gasto: 'Gasto de la empresa', dudoso: 'Dudoso (lo decides 
 let _revisor = null, _revisando = false;
 function eurRev(n){ return Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €'; }
 function fechaRev(iso){ return iso ? String(iso).split('-').reverse().join('/') : '—'; }
+function litrosRev(n){ return Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' l'; }
 function textoIvaRev(desglose){
   const p = (desglose || []).map(f => f.pct).filter((v, i, a) => a.indexOf(v) === i);
   return p.length ? ` (IVA ${p.join(' y ')} %)` : '';
@@ -6918,7 +7010,11 @@ function propuestaDesdePlantilla(fila, pl, res){
     desglose: c.desglose, pct_principal: c.pct_principal, categoria: def.categoria || null, concepto: c.concepto, contabilidad: def.contabilidad || 'oficial',
     tratamiento_iva: def.tratamiento_iva || 'normal', forma_pago: def.forma_pago || null, litros: c.litros, nif_cliente: c.nif_cliente, firma: cont.firma || null, confianza: res.confianza};
   const aNombre = res.destino === 'gasto' ? 'Va a nombre del titular.' : (res.destino === 'dudoso' ? res.motivo + '.' : '');
-  const entendido = `Factura de ${prov.nombre} nº ${c.numero || '—'}${c.fecha ? ' del ' + fechaRev(c.fecha) : ''}${c.litros ? ', unos ' + Math.round(c.litros).toLocaleString('es-ES') + ' litros' : ''}. ${aNombre}`.trim();
+  const co = c.consumo;
+  datos.consumo = co || null; datos.lineas = co ? c.lineas : null; datos.avisos = res.avisos || [];
+  const detalle = co ? `, ${litrosRev(co.litros_total)} de combustible${co.otros.articulos.length ? ' y ' + co.otros.articulos.reduce((s, a) => s + a.cantidad, 0) + ' artículo(s) más por ' + eurRev(co.otros.importe) : ''}`
+    : (c.litros ? ', unos ' + Math.round(c.litros).toLocaleString('es-ES') + ' litros' : '');
+  const entendido = `Factura de ${prov.nombre} nº ${c.numero || '—'}${c.fecha ? ' del ' + fechaRev(c.fecha) : ''}${detalle}. ${aNombre}`.trim();
   const prop = {origen: 'plantilla', plId: pl.id, destino: res.destino, motivo: res.motivo || '', entendido, datos};
   prop.propongo = textosPropuesta(prop).propongo;
   return prop;
@@ -6947,8 +7043,9 @@ function payloadGastoDesdePropuesta(fila, prop, proveedorId){
     archivo_path: fila.storage_path, archivo_url: url, justificante_url: url, estado_justificante: 'completo',
     metodo_extraccion: prop.origen === 'plantilla' && !prop.editada ? 'reglas' : 'manual', confianza_extraccion: d.confianza || (prop.origen === 'plantilla' ? 'alta' : 'media'), firma_plantilla: d.firma || null,
     relacion_actividad: prop.destino === 'dudoso' ? 'dudosa' : 'relacionada',
-    conceptos: d.litros ? [{cantidad: d.litros, unidad: 'l', descripcion: 'Combustible', precio_unitario: null}] : [],
-    cliente_datos_doc: {origen: 'correo', gmail_message_id: fila.gmail_message_id, remitente: fila.remitente, nif_cliente: d.nif_cliente || null, motivo_dudoso: prop.destino === 'dudoso' ? (prop.motivo || 'Marcado como dudoso') : null},
+    conceptos: d.consumo ? conceptosDesdeConsumo(d.consumo) : (d.litros ? [{cantidad: d.litros, unidad: 'l', descripcion: 'Combustible', precio_unitario: null}] : []),
+    cliente_datos_doc: {origen: 'correo', gmail_message_id: fila.gmail_message_id, remitente: fila.remitente, nif_cliente: d.nif_cliente || null, motivo_dudoso: prop.destino === 'dudoso' ? (prop.motivo || 'Marcado como dudoso') : null,
+      ...(d.lineas ? {lineas: d.lineas, consumo_verificado: true} : {})},
   };
 }
 async function abrirRevisorGastos(){
@@ -6998,6 +7095,13 @@ function renderRevisorGastos(){
   const filasDatos = [['Proveedor', d.proveedor && d.proveedor.nombre], ['NIF del proveedor', d.proveedor && d.proveedor.nif], ['Nº', d.numero], ['Fecha', d.fecha ? fechaRev(d.fecha) : null],
     ['Subtotal', d.base != null ? eurRev(d.base) : null], ['IVA', d.iva != null ? eurRev(d.iva) + textoIvaRev(d.desglose) : null], ['Total', d.total ? eurRev(d.total) : null],
     ['Categoría', d.categoria], ['Forma de pago', d.forma_pago], ['Concepto', d.concepto]].filter(x => x[1]);
+  if(d.consumo){
+    const co = d.consumo, arts = co.otros.articulos;
+    filasDatos.push(['Combustible', litrosRev(co.litros_total)]);
+    co.por_tipo.forEach(t => filasDatos.push([t.etiqueta, litrosRev(t.litros) + ' · ' + eurRev(t.importe)]));
+    if(arts.length) filasDatos.push(['Otros gastos', eurRev(co.otros.importe) + ' (' + arts.slice(0, 3).map(a => a.descripcion).join(', ') + (arts.length > 3 ? '…' : '') + ')']);
+    filasDatos.push(['Detalle', `✓ ${co.lineas_n} líneas, suman el total`]);
+  }
   const iguales = prop.plId && R.confirmadosGrupo.has(prop.plId) ? R.items.filter(x => x.prop.plId === prop.plId && x.prop.destino === 'gasto' && !x.prop.editada) : [];
   let cuerpo;
   if(R.editando){
@@ -7010,6 +7114,7 @@ function renderRevisorGastos(){
     cuerpo = `<div class="rev-bloque"><div class="rev-etq">He entendido</div><div class="rev-txt">${escHtml(prop.entendido || '—')}</div></div>
       <div class="rev-bloque"><div class="rev-etq">Propongo</div><div class="rev-txt">${escHtml(prop.propongo || '—')}</div></div>
       ${filasDatos.length ? `<dl class="rev-datos">${filasDatos.map(([k, v]) => `<dt>${escHtml(k)}</dt><dd>${escHtml(v)}</dd>`).join('')}</dl>` : ''}
+      ${(d.avisos || []).length ? `<div class="rev-nota">Ojo: ${escHtml(d.avisos.join('. '))}. No impide guardarla.</div>` : ''}
       ${problemas.length ? `<div class="rev-error">Para poder confirmarla falta: ${escHtml(problemas.join(', '))}. Pulsa Editar o Descartar.</div>` : ''}
       ${R.error ? `<div class="rev-error">${escHtml(R.error)}</div>` : ''}
       ${iguales.length > 1 ? `<div class="rev-aviso">Hay ${iguales.length} iguales a esta que también cuadran.<button class="btn primary" id="rev-iguales">Confirmar las ${iguales.length}</button></div>` : ''}
@@ -7151,6 +7256,16 @@ function totalesGastoHtml(d){
   const detalle = filas && filas.length > 1 ? `<div class="gasto-iva-det">${filas.map(f => `${escHtml(f.pct)}%: ${escHtml(eur(f.cuota))}`).join(' · ')}</div>` : '';
   return `<div class="gasto-tot"><div><span>${escHtml(etiqueta)}</span><b>${escHtml(eur(iva))}</b></div><div><span>Subtotal</span><b>${escHtml(eur(base))}</b></div><div class="gasto-tot-total"><span>Total</span><b>${escHtml(eur(d.importe))}</b></div></div>${detalle}`;
 }
+function consumoGastoHtml(d){
+  const cs = Array.isArray(d.conceptos) ? d.conceptos : [];
+  const comb = cs.filter(c => c.grupo === 'combustible');
+  if(!comb.length) return '';
+  const otros = cs.filter(c => c.grupo === 'otros');
+  const litros = comb.reduce((s, c) => s + Number(c.cantidad || 0), 0);
+  let h = `<div class="gasto-consumo"><b>${escHtml(litrosRev(litros))}</b> · ${comb.map(c => `${escHtml(c.descripcion)} ${escHtml(litrosRev(c.cantidad))}`).join(' · ')}</div>`;
+  if(otros.length) h += `<div class="gasto-consumo">Otros gastos: <b>${escHtml(eurRev(otros.reduce((s, o) => s + Number(o.importe || 0), 0)))}</b> (${otros.slice(0, 3).map(o => escHtml(o.descripcion)).join(', ')}${otros.length > 3 ? '…' : ''})</div>`;
+  return h;
+}
 function gastoCardHtml(d, modo){
   const prov = (clientes.find(c => c.id === d.entidad_id) || {}).name || d.client || '—';
   const fecha = d.dateRaw ? formatFechaCorta(d.dateRaw) : '—';
@@ -7173,12 +7288,25 @@ function gastoCardHtml(d, modo){
     <div class="gasto-meta">${ICO_DOC} Nº ${escHtml(d.numero || '—')} <span class="fc-meta-sep">|</span> ${ICO_CAL} ${escHtml(fecha)}</div>
     ${motivo ? `<div class="gasto-motivo">${escHtml(motivo)}</div>` : ''}
     ${totalesGastoHtml(d)}
+    ${consumoGastoHtml(d)}
     <div class="gasto-pie">${pie}</div>${acciones}
   </div>`;
 }
 function enlazarTarjetasGasto(cont){
   cont.querySelectorAll('[data-url]').forEach(b => { b.onclick = ev => { ev.stopPropagation(); abrirVisorDesdeUrl(b.dataset.url); }; });
   cont.querySelectorAll('[data-decidir]').forEach(b => { b.onclick = () => decidirGastoDudoso(b.dataset.id, b.dataset.decidir); });
+}
+function pintarCombustibleResumen(docs){
+  const cont = document.getElementById('gpro-combustible');
+  if(!cont) return;
+  const r = resumenCombustibleDeGastos(docs);
+  const linea = (a, b) => `<div class="econ-line"><span>${a}</span><span class="v">${b}</span></div>`;
+  if(!r.facturas){ cont.innerHTML = '<div class="empty">Sin datos de combustible en este periodo.</div>'; return; }
+  cont.innerHTML = linea('Litros totales', escHtml(litrosRev(r.litros))) +
+    r.tipos.map(t => linea(`${escHtml(t.etiqueta)} · ${escHtml(litrosRev(t.litros))}`, `${escHtml(eurRev(t.importe))}${t.litros ? ` <span style="color:var(--ink-soft);font-weight:400;">(${escHtml((t.importe / t.litros).toLocaleString('es-ES', {minimumFractionDigits: 3, maximumFractionDigits: 3}))} €/l)</span>` : ''}`)).join('') +
+    linea('Gasto en combustible', escHtml(eurRev(r.gastoCombustible))) +
+    (r.otros ? linea(`Otros gastos de la gasolinera (${r.articulos.slice(0, 3).map(a => escHtml(a.nombre)).join(', ')}${r.articulos.length > 3 ? '…' : ''})`, escHtml(eurRev(r.otros))) : '') +
+    `<div class="sub-t" style="margin-top:4px;font-size:11.5px;">${r.facturas} factura(s). Importes con IVA. Es solo control interno: al gestor solo se le manda la factura.</div>`;
 }
 function gastosDudososDocs(rel){
   return Object.values(documentosRealesById).filter(d => (d.type === 'gasto' || d.tipo === 'gasto') && d.relacion_actividad === rel);
@@ -7243,6 +7371,8 @@ function renderGastosProResumen(){
   document.getElementById('gpro-chart-evolucion').innerHTML = meses.map((m,i)=>`
     <div class="bar-col"><div class="bar" style="height:${Math.max(4,sumasMes[i]/maxMes*100)}%;${i===5?'background:var(--orange);':''}"></div><span>${nombresMes[m.getMonth()]}</span></div>
   `).join('');
+
+  pintarCombustibleResumen(docs);
 
   // por proveedor (todo el histórico de gasto)
   const porProveedor = {};
