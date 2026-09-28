@@ -1116,6 +1116,9 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .gasto-pie{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;}
 .gasto-pie .fc-ver-original{display:inline-flex;align-items:center;gap:6px;color:var(--blue,#3B6FA0);font-weight:600;font-size:12.5px;cursor:pointer;}
 .gasto-acciones{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+.gasto-adjuntos{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:12.5px;}
+.gasto-adj-tit{color:var(--ink-soft);font-weight:600;}
+.gasto-adjuntos .fc-ver-original{display:inline-flex;align-items:center;gap:5px;color:var(--blue,#3B6FA0);font-weight:600;cursor:pointer;}
 .gasto-consumo{font-size:12.5px;color:var(--ink-soft);overflow-wrap:anywhere;}
 .gasto-consumo b{color:var(--ink);}
 .rev-nota{font-size:12.5px;color:var(--orange);font-weight:600;}
@@ -2961,7 +2964,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.98</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.99</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3039,7 +3042,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.98</div>
+        <div class="sub" id="version-badge">V5.99</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7072,7 +7075,7 @@ async function cargarPlantillasGasto(){
 // Cada PDF de la cola sale como una tarjeta con una propuesta. La propuesta viene de la plantilla del proveedor
 // (el motor la lee solo) o de gastos_correo.propuesta (la escribe Claude leyendo el PDF). Nada se crea hasta pulsar Confirmar.
 const GASTO_CATEGORIAS = ['Combustible','Reparaciones y averías','Repuestos','Neumáticos','Aceites y lubricantes','Herramientas','Alquiler de maquinaria','Transporte','Materiales','Subcontratas','Personal','Seguridad Social','Dietas','Comidas','Alojamientos','Peajes y parking','Seguros','Impuestos y tasas','Gestoría/profesionales','Telefonía/internet','Software/suscripciones','Oficina','Suministros','Comisiones bancarias','Financiación','Vertedero y residuos','Otros'];
-const REV_DESTINOS = {gasto: 'Gasto de la empresa', dudoso: 'Dudoso (lo decides luego)', ayuntamiento: 'Ayuntamiento', documentacion: 'Documentación (banco, legal…)', justificante_pago: 'Justificante de pago', descartar: 'Descartar'};
+const REV_DESTINOS = {gasto: 'Gasto de la empresa', dudoso: 'Dudoso (lo decides luego)', adjunto: 'Adjunto de su factura', ayuntamiento: 'Ayuntamiento', documentacion: 'Empresa → Documentos', justificante_pago: 'Justificante de pago', descartar: 'Descartar'};
 let _revisor = null, _revisando = false;
 function eurRev(n){ return Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €'; }
 function fechaRev(iso){ return iso ? String(iso).split('-').reverse().join('/') : '—'; }
@@ -7088,6 +7091,8 @@ function textosPropuesta(prop){
   else if(prop.destino === 'dudoso') propongo = `Mandarla a Dudosos${prop.motivo ? ': ' + prop.motivo.charAt(0).toLowerCase() + prop.motivo.slice(1) : ''}. No contará ni se enviará al gestor hasta que decidas.`;
   else if(prop.destino === 'revisar') propongo = `No la doy por buena${prop.motivo ? ': ' + prop.motivo : ''}. Mírala tú o descártala.`;
   else if(prop.destino === 'descartar') propongo = 'Descartarla. Queda apuntada en la cola, no se borra.';
+  else if(prop.destino === 'adjunto') propongo = 'Pegarlo como adjunto a su factura: aparecerá en su tarjeta de Gastos, con su Ver PDF.';
+  else if(prop.destino === 'documentacion') propongo = 'Guardarlo en Empresa → Documentos, con su ficha y su archivo.';
   else propongo = `Anotarla como ${REV_DESTINOS[prop.destino] || prop.destino}. Queda apuntada y la coloco yo en su sitio.`;
   return {propongo};
 }
@@ -7161,7 +7166,8 @@ async function abrirRevisorGastos(){
     }
     if(prop) items.push({fila: f, prop}); else sinLeer++;
   }
-  items.sort((x, y) => (x.prop.plId ? 0 : 1) - (y.prop.plId ? 0 : 1) || String(x.prop.plId || '').localeCompare(String(y.prop.plId || '')) || String(y.fila.fecha_correo).localeCompare(String(x.fila.fecha_correo)));
+  const rango = x => x.prop.plId ? 0 : (x.prop.destino === 'adjunto' ? 2 : 1);   // los adjuntos van al final: necesitan que su factura ya esté guardada
+  items.sort((x, y) => rango(x) - rango(y) || String(x.prop.plId || '').localeCompare(String(y.prop.plId || '')) || String(y.fila.fecha_correo).localeCompare(String(x.fila.fecha_correo)));
   _revisor = {items, sinLeer, confirmadosGrupo: new Set(), provCache: {}, editando: false, error: '', aviso: '', hechas: 0};
   renderRevisorGastos();
   Promise.resolve(repararTodosPdfsCorreo()).catch(e => console.warn('Reparar PDFs:', e));
@@ -7182,6 +7188,15 @@ function renderRevisorGastos(){
   const filasDatos = [['Proveedor', d.proveedor && d.proveedor.nombre], ['NIF del proveedor', d.proveedor && d.proveedor.nif], ['Nº', d.numero], ['Fecha', d.fecha ? fechaRev(d.fecha) : null],
     ['Subtotal', d.base != null ? eurRev(d.base) : null], ['IVA', d.iva != null ? eurRev(d.iva) + textoIvaRev(d.desglose) : null], ['Total', d.total ? eurRev(d.total) : null],
     ['Categoría', d.categoria], ['Forma de pago', d.forma_pago], ['Concepto', d.concepto]].filter(x => x[1]);
+  if(prop.destino === 'adjunto'){
+    if(Array.isArray(d.adjunto_a) && d.adjunto_a.length) filasDatos.push(['Se pega a', d.adjunto_a.map(x => 'factura ' + x.numero).join(' y ')]);
+    if(d.adjunto_tipo) filasDatos.push(['Tipo', d.adjunto_tipo]);
+    if(d.adjunto_nombre) filasDatos.push(['Nombre', d.adjunto_nombre]);
+  }
+  if(prop.destino === 'documentacion'){
+    if(!d.categoria) filasDatos.push(['Categoría', 'Otros']);
+    if(d.nombre) filasDatos.push(['Nombre', d.nombre]);
+  }
   if(d.consumo){
     const co = d.consumo, arts = co.otros.articulos;
     filasDatos.push(['Combustible', litrosRev(co.litros_total)]);
@@ -7260,6 +7275,42 @@ async function aplicarPropuestaRevisor(it){
     const {error: eq} = await sb.from('gastos_correo').update({estado: 'clasificado', gasto_id: gastoId, plantilla_id: prop.plId || null,
       clasificacion: {destino: prop.destino, origen: prop.origen, confianza: prop.datos.confianza || null, numero: prop.datos.numero || null, total: prop.datos.total}}).eq('id', fila.id);
     if(eq) throw new Error(eq.message);
+  }else if(prop.destino === 'adjunto'){
+    const objetivos = Array.isArray(prop.datos && prop.datos.adjunto_a) ? prop.datos.adjunto_a.filter(o => o && o.numero) : [];
+    if(!objetivos.length) throw new Error('No sé a qué factura pegarlo. Pulsa Editar o Descartar');
+    // primero se comprueba que TODAS las facturas existen; si falta alguna no se toca nada
+    const destinos = [];
+    for(const o of objetivos){
+      const {data: gs, error: eg} = await sb.from('documentos_economicos').select('id,numero,adjuntos').eq('tipo', 'gasto').eq('numero', o.numero);
+      if(eg) throw new Error(eg.message);
+      if(!gs || !gs.length) throw new Error(`Confirma primero la factura ${o.numero}: todavía no está guardada como gasto`);
+      gs.forEach(g => { if(!destinos.some(x => x.id === g.id)) destinos.push(g); });
+    }
+    const adj = {nombre: prop.datos.adjunto_nombre || fila.nombre_archivo, tipo: prop.datos.adjunto_tipo || 'Documento', path: fila.storage_path, url: urlPublicaGastoCorreo(fila.storage_path), fecha: fila.fecha_correo ? String(fila.fecha_correo).slice(0, 10) : null, origen: 'correo'};
+    for(const g of destinos){
+      const lista = Array.isArray(g.adjuntos) ? g.adjuntos : [];
+      if(lista.some(a => a.path === adj.path)) continue;   // ya estaba pegado: no se duplica
+      const nueva = [...lista, adj];
+      const {error: ea} = await sb.from('documentos_economicos').update({adjuntos: nueva}).eq('id', g.id);
+      if(ea) throw new Error(ea.message);
+      if(documentosRealesById[g.id]) documentosRealesById[g.id].adjuntos = nueva;
+    }
+    const {error: ec} = await sb.from('gastos_correo').update({estado: 'clasificado', clasificacion: {destino: 'adjunto', origen: prop.origen, gasto_ids: destinos.map(g => g.id)}}).eq('id', fila.id);
+    if(ec) throw new Error(ec.message);
+  }else if(prop.destino === 'documentacion'){
+    const d = prop.datos || {};
+    const url = urlPublicaGastoCorreo(fila.storage_path);
+    const {data: ya, error: ey} = await sb.from('documentos_empresa').select('id').eq('archivo_path', fila.storage_path).limit(1);
+    if(ey) throw new Error(ey.message);
+    let docId = ya && ya[0] && ya[0].id;
+    if(!docId){
+      const {data: nuevo, error: en} = await sb.from('documentos_empresa').insert({categoria: d.categoria || 'Otros', nombre: d.nombre || fila.nombre_archivo, archivo_path: fila.storage_path, archivo_url: url,
+        archivos: [{nombre: fila.nombre_archivo, url}], info_clave: String(prop.entendido || '').slice(0, 800) || null}).select('id').single();
+      if(en) throw new Error(en.message);
+      docId = nuevo.id;
+    }
+    const {error: ec} = await sb.from('gastos_correo').update({estado: 'clasificado', clasificacion: {destino: 'documentacion', origen: prop.origen, empresa_doc_id: docId}}).eq('id', fila.id);
+    if(ec) throw new Error(ec.message);
   }else if(prop.destino === 'descartar'){
     const {error} = await sb.from('gastos_correo').update({estado: 'descartado', clasificacion: {destino: 'descartar', origen: prop.origen}}).eq('id', fila.id);
     if(error) throw new Error(error.message);
@@ -7288,7 +7339,7 @@ async function confirmarRevisor(){
     await aplicarPropuestaRevisor(it);
     if(it.prop.plId && it.prop.destino === 'gasto') R.confirmadosGrupo.add(it.prop.plId);
     R.items.shift(); R.hechas++;
-    R.aviso = it.prop.destino === 'gasto' || it.prop.destino === 'dudoso' ? (it.prop.destino === 'dudoso' ? '✓ Guardada en Dudosos.' : '✓ Guardada como gasto.') : '✓ Anotada.';
+    R.aviso = ({gasto: '✓ Guardada como gasto.', dudoso: '✓ Guardada en Dudosos.', adjunto: '✓ Pegado a su factura.', documentacion: '✓ Guardado en Empresa → Documentos.'})[it.prop.destino] || '✓ Anotada.';
   }catch(e){ R.error = 'No se ha podido guardar: ' + (e.message || e); }
   finally{ _revisando = false; }
   renderRevisorGastos();
@@ -7343,6 +7394,11 @@ function totalesGastoHtml(d){
   const detalle = filas && filas.length > 1 ? `<div class="gasto-iva-det">${filas.map(f => `${escHtml(f.pct)}%: ${escHtml(eur(f.cuota))}`).join(' · ')}</div>` : '';
   return `<div class="gasto-tot"><div><span>${escHtml(etiqueta)}</span><b>${escHtml(eur(iva))}</b></div><div><span>Subtotal</span><b>${escHtml(eur(base))}</b></div><div class="gasto-tot-total"><span>Total</span><b>${escHtml(eur(d.importe))}</b></div></div>${detalle}`;
 }
+function adjuntosGastoHtml(d){
+  const a = Array.isArray(d.adjuntos) ? d.adjuntos : [];
+  if(!a.length) return '';
+  return `<div class="gasto-adjuntos"><span class="gasto-adj-tit">Adjuntos</span>${a.map(x => `<span class="fc-ver-original" data-url="${escHtml(x.url || '')}">${ICO_CLIP} ${escHtml(x.nombre || x.tipo || 'Documento')}</span>`).join('')}</div>`;
+}
 function consumoGastoHtml(d){
   const cs = Array.isArray(d.conceptos) ? d.conceptos : [];
   const comb = cs.filter(c => c.grupo === 'combustible');
@@ -7376,6 +7432,7 @@ function gastoCardHtml(d, modo){
     ${motivo ? `<div class="gasto-motivo">${escHtml(motivo)}</div>` : ''}
     ${totalesGastoHtml(d)}
     ${consumoGastoHtml(d)}
+    ${adjuntosGastoHtml(d)}
     <div class="gasto-pie">${pie}</div>${acciones}
   </div>`;
 }
