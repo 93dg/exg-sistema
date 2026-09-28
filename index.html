@@ -3078,7 +3078,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.01</div>
+        <div class="sub" id="version-badge">V6.02</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -17291,23 +17291,59 @@ function recalcTotals(){
   if(btnRevisar) btnRevisar.style.display = document.querySelectorAll('#ie-items-body tr').length ? '' : 'none';
   return {base, iva, total, tratamientoIva};
 }
-// ===== Revisar líneas — motor offline entrenado el 27/09/26 sobre el albarán A21 =====
+// ===== Revisar líneas — motor entrenado el 28/09/26 sobre el albarán A21, línea a línea con Daniel =====
 // Detecta: precio faltante (busca en tarifas), cantidad que no es múltiplo de 1/4 de hora,
-// y concepto sin "CON [MÁQUINA]" al final (la deduce con las reglas aprendidas ese día).
+// y que la máquina no esté puesta al final con "CON [MÁQUINA]" (así se profesionaliza el texto).
 // Nunca aplica nada solo: siempre muestra original/propuesto y espera "Aceptar".
-function tieneMaquinaAlFinal(concepto){
-  return /(CAMIÓN|MIXTA|GIRATORIA|NIVELADORA|MOTONIVELADORA|MARTILLO HIDRÁULICO)\s*$/i.test((concepto||'').trim());
-}
-function deducirMaquina(concepto, precio){
-  const c = (concepto||'').toUpperCase();
-  if(/TIERRA VEGETAL/.test(c)) return 'GIRATORIA';
-  if(/EXTENDID|NIVELACI[ÓO]N/.test(c)) return precio === 65 ? 'NIVELADORA' : (precio === 45 ? 'MIXTA' : null);
-  if(/RETIRADA|APORTE/.test(c)) return precio === 45 ? 'CAMIÓN' : null;
-  if(/REPERFILAD|REBAJE|CARGA/.test(c)) return precio === 65 ? 'GIRATORIA' : (precio === 45 ? 'MIXTA' : null);
-  if(precio === 45) return 'MIXTA';
-  if(precio === 65) return 'GIRATORIA';
+// Reglas exactas confirmadas por Daniel, una a una, el 28/09/26:
+//  - "RETRO" es el mismo nombre que "MIXTA": siempre se normaliza a MIXTA (nunca se deja "RETRO").
+//  - La máquina, la diga el texto donde la diga, se mueve siempre al final: "... CON [MÁQUINA]".
+//  - Si el texto no menciona ninguna máquina: a 45 €/h se propone MIXTA — "por el precio, a 45 sé que es
+//    la mixta" — EXCEPTO si el verbo es "picando" (picar con martillo, no con mixta ni camión), que va con
+//    MARTILLO HIDRÁULICO a su propia tarifa (55 €/h), no a 45.
+//  - A 65 €/h SIN máquina dicha, no se adivina: a ese precio hay dos máquinas (Giratoria y Niveladora) y
+//    Daniel no dio una regla para diferenciarlas por el texto — se deja "decidir a mano".
+const MAQUINAS_CONOCIDAS = ['MIXTA','RETRO','RETROEXCAVADORA','CAMIÓN','CAMION','GIRATORIA','NIVELADORA','MOTONIVELADORA','MARTILLO HIDRÁULICO','MARTILLO HIDRAULICO','MARTILLO'];
+const MAQUINA_NORMALIZADA = {RETRO:'MIXTA', RETROEXCAVADORA:'MIXTA', CAMION:'CAMIÓN', 'MARTILLO HIDRAULICO':'MARTILLO HIDRÁULICO', MARTILLO:'MARTILLO HIDRÁULICO'};
+function normalizaMaquina(nombre){ const n = (nombre||'').toUpperCase().trim(); return MAQUINA_NORMALIZADA[n] || n; }
+// Busca cualquier máquina conocida en el texto, la quite de donde esté y diga si ya estaba puesta "bien"
+// (al final, con "CON " delante y ya con su nombre normalizado — ni un espacio de más).
+function maquinaEnTexto(concepto){
+  const c = (concepto||'').trim();
+  for(const m of MAQUINAS_CONOCIDAS){
+    const re = new RegExp('(^|\\bCON\\s+)' + m.replace(/[ÁÉÍÓÚ]/g,x=>({Á:'[ÁA]',É:'[ÉE]',Í:'[ÍI]',Ó:'[ÓO]',Ú:'[ÚU]'}[x])) + '\\b', 'i');
+    if(re.test(c)) return normalizaMaquina(m);
+  }
   return null;
 }
+// Qué máquina le corresponde a esta línea: "picando" es SIEMPRE Martillo Hidráulico (aunque el texto
+// mencione otra), y solo si no es eso se mira la máquina ya escrita en el texto, y si no hay ninguna,
+// se deduce por el precio (45€ → Mixta). A 65€ sin máquina dicha no se adivina (Giratoria/Niveladora).
+function maquinaCorrectaPara(concepto, precio){
+  const c = (concepto||'').toUpperCase();
+  if(/PICANDO/.test(c)) return {maquina:'MARTILLO HIDRÁULICO', precioSugerido:55, dichaEnTexto:false};
+  const enTexto = maquinaEnTexto(concepto);
+  if(enTexto) return {maquina:enTexto, precioSugerido:null, dichaEnTexto:true};
+  if(precio === 45) return {maquina:'MIXTA', precioSugerido:null, dichaEnTexto:false};
+  return {maquina:null, precioSugerido:null, dichaEnTexto:false};
+}
+function tieneMaquinaBienPuesta(concepto, precio){
+  const {maquina} = maquinaCorrectaPara(concepto, precio);
+  if(!maquina) return false;
+  const c = (concepto||'').trim().toUpperCase();
+  return new RegExp('CON ' + maquina.replace(/[ÁÉÍÓÚ]/g,x=>({Á:'[ÁA]',É:'[ÉE]',Í:'[ÍI]',Ó:'[ÓO]',Ú:'[ÚU]'}[x])) + '\\s*$').test(c);
+}
+// Construye la propuesta: quita la máquina de donde esté (principio o en medio) y la añade al final ya normalizada.
+function proponerConMaquinaAlFinal(concepto, maquina){
+  let texto = (concepto||'').trim();
+  for(const m of MAQUINAS_CONOCIDAS){
+    const re = new RegExp('(^|\\s)' + m.replace(/[ÁÉÍÓÚ]/g,x=>({Á:'[ÁA]',É:'[ÉE]',Í:'[ÍI]',Ó:'[ÓO]',Ú:'[ÚU]'}[x])) + '\\b\\s*', 'gi');
+    texto = texto.replace(re, (m0,pre)=>pre ? '' : '');
+  }
+  texto = texto.replace(/^CON\s+/i,'').replace(/\s{2,}/g,' ').trim();
+  return `${texto} CON ${maquina}`;
+}
+
 async function buscarTarifaPorConcepto(concepto){
   if(!sb) return null;
   const {data} = await sb.from('tarifas').select('concepto,precio_particular,palabras_clave');
@@ -17341,11 +17377,13 @@ async function revisarLineasDocumento(){
         original:`Cantidad: ${cantidad}`, propuesto:'No es múltiplo de un cuarto de hora — revisar a mano',
         valorPropuesto:null, campo:'cantidad' });
     }
-    if(concepto && !esServicio && !tieneMaquinaAlFinal(concepto)){
-      const maquina = deducirMaquina(concepto, precio);
-      hallazgos.push({ id, mensaje:`Falta máquina — "${concepto}" (${fecha||'sin fecha'}, ${precio}€)`,
-        original: concepto, propuesto: maquina ? `${concepto} CON ${maquina}` : 'No se pudo deducir — decidir a mano',
-        valorPropuesto: maquina ? `${concepto} CON ${maquina}` : null, campo:'concepto' });
+    if(concepto && !esServicio && !tieneMaquinaBienPuesta(concepto, precio)){
+      const {maquina, precioSugerido} = maquinaCorrectaPara(concepto, precio);
+      const propuesta = maquina ? proponerConMaquinaAlFinal(concepto, maquina) : null;
+      hallazgos.push({ id, mensaje:`Máquina — "${concepto}" (${fecha||'sin fecha'}, ${precio}€)`,
+        original: concepto,
+        propuesto: propuesta ? (propuesta + (precioSugerido && precioSugerido!==precio ? ` · precio ${precioSugerido} €/h (tarifa de esa máquina)` : '')) : 'No se pudo deducir la máquina — decidir a mano',
+        valorPropuesto: propuesta, campo:'concepto', precioSugerido });
     }
   }
   if(!hallazgos.length){
@@ -17363,7 +17401,7 @@ async function revisarLineasDocumento(){
           <div style="font-size:13px;color:var(--ink-soft);">Original: ${svgEsc(h.original)}</div>
           <div style="font-size:13px;margin-bottom:6px;">Propuesto: ${svgEsc(h.propuesto)}</div>
           <div style="display:flex;gap:8px;">
-            ${h.valorPropuesto!=null ? `<button type="button" class="btn sm primary" onclick="aplicarHallazgoRevision('${h.id}','${h.campo}', this)" data-valor="${svgEsc(String(h.valorPropuesto)).replace(/"/g,'&quot;')}">✓ Aceptar</button>` : ''}
+            ${h.valorPropuesto!=null ? `<button type="button" class="btn sm primary" onclick="aplicarHallazgoRevision('${h.id}','${h.campo}', this)" data-valor="${svgEsc(String(h.valorPropuesto)).replace(/"/g,'&quot;')}"${h.precioSugerido!=null ? ` data-precio-sugerido="${h.precioSugerido}"` : ''}>✓ Aceptar</button>` : ''}
             <button type="button" class="btn sm" onclick="document.getElementById('${h.id}')?.classList.remove('colapsada'); document.getElementById('${h.id}')?.scrollIntoView({behavior:'smooth',block:'center'}); actualizarResumenLinea('${h.id}');">✎ Editar a mano</button>
           </div>
         </div>
@@ -17384,7 +17422,11 @@ function aplicarHallazgoRevision(id, campo, btn){
   if(!tr) return;
   const valor = btn.dataset.valor;
   if(campo==='precio') tr.querySelector('.ie-price').value = valor;
-  else if(campo==='concepto') tr.querySelector('.ie-concept').value = valor;
+  else if(campo==='concepto'){
+    tr.querySelector('.ie-concept').value = valor;
+    // algunas máquinas (p.ej. el Martillo Hidráulico) llevan su propia tarifa: se sugiere el precio junto con el texto
+    if(btn.dataset.precioSugerido) tr.querySelector('.ie-price').value = btn.dataset.precioSugerido;
+  }
   recalcTotals();
   btn.outerHTML = '<span style="color:var(--green);font-weight:600;">✓ Aplicado</span>';
 }
