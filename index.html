@@ -371,6 +371,9 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
   padding:12px 14px; margin:0 10px 10px;
 }
 .notif-card.no-leida { border-left:3px solid var(--orange); }
+.notif-x-movil{flex:0 0 32px;width:32px;height:32px;margin:-6px -6px -6px 0;border:0;border-radius:50%;background:transparent;color:var(--ink-soft);font-size:16px;font-weight:800;line-height:1;cursor:pointer;}
+.notif-x-movil:active{background:var(--concrete-2);}
+.notif-x{color:var(--red);}
 .notif-card .nc-hora { font-size:11px; color:var(--ink-soft); margin-bottom:4px; }
 .notif-card .nc-accion { font-weight:700; font-size:14px; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .notif-card .nc-decision { font-size:12px; color:var(--ink-soft); margin-bottom:6px; }
@@ -2840,7 +2843,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.83</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.84</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2918,7 +2921,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.83</div>
+        <div class="sub" id="version-badge">V5.84</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3021,13 +3024,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
         </div>
         <div id="notif-body" style="display:none;">
+          <div id="notif-barra" style="display:none;justify-content:flex-end;padding:8px 14px 0;">
+            <button class="btn sm" style="color:var(--red);" onclick="borrarTodasNotif()">Borrar todas</button>
+          </div>
           <div class="tabla-escritorio-solo" style="padding:0;overflow-x:auto;">
             <table class="tbl" style="width:100%;">
               <thead><tr>
                 <th style="width:125px;text-align:left;">Fecha / Hora</th>
                 <th style="text-align:left;">Cambio realizado</th>
                 <th style="width:130px;text-align:left;">Elemento</th>
-                <th style="width:70px;"></th>
+                <th style="width:120px;"></th>
               </tr></thead>
               <tbody id="notif-tbody"></tbody>
             </table>
@@ -12001,6 +12007,8 @@ function renderNotificaciones(lista){
     const chev=document.getElementById('notif-chevron');
     if(body&&body.style.display==='none'){ body.style.display=''; if(chev) chev.textContent='▴'; }
   }
+  const barra = document.getElementById('notif-barra');
+  if(barra) barra.style.display = lista.length ? 'flex' : 'none';
   if(!lista.length){
     if(empty) empty.style.display='';
     document.getElementById('notif-tbody').innerHTML='';
@@ -12026,6 +12034,7 @@ function renderNotificaciones(lista){
         <td style="text-align:center;">
           <button class="btn sm" onclick="abrirDetalleNotif('${n.id}')">Ver</button>
           ${n.elemento_id&&n.seccion?`<button class="btn sm" onclick="irAElementoNotif('${n.id}')" title="Ir al elemento">↗</button>`:''}
+          <button class="btn sm notif-x" onclick="borrarNotif('${n.id}')" title="Borrar" aria-label="Borrar notificación">✕</button>
         </td>
       </tr>`;
     }).join('');
@@ -12044,6 +12053,7 @@ function renderNotificaciones(lista){
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
           <div class="nc-accion" style="flex:1;font-size:13px;font-weight:${n.leida?'400':'600'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${accion}</div>
           <div class="nc-hora" style="flex-shrink:0;font-size:11px;color:var(--ink-soft);">${fechaHora}</div>
+          <button type="button" class="notif-x-movil" onclick="borrarNotif('${n.id}')" aria-label="Borrar notificación">✕</button>
         </div>
         ${cliente?`<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${cliente}</div>`:''}
         <div class="nc-links" style="margin-top:8px;">
@@ -12360,6 +12370,26 @@ function resaltarCambioEnDrawer(datos){
   }
 }
 
+// "Borrar" una notificación = darla por resuelta: es lo que ya usa el sistema para quitarla de la
+// lista (verificado + leída). La fila no se destruye, así queda el rastro por si hiciera falta.
+async function borrarNotif(id){
+  if(!sb) return;
+  if(!exigirNivel('control','editar')) return;
+  const {error} = await sb.from('sistema_notificaciones').update({verificado:true, verificado_at:new Date().toISOString(), leida:true}).eq('id', id);
+  if(error){ mostrarToast('No se pudo borrar: '+errText(error)); return; }
+  _notificacionesCache = _notificacionesCache.filter(n=>n.id!==id);
+  renderNotificaciones(_notificacionesCache);
+}
+async function borrarTodasNotif(){
+  if(!sb) return;
+  if(!exigirNivel('control','editar')) return;
+  if(!(await confirmarAccion('¿Borrar todas las notificaciones?'))) return;
+  const {error} = await sb.from('sistema_notificaciones').update({verificado:true, verificado_at:new Date().toISOString(), leida:true}).eq('verificado', false);
+  if(error){ mostrarToast('No se pudo borrar: '+errText(error)); return; }
+  _notificacionesCache = [];
+  renderNotificaciones(_notificacionesCache);
+  mostrarToast('Notificaciones borradas.','ok');
+}
 async function marcarTodasLeidasNotif(){
   if(!sb) return;
   await sb.from('sistema_notificaciones').update({leida:true}).eq('leida',false);
