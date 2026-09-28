@@ -3078,7 +3078,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.00</div>
+        <div class="sub" id="version-badge">V6.01</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -21267,8 +21267,11 @@ async function toggleEnviadoGestor(id){
 function totalBlockHtml(doc){
   const total = Number(doc.importe||0);
   const totalLabel = total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  const pct = doc.iva_pct;
-  const esIsp = (doc.tratamiento_iva||'normal')==='isp';
+  // Solo los tipos de documento que llevan IVA (factura, proforma, presupuesto) lo enseñan aquí.
+  // Un albarán nunca lleva IVA (DOC_TYPES.albaran.hasIva=false, y su propio editor nunca lo muestra):
+  // si el dato quedó guardado por error, esta tarjeta no debe inventárselo.
+  const pct = (DOC_TYPES[doc.type] && DOC_TYPES[doc.type].hasIva===false) ? null : doc.iva_pct;
+  const esIsp = (DOC_TYPES[doc.type] && DOC_TYPES[doc.type].hasIva===false) ? false : (doc.tratamiento_iva||'normal')==='isp';
   let ivaHtml = '';
   let subtotalHtml = '';
   if(esIsp){
@@ -21285,10 +21288,10 @@ function totalBlockHtml(doc){
   return `${ivaHtml}${subtotalHtml}<div class="fc-total-mini"><span class="fc-total-label">Total</span><span class="fc-total-valor">${totalLabel}</span></div>`;
 }
 function ivaLineHtml(doc){
-  const pct = doc.iva_pct;
+  const pct = (DOC_TYPES[doc.type] && DOC_TYPES[doc.type].hasIva===false) ? null : doc.iva_pct;
   const total = Number(doc.importe||0);
   const totalLabel = total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  if((doc.tratamiento_iva||'normal')==='isp'){
+  if(!(DOC_TYPES[doc.type] && DOC_TYPES[doc.type].hasIva===false) && (doc.tratamiento_iva||'normal')==='isp'){
     return `<div class="fc-iva-info">% IVA: ISP · IVA: ISP · Subtotal ${totalLabel} · Total ${totalLabel}</div>`;
   }
   if(pct==null || pct==='' || Number(pct)===0) return '';
