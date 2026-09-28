@@ -40,6 +40,27 @@
   // ---------- Detección del documento ----------
   // Devuelve { esquinas: [4 puntos en coordenadas del canvas], seguro: true/false }
   function detectar(cv, canvas) {
+    const p1 = unaPasada(cv, canvas);
+    if (!p1) return { esquinas: esquinasPorDefecto(canvas.width, canvas.height), seguro: false };
+    // Segunda pasada, recortando alrededor de lo encontrado: menos fondo alrededor ayuda a precisar los bordes reales.
+    const xs = p1.quad.map((q) => q.x), ys = p1.quad.map((q) => q.y);
+    const mx = (Math.max(...xs) - Math.min(...xs)) * 0.12, my = (Math.max(...ys) - Math.min(...ys)) * 0.12;
+    const x0 = Math.max(0, Math.min(...xs) - mx), y0 = Math.max(0, Math.min(...ys) - my);
+    const x1 = Math.min(canvas.width, Math.max(...xs) + mx), y1 = Math.min(canvas.height, Math.max(...ys) + my);
+    const wr = Math.round(x1 - x0), hr = Math.round(y1 - y0);
+    if (wr < 40 || hr < 40) return { esquinas: ordenar(p1.quad), seguro: p1.cobertura >= 0.75 };
+    const recorte = document.createElement("canvas"); recorte.width = wr; recorte.height = hr;
+    recorte.getContext("2d").drawImage(canvas, x0, y0, wr, hr, 0, 0, wr, hr);
+    const p2 = unaPasada(cv, recorte);
+    const final = p2 ? { quad: p2.quad.map((q) => ({ x: q.x + x0, y: q.y + y0 })), cobertura: p2.cobertura } : p1;
+    return { esquinas: ordenar(final.quad), seguro: final.cobertura >= 0.75 };
+  }
+
+  // Una pasada de detección sobre una imagen (foto completa o un recorte de ella).
+  // Combina cuatro formas de ver el documento y se queda con la que mejor coincide con "esto parece papel":
+  //  1) contraste global (Otsu), 2) bordes (Canny), 3) el trozo de papel más grande, 4) todos los trozos de papel unidos
+  //     (una fila oscura de una tabla, un pliegue, etc. puede partir el papel en varios trozos).
+  function unaPasada(cv, canvas) {
     const borrar = [];
     const M = (m) => { borrar.push(m); return m; };
     try {
@@ -52,66 +73,91 @@
       const hsv = M(new cv.Mat()); cv.cvtColor(peq, hsv, cv.COLOR_RGBA2RGB); cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
       const canalesHSV = M(new cv.MatVector()); cv.split(hsv, canalesHSV);
       const saturacion = M(canalesHSV.get(1));
-      const area = w * h; let mejor = null;
+      const area = w * h;
 
-      const probar = (bin) => {
-        const contornos = new cv.MatVector(), jer = new cv.Mat();
-        cv.findContours(bin, contornos, jer, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-        for (let i = 0; i < contornos.size(); i++) {
-          const c = contornos.get(i), a = cv.contourArea(c);
-          if (a > area * 0.04 && a < area * 0.995) {
-            const hull = new cv.Mat(); cv.convexHull(c, hull, false, true);
-            const areaHull = cv.contourArea(hull), per = cv.arcLength(hull, true); let quad = null, exacto = false;
-            for (const eps of [0.015, 0.025, 0.04, 0.06, 0.09]) {
-              const ap = new cv.Mat(); cv.approxPolyDP(hull, ap, eps * per, true);
-              if (ap.rows === 4) { quad = []; for (let k = 0; k < 4; k++) quad.push({ x: ap.data32S[k * 2], y: ap.data32S[k * 2 + 1] }); exacto = true; }
-              ap.delete(); if (quad) break;
-            }
-            if (!quad) { const r = cv.minAreaRect(hull); quad = cv.RotatedRect.points(r).map((p) => ({ x: p.x, y: p.y })); }
-            const qa = areaPoligono(quad), relleno = Math.min(areaHull, qa) / Math.max(areaHull, qa);
-            // si el candidato ocupa casi toda la foto, es sospechoso: suele ser el fondo colándose, no un margen real
-            const fracImg = qa / area, penalizacion = fracImg > 0.97 ? 0.5 : 1;
-            const score = fracImg * relleno * relleno * (exacto ? 1 : 0.85) * penalizacion;
-            if (!mejor || score > mejor.score) mejor = { quad, score, exacto, relleno, fracImg };
-            hull.delete();
-          }
-          c.delete();
-        }
-        contornos.delete(); jer.delete();
-      };
-      const cierre = M(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(7, 7)));
-      // 1) documento claro sobre fondo más oscuro (Otsu)
-      const bin = M(new cv.Mat()); cv.threshold(suave, bin, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
-      cv.morphologyEx(bin, bin, cv.MORPH_CLOSE, cierre); probar(bin);
-      // 2) bordes (sirve cuando el fondo es claro o hay sombras)
-      const ed = M(new cv.Mat()); cv.Canny(suave, ed, 35, 110);
-      cv.dilate(ed, ed, cierre); cv.morphologyEx(ed, ed, cv.MORPH_CLOSE, cierre); probar(ed);
-      // 3) zona lisa y clara: el papel casi no tiene textura y el fondo (madera, tela, mantel...) sí.
-      // Se mide la variación local de gris; donde es baja y además es claro, es papel.
+      // Máscara "esto parece papel": liso (poca variación local), claro y sin apenas color.
       const kv = Math.max(5, Math.round(Math.min(w, h) / 60)) | 1;
       const media = M(new cv.Mat()); cv.boxFilter(suave, media, cv.CV_32F, new cv.Size(kv, kv));
       const suave2 = M(new cv.Mat()); suave.convertTo(suave2, cv.CV_32F); cv.multiply(suave2, suave2, suave2);
       const mediaCuad = M(new cv.Mat()); cv.boxFilter(suave2, mediaCuad, cv.CV_32F, new cv.Size(kv, kv));
       const mediaAlCuad = M(new cv.Mat()); cv.multiply(media, media, mediaAlCuad);
       const varianza = M(new cv.Mat()); cv.subtract(mediaCuad, mediaAlCuad, varianza);
-      // Umbral automático (Otsu) en vez de un número fijo: se adapta a la luz y a la textura de cada foto.
-      // La varianza del papel es casi 0 salvo donde hay texto/rayas; la del fondo (madera, tela...) es más constante y más alta.
       const varRec = M(new cv.Mat()); cv.min(varianza, new cv.Mat(varianza.rows, varianza.cols, varianza.type(), new cv.Scalar(90)), varRec);
       const var8 = M(new cv.Mat()); varRec.convertTo(var8, cv.CV_8U, 255 / 90);
       const media8 = M(new cv.Mat()); media.convertTo(media8, cv.CV_8U);
       const liso = M(new cv.Mat()), claro = M(new cv.Mat()), pocoColor = M(new cv.Mat()), papel = M(new cv.Mat());
       cv.threshold(var8, liso, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
       cv.threshold(media8, claro, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
-      cv.threshold(saturacion, pocoColor, 70, 255, cv.THRESH_BINARY_INV);   // el papel casi no tiene color; la madera, la tela, etc. sí
+      cv.threshold(saturacion, pocoColor, 70, 255, cv.THRESH_BINARY_INV);
       cv.bitwise_and(liso, claro, papel); cv.bitwise_and(papel, pocoColor, papel);
-      cv.morphologyEx(papel, papel, cv.MORPH_OPEN, cierre);
+      const cierrePapel = M(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(7, 7)));
+      cv.morphologyEx(papel, papel, cv.MORPH_OPEN, cierrePapel);
       cv.morphologyEx(papel, papel, cv.MORPH_CLOSE, M(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(19, 19))));
-      probar(papel);
-      if (window.__DEBUG_MASCARA) { const dbg = document.createElement('canvas'); dbg.width = w; dbg.height = h; cv.imshow(dbg, papel); window.__DEBUG_MASCARA(dbg.toDataURL('image/png')); }
-      if (!mejor || mejor.score < 0.03) return { esquinas: esquinasPorDefecto(canvas.width, canvas.height), seguro: false };
+
+      // Cuánto de un candidato cae dentro de esa máscara de papel (0 a 1): descarta bordes del propio fondo (madera, mantel...).
+      function cobertura(quad) {
+        const relleno = M(cv.Mat.zeros(h, w, cv.CV_8U));
+        const pts = quad.map((p) => [Math.round(p.x), Math.round(p.y)]);
+        const matPts = M(cv.matFromArray(pts.length, 1, cv.CV_32SC2, pts.flat()));
+        const vec = M(new cv.MatVector()); vec.push_back(matPts);
+        cv.fillPoly(relleno, vec, new cv.Scalar(255));
+        const inter = M(new cv.Mat()); cv.bitwise_and(relleno, papel, inter);
+        const nRel = cv.countNonZero(relleno);
+        return nRel > 0 ? cv.countNonZero(inter) / nRel : 0;
+      }
+      function aQuad(contorno) {
+        const hull = M(new cv.Mat()); cv.convexHull(contorno, hull, false, true);
+        const areaHull = cv.contourArea(hull), per = cv.arcLength(hull, true); let quad = null, exacto = false;
+        for (const eps of [0.015, 0.025, 0.04, 0.06, 0.09, 0.13]) {
+          const ap = M(new cv.Mat()); cv.approxPolyDP(hull, ap, eps * per, true);
+          if (ap.rows === 4) { quad = []; for (let k = 0; k < 4; k++) quad.push({ x: ap.data32S[k * 2], y: ap.data32S[k * 2 + 1] }); exacto = true; }
+          if (quad) break;
+        }
+        if (!quad) { const r = cv.minAreaRect(hull); quad = cv.RotatedRect.points(r).map((p) => ({ x: p.x, y: p.y })); }
+        return { quad, areaHull, exacto };
+      }
+      function puntuar(quad, areaHull, exacto) {
+        const qa = areaPoligono(quad), relleno = Math.min(areaHull, qa) / Math.max(areaHull, qa);
+        const fracImg = qa / area, penaliza = fracImg > 0.97 ? 0.5 : 1;
+        const cob = cobertura(quad);
+        // Solo se exige coincidir con "esto es papel" a los candidatos grandes (fracImg > 0.75): son los que pueden ser en
+        // realidad el fondo colándose. Un candidato normal, con margen visible, se puntúa igual que antes.
+        const factorCobertura = fracImg > 0.75 ? Math.pow(cob, 2.5) : 1;
+        return { quad, cobertura: cob, score: fracImg * relleno * relleno * (exacto ? 1 : 0.85) * penaliza * factorCobertura };
+      }
+      function probarMayor(bin) {
+        const contornos = new cv.MatVector(), jer = new cv.Mat();
+        cv.findContours(bin, contornos, jer, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        let mejor = null;
+        for (let i = 0; i < contornos.size(); i++) {
+          const c = contornos.get(i), a = cv.contourArea(c);
+          if (a > area * 0.04 && a < area * 0.995) { const { quad, areaHull, exacto } = aQuad(c); const cand = puntuar(quad, areaHull, exacto); if (!mejor || cand.score > mejor.score) mejor = cand; }
+        }
+        contornos.delete(); jer.delete();
+        return mejor;
+      }
+      function probarUnion(bin) {
+        const contornos = new cv.MatVector(), jer = new cv.Mat();
+        cv.findContours(bin, contornos, jer, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        let puntos = [];
+        for (let i = 0; i < contornos.size(); i++) { const c = contornos.get(i); if (cv.contourArea(c) > area * 0.01) for (let j = 0; j < c.rows; j++) puntos.push(c.data32S[j * 2], c.data32S[j * 2 + 1]); }
+        contornos.delete(); jer.delete();
+        if (puntos.length < 6) return null;
+        const matPts = cv.matFromArray(puntos.length / 2, 1, cv.CV_32SC2, puntos);
+        const hull = new cv.Mat(); cv.convexHull(matPts, hull, false, true);
+        const { quad, areaHull, exacto } = aQuad(hull);
+        matPts.delete(); hull.delete();
+        return puntuar(quad, areaHull, exacto);
+      }
+
+      const cierre = M(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(7, 7)));
+      const bin = M(new cv.Mat()); cv.threshold(suave, bin, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU); cv.morphologyEx(bin, bin, cv.MORPH_CLOSE, cierre);
+      const ed = M(new cv.Mat()); cv.Canny(suave, ed, 35, 110); cv.dilate(ed, ed, cierre); cv.morphologyEx(ed, ed, cv.MORPH_CLOSE, cierre);
+      const candidatos = [probarMayor(bin), probarMayor(ed), probarMayor(papel), probarUnion(papel)].filter(Boolean);
+      if (!candidatos.length) return null;
+      const g = candidatos.sort((a, b) => b.score - a.score)[0];
       const k = 1 / esc;
-      // "seguro" = cuatro esquinas claras y una forma limpia; un documento pequeño en la foto también puede ser seguro
-      return { esquinas: ordenar(mejor.quad.map((p) => ({ x: p.x * k, y: p.y * k }))), seguro: mejor.exacto && mejor.relleno > 0.93 && mejor.fracImg < 0.97 };
+      return { quad: g.quad.map((p) => ({ x: p.x * k, y: p.y * k })), cobertura: g.cobertura };
     } finally { borrar.forEach((m) => { try { m.delete(); } catch (e) {} }); }
   }
 
