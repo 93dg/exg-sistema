@@ -2886,7 +2886,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.91</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.92</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2964,7 +2964,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.91</div>
+        <div class="sub" id="version-badge">V5.92</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11467,10 +11467,62 @@ async function vincularCorreo(messageId){
 function b64urlEncode(str){
   return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
+function pantallaTactil(){ try{ return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches); }catch(e){ return false; } }
+let _visorPdfToken = 0;
+const VISOR_PDF_MAX_PAGINAS = 40;
+async function mostrarPdfPaginas(url){
+  const contenedor = document.getElementById('visor-original-tabla');
+  const iframe = document.getElementById('visor-original-iframe');
+  const token = ++_visorPdfToken;   // si se abre otro archivo o se cierra el visor mientras se dibuja, este dibujo se para
+  iframe.style.display = 'none'; contenedor.style.display = '';
+  contenedor.innerHTML = '<div class="sub-t" style="padding:20px;">Cargando el PDF…</div>';
+  const lib = await cargarPdfJs();
+  const resp = await fetch(url);
+  if(!resp.ok) throw new Error('No se pudo bajar el PDF (' + resp.status + ')');
+  const pdf = await lib.getDocument({data: new Uint8Array(await resp.arrayBuffer())}).promise;
+  if(token !== _visorPdfToken) return;
+  contenedor.innerHTML = '';
+  contenedor.style.background = '#e9e9e9';
+  const total = Math.min(pdf.numPages, VISOR_PDF_MAX_PAGINAS);
+  const ancho = Math.max(280, (contenedor.clientWidth || window.innerWidth || 360) - 16);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  for(let n = 1; n <= total; n++){
+    const pagina = await pdf.getPage(n);
+    if(token !== _visorPdfToken) return;
+    const base = pagina.getViewport({scale: 1});
+    const vp = pagina.getViewport({scale: (ancho / base.width) * dpr});
+    const caja = document.createElement('div');
+    caja.style.cssText = 'margin:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);';
+    const lienzo = document.createElement('canvas');
+    lienzo.width = Math.floor(vp.width); lienzo.height = Math.floor(vp.height);
+    lienzo.style.cssText = 'display:block;width:100%;height:auto;';
+    caja.appendChild(lienzo);
+    contenedor.appendChild(caja);
+    await pagina.render({canvasContext: lienzo.getContext('2d'), viewport: vp}).promise;
+    if(total > 1){
+      const etq = document.createElement('div');
+      etq.style.cssText = 'text-align:center;font-size:11px;color:#666;padding:2px 0 6px;';
+      etq.textContent = `Página ${n} de ${pdf.numPages}`;
+      caja.appendChild(etq);
+    }
+  }
+  if(pdf.numPages > total){
+    const mas = document.createElement('div');
+    mas.style.cssText = 'padding:12px;font-size:13px;color:#555;text-align:center;';
+    mas.textContent = `Se ven las primeras ${total} de ${pdf.numPages} páginas. Usa Descargar para verlo entero.`;
+    contenedor.appendChild(mas);
+  }
+}
 async function mostrarArchivoEnVisor(url){
   const iframe = document.getElementById('visor-original-iframe');
   const contenedor = document.getElementById('visor-original-tabla');
   if(/\.pdf(\?[^#]*)?(#.*)?$/i.test(url)){
+    // En el móvil el visor del navegador solo enseña la PRIMERA página de un PDF y no deja pasar a las
+    // siguientes: aquí se dibujan todas, una debajo de otra. En escritorio se usa el visor normal.
+    if(pantallaTactil()){
+      try{ await mostrarPdfPaginas(url); return; }
+      catch(e){ console.warn('Visor de PDF por páginas:', e); }
+    }
     contenedor.style.display = 'none';
     iframe.style.display = '';
     iframe.src = url;
@@ -11486,6 +11538,7 @@ async function mostrarArchivoEnVisor(url){
   }
   iframe.style.display = 'none';
   contenedor.style.display = '';
+  contenedor.style.background = '';
   contenedor.innerHTML = '<div class="sub-t" style="padding:20px;">Cargando...</div>';
   try{
     const resp = await fetch(url);
@@ -11525,6 +11578,8 @@ function abrirVisorArchivoOriginal(){
   abrirVisorDesdeUrl(url);
 }
 function cerrarVisorArchivoOriginal(){
+  _visorPdfToken++;   // para cualquier dibujo de PDF que siga en marcha
+  document.getElementById('visor-original-tabla').style.background = '';
   document.getElementById('visor-original-overlay').classList.remove('active');
   document.getElementById('visor-original-iframe').src = 'about:blank';
   document.getElementById('visor-original-tabla').innerHTML = '';
