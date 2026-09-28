@@ -2899,7 +2899,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.94</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.95</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2977,7 +2977,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.94</div>
+        <div class="sub" id="version-badge">V5.95</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6887,6 +6887,17 @@ function extraerFilasIva(texto, cfg, formato){
   while((s = reSuelto.exec(restos))){ const v = parseNumeroGasto(s[2], formato); if(!isNaN(v)) sueltos.push(v); }
   return {filas, sueltos};
 }
+// El apartado "Impuestos especiales" de la factura puede listar solo algunos tipos de combustible (p. ej. diésel y
+// gasóleo B pero no la gasolina). Los litros impresos cuadran si coinciden con la suma de ALGUNA combinación de tipos.
+function litrosCuadranConImpresos(porTipo, impresos){
+  if(impresos == null) return null;
+  const v = porTipo.map(t => t.litros); let ok = false;
+  for(let m = 1; m < (1 << v.length); m++){
+    let suma = 0; v.forEach((x, i) => { if(m & (1 << i)) suma += x; });
+    if(Math.abs(suma - impresos) <= 0.1) ok = true;
+  }
+  return ok;
+}
 // ---------- líneas de la factura (albaranes): combustible por tipo y "otros" artículos ----------
 // Solo control INTERNO. Al gestor NO se le manda nada de esto: solo la factura.
 function extraerLineasConsumo(texto, cfg, formato){
@@ -6984,10 +6995,10 @@ function extraerGastoConPlantilla(texto, pl, regla){
     if(lin.length){
       const consumo = resumirConsumo(lin, suma);
       consumo.litros_impresos = sumarCoincidencias(texto, pl.litros, formato);   // litros que la propia factura declara en "Impuestos especiales"
-      consumo.litros_cuadran = consumo.litros_impresos == null ? null : Math.abs(consumo.litros_total - consumo.litros_impresos) <= 0.1;
+      consumo.litros_cuadran = litrosCuadranConImpresos(consumo.por_tipo, consumo.litros_impresos);
       if(consumo.cuadra){ campos.consumo = consumo; campos.lineas = lin; }
       else avisos.push(`El detalle de litros no cuadra con el total (las líneas suman ${eurRevSeguro(consumo.suma_lineas)})`);
-      if(consumo.cuadra && consumo.litros_cuadran === false) avisos.push('Los litros de las líneas no coinciden con los que declara la factura');
+      if(consumo.cuadra && consumo.litros_cuadran === false) avisos.push(`La factura declara ${litrosRev(consumo.litros_impresos)} en su apartado de impuestos y en las líneas he leído ${litrosRev(consumo.litros_total)}`);
     }else avisos.push('No he podido leer las líneas de la factura');
   }
   const defecto = pl.defecto || {};
