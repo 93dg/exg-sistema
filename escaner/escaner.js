@@ -49,6 +49,9 @@
       const peq = M(new cv.Mat()); cv.resize(src, peq, new cv.Size(w, h), 0, 0, cv.INTER_AREA);
       const gris = M(new cv.Mat()); cv.cvtColor(peq, gris, cv.COLOR_RGBA2GRAY);
       const suave = M(new cv.Mat()); cv.GaussianBlur(gris, suave, new cv.Size(5, 5), 0);
+      const hsv = M(new cv.Mat()); cv.cvtColor(peq, hsv, cv.COLOR_RGBA2RGB); cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
+      const canalesHSV = M(new cv.MatVector()); cv.split(hsv, canalesHSV);
+      const saturacion = M(canalesHSV.get(1));
       const area = w * h; let mejor = null;
 
       const probar = (bin) => {
@@ -66,8 +69,10 @@
             }
             if (!quad) { const r = cv.minAreaRect(hull); quad = cv.RotatedRect.points(r).map((p) => ({ x: p.x, y: p.y })); }
             const qa = areaPoligono(quad), relleno = Math.min(areaHull, qa) / Math.max(areaHull, qa);
-            const score = (qa / area) * relleno * relleno * (exacto ? 1 : 0.85);
-            if (!mejor || score > mejor.score) mejor = { quad, score, exacto, relleno };
+            // si el candidato ocupa casi toda la foto, es sospechoso: suele ser el fondo colándose, no un margen real
+            const fracImg = qa / area, penalizacion = fracImg > 0.97 ? 0.5 : 1;
+            const score = fracImg * relleno * relleno * (exacto ? 1 : 0.85) * penalizacion;
+            if (!mejor || score > mejor.score) mejor = { quad, score, exacto, relleno, fracImg };
             hull.delete();
           }
           c.delete();
@@ -81,10 +86,32 @@
       // 2) bordes (sirve cuando el fondo es claro o hay sombras)
       const ed = M(new cv.Mat()); cv.Canny(suave, ed, 35, 110);
       cv.dilate(ed, ed, cierre); cv.morphologyEx(ed, ed, cv.MORPH_CLOSE, cierre); probar(ed);
+      // 3) zona lisa y clara: el papel casi no tiene textura y el fondo (madera, tela, mantel...) sí.
+      // Se mide la variación local de gris; donde es baja y además es claro, es papel.
+      const kv = Math.max(5, Math.round(Math.min(w, h) / 60)) | 1;
+      const media = M(new cv.Mat()); cv.boxFilter(suave, media, cv.CV_32F, new cv.Size(kv, kv));
+      const suave2 = M(new cv.Mat()); suave.convertTo(suave2, cv.CV_32F); cv.multiply(suave2, suave2, suave2);
+      const mediaCuad = M(new cv.Mat()); cv.boxFilter(suave2, mediaCuad, cv.CV_32F, new cv.Size(kv, kv));
+      const mediaAlCuad = M(new cv.Mat()); cv.multiply(media, media, mediaAlCuad);
+      const varianza = M(new cv.Mat()); cv.subtract(mediaCuad, mediaAlCuad, varianza);
+      // Umbral automático (Otsu) en vez de un número fijo: se adapta a la luz y a la textura de cada foto.
+      // La varianza del papel es casi 0 salvo donde hay texto/rayas; la del fondo (madera, tela...) es más constante y más alta.
+      const varRec = M(new cv.Mat()); cv.min(varianza, new cv.Mat(varianza.rows, varianza.cols, varianza.type(), new cv.Scalar(90)), varRec);
+      const var8 = M(new cv.Mat()); varRec.convertTo(var8, cv.CV_8U, 255 / 90);
+      const media8 = M(new cv.Mat()); media.convertTo(media8, cv.CV_8U);
+      const liso = M(new cv.Mat()), claro = M(new cv.Mat()), pocoColor = M(new cv.Mat()), papel = M(new cv.Mat());
+      cv.threshold(var8, liso, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+      cv.threshold(media8, claro, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+      cv.threshold(saturacion, pocoColor, 70, 255, cv.THRESH_BINARY_INV);   // el papel casi no tiene color; la madera, la tela, etc. sí
+      cv.bitwise_and(liso, claro, papel); cv.bitwise_and(papel, pocoColor, papel);
+      cv.morphologyEx(papel, papel, cv.MORPH_OPEN, cierre);
+      cv.morphologyEx(papel, papel, cv.MORPH_CLOSE, M(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(19, 19))));
+      probar(papel);
+      if (window.__DEBUG_MASCARA) { const dbg = document.createElement('canvas'); dbg.width = w; dbg.height = h; cv.imshow(dbg, papel); window.__DEBUG_MASCARA(dbg.toDataURL('image/png')); }
       if (!mejor || mejor.score < 0.03) return { esquinas: esquinasPorDefecto(canvas.width, canvas.height), seguro: false };
       const k = 1 / esc;
       // "seguro" = cuatro esquinas claras y una forma limpia; un documento pequeño en la foto también puede ser seguro
-      return { esquinas: ordenar(mejor.quad.map((p) => ({ x: p.x * k, y: p.y * k }))), seguro: mejor.exacto && mejor.relleno > 0.93 };
+      return { esquinas: ordenar(mejor.quad.map((p) => ({ x: p.x * k, y: p.y * k }))), seguro: mejor.exacto && mejor.relleno > 0.93 && mejor.fracImg < 0.97 };
     } finally { borrar.forEach((m) => { try { m.delete(); } catch (e) {} }); }
   }
 
