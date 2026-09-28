@@ -3000,7 +3000,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.103</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.104</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3078,7 +3078,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.103</div>
+        <div class="sub" id="version-badge">V5.104</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4260,11 +4260,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div class="chip-filter active" data-per="12m">12 meses</div>
           <div class="chip-filter" data-per="todo">Todo</div>
         </div>
+        <div class="filters" id="gpro-comb-tipos" style="margin-bottom:16px;">
+          <div class="chip-filter active" data-tipo="todos">Todos</div>
+          <div class="chip-filter" data-tipo="diesel">Diésel</div>
+          <div class="chip-filter" data-tipo="gasoleo_b">Gasóleo B</div>
+          <div class="chip-filter" data-tipo="gasolina">Gasolina</div>
+        </div>
         <div class="kpi-strip">
-          <div class="kpi"><div class="lbl">Litros totales</div><div class="val" id="gpro-comb-kpi-litros">—</div></div>
-          <div class="kpi"><div class="lbl">Gasto combustible</div><div class="val" id="gpro-comb-kpi-gasto">—</div></div>
+          <div class="kpi"><div class="lbl" id="gpro-comb-lbl-litros">Litros totales</div><div class="val" id="gpro-comb-kpi-litros">—</div></div>
+          <div class="kpi"><div class="lbl" id="gpro-comb-lbl-gasto">Gasto combustible</div><div class="val" id="gpro-comb-kpi-gasto">—</div></div>
           <div class="kpi"><div class="lbl">Precio medio/litro</div><div class="val" id="gpro-comb-kpi-precio">—</div></div>
-          <div class="kpi"><div class="lbl">Otros gastos</div><div class="val" id="gpro-comb-kpi-otros">—</div></div>
+          <div class="kpi"><div class="lbl" id="gpro-comb-lbl-otros">Otros gastos</div><div class="val" id="gpro-comb-kpi-otros">—</div></div>
         </div>
         <div id="gpro-comb-aviso" class="sub-t" style="margin:-6px 0 12px;"></div>
         <div class="grid-2">
@@ -4273,7 +4279,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="panel-body"><div class="bar-chart comb-chart" id="gpro-comb-chart-litros"></div></div>
           </div>
           <div class="panel">
-            <div class="panel-head"><h3>Precio del diésel (€/l, con IVA)</h3></div>
+            <div class="panel-head"><h3 id="gpro-comb-titulo-precio">Precio del diésel (€/l, con IVA)</h3></div>
             <div class="panel-body"><div class="bar-chart comb-chart" id="gpro-comb-chart-precio"></div></div>
           </div>
         </div>
@@ -6515,7 +6521,7 @@ document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filter
     if(chip.closest('#gpro-resumen')) renderGastosProResumen();
     if(chip.closest('#gpro-lista')) renderGastosProLista();
     if(chip.closest('#gpro-dudosos-chips')) renderGastosProDudosos();
-    if(chip.closest('#gpro-comb-chips')) renderGastosProCombustible();
+    if(chip.closest('#gpro-comb-chips') || chip.closest('#gpro-comb-tipos')) renderGastosProCombustible();
   });
 });
 document.addEventListener('click', ev => {
@@ -7586,6 +7592,12 @@ function otrosGastosCombustible(docs){
     subtipos: [...subt.entries()].map(([k, v]) => ({subtipo: k, etiqueta: COMB_SUBTIPOS[k] || 'Otros', importe: redondear2(v)})).sort((x, y) => y.importe - x.importe),
   };
 }
+const COMB_NOMBRE_CORTO = {diesel: 'diésel', gasoleo_b: 'gasóleo B', gasolina: 'gasolina'};
+const COMB_TITULO_PRECIO = {diesel: 'Precio del diésel (€/l, con IVA)', gasoleo_b: 'Precio del gasóleo B (€/l, con IVA)', gasolina: 'Precio de la gasolina (€/l, con IVA)'};
+// Deja en cada mes solo un tipo de combustible: sus litros, su importe y su precio; los meses sin ese tipo desaparecen
+function filtrarMesesPorTipo(meses, tipo){
+  return meses.filter(m => m.tipos[tipo]).map(m => { const t = m.tipos[tipo]; return {...m, litros: t.litros, importe: t.importe, precio: t.precio, otros: 0, tipos: {[tipo]: t}}; });
+}
 function nombreMesComb(m){ return `${MESES_ES[m.mes]} ${m.anio}`; }
 function renderGastosProCombustible(){
   const vista = document.getElementById('gpro-comb');
@@ -7593,20 +7605,30 @@ function renderGastosProCombustible(){
   const $ = id => document.getElementById(id);
   const per = vista.querySelector('#gpro-comb-chips .chip-filter.active')?.dataset.per || '12m';
   const docs = filtrarDocsPeriodoComb(gastosProDocs(), per, new Date());
-  const {meses, sinDetalle} = combustiblePorMes(docs);
+  const tipoSel = vista.querySelector('#gpro-comb-tipos .chip-filter.active')?.dataset.tipo || 'todos';
+  const infoTipo = COMB_TIPOS.find(t => t.tipo === tipoSel) || null, nomTipo = infoTipo ? COMB_NOMBRE_CORTO[tipoSel] : null;
+  const base = combustiblePorMes(docs), sinDetalle = base.sinDetalle;
+  const meses = infoTipo ? filtrarMesesPorTipo(base.meses, tipoSel) : base.meses;
   const tot = totalesCombustible(meses);
+  const facturasTipo = infoTipo ? docs.filter(d => (Array.isArray(d.conceptos) ? d.conceptos : []).some(c => c.grupo === 'combustible' && c.tipo === tipoSel)).length : 0;
+  const rotulo = (id, txt) => { const el = $(id); if(el) el.textContent = txt; };
+  rotulo('gpro-comb-lbl-litros', nomTipo ? 'Litros de ' + nomTipo : 'Litros totales');
+  rotulo('gpro-comb-lbl-gasto', nomTipo ? 'Gasto en ' + nomTipo : 'Gasto combustible');
+  rotulo('gpro-comb-lbl-otros', nomTipo ? 'Facturas' : 'Otros gastos');
+  rotulo('gpro-comb-titulo-precio', COMB_TITULO_PRECIO[infoTipo ? tipoSel : 'diesel']);
+  const panelOtros = $('gpro-comb-otros') && $('gpro-comb-otros').closest('.panel'); if(panelOtros) panelOtros.style.display = infoTipo ? 'none' : '';
   const eur = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
   const lit = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2});
   const pre = n => n == null ? '—' : Number(n).toLocaleString('es-ES', {minimumFractionDigits: 3, maximumFractionDigits: 3});
   $('gpro-comb-kpi-litros').textContent = meses.length ? lit(tot.litros) + ' l' : '—';
   $('gpro-comb-kpi-gasto').textContent = meses.length ? eur(tot.importe) : '—';
   $('gpro-comb-kpi-precio').textContent = meses.length && tot.precio != null ? pre(tot.precio) + ' €/l' : '—';
-  $('gpro-comb-kpi-otros').textContent = meses.length ? eur(tot.otros) : '—';
+  $('gpro-comb-kpi-otros').textContent = meses.length ? (infoTipo ? String(facturasTipo) : eur(tot.otros)) : '—';
   $('gpro-comb-aviso').textContent = sinDetalle.n ? `Hay ${sinDetalle.n} gasto(s) de combustible sin detalle de litros (${eur(sinDetalle.importe)}) que no entran en estas cifras.` : '';
   if(!meses.length){
-    const vacio = '<div class="empty" style="padding:16px;width:100%;">Sin datos de combustible en este periodo.</div>';
+    const vacio = `<div class="empty" style="padding:16px;width:100%;">${nomTipo ? 'Sin ' + nomTipo + ' en este periodo.' : 'Sin datos de combustible en este periodo.'}</div>`;
     ['gpro-comb-chart-litros', 'gpro-comb-chart-precio', 'gpro-comb-movil', 'gpro-comb-otros'].forEach(id => { $(id).innerHTML = vacio; });
-    $('gpro-comb-tbody').innerHTML = '<tr><td colspan="8" class="empty">Sin datos de combustible en este periodo.</td></tr>';
+    $('gpro-comb-tbody').innerHTML = `<tr><td colspan="8" class="empty">${nomTipo ? 'Sin ' + nomTipo + ' en este periodo.' : 'Sin datos de combustible en este periodo.'}</td></tr>`;
     $('gpro-comb-leyenda').innerHTML = '';
     return;
   }
@@ -7621,15 +7643,16 @@ function renderGastosProCombustible(){
     <span class="comb-val">${Math.round(m.litros).toLocaleString('es-ES')}</span>
     <div class="bar comb-stack" style="height:${Math.max(4, m.litros / maxL * 100)}%;">${usados.filter(t => m.tipos[t.tipo]).map(t => `<i style="height:${m.tipos[t.tipo].litros / m.litros * 100}%;background:${t.color}"></i>`).join('')}</div>
     <span>${etq(m, i, meses.length)}</span></div>`).join('');
-  // precio del diésel por mes: las barras empiezan en un mínimo para que se vea la subida y la bajada
-  const conD = meses.filter(m => m.tipos.diesel && m.tipos.diesel.precio != null);
+  // precio del combustible elegido (diésel si están todos) por mes: las barras empiezan en un mínimo para que se vea la subida y la bajada
+  const tp = infoTipo ? tipoSel : 'diesel';
+  const conD = meses.filter(m => m.tipos[tp] && m.tipos[tp].precio != null);
   if(conD.length){
-    const ps = conD.map(m => m.tipos.diesel.precio), minP = Math.min(...ps), maxP = Math.max(...ps), base = Math.max(0, minP - (maxP - minP) * 0.6 - 0.02);
-    $('gpro-comb-chart-precio').innerHTML = conD.map((m, i) => { const p = m.tipos.diesel.precio; return `<div class="bar-col" title="${escHtml(nombreMesComb(m))}: ${escHtml(pre(p))} €/l">
+    const ps = conD.map(m => m.tipos[tp].precio), minP = Math.min(...ps), maxP = Math.max(...ps), base = Math.max(0, minP - (maxP - minP) * 0.6 - 0.02);
+    $('gpro-comb-chart-precio').innerHTML = conD.map((m, i) => { const p = m.tipos[tp].precio; return `<div class="bar-col" title="${escHtml(nombreMesComb(m))}: ${escHtml(pre(p))} €/l">
       <span class="comb-val">${escHtml(p.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}))}</span>
       <div class="bar" style="height:${maxP === minP ? 60 : Math.max(6, (p - base) / (maxP - base) * 100)}%;${m === conD[conD.length - 1] ? 'background:var(--orange);' : ''}"></div>
       <span>${etq(m, i, conD.length)}</span></div>`; }).join('');
-  }else $('gpro-comb-chart-precio').innerHTML = '<div class="empty" style="padding:16px;width:100%;">Sin diésel en este periodo.</div>';
+  }else $('gpro-comb-chart-precio').innerHTML = `<div class="empty" style="padding:16px;width:100%;">Sin ${COMB_NOMBRE_CORTO[tp]} en este periodo.</div>`;
   // detalle mes a mes (recientes primero): tabla en escritorio y tarjetas en móvil
   const desc = meses.slice().reverse();
   const lt = (m, k) => m.tipos[k] ? lit(m.tipos[k].litros) : '—';
