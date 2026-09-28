@@ -2886,7 +2886,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.90</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.91</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2964,7 +2964,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.90</div>
+        <div class="sub" id="version-badge">V5.91</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6416,7 +6416,8 @@ function cargarPdfJs(){
 // doble espacio, que es lo que necesitan luego las reglas para encontrar "Total", "Base", "NIF"...
 async function extraerTextoPdf(bytes){
   const lib = await cargarPdfJs();
-  const pdf = await lib.getDocument({data: bytes}).promise;
+  // OJO: pdf.js TRANSFIERE el buffer que recibe a su worker y deja el original vacío (length 0). Se le pasa una copia.
+  const pdf = await lib.getDocument({data: bytes.slice()}).promise;
   const partes = [];
   for(let n=1; n<=Math.min(pdf.numPages, 15); n++){
     const pagina = await pdf.getPage(n);
@@ -6466,6 +6467,102 @@ function cabeceraGmail(msg, nombre){
   return (msg.payload?.headers||[]).find(h=>h.name.toLowerCase()===nombre.toLowerCase())?.value || '';
 }
 // Partes del correo que son un PDF (a cualquier nivel de anidación: los adjuntos suelen ir dentro de multipart/mixed)
+// ----- PDFs del correo: comprobar que están enteros en Storage y recuperarlos de Gmail si no -----
+function rutaDeUrlPublica(url){
+  const m = String(url).match(/\/object\/public\/[^/]+\/([^?#]+)/);
+  try{ return m ? decodeURIComponent(m[1]) : ''; }catch(e){ return ''; }
+}
+async function tamanoPdfGuardado(ruta){
+  try{
+    const r = await fetch(urlPublicaGastoCorreo(ruta), {method: 'HEAD', cache: 'no-store'});
+    if(!r.ok) return null;
+    const len = r.headers.get('content-length');
+    return len === null ? null : Number(len);
+  }catch(e){ return null; }   // sin red para comprobar: no se da por roto
+}
+async function pdfCorreoVacio(ruta){ return (await tamanoPdfGuardado(ruta)) === 0; }
+async function verificarPdfGuardado(ruta, esperado){
+  const real = await tamanoPdfGuardado(ruta);
+  if(real !== null && real !== esperado) throw new Error(`El PDF se ha guardado incompleto (${real} de ${esperado} bytes)`);
+}
+// Baja otra vez el adjunto de Gmail y lo sube de nuevo. Solo lo sube si es idéntico al que se leyó (mismo hash).
+async function repararPdfCorreo(fila){
+  const msg = await gmailApi(`messages/${fila.gmail_message_id}?format=full`);
+  const parte = recogerPartesPdf(msg.payload).find(p => String(p.partId || '0') === String(fila.gmail_part_id));
+  if(!parte) throw new Error('el PDF ya no está en el correo');
+  const b64 = parte.body.data || (await gmailApi(`messages/${fila.gmail_message_id}/attachments/${parte.body.attachmentId}`)).data;
+  const bytes = base64UrlABytes(b64);
+  if(fila.hash && (await sha256Hex(bytes)) !== fila.hash) throw new Error('el PDF del correo no es el mismo que se guardó');
+  const blob = new Blob([bytes], {type: 'application/pdf'});
+  const {error} = await sb.storage.from(DOC_BUCKET).upload(fila.storage_path, blob, {contentType: 'application/pdf', upsert: true});
+  if(error) throw new Error(error.message);
+  await verificarPdfGuardado(fila.storage_path, blob.size);
+}
+// Al abrir un PDF del correo: si está vacío, se recupera en el momento y luego se abre.
+async function asegurarPdfCorreoYMostrar(url){
+  const contenedor = document.getElementById('visor-original-tabla');
+  const iframe = document.getElementById('visor-original-iframe');
+  const aviso = t => { iframe.style.display = 'none'; contenedor.style.display = ''; contenedor.innerHTML = `<div class="sub-t" style="padding:20px;">${escHtml(t)}</div>`; };
+  const destino = url + '?v=2';   // el "?v=2" evita ver la versión vacía que el navegador pudo guardar antes de la corrección
+  try{
+    const ruta = rutaDeUrlPublica(url);
+    if(ruta && await pdfCorreoVacio(ruta)){
+      aviso('Este PDF se guardó vacío. Lo recupero del correo…');
+      const {data: filas} = await sb.from('gastos_correo').select('gmail_message_id,gmail_part_id,storage_path,hash').eq('storage_path', ruta).limit(1);
+      if(!filas || !filas[0]) throw new Error('no encuentro ese PDF en la cola');
+      if(!(await asegurarTokenGmail())) throw new Error('Gmail no está conectado (conéctalo en Gastos)');
+      await repararPdfCorreo(filas[0]);
+    }
+  }catch(e){
+    aviso('No se pudo recuperar este PDF: ' + (e.message || e));
+    return;
+  }
+  document.getElementById('visor-original-descargar').href = destino;
+  mostrarArchivoEnVisor(destino);
+}
+// En segundo plano y una sola vez: recupera TODOS los PDF vacíos y lo deja apuntado en "sistema".
+let _reparandoPdfs = false;
+async function repararTodosPdfsCorreo(){
+  if(!sb || _reparandoPdfs || _gastosCorreoBuscando || !puedeEditar('gastospro')) return;
+  _reparandoPdfs = true;
+  const estado = document.getElementById('gcor-estado');
+  const decir = t => { if(estado && !_gastosCorreoBuscando) estado.textContent = t; };
+  try{
+    const {data: marca} = await sb.from('sistema').select('id').eq('tipo', 'pdfs_correo_reparados').limit(1);
+    if(marca && marca.length) return;
+    if(!(await asegurarTokenGmail())) return;   // sin Gmail no se puede: se intentará la próxima vez
+    let filas = [], desde = 0;
+    while(true){
+      const {data, error} = await sb.from('gastos_correo').select('id,gmail_message_id,gmail_part_id,storage_path,hash').neq('estado', 'error').range(desde, desde + 499);
+      if(error) throw new Error(error.message);
+      if(!data || !data.length) break;
+      filas = filas.concat(data.filter(f => f.storage_path));
+      if(data.length < 500) break;
+      desde += 500;
+    }
+    decir('Comprobando los PDF guardados…');
+    const vacios = [];
+    for(let i = 0; i < filas.length; i += 8){
+      const lote = filas.slice(i, i + 8);
+      const r = await Promise.all(lote.map(f => pdfCorreoVacio(f.storage_path)));
+      lote.forEach((f, j) => { if(r[j]) vacios.push(f); });
+    }
+    let hechos = 0, fallos = 0, ultimo = '', idx = 0;
+    const trabajador = async () => {
+      while(idx < vacios.length){
+        const f = vacios[idx++];
+        try{ await repararPdfCorreo(f); hechos++; }catch(e){ fallos++; ultimo = e.message || String(e); }
+        decir(`Recuperando los PDF del correo… ${hechos + fallos} de ${vacios.length}`);
+      }
+    };
+    await Promise.all([trabajador(), trabajador(), trabajador()]);
+    if(!fallos){
+      await sb.from('sistema').insert({tipo: 'pdfs_correo_reparados', data: {fecha: new Date().toISOString(), reparados: hechos, revisados: filas.length}});
+      decir(vacios.length ? `✓ ${hechos} PDF recuperados del correo.` : '');
+    }else decir(`Se recuperaron ${hechos} PDF y ${fallos} no se pudieron (${ultimo}). Se reintentará la próxima vez.`);
+  }catch(e){ console.warn('Reparar PDFs del correo:', e); }
+  finally{ _reparandoPdfs = false; }
+}
 function recogerPartesPdf(parte, acc){
   acc = acc || [];
   if(!parte) return acc;
@@ -6512,6 +6609,8 @@ async function procesarCorreoGasto(messageId, res){
         res.grandes = (res.grandes||0)+1; continue;
       }
       fila.hash = await sha256Hex(bytes);
+      const blobPdf = new Blob([bytes], {type:'application/pdf'});   // se prepara ya, antes de pasar los bytes a pdf.js
+      if(blobPdf.size !== bytes.length) throw new Error('El PDF se ha vaciado antes de guardarlo');
       const {data: igual} = await sb.from('gastos_correo').select('id').eq('hash', fila.hash).neq('estado','error').limit(1);   // una fila en error no cuenta: el reintento se encontraría a sí mismo
       if(igual && igual.length){
         await insertarColaGasto({...fila, estado:'duplicado', nota:'mismo archivo que '+igual[0].id});
@@ -6528,8 +6627,9 @@ async function procesarCorreoGasto(messageId, res){
       if(!fila.tiene_texto) res.sinTexto++;
       const anio = (fila.fecha_correo || new Date().toISOString()).slice(0,4);
       const ruta = `EXCAVACIONES-GOMEZ/ECONOMIA/${anio}/GASTOS/CORREO/${messageId}_${fila.gmail_part_id}_${nombreArchivoSeguro(parte.filename)}`;
-      const {error: errSubida} = await sb.storage.from(DOC_BUCKET).upload(ruta, new Blob([bytes], {type:'application/pdf'}), {contentType:'application/pdf', upsert:true});
+      const {error: errSubida} = await sb.storage.from(DOC_BUCKET).upload(ruta, blobPdf, {contentType:'application/pdf', upsert:true});
       if(errSubida) throw new Error('No se pudo guardar el PDF: '+errSubida.message);
+      await verificarPdfGuardado(ruta, blobPdf.size);   // que en Storage haya lo mismo que se subió (antes se guardaban vacíos sin darse cuenta)
       fila.storage_path = ruta;
       if(fila.nota===undefined) fila.nota = null;   // si es un reintento, borra la nota del error anterior (el upsert solo actualiza las columnas que se envían)
       fila.estado = 'pendiente';
@@ -6880,6 +6980,7 @@ async function abrirRevisorGastos(){
   items.sort((x, y) => (x.prop.plId ? 0 : 1) - (y.prop.plId ? 0 : 1) || String(x.prop.plId || '').localeCompare(String(y.prop.plId || '')) || String(y.fila.fecha_correo).localeCompare(String(x.fila.fecha_correo)));
   _revisor = {items, sinLeer, confirmadosGrupo: new Set(), provCache: {}, editando: false, error: '', aviso: '', hechas: 0};
   renderRevisorGastos();
+  Promise.resolve(repararTodosPdfsCorreo()).catch(e => console.warn('Reparar PDFs:', e));
 }
 function itemRevisor(){ return _revisor && _revisor.items[0] ? _revisor.items[0] : null; }
 function renderRevisorGastos(){
@@ -11369,7 +11470,7 @@ function b64urlEncode(str){
 async function mostrarArchivoEnVisor(url){
   const iframe = document.getElementById('visor-original-iframe');
   const contenedor = document.getElementById('visor-original-tabla');
-  if(/\.pdf$/i.test(url)){
+  if(/\.pdf(\?[^#]*)?(#.*)?$/i.test(url)){
     contenedor.style.display = 'none';
     iframe.style.display = '';
     iframe.src = url;
@@ -11414,6 +11515,7 @@ async function mostrarArchivoEnVisor(url){
 function abrirVisorDesdeUrl(url){
   document.getElementById('visor-original-descargar').href = url;
   document.getElementById('visor-original-overlay').classList.add('active');
+  if(/\/GASTOS\/CORREO\//.test(url)){ asegurarPdfCorreoYMostrar(url); return; }
   mostrarArchivoEnVisor(url);
 }
 function abrirVisorArchivoOriginal(){
