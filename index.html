@@ -1119,6 +1119,16 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .gasto-consumo{font-size:12.5px;color:var(--ink-soft);overflow-wrap:anywhere;}
 .gasto-consumo b{color:var(--ink);}
 .rev-nota{font-size:12.5px;color:var(--orange);font-weight:600;}
+.comb-chart{overflow-x:auto;gap:8px;padding-bottom:2px;}
+.comb-chart .bar-col{min-width:30px;}
+.comb-stack{display:flex;flex-direction:column-reverse;background:transparent !important;overflow:hidden;border-radius:3px;width:100%;}
+.comb-stack i{display:block;width:100%;}
+.comb-val{font-size:10.5px;color:var(--ink);font-weight:600;}
+.comb-mes{border:1px solid var(--line, rgba(0,0,0,0.1));border-radius:10px;padding:11px 13px;margin-bottom:8px;display:flex;flex-direction:column;gap:3px;background:var(--card, #fff);}
+.comb-mes-cab{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+.comb-mes-cab b{font-size:15px;text-transform:capitalize;}
+.comb-mes-linea{font-size:12.5px;color:var(--ink-soft);overflow-wrap:anywhere;}
+.comb-leyenda i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:baseline;}
 .rev-card{border:1px solid var(--line, rgba(0,0,0,0.1));border-radius:12px;padding:14px;margin:10px;background:var(--card, #fff);display:flex;flex-direction:column;gap:12px;}
 .rev-cab{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:12.5px;color:var(--ink-soft);flex-wrap:wrap;}
 .rev-de{font-size:13px;overflow-wrap:anywhere;}
@@ -2889,7 +2899,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.93</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V5.94</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -2967,7 +2977,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V5.93</div>
+        <div class="sub" id="version-badge">V5.94</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4023,6 +4033,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="client-tabs" id="gpro-subtabs">
         <div class="client-tab active" data-sub="resumen">Resumen</div>
         <div class="client-tab" data-sub="lista">Gastos</div>
+        <div class="client-tab" data-sub="combustible">Combustible</div>
         <div class="client-tab" data-sub="revisar">Por revisar</div>
         <div class="client-tab" data-sub="dudosos">Dudosos</div>
         <div class="client-tab" data-sub="efectivo">Efectivo</div>
@@ -4054,10 +4065,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="panel-body">
               <div class="bar-chart" id="gpro-chart-evolucion"></div>
             </div>
-          </div>
-          <div class="panel">
-            <div class="panel-head"><h3>Combustible</h3></div>
-            <div class="panel-body" id="gpro-combustible" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
           <div class="panel">
             <div class="panel-head"><h3>Por proveedor</h3></div>
@@ -4123,6 +4130,48 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
 
       <!-- EFECTIVO -->
+      <!-- COMBUSTIBLE: control de litros y precios (solo control interno; al gestor solo va la factura) -->
+      <div class="sub-view" id="gpro-comb" style="display:none;">
+        <div class="filters" id="gpro-comb-chips" style="margin-bottom:16px;">
+          <div class="chip-filter" data-per="trim">Trimestre</div>
+          <div class="chip-filter" data-per="anio">Año</div>
+          <div class="chip-filter active" data-per="12m">Últimos 12 meses</div>
+          <div class="chip-filter" data-per="todo">Todo</div>
+        </div>
+        <div class="kpi-strip">
+          <div class="kpi"><div class="lbl">Litros totales</div><div class="val" id="gpro-comb-kpi-litros">—</div></div>
+          <div class="kpi"><div class="lbl">Gasto combustible</div><div class="val" id="gpro-comb-kpi-gasto">—</div></div>
+          <div class="kpi"><div class="lbl">Precio medio/litro</div><div class="val" id="gpro-comb-kpi-precio">—</div></div>
+          <div class="kpi"><div class="lbl">Otros gastos</div><div class="val" id="gpro-comb-kpi-otros">—</div></div>
+        </div>
+        <div id="gpro-comb-aviso" class="sub-t" style="margin:-6px 0 12px;"></div>
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head"><h3>Litros por mes</h3><div id="gpro-comb-leyenda" style="font-size:11.5px;display:flex;gap:10px;flex-wrap:wrap;"></div></div>
+            <div class="panel-body"><div class="bar-chart comb-chart" id="gpro-comb-chart-litros"></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Precio del diésel (€/l, con IVA)</h3></div>
+            <div class="panel-body"><div class="bar-chart comb-chart" id="gpro-comb-chart-precio"></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Mes a mes</h3></div>
+          <div class="panel-body" style="padding:0;">
+            <div class="tabla-escritorio-solo"><table class="tbl">
+              <tr><th>Mes</th><th class="num">Litros</th><th class="num">Diésel</th><th class="num">Gasóleo B</th><th class="num">Gasolina</th><th class="num">Combustible</th><th class="num">€/l</th><th class="num">Otros</th></tr>
+              <tbody id="gpro-comb-tbody"></tbody>
+            </table></div>
+            <div class="lista-movil-solo"><div id="gpro-comb-movil" style="padding:10px;"></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Otros gastos de la gasolinera</h3></div>
+          <div class="panel-body" id="gpro-comb-otros" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+        <div class="two-col-note">Importes con IVA, tal y como vienen en las facturas. Es solo control interno: al gestor se le manda únicamente la factura.</div>
+      </div>
+
       <!-- DUDOSOS: gastos que parecen no tener relación con la actividad o no van a nombre del titular -->
       <div class="sub-view" id="gpro-dudosos" style="display:none;">
         <div class="filters" id="gpro-dudosos-chips" style="margin:0 0 10px;">
@@ -6381,7 +6430,7 @@ function setupSubtabs(navId, prefix, mapping, opts){
 }
 setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimiento:'flota-mantenimiento',averias:'flota-averias',documentacion:'flota-documentacion',repuestos:'flota-repuestos',historial:'flota-historial'});
 setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',cobros:'econ-cobros',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad',cierre:'econ-cierre'});
-setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',revisar:'gpro-revisar',dudosos:'gpro-dudosos',efectivo:'gpro-efectivo',banco:'gpro-banco',recurrentes:'gpro-recurrentes',seguros:'gpro-seguros',prestamos:'gpro-prestamos',maquinas:'gpro-maquinas'},{onSwitch:{revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); }, dudosos:()=>renderGastosProDudosos()}});
+setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',combustible:'gpro-comb',revisar:'gpro-revisar',dudosos:'gpro-dudosos',efectivo:'gpro-efectivo',banco:'gpro-banco',recurrentes:'gpro-recurrentes',seguros:'gpro-seguros',prestamos:'gpro-prestamos',maquinas:'gpro-maquinas'},{onSwitch:{revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); }, dudosos:()=>renderGastosProDudosos(), combustible:()=>renderGastosProCombustible()}});
 document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filters .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     chip.parentElement.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
@@ -6389,6 +6438,7 @@ document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filter
     if(chip.closest('#gpro-resumen')) renderGastosProResumen();
     if(chip.closest('#gpro-lista')) renderGastosProLista();
     if(chip.closest('#gpro-dudosos-chips')) renderGastosProDudosos();
+    if(chip.closest('#gpro-comb-chips')) renderGastosProCombustible();
   });
 });
 function gastosProDocs(){
@@ -6892,22 +6942,6 @@ function conceptosDesdeConsumo(consumo){
   consumo.otros.articulos.forEach(a => out.push({cantidad: a.cantidad, unidad: 'ud', descripcion: a.descripcion, precio_unitario: a.precio_medio, importe: a.importe, grupo: 'otros', subtipo: a.subtipo}));
   return out;
 }
-// Resumen de combustible de un conjunto de gastos (para el panel del Resumen de Gastos): sale de los conceptos guardados
-function resumenCombustibleDeGastos(docs){
-  const tipos = new Map(); let otros = 0, nOtros = 0, facturas = 0; const arts = new Map();
-  docs.forEach(d => {
-    const cs = Array.isArray(d.conceptos) ? d.conceptos : [];
-    if(!cs.some(c => c.grupo === 'combustible')) return;
-    facturas++;
-    cs.forEach(c => {
-      if(c.grupo === 'combustible'){
-        const t = tipos.get(c.tipo) || {tipo: c.tipo, etiqueta: c.descripcion, litros: 0, importe: 0}; t.litros += Number(c.cantidad || 0); t.importe += Number(c.importe || 0); tipos.set(c.tipo, t);
-      }else if(c.grupo === 'otros'){ otros += Number(c.importe || 0); nOtros += Number(c.cantidad || 0); arts.set(c.descripcion, (arts.get(c.descripcion) || 0) + Number(c.importe || 0)); }
-    });
-  });
-  const lista = [...tipos.values()].map(t => ({...t, litros: redondear2(t.litros), importe: redondear2(t.importe)})).sort((a, b) => b.litros - a.litros);
-  return {facturas, litros: redondear2(lista.reduce((s, t) => s + t.litros, 0)), gastoCombustible: redondear2(lista.reduce((s, t) => s + t.importe, 0)), tipos: lista, otros: redondear2(otros), nOtros, articulos: [...arts.entries()].sort((a, b) => b[1] - a[1]).map(([nombre, importe]) => ({nombre, importe: redondear2(importe)}))};
-}
 // Devuelve: destino ('gasto' | 'dudoso' | 'revisar'), confianza, campos, problemas y motivo.
 function extraerGastoConPlantilla(texto, pl, regla){
   const formato = pl.formato_numero || 'auto';
@@ -7296,17 +7330,128 @@ function enlazarTarjetasGasto(cont){
   cont.querySelectorAll('[data-url]').forEach(b => { b.onclick = ev => { ev.stopPropagation(); abrirVisorDesdeUrl(b.dataset.url); }; });
   cont.querySelectorAll('[data-decidir]').forEach(b => { b.onclick = () => decidirGastoDudoso(b.dataset.id, b.dataset.decidir); });
 }
-function pintarCombustibleResumen(docs){
-  const cont = document.getElementById('gpro-combustible');
-  if(!cont) return;
-  const r = resumenCombustibleDeGastos(docs);
-  const linea = (a, b) => `<div class="econ-line"><span>${a}</span><span class="v">${b}</span></div>`;
-  if(!r.facturas){ cont.innerHTML = '<div class="empty">Sin datos de combustible en este periodo.</div>'; return; }
-  cont.innerHTML = linea('Litros totales', escHtml(litrosRev(r.litros))) +
-    r.tipos.map(t => linea(`${escHtml(t.etiqueta)} · ${escHtml(litrosRev(t.litros))}`, `${escHtml(eurRev(t.importe))}${t.litros ? ` <span style="color:var(--ink-soft);font-weight:400;">(${escHtml((t.importe / t.litros).toLocaleString('es-ES', {minimumFractionDigits: 3, maximumFractionDigits: 3}))} €/l)</span>` : ''}`)).join('') +
-    linea('Gasto en combustible', escHtml(eurRev(r.gastoCombustible))) +
-    (r.otros ? linea(`Otros gastos de la gasolinera (${r.articulos.slice(0, 3).map(a => escHtml(a.nombre)).join(', ')}${r.articulos.length > 3 ? '…' : ''})`, escHtml(eurRev(r.otros))) : '') +
-    `<div class="sub-t" style="margin-top:4px;font-size:11.5px;">${r.facturas} factura(s). Importes con IVA. Es solo control interno: al gestor solo se le manda la factura.</div>`;
+// ===================== COMBUSTIBLE — control de litros y precios =====================
+// Sale de los "conceptos" que se guardan en cada gasto de combustible (ver conceptosDesdeConsumo). Es solo
+// control INTERNO: al gestor no se le manda nada de esto, solo la factura. Importes con IVA, como en la factura.
+const COMB_TIPOS = [{tipo: 'diesel', etiqueta: 'Diésel', color: '#D8560F'}, {tipo: 'gasoleo_b', etiqueta: 'Gasóleo B', color: '#3B6FA0'}, {tipo: 'gasolina', etiqueta: 'Gasolina', color: '#3C6E47'}];
+const COMB_SUBTIPOS = {comida_bebida: 'Comida y bebida', taller_consumibles: 'Taller y consumibles', varios: 'Otros'};
+const MESES_CORTO_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'];
+function filtrarDocsPeriodoComb(docs, per, hoy){
+  hoy = hoy || new Date();
+  return docs.filter(d => {
+    if(!d.dateRaw) return per === 'todo';
+    const dt = new Date(d.dateRaw);
+    if(isNaN(dt)) return false;
+    if(per === 'todo') return true;
+    if(per === 'anio') return dt.getFullYear() === hoy.getFullYear();
+    if(per === 'trim') return dt.getFullYear() === hoy.getFullYear() && Math.floor(dt.getMonth() / 3) === Math.floor(hoy.getMonth() / 3);
+    const desde = new Date(hoy.getFullYear(), hoy.getMonth() - 11, 1);   // '12m': los 12 meses naturales que terminan en el actual
+    return dt >= desde && dt <= new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59);
+  });
+}
+function combustiblePorMes(docs){
+  const meses = new Map(); const sinDetalle = {n: 0, importe: 0};
+  docs.forEach(d => {
+    const cs = Array.isArray(d.conceptos) ? d.conceptos : [];
+    const comb = cs.filter(c => c.grupo === 'combustible');
+    if(!comb.length){ if(d.categoria === 'Combustible'){ sinDetalle.n++; sinDetalle.importe += Number(d.importe || d.total || 0); } return; }
+    const dt = new Date(d.dateRaw);
+    if(isNaN(dt)) return;
+    const clave = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    const m = meses.get(clave) || {clave, anio: dt.getFullYear(), mes: dt.getMonth(), litros: 0, importe: 0, otros: 0, facturas: 0, tipos: {}};
+    m.facturas++;
+    comb.forEach(c => {
+      const t = m.tipos[c.tipo] || (m.tipos[c.tipo] = {etiqueta: c.descripcion, litros: 0, importe: 0});
+      t.litros += Number(c.cantidad || 0); t.importe += Number(c.importe || 0);
+      m.litros += Number(c.cantidad || 0); m.importe += Number(c.importe || 0);
+    });
+    cs.filter(c => c.grupo === 'otros').forEach(c => { m.otros += Number(c.importe || 0); });
+    meses.set(clave, m);
+  });
+  const lista = [...meses.values()].sort((a, b) => a.clave.localeCompare(b.clave)).map(m => {
+    Object.values(m.tipos).forEach(t => { t.litros = redondear2(t.litros); t.importe = redondear2(t.importe); t.precio = t.litros ? Math.round(t.importe / t.litros * 1000) / 1000 : null; });
+    return {...m, litros: redondear2(m.litros), importe: redondear2(m.importe), otros: redondear2(m.otros), precio: m.litros ? Math.round(m.importe / m.litros * 1000) / 1000 : null};
+  });
+  return {meses: lista, sinDetalle: {n: sinDetalle.n, importe: redondear2(sinDetalle.importe)}};
+}
+function totalesCombustible(meses){
+  const t = {litros: 0, importe: 0, otros: 0, facturas: 0, tipos: {}};
+  meses.forEach(m => {
+    t.litros += m.litros; t.importe += m.importe; t.otros += m.otros; t.facturas += m.facturas;
+    Object.entries(m.tipos).forEach(([k, v]) => { const x = t.tipos[k] || (t.tipos[k] = {etiqueta: v.etiqueta, litros: 0, importe: 0}); x.litros += v.litros; x.importe += v.importe; });
+  });
+  Object.values(t.tipos).forEach(x => { x.litros = redondear2(x.litros); x.importe = redondear2(x.importe); x.precio = x.litros ? Math.round(x.importe / x.litros * 1000) / 1000 : null; });
+  return {...t, litros: redondear2(t.litros), importe: redondear2(t.importe), otros: redondear2(t.otros), precio: t.litros ? Math.round(t.importe / t.litros * 1000) / 1000 : null};
+}
+function otrosGastosCombustible(docs){
+  const arts = new Map(), subt = new Map();
+  docs.forEach(d => (Array.isArray(d.conceptos) ? d.conceptos : []).filter(c => c.grupo === 'otros').forEach(c => {
+    const a = arts.get(c.descripcion) || {nombre: c.descripcion, subtipo: c.subtipo || 'varios', cantidad: 0, importe: 0};
+    a.cantidad += Number(c.cantidad || 0); a.importe += Number(c.importe || 0); arts.set(c.descripcion, a);
+    const k = c.subtipo || 'varios'; subt.set(k, (subt.get(k) || 0) + Number(c.importe || 0));
+  }));
+  return {
+    articulos: [...arts.values()].map(a => ({...a, cantidad: redondear2(a.cantidad), importe: redondear2(a.importe)})).sort((x, y) => y.importe - x.importe),
+    subtipos: [...subt.entries()].map(([k, v]) => ({subtipo: k, etiqueta: COMB_SUBTIPOS[k] || 'Otros', importe: redondear2(v)})).sort((x, y) => y.importe - x.importe),
+  };
+}
+function nombreMesComb(m){ return `${MESES_ES[m.mes]} ${m.anio}`; }
+function renderGastosProCombustible(){
+  const vista = document.getElementById('gpro-comb');
+  if(!vista) return;
+  const $ = id => document.getElementById(id);
+  const per = vista.querySelector('#gpro-comb-chips .chip-filter.active')?.dataset.per || '12m';
+  const docs = filtrarDocsPeriodoComb(gastosProDocs(), per, new Date());
+  const {meses, sinDetalle} = combustiblePorMes(docs);
+  const tot = totalesCombustible(meses);
+  const eur = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  const lit = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const pre = n => n == null ? '—' : Number(n).toLocaleString('es-ES', {minimumFractionDigits: 3, maximumFractionDigits: 3});
+  $('gpro-comb-kpi-litros').textContent = meses.length ? lit(tot.litros) + ' l' : '—';
+  $('gpro-comb-kpi-gasto').textContent = meses.length ? eur(tot.importe) : '—';
+  $('gpro-comb-kpi-precio').textContent = meses.length && tot.precio != null ? pre(tot.precio) + ' €/l' : '—';
+  $('gpro-comb-kpi-otros').textContent = meses.length ? eur(tot.otros) : '—';
+  $('gpro-comb-aviso').textContent = sinDetalle.n ? `Hay ${sinDetalle.n} gasto(s) de combustible sin detalle de litros (${eur(sinDetalle.importe)}) que no entran en estas cifras.` : '';
+  if(!meses.length){
+    const vacio = '<div class="empty" style="padding:16px;width:100%;">Sin datos de combustible en este periodo.</div>';
+    ['gpro-comb-chart-litros', 'gpro-comb-chart-precio', 'gpro-comb-movil', 'gpro-comb-otros'].forEach(id => { $(id).innerHTML = vacio; });
+    $('gpro-comb-tbody').innerHTML = '<tr><td colspan="8" class="empty">Sin datos de combustible en este periodo.</td></tr>';
+    $('gpro-comb-leyenda').innerHTML = '';
+    return;
+  }
+  // leyenda + litros por mes, apilado por tipo de combustible
+  const usados = COMB_TIPOS.filter(t => tot.tipos[t.tipo]);
+  $('gpro-comb-leyenda').innerHTML = usados.map(t => `<span class="comb-leyenda"><i style="background:${t.color}"></i>${escHtml(t.etiqueta)}</span>`).join('');
+  const maxL = Math.max(1, ...meses.map(m => m.litros));
+  $('gpro-comb-chart-litros').innerHTML = meses.map(m => `<div class="bar-col" title="${escHtml(nombreMesComb(m))}: ${escHtml(lit(m.litros))} l">
+    <span class="comb-val">${Math.round(m.litros).toLocaleString('es-ES')}</span>
+    <div class="bar comb-stack" style="height:${Math.max(4, m.litros / maxL * 100)}%;">${usados.filter(t => m.tipos[t.tipo]).map(t => `<i style="height:${m.tipos[t.tipo].litros / m.litros * 100}%;background:${t.color}"></i>`).join('')}</div>
+    <span>${MESES_CORTO_ES[m.mes]}${meses.length > 12 ? ' ' + String(m.anio).slice(2) : ''}</span></div>`).join('');
+  // precio del diésel por mes: las barras empiezan en un mínimo para que se vea la subida y la bajada
+  const conD = meses.filter(m => m.tipos.diesel && m.tipos.diesel.precio != null);
+  if(conD.length){
+    const ps = conD.map(m => m.tipos.diesel.precio), minP = Math.min(...ps), maxP = Math.max(...ps), base = Math.max(0, minP - (maxP - minP) * 0.6 - 0.02);
+    $('gpro-comb-chart-precio').innerHTML = conD.map(m => { const p = m.tipos.diesel.precio; return `<div class="bar-col" title="${escHtml(nombreMesComb(m))}: ${escHtml(pre(p))} €/l">
+      <span class="comb-val">${escHtml(p.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}))}</span>
+      <div class="bar" style="height:${maxP === minP ? 60 : Math.max(6, (p - base) / (maxP - base) * 100)}%;${m === conD[conD.length - 1] ? 'background:var(--orange);' : ''}"></div>
+      <span>${MESES_CORTO_ES[m.mes]}${conD.length > 12 ? ' ' + String(m.anio).slice(2) : ''}</span></div>`; }).join('');
+  }else $('gpro-comb-chart-precio').innerHTML = '<div class="empty" style="padding:16px;width:100%;">Sin diésel en este periodo.</div>';
+  // detalle mes a mes (recientes primero): tabla en escritorio y tarjetas en móvil
+  const desc = meses.slice().reverse();
+  const lt = (m, k) => m.tipos[k] ? lit(m.tipos[k].litros) : '—';
+  $('gpro-comb-tbody').innerHTML = desc.map(m => `<tr><td>${escHtml(nombreMesComb(m))}</td><td class="num">${lit(m.litros)}</td><td class="num">${lt(m, 'diesel')}</td><td class="num">${lt(m, 'gasoleo_b')}</td><td class="num">${lt(m, 'gasolina')}</td><td class="num">${eur(m.importe)}</td><td class="num">${pre(m.precio)}</td><td class="num">${m.otros ? eur(m.otros) : '—'}</td></tr>`).join('') +
+    `<tr style="font-weight:700;"><td>Total</td><td class="num">${lit(tot.litros)}</td><td class="num">${tot.tipos.diesel ? lit(tot.tipos.diesel.litros) : '—'}</td><td class="num">${tot.tipos.gasoleo_b ? lit(tot.tipos.gasoleo_b.litros) : '—'}</td><td class="num">${tot.tipos.gasolina ? lit(tot.tipos.gasolina.litros) : '—'}</td><td class="num">${eur(tot.importe)}</td><td class="num">${pre(tot.precio)}</td><td class="num">${tot.otros ? eur(tot.otros) : '—'}</td></tr>`;
+  $('gpro-comb-movil').innerHTML = desc.map(m => `<div class="comb-mes">
+    <div class="comb-mes-cab"><b>${escHtml(nombreMesComb(m))}</b><b style="text-transform:none;">${escHtml(eur(m.importe))}</b></div>
+    <div class="comb-mes-linea"><b style="color:var(--ink);">${escHtml(lit(m.litros))} l</b> · ${escHtml(pre(m.precio))} €/l de media</div>
+    <div class="comb-mes-linea">${COMB_TIPOS.filter(t => m.tipos[t.tipo]).map(t => `${escHtml(t.etiqueta)} ${escHtml(lit(m.tipos[t.tipo].litros))} l (${escHtml(pre(m.tipos[t.tipo].precio))} €/l)`).join(' · ')}</div>
+    ${m.otros ? `<div class="comb-mes-linea">Otros gastos: ${escHtml(eur(m.otros))}</div>` : ''}</div>`).join('') +
+    `<div class="comb-mes" style="background:rgba(0,0,0,0.03);"><div class="comb-mes-cab"><b>Total</b><b style="text-transform:none;">${escHtml(eur(tot.importe))}</b></div><div class="comb-mes-linea"><b style="color:var(--ink);">${escHtml(lit(tot.litros))} l</b> · ${escHtml(pre(tot.precio))} €/l de media${tot.otros ? ` · Otros ${escHtml(eur(tot.otros))}` : ''}</div></div>`;
+  // otros gastos de la gasolinera
+  const o = otrosGastosCombustible(docs);
+  $('gpro-comb-otros').innerHTML = o.articulos.length
+    ? o.subtipos.map(st => `<div class="econ-line"><span><b>${escHtml(st.etiqueta)}</b></span><span class="v"><b>${escHtml(eur(st.importe))}</b></span></div>` + o.articulos.filter(a => a.subtipo === st.subtipo).map(a => `<div class="econ-line"><span style="color:var(--ink-soft);">${escHtml(a.nombre)} ×${escHtml(String(a.cantidad).replace('.', ','))}</span><span class="v">${escHtml(eur(a.importe))}</span></div>`).join('')).join('')
+    : '<div class="empty" style="padding:8px;">Nada aparte del combustible en este periodo.</div>';
 }
 function gastosDudososDocs(rel){
   return Object.values(documentosRealesById).filter(d => (d.type === 'gasto' || d.tipo === 'gasto') && d.relacion_actividad === rel);
@@ -7372,8 +7517,6 @@ function renderGastosProResumen(){
     <div class="bar-col"><div class="bar" style="height:${Math.max(4,sumasMes[i]/maxMes*100)}%;${i===5?'background:var(--orange);':''}"></div><span>${nombresMes[m.getMonth()]}</span></div>
   `).join('');
 
-  pintarCombustibleResumen(docs);
-
   // por proveedor (todo el histórico de gasto)
   const porProveedor = {};
   gastosProDocs().forEach(d=>{
@@ -7430,6 +7573,7 @@ function renderGastosPro(){
   renderGastosProLista();
   renderGastosProRecurrentes();
   renderGastosProDudosos();
+  renderGastosProCombustible();
 }
 
 setupSubtabs('entradas-subtabs','entradas',{bandeja:'sub-bandeja',whatsapp:'sub-whatsapp'});
