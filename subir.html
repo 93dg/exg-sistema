@@ -126,7 +126,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.18 · Sistema …</div>
+    <div class="ver" id="ver-subir">Subir S3.19 · Sistema …</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -714,159 +714,53 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     }
   }
 
-  // Resumen del documento donde cayó la entrada (albarán/factura/proforma/...): tipo, número y totales.
+  // Detalle de una entrada verificada, dentro de su tarjeta (sin botón): a qué documento se añadió,
+  // las líneas que añadió (fecha, cantidad, concepto, precio, total) y los totales del documento.
   // Albarán: solo total (no lleva IVA). Con IVA: subtotal, IVA y total. total = importe (ya con IVA), salvo ISP.
-  async function pintarResumenSolucion(elementoId, lineas){
-    const texto = document.getElementById("modal-solucion-texto");
-    if (!texto) return;
-    let cont = document.getElementById("modal-solucion-doc");
-    if (!cont){
-      cont = document.createElement("div");
-      cont.id = "modal-solucion-doc";
-      cont.style.cssText = "font-size:13px;line-height:1.7;color:#444;background:#f5f3ef;border-radius:8px;padding:8px 10px;margin-bottom:16px;";
-      texto.insertAdjacentElement("afterend", cont);
-    }
-    cont.textContent = "";
-    cont.style.display = "none";
+  async function rellenarDetalleEntrada(cont, elementoId, lineas){
+    if (!cont) return;
     const eur = n => Number(n||0).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
     const num = n => Number(n||0).toLocaleString("es-ES",{maximumFractionDigits:2});
-    // Líneas que añadió esta entrada (guardadas en interpretacion.lineas al procesarla): fecha, cantidad, concepto, precio y total
-    if (Array.isArray(lineas) && lineas.length){
-      const cab = document.createElement("div");
-      cab.style.cssText = "font-weight:700;margin-bottom:2px;";
-      cab.textContent = "Líneas añadidas";
-      cont.appendChild(cab);
+    const nombres = { albaran:"Albarán", factura:"Factura", proforma:"Proforma", presupuesto:"Presupuesto" };
+    const fila = (a,b,fuerte) => { const row = document.createElement("div"); row.style.cssText = "display:flex;justify-content:space-between;gap:8px;"+(fuerte?"font-weight:700;":""); const x = document.createElement("span"); x.textContent = a; const y = document.createElement("span"); y.textContent = b; row.appendChild(x); row.appendChild(y); return row; };
+    const titulo = (t, sep) => { const d = document.createElement("div"); d.style.cssText = "font-weight:700;margin:"+(sep?"6px 0 2px;border-top:1px solid rgba(0,0,0,.12);padding-top:6px;":"0 0 2px;"); d.textContent = t; return d; };
+    let d = null;
+    if (elementoId){
+      try {
+        const r = await fetch(SUPABASE_URL+"/rest/v1/rpc/resumen_documento", { method:"POST", headers:{ "Authorization":"Bearer "+SUPABASE_ANON_KEY, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" }, body: JSON.stringify({ p_id: elementoId }) });
+        const j = await r.json();
+        if (j && j.tipo) d = j;
+      } catch(e) { d = null; }
+    }
+    const hayLineas = Array.isArray(lineas) && lineas.length;
+    if (!d && !hayLineas) return;
+    cont.textContent = "";
+    cont.style.cssText = "margin-top:6px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.6);color:#333;font-size:12px;line-height:1.5;";
+    if (d) cont.appendChild(titulo("Añadido a: "+(nombres[d.tipo]||d.tipo)+(d.numero?" · "+d.numero:""), false));
+    if (hayLineas){
+      cont.appendChild(titulo("Líneas añadidas", !!d));
       lineas.forEach(l => {
         const b = document.createElement("div");
-        b.style.cssText = "border-top:1px solid #e3ded5;padding:4px 0;";
+        b.style.cssText = "padding:3px 0;";
         const f = String(l.fecha||"").split("-");
         const t1 = document.createElement("div");
         t1.textContent = (f.length===3 ? f[2]+"/"+f[1] : "")+" · "+(l.concepto||"");
-        const t2 = document.createElement("div");
-        t2.style.cssText = "display:flex;justify-content:space-between;gap:8px;";
-        const a = document.createElement("span"); a.textContent = num(l.cantidad)+" "+(l.unidad||"h")+" × "+eur(l.precio);
-        const z = document.createElement("span"); z.style.fontWeight = "700"; z.textContent = eur(l.total);
-        t2.appendChild(a); t2.appendChild(z);
-        b.appendChild(t1); b.appendChild(t2);
+        b.appendChild(t1);
+        b.appendChild(fila(num(l.cantidad)+" "+(l.unidad||"h")+" × "+eur(l.precio), eur(l.total), true));
         cont.appendChild(b);
       });
-      cont.style.display = "block";
     }
-    if (!elementoId) return;
-    try {
-      const r = await fetch(SUPABASE_URL+"/rest/v1/rpc/resumen_documento", { method:"POST", headers:{ "Authorization":"Bearer "+SUPABASE_ANON_KEY, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" }, body: JSON.stringify({ p_id: elementoId }) });
-      const d = await r.json();
-      if (!d || !d.tipo) return;
-      const fila = (a,b,fuerte) => { const row = document.createElement("div"); row.style.cssText = "display:flex;justify-content:space-between;gap:8px;"+(fuerte?"font-weight:700;":""); const x = document.createElement("span"); x.textContent = a; const y = document.createElement("span"); y.textContent = b; row.appendChild(x); row.appendChild(y); return row; };
-      const nombres = { albaran:"Albarán", factura:"Factura", proforma:"Proforma", presupuesto:"Presupuesto" };
-      const cab = document.createElement("div");
-      cab.style.cssText = "font-weight:700;margin:6px 0 2px;border-top:1px solid #e3ded5;padding-top:6px;";
-      cab.textContent = (nombres[d.tipo]||d.tipo)+(d.numero?" · "+d.numero:"");
-      cont.appendChild(cab);
+    if (d){
+      cont.appendChild(titulo("Totales del documento", true));
       const total = Number(d.total||0);
       const pct = Number(d.iva_pct||0);
-      const conIva = d.tipo !== "albaran" && pct > 0 && d.tratamiento_iva !== "isp";
-      if (conIva){
+      if (d.tipo !== "albaran" && pct > 0 && d.tratamiento_iva !== "isp"){
         const sub = Math.round(total/(1+pct/100)*100)/100;
         cont.appendChild(fila("Subtotal", eur(sub)));
         cont.appendChild(fila("IVA "+pct+"%", eur(Math.round((total-sub)*100)/100)));
       }
       cont.appendChild(fila(d.tratamiento_iva === "isp" ? "Total (ISP, sin IVA)" : "Total", eur(total), true));
-      cont.style.display = "block";
-    } catch(e) { /* sin resumen: el modal sigue igual que antes */ }
-  }
-  async function mostrarSolucionPorIds(docIdsStr){
-    const ids = docIdsStr.split(',').map(x=>x.trim()).filter(Boolean);
-    if(!ids.length) return;
-    const resp = await fetch(SUPABASE_URL+"/rest/v1/documentos?id=in.("+ids.join(",")+")"+"&select=id,linked_label,interpretacion,action_type", { headers:{ "Authorization":"Bearer "+SUPABASE_ANON_KEY, "apikey": SUPABASE_ANON_KEY } });
-    const filas = await resp.json();
-    const label = (filas.find(f => f.linked_label)||{}).linked_label || "—";
-    const interp = (filas.find(f => f.interpretacion)||{}).interpretacion || {};
-    const elementoId = interp.elemento_id || interp.albaran_id || null;
-    const tipo = interp.elemento_tipo || "albaran";
-    let ov = document.getElementById("modal-solucion");
-    if (!ov){
-      ov = document.createElement("div");
-      ov.id = "modal-solucion";
-      ov.style.cssText = "display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;";
-      const box = document.createElement("div");
-      box.style.cssText = "background:#fff;border-radius:16px;padding:20px;max-width:360px;width:100%;";
-      const titulo = document.createElement("div");
-      titulo.style.cssText = "font-weight:700;font-size:16px;margin-bottom:10px;";
-      titulo.textContent = "✓ Solución aplicada";
-      const texto = document.createElement("div");
-      texto.id = "modal-solucion-texto";
-      texto.style.cssText = "font-size:14px;line-height:1.5;color:#444;margin-bottom:16px;";
-      const btnDiv = document.createElement("div");
-      btnDiv.id = "modal-solucion-btn";
-      const cerrar = document.createElement("button");
-      cerrar.textContent = "Cerrar";
-      cerrar.style.cssText = "margin-top:10px;width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;background:transparent;font-size:14px;cursor:pointer;";
-      cerrar.onclick = function(){ ov.style.display="none"; };
-      box.appendChild(titulo); box.appendChild(texto); box.appendChild(btnDiv); box.appendChild(cerrar);
-      ov.appendChild(box);
-      ov.addEventListener("click", function(e){ if(e.target===ov) ov.style.display="none"; });
-      document.body.appendChild(ov);
     }
-    document.getElementById("modal-solucion-texto").textContent = label;
-    await pintarResumenSolucion(elementoId, interp.lineas);
-    const btnDiv = document.getElementById("modal-solucion-btn");
-    btnDiv.innerHTML = "";
-    if (elementoId){
-      const btn = document.createElement("button");
-      btn.textContent = "Abrir en el sistema →";
-      btn.style.cssText = "width:100%;padding:10px;border-radius:8px;background:#c0522a;color:#fff;border:none;font-size:14px;cursor:pointer;";
-      btn.onclick = function(){ ov.style.display="none"; abrirEnlaceDesdeSubir(elementoId, tipo); };
-      btnDiv.appendChild(btn);
-    }
-    ov.style.display = "flex";
-  }
-  async function mostrarSolucionEntrada(msgId){
-    const m = leerHistorial().find(x => x.msg_id === msgId);
-    if (!m) return;
-    const ids = m.kind === "texto" ? [m.documento_id] : m.attachments.map(a => a.documento_id);
-    const resp = await fetch(SUPABASE_URL+"/rest/v1/documentos?id=in.("+ids.join(",")+")"+"&select=id,linked_label,interpretacion,action_type", { headers:{ "Authorization":"Bearer "+SUPABASE_ANON_KEY, "apikey": SUPABASE_ANON_KEY } });
-    const filas = await resp.json();
-    const label = (filas.find(f => f.linked_label)||{}).linked_label || "—";
-    const interp = (filas.find(f => f.interpretacion)||{}).interpretacion || {};
-    const elementoId = interp.elemento_id || interp.albaran_id || null;
-    const tipo = interp.elemento_tipo || "albaran";
-    let ov = document.getElementById("modal-solucion");
-    if (!ov){
-      ov = document.createElement("div");
-      ov.id = "modal-solucion";
-      ov.style.cssText = "display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;";
-      const box = document.createElement("div");
-      box.style.cssText = "background:#fff;border-radius:16px;padding:20px;max-width:360px;width:100%;";
-      const titulo = document.createElement("div");
-      titulo.style.cssText = "font-weight:700;font-size:16px;margin-bottom:10px;";
-      titulo.textContent = "✓ Solución aplicada";
-      const texto = document.createElement("div");
-      texto.id = "modal-solucion-texto";
-      texto.style.cssText = "font-size:14px;line-height:1.5;color:#444;margin-bottom:16px;";
-      const btnDiv = document.createElement("div");
-      btnDiv.id = "modal-solucion-btn";
-      const cerrar = document.createElement("button");
-      cerrar.textContent = "Cerrar";
-      cerrar.style.cssText = "margin-top:10px;width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;background:transparent;font-size:14px;cursor:pointer;";
-      cerrar.onclick = function(){ ov.style.display="none"; };
-      box.appendChild(titulo); box.appendChild(texto); box.appendChild(btnDiv); box.appendChild(cerrar);
-      ov.appendChild(box);
-      ov.addEventListener("click", function(e){ if(e.target===ov) ov.style.display="none"; });
-      document.body.appendChild(ov);
-    }
-    document.getElementById("modal-solucion-texto").textContent = label;
-    await pintarResumenSolucion(elementoId, interp.lineas);
-    const btnDiv = document.getElementById("modal-solucion-btn");
-    btnDiv.innerHTML = "";
-    if (elementoId){
-      const btn = document.createElement("button");
-      btn.textContent = "Abrir en el sistema →";
-      btn.style.cssText = "width:100%;padding:10px;border-radius:8px;background:#c0522a;color:#fff;border:none;font-size:14px;cursor:pointer;";
-      btn.onclick = function(){ abrirEnlaceDesdeSubir(elementoId, tipo); };
-      btnDiv.appendChild(btn);
-    }
-    ov.style.display = "flex";
   }
     function abrirEnlaceDesdeSubir(elementoId, tipo){
     localStorage.setItem('exg_goto', JSON.stringify({tipo, id: elementoId, ts: Date.now()}));
@@ -920,14 +814,12 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
         if (!caja){ caja = document.createElement("div"); caja.className = "msg-interpretacion"; caja.style.cssText = "margin-top:6px;padding:8px 10px;border-radius:9px;font-size:12px;line-height:1.4;"; cuerpo.appendChild(caja); }
 
         if (esVerificado && linkedLabel){
-          // Verificado: mostrar botón "Ver solución"
+          // Verificado: texto + detalle directamente en la tarjeta (sin botón)
           caja.style.background = "var(--green-soft)"; caja.style.color = "var(--green)";
-          const elementoId = filas.find(f => f.interpretacion?.elemento_id)?.interpretacion?.elemento_id || null;
-          const docIds = filas.map(f=>f.id).join(',');
-          caja.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <span style="flex:1;">✓ ${linkedLabel.replace('✓ ','').replace('verificado','').replace('Verificado','').trim().replace(/[—-]\s*$/,'').trim()}</span>
-            <button onclick="mostrarSolucionPorIds('${docIds}')" style="flex-shrink:0;padding:3px 8px;border-radius:6px;border:1px solid var(--green);background:transparent;color:var(--green);font-size:11px;cursor:pointer;">Ver solución →</button>
-          </div>`;
+          const interpV = filas.find(f => f.interpretacion)?.interpretacion || {};
+          const elementoId = interpV.elemento_id || interpV.albaran_id || null;
+          caja.innerHTML = `<div>✓ ${linkedLabel.replace('✓ ','').replace('verificado','').replace('Verificado','').trim().replace(/[—-]\s*$/,'').trim()}</div><div class="msg-detalle"></div>`;
+          rellenarDetalleEntrada(caja.querySelector(".msg-detalle"), elementoId, interpV.lineas);
         } else if (esFlota){
           caja.style.background = "var(--green-soft)"; caja.style.color = "var(--green)";
           caja.textContent = "→ Registrado en flota";
@@ -964,8 +856,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   window.abrirMenuAnadir = abrirMenuAnadir;
   // Versión del sistema desde BD (no hay que actualizarla a mano)
   fetch(SUPABASE_URL+"/rest/v1/arranque?clave=eq.web_version_actual&select=valor",{headers:{"Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY}})
-    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.18 · Sistema '+d[0].valor; }).catch(()=>{});
-  window.mostrarSolucionPorIds = mostrarSolucionPorIds;
+    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.19 · Sistema '+d[0].valor; }).catch(()=>{});
   window.abrirEnlaceDesdeSubir = abrirEnlaceDesdeSubir;
   window.toggleMsgVerificado = toggleMsgVerificado;
   menuAnadir.addEventListener("click", (e) => { if (e.target === menuAnadir) menuAnadir.classList.remove("activo"); });
