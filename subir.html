@@ -126,7 +126,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.19 · Sistema …</div>
+    <div class="ver" id="ver-subir">Subir S3.20 · Sistema …</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -717,7 +717,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   // Detalle de una entrada verificada, dentro de su tarjeta (sin botón): a qué documento se añadió,
   // las líneas que añadió (fecha, cantidad, concepto, precio, total) y los totales del documento.
   // Albarán: solo total (no lleva IVA). Con IVA: subtotal, IVA y total. total = importe (ya con IVA), salvo ISP.
-  async function rellenarDetalleEntrada(cont, elementoId, lineas){
+  async function rellenarDetalleEntrada(cont, elementoId, lineas, totalTras){
     if (!cont) return;
     const eur = n => Number(n||0).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
     const num = n => Number(n||0).toLocaleString("es-ES",{maximumFractionDigits:2});
@@ -751,8 +751,10 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
       });
     }
     if (d){
-      cont.appendChild(titulo("Totales del documento", true));
-      const total = Number(d.total||0);
+      // Total del documento TRAS añadir las líneas de esta entrada (guardado al procesarla); si no está, el actual
+      const tieneTotalTras = totalTras !== undefined && totalTras !== null && totalTras !== "";
+      cont.appendChild(titulo(tieneTotalTras ? "Totales del documento tras añadir" : "Totales del documento", true));
+      const total = Number(tieneTotalTras ? totalTras : d.total||0);
       const pct = Number(d.iva_pct||0);
       if (d.tipo !== "albaran" && pct > 0 && d.tratamiento_iva !== "isp"){
         const sub = Math.round(total/(1+pct/100)*100)/100;
@@ -819,7 +821,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
           const interpV = filas.find(f => f.interpretacion)?.interpretacion || {};
           const elementoId = interpV.elemento_id || interpV.albaran_id || null;
           caja.innerHTML = `<div>✓ ${linkedLabel.replace('✓ ','').replace('verificado','').replace('Verificado','').trim().replace(/[—-]\s*$/,'').trim()}</div><div class="msg-detalle"></div>`;
-          rellenarDetalleEntrada(caja.querySelector(".msg-detalle"), elementoId, interpV.lineas);
+          rellenarDetalleEntrada(caja.querySelector(".msg-detalle"), elementoId, interpV.lineas, interpV.total_documento);
         } else if (esFlota){
           caja.style.background = "var(--green-soft)"; caja.style.color = "var(--green)";
           caja.textContent = "→ Registrado en flota";
@@ -856,7 +858,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   window.abrirMenuAnadir = abrirMenuAnadir;
   // Versión del sistema desde BD (no hay que actualizarla a mano)
   fetch(SUPABASE_URL+"/rest/v1/arranque?clave=eq.web_version_actual&select=valor",{headers:{"Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY}})
-    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.19 · Sistema '+d[0].valor; }).catch(()=>{});
+    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.20 · Sistema '+d[0].valor; }).catch(()=>{});
   window.abrirEnlaceDesdeSubir = abrirEnlaceDesdeSubir;
   window.toggleMsgVerificado = toggleMsgVerificado;
   menuAnadir.addEventListener("click", (e) => { if (e.target === menuAnadir) menuAnadir.classList.remove("activo"); });
