@@ -2012,8 +2012,8 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .imp-linea .mono{white-space:nowrap;}
 .imp-linea.tot{font-weight:700;}
 .imp-linea.sub{color:var(--ink-soft);font-size:12.5px;}
-.imp-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper);margin-bottom:12px;}
-.imp-tabs button{padding:12px 4px;font-size:14px;font-weight:600;border:none;background:transparent;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+.imp-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper);margin-bottom:12px;}
+.imp-tabs button{padding:12px 2px;font-size:13px;white-space:nowrap;font-weight:600;border:none;background:transparent;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
 .imp-tabs button.active{background:var(--asphalt);color:#fff;}
 .imp-gestor-btn{width:100%;padding:14px;font-size:15px;margin:2px 0 10px;}
 .imp-av{display:flex;gap:8px;padding:7px 0;font-size:13.5px;line-height:1.4;border-bottom:1px solid var(--line);}
@@ -3119,7 +3119,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.28</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.29</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3197,7 +3197,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.28</div>
+        <div class="sub" id="version-badge">V6.29</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4642,7 +4642,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div><h1>Impuestos</h1><div class="desc">IVA (303) e IRPF (130)</div></div>
       </div>
       <div class="imp-tabs" id="imp-tabs">
-        <button type="button" data-p="trim" class="active">Trimestres</button><button type="button" data-p="anual">IRPF anual</button><button type="button" data-p="presentadas">Presentadas</button>
+        <button type="button" data-p="trim" class="active">Trimestres</button><button type="button" data-p="anual">IRPF anual</button><button type="button" data-p="presentadas">Presentadas</button><button type="button" data-p="deudas">Deudas</button>
       </div>
 
       <!-- ===== TRIMESTRES ===== -->
@@ -4696,6 +4696,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div id="imp-pag-presentadas" style="display:none;">
         <div class="imp-fechas">Historial de las declaraciones que ya se han presentado, con sus papeles.</div>
         <div id="imp-pres-lista"></div>
+      </div>
+
+      <!-- ===== DEUDAS: embargos y aplazamientos ===== -->
+      <div id="imp-pag-deudas" style="display:none;">
+        <div class="imp-fechas">Embargos cobrados en la cuenta y plazos pagados de los aplazamientos con Hacienda.</div>
+        <div id="imp-deu-lista"></div>
       </div>
 
       <!-- ===== IRPF ANUAL ===== -->
@@ -18532,7 +18538,7 @@ async function impGuardarPago(k){
 }
 async function iniciarImpuestos(){
   if(!_impPagosCargados) await impCargarPagos();
-  if(_impPag === 'anual') renderImpAnual(); else if(_impPag === 'presentadas') renderImpPresentadas(); else renderImpuestos(_impQ || (Math.floor(new Date().getMonth()/3)+1));
+  if(_impPag === 'anual') renderImpAnual(); else if(_impPag === 'presentadas') renderImpPresentadas(); else if(_impPag === 'deudas') iniciarDeudas(); else renderImpuestos(_impQ || (Math.floor(new Date().getMonth()/3)+1));
 }
 // ===== Pestañas de Impuestos: Trimestres / IRPF anual =====
 let _impPag = 'trim';
@@ -18542,8 +18548,66 @@ function impPestana(p){
   document.getElementById('imp-pag-trim').style.display = p === 'trim' ? '' : 'none';
   document.getElementById('imp-pag-anual').style.display = p === 'anual' ? '' : 'none';
   document.getElementById('imp-pag-presentadas').style.display = p === 'presentadas' ? '' : 'none';
+  document.getElementById('imp-pag-deudas').style.display = p === 'deudas' ? '' : 'none';
   document.getElementById('imp-pag-gestor').style.display = 'none';
-  if(p === 'anual') renderImpAnual(); else if(p === 'presentadas') renderImpPresentadas(); else renderImpuestos();
+  if(p === 'anual') renderImpAnual(); else if(p === 'presentadas') renderImpPresentadas(); else if(p === 'deudas') iniciarDeudas(); else renderImpuestos();
+}
+// ===== Deudas con Hacienda: embargos cobrados en la cuenta y plazos pagados de los aplazamientos (se leen de los correos del banco) =====
+let _deudas = null;
+function dbNum(s){ return Number(String(s || '0').replace(/\./g, '').replace(',', '.')) || 0; }
+function dbFecha(s){ const m = /(\d\d)[-\/](\d\d)[-\/](\d{4})/.exec(s || ''); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; }
+function dbAnalizar(filas){
+  const embargos = [], plazos = [], retenciones = [], levantamientos = [];
+  (filas || []).forEach(r => {
+    const t = String(r.texto_extraido || '').replace(/\s+/g, ' ').trim(), n = String(r.nombre_archivo || '').toLowerCase();
+    if(/APLAZAMIENTO\/FRACCIONAMIENTO/.test(t)){
+      const e = /N. Expediente N. Justificante Declaraci.n Entidad Emisora (\S+?)\/ /.exec(t), p = /Importe \(EUR\) (\d\d) (\d\d-\d\d-\d{4}) \S+ \S+ ([0-9.,]+)/.exec(t);
+      if(p) plazos.push({expediente: e ? e[1] : '—', plazo: Number(p[1]), fecha: dbFecha(p[2]), importe: dbNum(p[3]), modelo002: /MODELO 002/.test(t), id: r.id});
+    } else if(n.includes('adeudo por diligencia de embargo')){
+      const org = /Organismo Embargador: (.*?) Deudor/.exec(t), num = /N.m\. de Diligencia: (\S+)/.exec(t), imp = /IMPORTE ADEUDADO (?:\S+ ){4}([0-9.,]+) ([0-9.,]+) ([0-9.,]+)/.exec(t), f = /FUENTE OBEJUNA \d+ (\d\d\/\d\d\/\d{4})/.exec(t);
+      if(imp) embargos.push({fecha: dbFecha(f ? f[1] : ''), organismo: org ? org[1] : '—', diligencia: num ? num[1] : '', retenido: dbNum(imp[1]), levantado: dbNum(imp[2]), cobrado: dbNum(imp[3]), id: r.id});
+    } else if(n.includes('retencion por diligencia de embargo')){
+      const ex = /Expediente Ejecutivo: (\d+)/.exec(t), imp = /\*{6}\d{4} ([0-9.,]+) 3187 14290/.exec(t), f = /F\. RETENCI.N FUENTE OBEJUNA \d+ (\d\d-\d\d-\d{4})/.exec(t);
+      if(imp) retenciones.push({fecha: dbFecha(f ? f[1] : ''), importe: dbNum(imp[1]), expediente: ex ? ex[1] : ''});
+    } else if(n.includes('levantamiento de embargo')){
+      const imp = /(\d[\d.,]*) (\d[\d.,]*) (\d[\d.,]*) Dom\. Soc\./.exec(t), f = /F\. LVTO FUENTE OBEJUNA \d+ (\d\d-\d\d-\d{4})/.exec(t);
+      levantamientos.push({fecha: dbFecha(f ? f[1] : ''), levantado: imp ? dbNum(imp[2]) : 0});
+    }
+  });
+  // cada cobro con su retención (mismo importe, en los 60 días anteriores) para saber el expediente
+  embargos.forEach(e => { const r = retenciones.filter(x => Math.abs(x.importe - e.retenido) < 0.005 && x.fecha && e.fecha && x.fecha <= e.fecha).sort((a, b) => b.fecha.localeCompare(a.fecha))[0]; e.expediente = r ? r.expediente : ''; e.retencion = r ? r.fecha : null; });
+  embargos.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  const planes = {}; plazos.forEach(p => { (planes[p.expediente] = planes[p.expediente] || []).push(p); });
+  const listaPlanes = Object.entries(planes).map(([exp, ps]) => { ps.sort((a, b) => a.fecha.localeCompare(b.fecha)); return {expediente: exp, plazos: ps, total: ps.reduce((s, x) => s + x.importe, 0), ultimo: ps[ps.length-1], modelo002: ps.some(x => x.modelo002)}; }).sort((a, b) => b.ultimo.fecha.localeCompare(a.ultimo.fecha));
+  return {embargos, planes: listaPlanes, levantamientos};
+}
+async function cargarDeudas(){
+  if(!sb) return;
+  try{
+    const {data, error} = await sb.from('gastos_correo').select('id,fecha_correo,nombre_archivo,texto_extraido').or('nombre_archivo.ilike.*embargo*,texto_extraido.ilike.*APLAZAMIENTO/FRACCIONAMIENTO*').order('fecha_correo', {ascending: true});
+    if(error) throw error;
+    _deudas = dbAnalizar(data || []);
+  }catch(e){ console.error(e); _deudas = {embargos: [], planes: [], levantamientos: [], error: true}; }
+}
+async function iniciarDeudas(){ if(_deudas === null) await cargarDeudas(); renderImpDeudas(); }
+function renderImpDeudas(){
+  const cont = document.getElementById('imp-deu-lista'); if(!cont) return;
+  const D = _deudas; if(!D){ cont.innerHTML = '<div class="empty" style="padding:20px;">Cargando…</div>'; return; }
+  const hoy = new Date(), iso = hoy.toISOString().slice(0, 10), anio = hoy.getFullYear();
+  const f = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('es-ES', {day: 'numeric', month: 'short', year: 'numeric'}).replace(/\./g, '') : '—';
+  const dias = d => Math.floor((hoy - new Date(d + 'T00:00:00')) / 86400000);
+  const cobrados = D.embargos.reduce((s, e) => s + e.cobrado, 0), aplaz26 = D.planes.reduce((s, p) => s + p.plazos.filter(x => x.fecha.startsWith(String(anio))).reduce((a, x) => a + x.importe, 0), 0);
+  const avisos = [];
+  D.planes.forEach((p, i) => { const d = dias(p.ultimo.fecha); if(d > 40 && d < 150 && D.planes.slice(0, i).some(q => q.ultimo.fecha > p.ultimo.fecha)) avisos.push(`El aplazamiento ${p.expediente} no tiene plazos posteriores al ${f(p.ultimo.fecha)} en los correos del banco y hay uno más nuevo. Comprueba en la sede de la AEAT si sigue activo o si se sustituyó: un plazo sin pagar acaba en apremio.`); });
+  if(D.embargos.length && dias(D.embargos[0].fecha) < 45) avisos.push(`Hay un embargo reciente (${f(D.embargos[0].fecha)}, ${impEur(D.embargos[0].cobrado)}). Mira en la sede de Hacienda Local qué deuda era y si queda alguna pendiente.`);
+  cont.innerHTML = (D.error ? '<div class="imp-av aviso"><span class="ic">!</span><span>No se pudieron leer los correos del banco.</span></div>' : '') +
+    `<div class="imp-grid"><div class="imp-k"><div class="l">Cobrado por embargos</div><div class="v">${impEur(cobrados)}</div><div class="s">${D.embargos.length} desde ${D.embargos.length ? f(D.embargos[D.embargos.length-1].fecha) : '—'}</div></div><div class="imp-k"><div class="l">Aplazamientos ${anio}</div><div class="v">${impEur(aplaz26)}</div><div class="s">pagado a la AEAT</div></div></div>` +
+    (avisos.length ? `<div class="panel"><div class="panel-head"><h3>A revisar</h3></div><div class="panel-body">${avisos.map(a => `<div class="imp-av aviso"><span class="ic">!</span><span>${escHtml(a)}</span></div>`).join('')}</div></div>` : '') +
+    `<div class="panel"><div class="panel-head"><h3>Aplazamientos de la AEAT</h3><span class="count">${D.planes.length}</span></div><div class="panel-body">` +
+    (D.planes.length ? D.planes.map(p => `<details class="imp-det" style="margin-bottom:6px;"><summary><span>${escHtml(p.expediente)}${p.modelo002 ? ' · modelo 002' : ''}<span style="display:block;font-size:11.5px;color:var(--ink-soft);font-weight:400;">${p.plazos.length} plazo${p.plazos.length === 1 ? '' : 's'} · ${impEur(p.total)} · último ${f(p.ultimo.fecha)}</span></span></summary><div class="imp-det-body">${p.plazos.map(x => `<div class="imp-linea"><span>Plazo ${String(x.plazo).padStart(2, '0')} · ${f(x.fecha)}</span><span class="mono">${impEur(x.importe)}</span></div>`).join('')}</div></details>`).join('') : '<div class="empty" style="padding:12px;">Sin aplazamientos en los correos.</div>') +
+    `</div></div><div class="panel"><div class="panel-head"><h3>Embargos cobrados en la cuenta</h3><span class="count">${D.embargos.length}</span></div><div class="panel-body">` +
+    (D.embargos.length ? D.embargos.map(e => `<div class="ct-g" style="padding:8px 0;"><div class="ct-g1"><span class="ct-prov">${escHtml(/SEGURIDAD SOCIAL/i.test(e.organismo) ? 'Seguridad Social' : 'Hacienda Local')}</span><span class="mono">${impEur(e.cobrado)}</span></div><div class="ct-g2">Cobrado el ${f(e.fecha)}${e.retencion ? ' · retenido el ' + f(e.retencion) : ''}${e.expediente ? ' · expediente ' + escHtml(e.expediente) : ''}</div>${e.levantado > 0.005 ? `<div class="ct-g3">Se liberaron ${impEur(e.levantado)} de lo retenido</div>` : ''}</div>`).join('') : '<div class="empty" style="padding:12px;">Sin embargos en los correos.</div>') +
+    `</div></div><div class="two-col-note">Sale de los correos que manda Caja Rural. Es un control: lo que se debe hoy lo dicen las sedes electrónicas de Hacienda Local y de la AEAT.</div>`;
 }
 function renderImpPresentadas(){
   const cont = document.getElementById('imp-pres-lista'); if(!cont) return;
