@@ -2034,6 +2034,7 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .factura-card-movil{content-visibility:auto;contain-intrinsic-size:auto 150px;}
 #clientes-lista-movil > *, #econ-presupuestos-tbody tr, #gpro-lista-movil > *{content-visibility:auto;contain-intrinsic-size:auto 96px;}
 .mostrar-mas-movil{display:block;width:100%;margin:12px 0 90px;padding:14px;font-size:14px;font-weight:600;}
+.cargando-historico::after{content:'Cargando el histórico…';position:fixed;left:12px;bottom:84px;z-index:50;background:var(--asphalt);color:#fff;font-size:11.5px;padding:5px 10px;border-radius:14px;opacity:.85;pointer-events:none;}
 </style>
 <style>
 /* required styles */
@@ -3111,7 +3112,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.23</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.24</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3189,7 +3190,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.23</div>
+        <div class="sub" id="version-badge">V6.24</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -16093,7 +16094,9 @@ async function borrarPendientesSeleccionados(grupo){
 // Pobla los paneles de "Nombres sospechosos" y "Sin actividad" — se llama
 // en revisarClientesAuto Y en cargarDatosReales para que persistan al recargar
 function actualizarPanelesSinActividad(){
-  if(!entidades || !documentosRealesById) return;
+  // antes usaba una variable `entidades` que no existe aquí (fallaba en cada carga); se parte de los clientes ya cargados
+  const entidades = (typeof clientes !== 'undefined' ? clientes : []).map(c=>({id:c.id, nombre:c.name, clase_nombre:c.clase_nombre||''}));
+  if(!entidades.length || !documentosRealesById) return;
 
   // Falsos clientes (nombre parece dirección)
   const falsos = entidades.filter(e=>(e.clase_nombre||'')==='direccion');
@@ -22400,8 +22403,10 @@ async function cargarDocumentosEconomicosReales(){
     }
     if(!data.length) return;
     _diferirTarjetas = true;
-    data.forEach(doc=>{
-      if(documentosRealesById[doc.id]) return; // ya está (lo acabamos de guardar nosotros mismos)
+    const yaEstaban = new Set(Object.keys(documentosRealesById));
+    // fase 'datos': solo registra el documento en memoria (rápido). fase 'filas': construye su fila de tabla y su tarjeta (lo caro).
+    const procesar = (doc, fase)=>{
+      if(fase !== 'filas' && documentosRealesById[doc.id]) return; // ya está (lo acabamos de guardar nosotros mismos)
       const entidad = clientes.find(c=>c.id===doc.entidad_id);
       const trabajo = jobs.find(j=>j.id===doc.trabajo_id);
       const items = (doc.conceptos||[]).map(c=>({qty:c.cantidad, concept:c.descripcion, price:c.precio_unitario, machine:c.maquina, fecha:c.fecha, unidad:c.unidad, nuevo:c.nuevo||false, origen_entrada_id:c.origen_entrada_id||null, origen_entrada_ids:c.origen_entrada_ids||null}));
@@ -22420,11 +22425,12 @@ async function cargarDocumentosEconomicosReales(){
       const ibanReal = doc.iban || EMPRESA_BANCO.iban;
       const titularReal = doc.titular || EMPRESA_BANCO.titular;
       const conceptoReal = doc.tipo==='factura' ? (doc.concepto_transferencia || conceptoDeFactura(doc.numero)) : (doc.concepto_transferencia || '');
-      documentosRealesById[doc.id] = {
+      if(fase !== 'filas') documentosRealesById[doc.id] = {
         ...doc, id: doc.id, type: doc.tipo, num: doc.numero, client: entidad ? entidad.name : '—', job: trabajo ? (trabajo.code+' — '+trabajo.client) : '—',
         dateRaw: doc.fecha_devengo, dateLabel, amountLabel, status, items, ivaPct: doc.iva_pct != null ? doc.iva_pct : 21, tratamientoIva: doc.tratamiento_iva || 'normal', total: totalNum, base: baseNum, iva: ivaNum,
         payment: paymentReal, iban: ibanReal, titular: titularReal, concepto_transferencia: conceptoReal,
       };
+      if(fase === 'datos') return;
       const estadoPill = estadoDocumentoSelect(doc.tipo, doc.id, doc.estado_cobro, 'pres-');
       const estadoPillStandalone = estadoDocumentoSelect(doc.tipo, doc.id, doc.estado_cobro, 'pres2-');
       if(doc.tipo==='factura'){
@@ -22471,31 +22477,58 @@ async function cargarDocumentosEconomicosReales(){
         // Tarjeta móvil — misma estructura que Facturas
         row._mkCard = () => { construirCardMovil(doc, 'albaran', 'alb-lista-movil', 'alb-sel-chk', amountLabel, fechaCortaA, entidad, trabajo, archivoUrlRealA, calidadCorta(doc)); return document.getElementById('mcard-'+doc.id); };
       }
-    });
-    _diferirTarjetas = false;
-    const contAlb = document.getElementById('albaranes-standalone-count');
-    if(contAlb) contAlb.textContent = document.querySelectorAll('#albaranes-tbody-standalone tr').length;
-    actualizarContadorPresupuestosStandalone();
-    renderFacturasKPIs();
-    renderAlbaranesKPIs();
-    renderPresupuestosKPIs();
-    renderControlDocs();
-    calcularKPIsReales();
-    poblarFiltroAniosEconomia();
-    recalcularResumenEconomia();
-    renderGraficoFacturacion();
-    poblarFiltroAniosChipsGenerico('albaranes-tbody-standalone','alb-filtro-anio-chips','alb');
-    poblarFiltroAniosChipsGenerico('presupuestos-tbody-standalone','pres-filtro-anio-chips','pres');
-    poblarFiltroAniosChips('econ-facturas-tbody','fact-filtro-anio-chips');
-    filtrarTablaOrdenable('econ-facturas-tbody');
-    aplicarOrdenGuardadoSiExiste('econ-facturas-tbody','fact-orden-chips');
-    sincronizarListaMovilFacturas();
-    filtrarPorAnioTrim('albaranes-tbody-standalone','alb');
-    aplicarOrdenGuardadoSiExiste('albaranes-tbody-standalone','alb-orden-chips');
-    filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
-    aplicarOrdenGuardadoSiExiste('presupuestos-tbody-standalone','pres-orden-chips');
-    calcularTotalesClientes();
-    renderGastosPro();
+    };
+    // Cede el turno al navegador entre trozos de trabajo: así la web sigue respondiendo a los toques mientras carga
+    const ceder = ()=>new Promise(r=>setTimeout(r, 0));
+    // esFinal: al terminar el histórico solo se repite lo que depende de las filas de las tablas; lo que sale de los datos en memoria ya está bien desde el principio
+    const finalizarCargaDocs = async (esFinal)=>{
+      const contAlb = document.getElementById('albaranes-standalone-count');
+      if(contAlb) contAlb.textContent = document.querySelectorAll('#albaranes-tbody-standalone tr').length;
+      actualizarContadorPresupuestosStandalone();
+      renderFacturasKPIs(); renderAlbaranesKPIs(); renderPresupuestosKPIs();
+      await ceder();
+      if(!esFinal){ renderControlDocs(); calcularKPIsReales(); }
+      poblarFiltroAniosEconomia(); recalcularResumenEconomia();
+      await ceder();
+      if(!esFinal) renderGraficoFacturacion();
+      poblarFiltroAniosChipsGenerico('albaranes-tbody-standalone','alb-filtro-anio-chips','alb');
+      poblarFiltroAniosChipsGenerico('presupuestos-tbody-standalone','pres-filtro-anio-chips','pres');
+      poblarFiltroAniosChips('econ-facturas-tbody','fact-filtro-anio-chips');
+      await ceder();
+      filtrarTablaOrdenable('econ-facturas-tbody');
+      aplicarOrdenGuardadoSiExiste('econ-facturas-tbody','fact-orden-chips');
+      sincronizarListaMovilFacturas();
+      await ceder();
+      filtrarPorAnioTrim('albaranes-tbody-standalone','alb');
+      aplicarOrdenGuardadoSiExiste('albaranes-tbody-standalone','alb-orden-chips');
+      filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
+      aplicarOrdenGuardadoSiExiste('presupuestos-tbody-standalone','pres-orden-chips');
+      if(!esFinal){ await ceder(); calcularTotalesClientes(); renderGastosPro(); }
+    };
+    // 1) TODOS los documentos en memoria (rápido) para que totales y buscadores tengan todo; 2) filas y tarjetas solo de lo reciente;
+    // 3) el histórico se va construyendo en segundo plano en trozos pequeños, para que la web siga respondiendo a los toques
+    for(let i = 0; i < data.length; i += 200){ data.slice(i, i + 200).forEach(doc=>procesar(doc, 'datos')); await ceder(); }
+    const hoyL = new Date(), limiteL = new Date(hoyL.getFullYear()-1, hoyL.getMonth(), 1);
+    const nuevos = data.filter(d=>!yaEstaban.has(d.id));
+    const recientes = nuevos.filter(d=>!d.fecha_devengo || new Date(d.fecha_devengo) >= limiteL);
+    const antiguos = nuevos.filter(d=>d.fecha_devengo && new Date(d.fecha_devengo) < limiteL);
+    for(let i = 0; i < recientes.length; i += 40){ recientes.slice(i, i + 40).forEach(doc=>procesar(doc, 'filas')); await ceder(); }
+    await finalizarCargaDocs(false);
+    if(!antiguos.length){ _diferirTarjetas = false; }
+    else {
+      document.body.classList.add('cargando-historico');
+      let i = 0;
+      const terminar = ()=>{ _diferirTarjetas = false; document.body.classList.remove('cargando-historico'); };
+      const trozo = ()=>{
+        try{
+          const t0 = performance.now();
+          while(i < antiguos.length && performance.now() - t0 < 12) procesar(antiguos[i++], 'filas');
+          if(i < antiguos.length){ setTimeout(trozo, 30); return; }
+          finalizarCargaDocs(true).catch(e=>console.error('histórico', e)).then(terminar);
+        }catch(e){ console.error('histórico', e); terminar(); }
+      };
+      setTimeout(trozo, 800);
+    }
   }catch(err){ _diferirTarjetas = false; console.error('No se pudieron cargar los documentos reales', err); }
 }
 // Datos maestros de la empresa: única fuente de verdad para IBAN/titular al pasar a factura.
