@@ -18212,7 +18212,7 @@ function impGastoDeducible(d){ return impTotalGasto(d) - impIvaDeducible(d); }
 function impTratGasto(d){
   const des = impDesgloseGasto(d);
   if(!des.length) return d.iva_pct != null ? 'IVA ' + Number(d.iva_pct) + ' %' : 'Sin datos de IVA';
-  return des.map(x => x.exento ? 'Exento' : impEsExtranjero(x) ? 'IVA de otro país (no deducible)' : Number(x.pct) > 0 ? 'IVA ' + x.pct + ' %' : 'Sin IVA').filter((v, i, a) => a.indexOf(v) === i).join(' + ');
+  return des.map(x => x.exento ? 'Exento' : x.isp ? 'Inversión del sujeto pasivo (IVA autoliquidado)' : impEsExtranjero(x) ? 'IVA de otro país (no deducible)' : Number(x.pct) > 0 ? 'IVA ' + x.pct + ' %' : 'Sin IVA').filter((v, i, a) => a.indexOf(v) === i).join(' + ');
 }
 // ¿Cuenta como gasto del trimestre? Las compras de vehículos son inversión y los dudosos no se cuentan.
 function impMotivoExclusion(d){
@@ -18257,6 +18257,7 @@ function impDatos(q, anio){
     baseIsp: sum(fq.filter(d => d.tratamientoIva === 'isp'), impBaseFactura), nIsp: fq.filter(d => d.tratamientoIva === 'isp').length,
     baseSinIva: sum(fq.filter(d => d.tratamientoIva !== 'isp' && impIvaFactura(d) <= 0), impBaseFactura), nSinIva: fq.filter(d => d.tratamientoIva !== 'isp' && impIvaFactura(d) <= 0).length,
     ivaNoDed: sum(gq, impIvaNoDeducible), baseExenta: sum(gq, impBaseExentaGasto),
+    gIsp: gq.filter(d => impDesgloseGasto(d).some(x => x.isp)), baseGIsp: sum(gq.filter(d => impDesgloseGasto(d).some(x => x.isp)), d => impDesgloseGasto(d).filter(x => x.isp).reduce((s, x) => s + Number(x.base || 0), 0)),
     ingAcum: sum(fA, impBaseFactura), gasAcum: sum(gA, impGastoDeducible),
     gastosSinIva: gA.filter(d => !impGastoTieneIva(d)).length + 0,
     gastosSinIvaQ: gq.filter(d => !impGastoTieneIva(d))
@@ -18366,6 +18367,7 @@ function renderImpuestos(q){
   if(deOtros.length) det.push(`<div class="imp-linea"><span>Gastos con fecha de otro trimestre que cuentan en este (${deOtros.length})</span><span class="mono">${impEur(deOtros.reduce((s, d) => s + impTotalGasto(d), 0))}</span></div>`);
   if(D.nIsp) det.push(`<div class="imp-linea"><span>Inversión del sujeto pasivo (${D.nIsp} factura${D.nIsp === 1 ? '' : 's'}): base, sin IVA repercutido</span><span class="mono">${impEur(D.baseIsp)}</span></div>`);
   if(D.nSinIva) det.push(`<div class="imp-linea"><span>Facturas sin IVA (${D.nSinIva})</span><span class="mono">${impEur(D.baseSinIva)}</span></div>`);
+  if(D.gIsp.length) det.push(`<div class="imp-linea"><span>Gastos con inversión del sujeto pasivo (${D.gIsp.length}, p. ej. suscripciones de Irlanda): base. El IVA se autoliquida y se deduce a la vez, neto 0</span><span class="mono">${impEur(D.baseGIsp)}</span></div>`);
   if(D.baseExenta > 0.004) det.push(`<div class="imp-linea"><span>Gastos exentos de IVA (base)</span><span class="mono">${impEur(D.baseExenta)}</span></div>`);
   if(D.ivaNoDed > 0.004) det.push(`<div class="imp-linea"><span>IVA de gastos que no se deduce</span><span class="mono">${impEur(D.ivaNoDed)}</span></div>`);
   if(D.excluidos.length) det.push(`<div style="margin-top:8px;font-size:12px;color:var(--ink-soft);">Documentos que no entran en el cálculo:</div>` + D.excluidos.map(({d, motivo}) => `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}</span><span class="mono">${impEur(impTotalGasto(d))}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div><div class="ct-g3">${escHtml(motivo)}</div></div>`).join(''));
