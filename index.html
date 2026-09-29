@@ -2024,6 +2024,12 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .imp-av.info .ic{color:var(--ink-soft);}
 .imp-av.ok .ic{color:var(--green);}
 .imp-av .sub{display:block;font-size:12px;color:var(--ink-soft);margin-top:2px;overflow-wrap:anywhere;}
+.imp-tard{border:1px solid var(--orange);border-radius:10px;padding:8px 12px;margin-bottom:8px;background:var(--paper);}
+.imp-tard > summary{cursor:pointer;font-weight:600;font-size:13.5px;line-height:1.4;list-style:none;}
+.imp-tard > summary::-webkit-details-marker{display:none;}
+.imp-tard .ic{color:var(--orange);font-weight:700;margin-right:4px;}
+.imp-tard-b{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+.imp-tard-b .btn{font-size:12.5px;padding:7px 12px;}
 </style>
 <style>
 /* required styles */
@@ -3101,7 +3107,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.21</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.22</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3179,7 +3185,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.21</div>
+        <div class="sub" id="version-badge">V6.22</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18132,6 +18138,15 @@ function impEur(n){ return Number(n||0).toLocaleString('es-ES',{minimumFractionD
 function impFecha(v){ const x = new Date(v); return isNaN(x) ? null : x; }
 function impTrim(v){ const x = impFecha(v); return x ? Math.floor(x.getMonth()/3)+1 : null; }
 function impAnioDe(v){ const x = impFecha(v); return x ? x.getFullYear() : null; }
+// Trimestre en el que cuenta un documento: el que se le haya asignado (periodo_fiscal, p. ej. una factura de junio recibida y registrada en septiembre) o, si no, el de su fecha
+function impPeriodo(d){
+  const m = /^(\d{4})-T([1-4])$/.exec(String(d.periodo_fiscal || ''));
+  if(m) return {anio: Number(m[1]), q: Number(m[2]), manual: true};
+  const x = impFecha(d.dateRaw);
+  return x ? {anio: x.getFullYear(), q: Math.floor(x.getMonth()/3)+1, manual: false} : {anio: null, q: null, manual: false};
+}
+function impPeriodoPropio(d){ const x = impFecha(d.dateRaw); return x ? {anio: x.getFullYear(), q: Math.floor(x.getMonth()/3)+1} : {anio: null, q: null}; }
+function impCuentaEnOtro(d){ const p = impPeriodo(d), o = impPeriodoPropio(d); return p.manual && (p.anio !== o.anio || p.q !== o.q); }
 function impEsOficial(d){ return (d.contabilidad || 'oficial') === 'oficial'; }
 function impEsExtranjero(x){ return /alem[aá]n|extranjer/i.test(String((x && x.nota) || '')); }
 function impFacturasValidas(){ return Object.values(documentosRealesById).filter(d => d.type === 'factura' && d.estado !== 'borrador' && d.status !== 'Borrador' && d.estado !== 'anulado' && d.estado_cobro !== 'nula' && impEsOficial(d)); }
@@ -18165,10 +18180,32 @@ function impMotivoExclusion(d){
   if(d.categoria === 'Compra de vehículos') return 'Compra de vehículo: es inversión, no gasto del trimestre' + (impDesgloseGasto(d).some(impEsExtranjero) ? '; el IVA de otro país no se deduce' : '');
   return null;
 }
+function impGastosTardios(q, anio){
+  const iniQ = new Date(anio, (q-1)*3, 1);
+  return impGastosOficiales().filter(d => !d.periodo_fiscal && !impMotivoExclusion(d) && impFecha(d.dateRaw) && impFecha(d.dateRaw) < iniQ && impFecha(d.created_at) && impFecha(d.created_at) >= iniQ)
+    .sort((a, b) => String(a.dateRaw || '').localeCompare(String(b.dateRaw || '')));
+}
+async function impAsignarPeriodo(id, periodo){
+  const d = documentosRealesById[id]; if(!d || !sb) return;
+  try{
+    const {error} = await sb.from('documentos_economicos').update({periodo_fiscal: periodo}).eq('id', id);
+    if(error){ mostrarToast('No se pudo guardar: ' + errText(error), 'err'); return; }
+    d.periodo_fiscal = periodo; renderImpuestos();
+  }catch(e){ mostrarToast('No se pudo guardar: ' + errText(e), 'err'); }
+}
+async function impAsignarTodos(periodo){
+  const q = _impQ || (Math.floor(new Date().getMonth()/3)+1), lista = impGastosTardios(q, new Date().getFullYear());
+  if(!lista.length || !sb) return;
+  try{
+    const {error} = await sb.from('documentos_economicos').update({periodo_fiscal: periodo}).in('id', lista.map(d => d.id));
+    if(error){ mostrarToast('No se pudo guardar: ' + errText(error), 'err'); return; }
+    lista.forEach(d => { d.periodo_fiscal = periodo; }); mostrarToast(`${lista.length} gasto(s) contados en el ${q}T ✓`, 'ok'); renderImpuestos();
+  }catch(e){ mostrarToast('No se pudo guardar: ' + errText(e), 'err'); }
+}
 function impDatos(q, anio){
   const F = impFacturasValidas(), G = impGastosOficiales();
-  const enQ = d => impAnioDe(d.dateRaw) === anio && impTrim(d.dateRaw) === q;
-  const hastaQ = d => impAnioDe(d.dateRaw) === anio && impTrim(d.dateRaw) <= q;
+  const enQ = d => { const p = impPeriodo(d); return p.anio === anio && p.q === q; };
+  const hastaQ = d => { const p = impPeriodo(d); return impAnioDe(d.dateRaw) === anio && p.anio === anio && p.q <= q; };   // IRPF: solo lo devengado en el año
   const gOk = G.filter(d => !impMotivoExclusion(d));
   const sum = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
   const fq = F.filter(enQ), gq = gOk.filter(enQ), fA = F.filter(hastaQ), gA = gOk.filter(hastaQ);
@@ -18203,7 +18240,7 @@ function impSugerenciaPago(k, anio){
 function impPlazo(q, anio){ return new Date(anio + (q === 4 ? 1 : 0), IMP_PLAZOS[q][0], IMP_PLAZOS[q][1]); }
 function impIncidencias(q, anio, D, c130){
   const out = [];
-  const enQ = d => impAnioDe(d.dateRaw) === anio && impTrim(d.dateRaw) === q;
+  const enQ = d => { const p = impPeriodo(d); return p.anio === anio && p.q === q; };
   const n = (k, s, p) => `${k} ${k === 1 ? s : p}`;
   if(q > 1 && c130.faltan.length) out.push({tipo: 'pago130', txt: 'Falta introducir el pago del modelo 130 del ' + c130.faltan.map(k => k + 'T').join(', ')});
   for(let k = 1; k < q; k++){ const Dk = impDatos(k, anio); if(impRes303(Dk) < -0.005) out.push({txt: `El 303 del ${k}T salió a compensar (${impEur(-impRes303(Dk))}): confirma con el gestor si se compensa en este trimestre. No está aplicado`}); }
@@ -18259,9 +18296,14 @@ function renderImpuestos(q){
 
   // antes de cerrar
   const inc = ini > hoy ? [] : impIncidencias(q, anio, D, c130);
-  $('imp-estado-tit').textContent = futuro ? 'Trimestre sin empezar' : inc.length ? 'Antes de cerrar' : 'Trimestre preparado';
+  const tard = ini > hoy ? [] : impGastosTardios(q, anio), perTxt = `${anio}-T${q}`;
+  const tardHtml = tard.length ? `<details class="imp-tard" open><summary><span class="ic">!</span> ${tard.length} gasto(s) con fecha de un trimestre anterior, registrados ahora (${impEur(tard.reduce((s, d) => s + impTotalGasto(d), 0))}): ¿cuentan en el ${q}T?</summary>
+      <div style="margin:6px 0 4px;"><button type="button" class="btn primary" style="font-size:12.5px;padding:7px 12px;" onclick="impAsignarTodos('${perTxt}')">Contar todos en el ${q}T</button></div>` +
+      tard.map(d => { const o = impPeriodoPropio(d); return `<div class="ct-g" style="padding:8px 0;"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}</span><span class="mono">${impEur(impTotalGasto(d))}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(d.categoria || 'Sin categoría')}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div><div class="imp-tard-b"><button type="button" class="btn primary" onclick="impAsignarPeriodo('${d.id}','${perTxt}')">Contar en el ${q}T</button><button type="button" class="btn" onclick="impAsignarPeriodo('${d.id}','${o.anio}-T${o.q}')">Dejar en el ${o.q}T</button></div></div>`; }).join('') +
+      `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:6px;line-height:1.45;">El IVA de una factura se deduce en el trimestre en que se recibe y registra. Si el ${tard[0] ? impPeriodoPropio(tard[0]).q : ''}T ya se presentó sin ella, cuéntala aquí. El IRPF (130) es acumulado del año, así que no cambia.</div></details>` : '';
+  $('imp-estado-tit').textContent = futuro ? 'Trimestre sin empezar' : (inc.length || tard.length) ? 'Antes de cerrar' : 'Trimestre preparado';
   $('imp-estado').innerHTML = ini > hoy ? '<div class="imp-inc ok"><span class="ic">·</span><span>Sin documentos todavía.</span></div>'
-    : inc.length ? inc.map(x => `<div class="imp-inc"><span class="ic">!</span><span>${escHtml(x.txt)}</span></div>`).join('') + (c130.faltan.length ? c130.faltan.map(k => impPagoHtml(k, anio, k === c130.faltan[0] ? impSugerenciaPago(k, anio) : null)).join('') : '')
+    : (inc.length || tard.length) ? tardHtml + inc.map(x => `<div class="imp-inc"><span class="ic">!</span><span>${escHtml(x.txt)}</span></div>`).join('') + (c130.faltan.length ? c130.faltan.map(k => impPagoHtml(k, anio, k === c130.faltan[0] ? impSugerenciaPago(k, anio) : null)).join('') : '')
     : '<div class="imp-inc ok"><span class="ic">✓</span><span>No hay incidencias que impidan preparar el trimestre.</span></div>';
 
   // cálculo del 303
@@ -18276,9 +18318,11 @@ function renderImpuestos(q){
   $('imp-fact-sum').textContent = `Ver facturas incluidas (${D.fq.length})`;
   $('imp-fact-lista').innerHTML = D.fq.length ? D.fq.slice().sort((a, b) => String(b.dateRaw||'').localeCompare(String(a.dateRaw||''))).map(d => `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(d.num ? 'Nº ' + d.num : 'Sin número')} · ${escHtml(d.client || '—')}</span><span class="mono">${impEur(d.total)}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratFactura(d))}</div><div class="ct-g3">Base <b>${impEur(impBaseFactura(d))}</b> · IVA <b>${impEur(impIvaFactura(d))}</b></div></div>`).join('') : '<div class="empty" style="padding:12px;">Ninguna factura en este trimestre.</div>';
   $('imp-gast-sum').textContent = `Ver gastos incluidos (${D.gq.length})`;
-  $('imp-gast-lista').innerHTML = D.gq.length ? D.gq.slice().sort((a, b) => String(b.dateRaw||'').localeCompare(String(a.dateRaw||''))).map(d => `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}</span><span class="mono">${impEur(impTotalGasto(d))}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratGasto(d))}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div><div class="ct-g3">Gasto sin IVA <b>${impEur(impGastoDeducible(d))}</b> · IVA deducible <b>${impEur(impIvaDeducible(d))}</b></div></div>`).join('') : '<div class="empty" style="padding:12px;">Ningún gasto en este trimestre.</div>';
+  $('imp-gast-lista').innerHTML = D.gq.length ? D.gq.slice().sort((a, b) => String(b.dateRaw||'').localeCompare(String(a.dateRaw||''))).map(d => `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}</span><span class="mono">${impEur(impTotalGasto(d))}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratGasto(d))}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div><div class="ct-g3">Gasto sin IVA <b>${impEur(impGastoDeducible(d))}</b> · IVA deducible <b>${impEur(impIvaDeducible(d))}</b></div>${impCuentaEnOtro(d) ? `<div class="ct-g3" style="color:var(--orange);">Fecha del documento de otro trimestre: cuenta aquí. <a href="#" onclick="event.preventDefault();impAsignarPeriodo('${d.id}','${impPeriodoPropio(d).anio}-T${impPeriodoPropio(d).q}')">Devolverlo al ${impPeriodoPropio(d).q}T</a></div>` : ''}</div>`).join('') : '<div class="empty" style="padding:12px;">Ningún gasto en este trimestre.</div>';
   // detalles fiscales: solo si hay algo que contar
   const det = [];
+  const deOtros = D.gq.filter(impCuentaEnOtro);
+  if(deOtros.length) det.push(`<div class="imp-linea"><span>Gastos con fecha de otro trimestre que cuentan en este (${deOtros.length})</span><span class="mono">${impEur(deOtros.reduce((s, d) => s + impTotalGasto(d), 0))}</span></div>`);
   if(D.nIsp) det.push(`<div class="imp-linea"><span>Inversión del sujeto pasivo (${D.nIsp} factura${D.nIsp === 1 ? '' : 's'}): base, sin IVA repercutido</span><span class="mono">${impEur(D.baseIsp)}</span></div>`);
   if(D.nSinIva) det.push(`<div class="imp-linea"><span>Facturas sin IVA (${D.nSinIva})</span><span class="mono">${impEur(D.baseSinIva)}</span></div>`);
   if(D.baseExenta > 0.004) det.push(`<div class="imp-linea"><span>Gastos exentos de IVA (base)</span><span class="mono">${impEur(D.baseExenta)}</span></div>`);
@@ -18397,6 +18441,8 @@ function impPaquete(q, anio){
   // dudosos / pendientes de revisión
   const dud = D.excluidos.filter(x => x.d.relacion_actividad === 'dudosa');
   if(dud.length) add('aviso', `${dud.length} gasto(s) dudoso(s) por decidir`, lista(dud.map(x => x.d.client || '—')));
+  const tard = impGastosTardios(q, anio);
+  if(tard.length) add('aviso', `${tard.length} gasto(s) con fecha de un trimestre anterior, registrados ahora, sin decidir si cuentan en este trimestre`, lista(tard.map(d => (d.client || '—') + ' ' + impEur(impTotalGasto(d)))) + '. Decídelo en Impuestos, en Antes de cerrar.');
   const pend = gastos.filter(d => String(d.info_faltante || '').trim());
   if(pend.length) add('aviso', `${pend.length} gasto(s) con información pendiente de revisar`, lista(pend.map(d => (d.client || '—') + ': ' + d.info_faltante)));
   // registrados en el trimestre y que no van en el paquete
@@ -18559,7 +18605,7 @@ function impResumenPdf(P, res){
   P.gastos.forEach(d => { const e = impEntidad(d), b = impBaseIvaGasto(d), r = res.get(d.id) || {}, num = d.numero || (d.num && d.num !== '—' ? d.num : '');
     bloque(`${String(d.dateRaw || '').slice(0, 10)}  -  ${num ? 'Nº ' + num : 'Sin número'}`, `${d.client || '-'}${e && e.nif ? '  -  NIF/CIF ' + e.nif : ''}`, `${d.categoria || 'Sin categoría'}${d.concepto ? '  -  ' + d.concepto : ''}`,
       `Base ${impEur(b.base)}   |   IVA ${b.tipo ? b.tipo + ' ' : ''}${impEur(b.iva)}   |   IVA deducible ${impEur(impIvaDeducible(d))}`,
-      `Tratamiento registrado: ${impTratGasto(d)}.  Documento: ${r.doc || 'SIN DOCUMENTO'}${r.estado && !r.doc ? ' (' + r.estado + ')' : ''}`, impEur(impTotalGasto(d))); });
+      `Tratamiento registrado: ${impTratGasto(d)}.${impCuentaEnOtro(d) ? '  Fecha del documento de otro trimestre; se computa en el ' + q + 'T.' : ''}  Documento: ${r.doc || 'SIN DOCUMENTO'}${r.estado && !r.doc ? ' (' + r.estado + ')' : ''}`, impEur(impTotalGasto(d))); });
   // ---------- NO INCLUIDOS ----------
   nueva(); titulo('Registrados en el trimestre y NO incluidos', 15); parrafo('Documentos oficiales del trimestre que no entran en el cálculo ni en el paquete. El gestor decide su tratamiento.', 9.5, true); y += 2;
   if(!D.excluidos.length) parrafo('Ninguno.', 10.5);
