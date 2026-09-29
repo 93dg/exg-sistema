@@ -3127,7 +3127,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.31</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.32</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3205,7 +3205,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.31</div>
+        <div class="sub" id="version-badge">V6.32</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8466,6 +8466,8 @@ function renderEconDocs(prefijo){
 // Móvil: las listas de Facturas, Albaranes y Presupuestos tienen cientos de tarjetas; solo se construyen las primeras (con "Mostrar más").
 // La tabla de cada lista sigue teniendo TODAS las filas y sigue mandando en filtros, orden y totales.
 let _diferirTarjetas = false;
+let _docsListos = false;   // true cuando todos los documentos ya están en memoria (Impuestos y Préstamos esperan a esto para no pintar ceros)
+const _cargaMarcas = {};
 const CARDS_POR_PAGINA = 40;
 function docIdDeFila(tr){ return tr.dataset.docId || tr.id.replace(/^(presrow-|albrow-|docrow-)/, ''); }
 function firmaFiltrosLista(tbody){
@@ -18243,6 +18245,7 @@ async function prRecibosDelBanco(){
 async function iniciarPrestamos(){ if(!_prestamosCargados) await cargarPrestamos(); renderPrestamos(); }
 function renderPrestamos(){
   const cont = document.getElementById('prest-lista'); if(!cont) return;
+  if(!_docsListos){ cont.innerHTML = '<div class="empty" style="padding:20px;">Cargando los documentos…</div>'; return; }
   if(!_prestamos.length){ cont.innerHTML = '<div class="empty" style="padding:20px;">No hay ningún préstamo registrado.</div>'; return; }
   const hoy = new Date(), hoyIso = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0') + '-' + String(hoy.getDate()).padStart(2,'0'), anio = hoy.getFullYear();
   cont.innerHTML = _prestamos.map(p => {
@@ -18456,8 +18459,16 @@ function impPagoHtml(k, anio, sugerido){
   const v = _impPagos[k];
   return `<div class="imp-pago"><span>Pago del 130 del ${k}T:</span><input class="search-box" type="number" step="0.01" min="0" id="imp-pago-${k}" placeholder="importe (0 si no hubo)" value="${v != null ? v : (sugerido != null ? sugerido.toFixed(2) : '')}"><button type="button" class="btn primary" style="font-size:12px;padding:5px 10px;" onclick="impGuardarPago(${k})">${v != null ? 'Corregir' : 'Guardar'}</button>${(v == null && sugerido != null) ? `<span style="color:var(--ink-soft);">calculado por la app: ${impEur(sugerido)}. Confírmalo con lo que pagaste</span>` : ''}</div>`;
 }
+function impMostrarCargando(){
+  ['imp-rep', 'imp-ded', 'imp-303', 'imp-130', 'imp-total'].forEach(id => { const e = document.getElementById(id); if(e){ e.textContent = '…'; e.classList.remove('n-pos', 'n-neg', 'n-warn'); } });
+  ['imp-303-s', 'imp-130-s', 'imp-total-s'].forEach(id => { const e = document.getElementById(id); if(e) e.textContent = ''; });
+  const b = document.getElementById('imp-total-baja'); if(b) b.style.display = 'none';
+  const t = document.getElementById('imp-estado-tit'); if(t) t.textContent = 'Cargando los documentos…';
+  const s = document.getElementById('imp-estado'); if(s) s.innerHTML = '<div class="imp-inc"><span class="ic">·</span><span>Un momento: se están leyendo tus facturas y gastos. Las cifras aparecen solas.</span></div>';
+}
 function renderImpuestos(q){
   if(q == null) q = _impQ || (Math.floor(new Date().getMonth()/3)+1);
+  if(!_docsListos){ impMostrarCargando(); return; }
   _impQ = q; try{ localStorage.setItem('imp_q', String(q)); }catch(e){}
   const anio = new Date().getFullYear(), $ = id => document.getElementById(id);
   document.querySelectorAll('#imp-q button').forEach(b => b.classList.toggle('active', Number(b.dataset.q) === q));
@@ -18647,6 +18658,7 @@ function renderImpDeudas(){
 }
 function renderImpPresentadas(){
   const cont = document.getElementById('imp-pres-lista'); if(!cont) return;
+  if(!_docsListos){ cont.innerHTML = '<div class="empty" style="padding:20px;">Cargando los documentos…</div>'; return; }
   const lista = _impDeclaraciones.slice().sort((a, b) => String(b.fecha_presentacion || '').localeCompare(String(a.fecha_presentacion || '')));
   if(!lista.length){ cont.innerHTML = '<div class="empty" style="padding:20px;">Todavía no hay declaraciones guardadas.</div>'; return; }
   const f = iso => { const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}) + ' a las ' + d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}); };
@@ -18668,6 +18680,7 @@ function renderImpPresentadas(){
   }).join('');
 }
 function renderImpAnual(){
+  if(!_docsListos){ ['imp-a-ing', 'imp-a-gas', 'imp-a-rend'].forEach(id => { const e = document.getElementById(id); if(e) e.textContent = '…'; }); ['imp-a-pagado', 'imp-a-est', 'imp-a-def', 'imp-a-evol'].forEach(id => { const e = document.getElementById(id); if(e) e.innerHTML = '<div class="empty" style="padding:10px;">Cargando los documentos…</div>'; }); return; }
   const $ = id => document.getElementById(id), anio = new Date().getFullYear(), hoy = new Date();
   const qAct = Math.floor(hoy.getMonth()/3)+1, D = impDatos(qAct, anio), rend = D.ingAcum - D.gasAcum;
   $('imp-a-fechas').innerHTML = `<b>Ejercicio ${anio}</b> · del 1 ene hasta hoy (${qAct}T en curso)<br>Solo contabilidad oficial. Es un control y una estimación, no la declaración.`;
@@ -18755,6 +18768,7 @@ function impMensajeGestor(P, c130, incompleto303){
   return `Hola,\n\nAdjunto la documentación correspondiente al ${q}.º trimestre de ${anio}, junto con un PDF resumen de las facturas emitidas y los gastos registrados.\n\nSegún nuestros datos, la estimación actual del IVA ${iva} y la del pago fraccionado de IRPF ${irpf}.\n\nTe adjunto toda la documentación para su revisión y cálculo definitivo.\n\nUna cosa más: como en los trimestres anteriores, no os olvidéis de incluir este trimestre las facturas de vuestra propia gestoría. Nosotros solo tenemos el recibo del banco de la cuota mensual (45 € + IVA), así que, por favor, mandádnoslas cada mes para tenerlas también nosotros.\n\nGracias.`;
 }
 function impAbrirGestor(){
+  if(!_docsListos){ mostrarToast('Espera un momento: aún se están cargando los documentos.', 'err'); return; }
   const q = _impQ || (Math.floor(new Date().getMonth()/3)+1), anio = new Date().getFullYear(), $ = id => document.getElementById(id);
   const P = impPaquete(q, anio), c130 = impCalc130(q, anio, P.D), inc303 = P.D.gastosSinIvaQ.length > 0;
   document.getElementById('imp-pag-trim').style.display = 'none';
@@ -18920,6 +18934,12 @@ function impResumenPdf(P, res){
 
 document.querySelectorAll('#imp-q button').forEach(b => b.addEventListener('click', () => renderImpuestos(Number(b.dataset.q))));
 document.querySelectorAll('#imp-tabs button').forEach(b => b.addEventListener('click', () => impPestana(b.dataset.p)));
+document.addEventListener('exg-docs-listos', () => {
+  try{
+    if(document.getElementById('view-impuestos')?.classList.contains('active')){ if(_impPag === 'anual') renderImpAnual(); else if(_impPag === 'presentadas') renderImpPresentadas(); else if(_impPag === 'trim') renderImpuestos(_impQ || (Math.floor(new Date().getMonth()/3)+1)); }
+    if(document.getElementById('gpro-prestamos')?.style.display === 'block') renderPrestamos();
+  }catch(e){ console.error(e); }
+});
 
 
 // Móvil: cada tabla de Economía se ve como tarjetas; la etiqueta de cada dato sale de la cabecera de su columna
@@ -22648,6 +22668,7 @@ async function cargarDocumentosEconomicosReales(){
     // OJO: Supabase solo devuelve 1000 filas por consulta si no se pagina con .range() — con
     // ~2000 documentos activos, media tabla se quedaba fuera del caché sin este bucle (fallo
     // real encontrado el 27/09/26: documentos antiguos "no se encontraban" al abrirlos).
+    const _t0 = performance.now();
     let data = [];
     let desde = 0;
     const TAMAÑO_PAGINA = 1000;
@@ -22659,7 +22680,8 @@ async function cargarDocumentosEconomicosReales(){
       if(pagina.length < TAMAÑO_PAGINA) break; // última página
       desde += TAMAÑO_PAGINA;
     }
-    if(!data.length) return;
+    _cargaMarcas.red = Math.round(performance.now() - _t0);
+    if(!data.length){ _docsListos = true; document.dispatchEvent(new Event('exg-docs-listos')); return; }
     _diferirTarjetas = true;
     const yaEstaban = new Set(Object.keys(documentosRealesById));
     // fase 'datos': solo registra el documento en memoria (rápido). fase 'filas': construye su fila de tabla y su tarjeta (lo caro).
@@ -22766,17 +22788,21 @@ async function cargarDocumentosEconomicosReales(){
     // 1) TODOS los documentos en memoria (rápido) para que totales y buscadores tengan todo; 2) filas y tarjetas solo de lo reciente;
     // 3) el histórico se va construyendo en segundo plano en trozos pequeños, para que la web siga respondiendo a los toques
     for(let i = 0; i < data.length; i += 200){ data.slice(i, i + 200).forEach(doc=>procesar(doc, 'datos')); await ceder(); }
+    _cargaMarcas.datos = Math.round(performance.now() - _t0);
+    _docsListos = true; document.dispatchEvent(new Event('exg-docs-listos'));   // Impuestos y Préstamos ya pueden calcular
     const hoyL = new Date(), limiteL = new Date(hoyL.getFullYear()-1, hoyL.getMonth(), 1);
     const nuevos = data.filter(d=>!yaEstaban.has(d.id));
     const recientes = nuevos.filter(d=>!d.fecha_devengo || new Date(d.fecha_devengo) >= limiteL);
     const antiguos = nuevos.filter(d=>d.fecha_devengo && new Date(d.fecha_devengo) < limiteL);
     for(let i = 0; i < recientes.length; i += 40){ recientes.slice(i, i + 40).forEach(doc=>procesar(doc, 'filas')); await ceder(); }
     await finalizarCargaDocs(false);
-    if(!antiguos.length){ _diferirTarjetas = false; }
+    _cargaMarcas.filas = Math.round(performance.now() - _t0);
+    const informarCarga = ()=>{ _cargaMarcas.total = Math.round(performance.now() - _t0); try{ aiRegistrarEvento('carga_web', aiVistaActual(), {..._cargaMarcas, docs: data.length, movil: /iPhone|Android/i.test(navigator.userAgent)}); }catch(e){} };
+    if(!antiguos.length){ _diferirTarjetas = false; informarCarga(); }
     else {
       document.body.classList.add('cargando-historico');
       let i = 0;
-      const terminar = ()=>{ _diferirTarjetas = false; document.body.classList.remove('cargando-historico'); };
+      const terminar = ()=>{ _diferirTarjetas = false; document.body.classList.remove('cargando-historico'); informarCarga(); };
       const trozo = ()=>{
         try{
           const t0 = performance.now();
@@ -22787,7 +22813,7 @@ async function cargarDocumentosEconomicosReales(){
       };
       setTimeout(trozo, 800);
     }
-  }catch(err){ _diferirTarjetas = false; console.error('No se pudieron cargar los documentos reales', err); }
+  }catch(err){ _diferirTarjetas = false; _docsListos = true; document.dispatchEvent(new Event('exg-docs-listos')); console.error('No se pudieron cargar los documentos reales', err); }
 }
 // Datos maestros de la empresa: única fuente de verdad para IBAN/titular al pasar a factura.
 // Nunca deja campos en "undefined" — si el fetch falla, se mantiene el valor de reserva.
