@@ -126,7 +126,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.17 · Sistema …</div>
+    <div class="ver" id="ver-subir">Subir S3.18 · Sistema …</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -716,7 +716,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 
   // Resumen del documento donde cayó la entrada (albarán/factura/proforma/...): tipo, número y totales.
   // Albarán: solo total (no lleva IVA). Con IVA: subtotal, IVA y total. total = importe (ya con IVA), salvo ISP.
-  async function pintarResumenSolucion(elementoId){
+  async function pintarResumenSolucion(elementoId, lineas){
     const texto = document.getElementById("modal-solucion-texto");
     if (!texto) return;
     let cont = document.getElementById("modal-solucion-doc");
@@ -728,16 +728,39 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     }
     cont.textContent = "";
     cont.style.display = "none";
+    const eur = n => Number(n||0).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+    const num = n => Number(n||0).toLocaleString("es-ES",{maximumFractionDigits:2});
+    // Líneas que añadió esta entrada (guardadas en interpretacion.lineas al procesarla): fecha, cantidad, concepto, precio y total
+    if (Array.isArray(lineas) && lineas.length){
+      const cab = document.createElement("div");
+      cab.style.cssText = "font-weight:700;margin-bottom:2px;";
+      cab.textContent = "Líneas añadidas";
+      cont.appendChild(cab);
+      lineas.forEach(l => {
+        const b = document.createElement("div");
+        b.style.cssText = "border-top:1px solid #e3ded5;padding:4px 0;";
+        const f = String(l.fecha||"").split("-");
+        const t1 = document.createElement("div");
+        t1.textContent = (f.length===3 ? f[2]+"/"+f[1] : "")+" · "+(l.concepto||"");
+        const t2 = document.createElement("div");
+        t2.style.cssText = "display:flex;justify-content:space-between;gap:8px;";
+        const a = document.createElement("span"); a.textContent = num(l.cantidad)+" "+(l.unidad||"h")+" × "+eur(l.precio);
+        const z = document.createElement("span"); z.style.fontWeight = "700"; z.textContent = eur(l.total);
+        t2.appendChild(a); t2.appendChild(z);
+        b.appendChild(t1); b.appendChild(t2);
+        cont.appendChild(b);
+      });
+      cont.style.display = "block";
+    }
     if (!elementoId) return;
     try {
       const r = await fetch(SUPABASE_URL+"/rest/v1/rpc/resumen_documento", { method:"POST", headers:{ "Authorization":"Bearer "+SUPABASE_ANON_KEY, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" }, body: JSON.stringify({ p_id: elementoId }) });
       const d = await r.json();
       if (!d || !d.tipo) return;
-      const eur = n => Number(n||0).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
       const fila = (a,b,fuerte) => { const row = document.createElement("div"); row.style.cssText = "display:flex;justify-content:space-between;gap:8px;"+(fuerte?"font-weight:700;":""); const x = document.createElement("span"); x.textContent = a; const y = document.createElement("span"); y.textContent = b; row.appendChild(x); row.appendChild(y); return row; };
       const nombres = { albaran:"Albarán", factura:"Factura", proforma:"Proforma", presupuesto:"Presupuesto" };
       const cab = document.createElement("div");
-      cab.style.cssText = "font-weight:700;margin-bottom:2px;";
+      cab.style.cssText = "font-weight:700;margin:6px 0 2px;border-top:1px solid #e3ded5;padding-top:6px;";
       cab.textContent = (nombres[d.tipo]||d.tipo)+(d.numero?" · "+d.numero:"");
       cont.appendChild(cab);
       const total = Number(d.total||0);
@@ -786,7 +809,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
       document.body.appendChild(ov);
     }
     document.getElementById("modal-solucion-texto").textContent = label;
-    await pintarResumenSolucion(elementoId);
+    await pintarResumenSolucion(elementoId, interp.lineas);
     const btnDiv = document.getElementById("modal-solucion-btn");
     btnDiv.innerHTML = "";
     if (elementoId){
@@ -833,7 +856,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
       document.body.appendChild(ov);
     }
     document.getElementById("modal-solucion-texto").textContent = label;
-    await pintarResumenSolucion(elementoId);
+    await pintarResumenSolucion(elementoId, interp.lineas);
     const btnDiv = document.getElementById("modal-solucion-btn");
     btnDiv.innerHTML = "";
     if (elementoId){
@@ -941,7 +964,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   window.abrirMenuAnadir = abrirMenuAnadir;
   // Versión del sistema desde BD (no hay que actualizarla a mano)
   fetch(SUPABASE_URL+"/rest/v1/arranque?clave=eq.web_version_actual&select=valor",{headers:{"Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY}})
-    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.17 · Sistema '+d[0].valor; }).catch(()=>{});
+    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.18 · Sistema '+d[0].valor; }).catch(()=>{});
   window.mostrarSolucionPorIds = mostrarSolucionPorIds;
   window.abrirEnlaceDesdeSubir = abrirEnlaceDesdeSubir;
   window.toggleMsgVerificado = toggleMsgVerificado;
