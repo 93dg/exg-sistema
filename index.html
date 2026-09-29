@@ -3003,7 +3003,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.13</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.14</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3081,7 +3081,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.13</div>
+        <div class="sub" id="version-badge">V6.14</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9754,6 +9754,30 @@ function togglePanelCC(panel){
   if(chev) chev.textContent = oculto ? '▾' : '▸';
 }
 
+// Avisos automáticos de ITV (flota.itv_vence = fecha hasta la que vale la última ITV favorable):
+// saltan 15 días antes del vencimiento y siguen mientras esté vencida. Se calculan cada vez, no se guardan.
+const DIAS_AVISO_ITV = 15;
+function avisosItvFlota(filasFlota, hoy){
+  const h = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  return (filasFlota||[])
+    .filter(v => v.itv_vence && v.estado !== 'vendida')
+    .map(v => { const f = new Date(v.itv_vence+'T00:00:00'); return {v, dias: Math.round((f-h)/86400000)}; })
+    .filter(a => a.dias <= DIAS_AVISO_ITV)
+    .sort((a,b) => a.dias - b.dias);
+}
+function htmlAvisoItv(a){
+  const v = a.v, d = a.dias;
+  const [y,m,dd] = String(v.itv_vence).split('-');
+  const cuando = d < 0 ? `vencida hace ${-d} día${-d===1?'':'s'}` : d === 0 ? 'vence hoy' : `vence en ${d} día${d===1?'':'s'}`;
+  const color = d < 0 ? 'red' : 'orange';
+  return `<div class="alert-row" style="align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);">
+      <div class="alert-dot ${color}" style="margin-top:4px;flex-shrink:0;"></div>
+      <div style="flex:1;">
+        <div class="t">🚗 ITV ${v.nombre}${v.matricula?' ('+v.matricula+')':''} — ${cuando}</div>
+        <div class="s" style="margin-top:2px;">Válida hasta ${dd}/${m}/${y}. Aviso automático: desaparece al actualizar la fecha de ITV en la ficha del vehículo.</div>
+      </div>
+    </div>`;
+}
 async function cargarAlertasYRecordatorios(){
   if(!sb) return;
   const cont = document.getElementById('alertas-list-bd');
@@ -9780,7 +9804,12 @@ async function cargarAlertasYRecordatorios(){
       <div class="s" style="flex-shrink:0;font-size:10px;">${new Date(r.created_at).toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}</div>
     </div>`;
   }).join('');
-  document.getElementById('alertas-list-bd').innerHTML = html;
+  let htmlItv = '';
+  try{
+    const {data: fl} = await sb.from('flota').select('id,nombre,matricula,itv_vence,estado').not('itv_vence','is',null);
+    htmlItv = avisosItvFlota(fl, new Date()).map(htmlAvisoItv).join('');
+  }catch(e){}
+  document.getElementById('alertas-list-bd').innerHTML = htmlItv + html;
   actualizarVacioAlertas();
 }
 function actualizarVacioAlertas(){
