@@ -1938,10 +1938,9 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
   #econ-subtabs .client-tab{padding:12px 2px;font-size:13.5px;text-align:center;border:none;border-radius:0;background:transparent;color:var(--ink-soft);white-space:nowrap;min-width:0;}
   #econ-subtabs .client-tab:nth-child(n+4){border-top:1px solid var(--line);}
   #econ-subtabs .client-tab.active{background:var(--asphalt);color:#fff;}
-  /* Gastos: 5 pestañas, 3 arriba y 2 abajo */
-  #gpro-subtabs{grid-template-columns:repeat(6,1fr);}
-  #gpro-subtabs .client-tab{grid-column:span 2;}
-  #gpro-subtabs .client-tab:nth-child(n+4){grid-column:span 3;border-top:1px solid var(--line);}
+  /* Gastos: 6 pestañas, 3 arriba y 3 abajo */
+  #gpro-subtabs{grid-template-columns:repeat(3,1fr);}
+  #gpro-subtabs .client-tab:nth-child(n+4){border-top:1px solid var(--line);}
   /* cajas de arriba: 2 x 2 */
   #view-economia .kpi-strip{display:grid;grid-template-columns:1fr 1fr;gap:8px;border:none;padding:0;margin-bottom:12px;}
   #view-economia .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:left;background:var(--paper);min-width:0;}
@@ -2035,6 +2034,14 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 #clientes-lista-movil > *, #econ-presupuestos-tbody tr, #gpro-lista-movil > *{content-visibility:auto;contain-intrinsic-size:auto 96px;}
 .mostrar-mas-movil{display:block;width:100%;margin:12px 0 90px;padding:14px;font-size:14px;font-weight:600;}
 .cargando-historico::after{content:'Cargando el histórico…';position:fixed;left:12px;bottom:84px;z-index:50;background:var(--asphalt);color:#fff;font-size:11.5px;padding:5px 10px;border-radius:14px;opacity:.85;pointer-events:none;}
+.pr-fila{display:grid;grid-template-columns:18px 1.5fr 1fr 1fr 1.2fr;gap:6px;padding:7px 14px;font-size:12.5px;border-bottom:1px solid var(--line);align-items:baseline;}
+.pr-fila .mono{text-align:right;white-space:nowrap;}
+.pr-fila .pr-cuota{display:block;font-size:10.5px;color:var(--ink-soft);}
+.pr-cab{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:var(--paper);}
+.pr-cab span:nth-child(n+3){text-align:right;}
+.pr-ic{font-weight:700;}
+.pr-ok .pr-ic{color:var(--green);} .pr-sin .pr-ic{color:var(--orange);} .pr-pend{color:var(--ink-soft);}
+.pr-sin{background:rgba(232,93,4,.06);}
 </style>
 <style>
 /* required styles */
@@ -3112,7 +3119,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.24</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.25</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3190,7 +3197,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.24</div>
+        <div class="sub" id="version-badge">V6.25</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4249,6 +4256,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="client-tab" data-sub="lista">Gastos</div>
         <div class="client-tab" data-sub="control">Control</div>
         <div class="client-tab" data-sub="combustible">Combustible</div>
+        <div class="client-tab" data-sub="prestamos">Préstamos</div>
         <div class="client-tab" data-sub="revisar">Revisar</div>
       </div>
 
@@ -4349,6 +4357,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       </div>
 
       <!-- REVISAR: lo que llega del correo y los gastos dudosos -->
+      <!-- PRÉSTAMOS: deuda que se sigue mes a mes; los intereses de cada recibo son gasto, la amortización no -->
+      <div class="sub-view" id="gpro-prestamos" style="display:none;">
+        <div id="prest-lista"></div>
+        <div class="two-col-note">Los intereses de cada recibo son un gasto financiero (sin IVA). La amortización del capital no es gasto: es devolver deuda. El cuadro se calcula con el tipo y la cuota del préstamo y se ha comprobado con las filas que da el banco.</div>
+      </div>
+
       <div class="sub-view" id="gpro-revisar" style="display:none;">
         <div class="gm-seg2" id="gpro-revisar-seg"><button type="button" class="active" data-r="recibos" id="gpro-seg-recibos">Recibos</button><button type="button" data-r="correo">Del correo</button><button type="button" data-r="dudosos" id="gpro-seg-dudosos">Dudosos</button></div>
         <div id="gpro-revisar-recibos">
@@ -6686,7 +6700,7 @@ function setupSubtabs(navId, prefix, mapping, opts){
 }
 setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimiento:'flota-mantenimiento',averias:'flota-averias',documentacion:'flota-documentacion',repuestos:'flota-repuestos',historial:'flota-historial'});
 setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',cobros:'econ-cobros',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad'});
-setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',control:'gpro-control',combustible:'gpro-comb',revisar:'gpro-revisar'},{onSwitch:{revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible(), control:()=>renderGastosProControl()}});
+setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',control:'gpro-control',combustible:'gpro-comb',prestamos:'gpro-prestamos',revisar:'gpro-revisar'},{onSwitch:{revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible(), control:()=>renderGastosProControl(), prestamos:()=>iniciarPrestamos()}});
 document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filters .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     chip.parentElement.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
@@ -18167,6 +18181,100 @@ function onImageAttach(input){
 /* Almacén en memoria de todos los documentos creados desde la app (para poder reabrirlos) */
 const documentosRealesById = {};
 let editingDocId = null;
+
+// ===================== PRÉSTAMOS (Gastos) =====================
+// Cada préstamo vive en sistema (tipo "prestamo"). El cuadro de amortización se calcula (sistema francés con cuota fija);
+// los intereses de cada recibo pagado se pueden registrar como gasto financiero exento de IVA. La amortización nunca es gasto.
+let _prestamos = [], _prestamosCargados = false;
+const PR_EUR = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
+const PR_R2 = x => Math.round((x + Number.EPSILON) * 100) / 100;
+function prFechaCorta(iso){ const d = new Date(iso + 'T00:00:00'); return d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}).replace(/\./g,''); }
+function prCuadro(p){
+  const filas = []; let pend = Number(p.capital); const ini = new Date(p.primera_cuota + 'T00:00:00'), dia = Number(p.dia_recibo) || ini.getDate();
+  for(let i = 1; i <= Number(p.n_cuotas); i++){
+    const f = new Date(ini.getFullYear(), ini.getMonth() + i - 1, dia), iso = f.getFullYear() + '-' + String(f.getMonth()+1).padStart(2,'0') + '-' + String(dia).padStart(2,'0');
+    const interes = PR_R2(pend * Number(p.tipo_interes) / 1200); let cuota = Number(p.cuota), capital = PR_R2(cuota - interes);
+    if(i === Number(p.n_cuotas)){ capital = pend; cuota = PR_R2(pend + interes); }
+    pend = PR_R2(pend - capital);
+    filas.push({n: i, iso, cuota, capital, interes, pendiente: pend});
+  }
+  return filas;
+}
+function prNumeroGasto(p, iso){ const [y, m, d] = iso.split('-'); return `PRESTAMO ${p.num_acuerdo} ${d}/${m}/${y}`; }
+function prGastoDe(p, iso){ const num = prNumeroGasto(p, iso); return Object.values(documentosRealesById).find(d => d.type === 'gasto' && d.numero === num) || null; }
+async function cargarPrestamos(){
+  if(!sb) return;
+  try{
+    const {data} = await sb.from('sistema').select('id,tipo,data').eq('tipo', 'prestamo');
+    _prestamos = (data || []).filter(r => r.tipo === 'prestamo' && r.data && r.data.estado !== 'cerrado').map(r => ({id: r.id, ...r.data}));
+  }catch(e){ console.error(e); }
+  _prestamosCargados = true;
+}
+async function iniciarPrestamos(){ if(!_prestamosCargados) await cargarPrestamos(); renderPrestamos(); }
+function renderPrestamos(){
+  const cont = document.getElementById('prest-lista'); if(!cont) return;
+  if(!_prestamos.length){ cont.innerHTML = '<div class="empty" style="padding:20px;">No hay ningún préstamo registrado.</div>'; return; }
+  const hoy = new Date(), hoyIso = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0') + '-' + String(hoy.getDate()).padStart(2,'0'), anio = hoy.getFullYear();
+  cont.innerHTML = _prestamos.map(p => {
+    const cuadro = prCuadro(p), pagadas = cuadro.filter(f => f.iso <= hoyIso), pendientes = cuadro.filter(f => f.iso > hoyIso);
+    const capPagado = pagadas.reduce((s, f) => s + f.capital, 0), saldo = pagadas.length ? pagadas[pagadas.length-1].pendiente : Number(p.capital), prox = pendientes[0];
+    const pct = Math.round(capPagado / Number(p.capital) * 100);
+    const deEsteAnio = pagadas.filter(f => f.iso.startsWith(String(anio)));
+    const contadas = deEsteAnio.filter(f => prGastoDe(p, f.iso)), sinContar = deEsteAnio.filter(f => !prGastoDe(p, f.iso));
+    const sum = (a, k) => a.reduce((s, f) => s + f[k], 0);
+    const porAnio = {}; cuadro.forEach(f => { const a = f.iso.slice(0,4); porAnio[a] = PR_R2((porAnio[a] || 0) + f.interes); });
+    const estado = f => { if(f.iso > hoyIso) return ['○','pr-pend','pendiente']; if(!f.iso.startsWith(String(anio))) return ['✓','pr-ok','pagada (año anterior)']; return prGastoDe(p, f.iso) ? ['✓','pr-ok','pagada y contada como gasto'] : ['●','pr-sin','pagada, intereses sin contar como gasto']; };
+    return `<div class="pr-card panel">
+      <div class="panel-head" style="flex-wrap:wrap;gap:6px;"><h3>${escHtml(p.nombre || 'Préstamo')}</h3><span class="count">${p.uso === 'empresa' ? 'de la empresa' : escHtml(p.uso || '')}</span></div>
+      <div class="panel-body">
+        <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:10px;">${escHtml(p.entidad || '')} · nº ${escHtml(p.num_acuerdo || '')} · ${Number(p.tipo_interes).toLocaleString('es-ES')} % ${escHtml((p.modalidad || '').toLowerCase())} · formalizado el ${prFechaCorta(p.fecha_formalizacion)} · vence el ${prFechaCorta(p.vencimiento)} · cuenta ${escHtml(p.cuenta_cargo || '')}</div>
+        <div style="height:10px;background:var(--concrete);border-radius:5px;overflow:hidden;"><div style="height:10px;width:${Math.max(2, pct)}%;background:var(--green);"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin:4px 0 12px;"><span>Pagado ${PR_EUR(capPagado)} (${pct} %)</span><span>Concedido ${PR_EUR(p.capital)}</span></div>
+        <div class="imp-grid">
+          <div class="imp-k"><div class="l">Pendiente</div><div class="v">${PR_EUR(saldo)}</div></div>
+          <div class="imp-k"><div class="l">Próximo recibo</div><div class="v">${prox ? PR_EUR(prox.cuota) : '—'}</div><div class="s">${prox ? prFechaCorta(prox.iso) : 'préstamo terminado'}</div></div>
+          <div class="imp-k"><div class="l">Cuotas pendientes</div><div class="v">${pendientes.length}</div><div class="s">de ${cuadro.length}</div></div>
+          <div class="imp-k"><div class="l">Intereses ${anio}</div><div class="v">${PR_EUR(sum(deEsteAnio, 'interes'))}</div><div class="s">${deEsteAnio.length} recibo${deEsteAnio.length === 1 ? '' : 's'} pagado${deEsteAnio.length === 1 ? '' : 's'}</div></div>
+        </div>
+        <div class="imp-linea" style="margin-top:6px;"><span>Intereses de ${anio} ya contados como gasto</span><span class="mono">${PR_EUR(sum(contadas, 'interes'))}</span></div>
+        <div class="imp-linea"><span>Intereses de ${anio} sin contar como gasto (${sinContar.length} recibo${sinContar.length === 1 ? '' : 's'})</span><span class="mono" style="color:${sinContar.length ? 'var(--orange)' : 'inherit'};">${PR_EUR(sum(sinContar, 'interes'))}</span></div>
+        ${sinContar.length ? `<button type="button" class="btn primary" style="width:100%;margin:10px 0 4px;padding:12px;" onclick="prRegistrarPendientes('${p.id}')">Registrar ${sinContar.length} recibo${sinContar.length === 1 ? '' : 's'} como gasto (${PR_EUR(sum(sinContar, 'interes'))})</button><div style="font-size:11.5px;color:var(--ink-soft);line-height:1.45;">Solo los intereses. Los de años anteriores no se tocan. Los recibos anteriores a septiembre no tienen justificante en la app: quedan pendientes de justificante hasta que pidas al banco el certificado de intereses.</div>` : ''}
+        <details class="imp-det" style="margin-top:10px;"><summary>Cuadro de amortización (${cuadro.length} cuotas)</summary><div class="imp-det-body" style="padding:0 0 8px;">
+          <div class="pr-fila pr-cab"><span></span><span>Fecha</span><span>Capital</span><span>Interés</span><span>Pendiente</span></div>
+          ${cuadro.map(f => { const e = estado(f); return `<div class="pr-fila ${e[1]}" title="${e[2]}"><span class="pr-ic">${e[0]}</span><span>${prFechaCorta(f.iso)}<span class="pr-cuota">cuota ${f.cuota.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></span><span class="mono">${f.capital.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span><span class="mono">${f.interes.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span><span class="mono">${f.pendiente.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>`; }).join('')}
+          <div style="font-size:11.5px;color:var(--ink-soft);padding:8px 14px 0;">✓ pagada · ● pagada y con intereses sin contar · ○ pendiente</div>
+        </div></details>
+        <details class="imp-det"><summary>Intereses por año</summary><div class="imp-det-body">${Object.entries(porAnio).map(([a, v]) => `<div class="imp-linea"><span>${a}</span><span class="mono">${PR_EUR(v)}</span></div>`).join('')}<div class="imp-linea tot"><span>Total de intereses del préstamo</span><span class="mono">${PR_EUR(Object.values(porAnio).reduce((s, v) => s + v, 0))}</span></div></div></details>
+        <details class="imp-det"><summary>Documentos (${(p.documentos || []).length})</summary><div class="imp-det-body">${(p.documentos || []).map(d => `<div class="imp-linea"><a href="${escHtml(d.url)}" target="_blank" rel="noopener">📄 ${escHtml(d.nombre)}</a><span></span></div>`).join('') || '<div class="empty" style="padding:10px;">Sin documentos.</div>'}</div></details>
+      </div></div>`;
+  }).join('');
+}
+async function prRegistrarPendientes(id){
+  const p = _prestamos.find(x => String(x.id) === String(id)); if(!p || !sb) return;
+  const hoy = new Date(), hoyIso = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0') + '-' + String(hoy.getDate()).padStart(2,'0'), anio = hoy.getFullYear();
+  const lista = prCuadro(p).filter(f => f.iso <= hoyIso && f.iso.startsWith(String(anio)) && !prGastoDe(p, f.iso));
+  if(!lista.length) return;
+  const total = lista.reduce((s, f) => s + f.interes, 0);
+  if(!window.confirm(`Se crearán ${lista.length} gasto(s) de intereses del préstamo de ${p.entidad} (${PR_EUR(total)} en total). No se cuenta nada de amortización. ¿Continuar?`)) return;
+  const url = 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/prestamos/' + p.num_acuerdo + '/cuadro-amortizacion-2026.png';
+  const payloads = lista.map(f => { const q = Math.floor((Number(f.iso.slice(5,7)) - 1) / 3) + 1;
+    return {tipo: 'gasto', estado: 'emitido', numero: prNumeroGasto(p, f.iso), fecha_devengo: f.iso, entidad_id: p.entidad_id || null, importe: f.interes, iva_pct: 0,
+      concepto: `Intereses del préstamo de ${p.entidad} (nº ${p.num_acuerdo}), recibo del ${prFechaCorta(f.iso)}: cuota ${PR_EUR(f.cuota)} = ${PR_EUR(f.capital)} de amortización (no es gasto) + ${PR_EUR(f.interes)} de intereses`,
+      conceptos: [{descripcion: `INTERESES DEL PRÉSTAMO (cuota ${f.n} de ${p.n_cuotas}), TIPO ${p.tipo_interes} %`, cantidad: 1, unidad: 'ud', precio_unitario: f.interes, importe: f.interes, categoria: 'Gastos financieros', subcategoria: 'Intereses de préstamo', maquina: null}],
+      contabilidad: 'oficial', categoria: 'Gastos financieros', forma_pago: 'Domiciliado', archivo_url: url, justificante_url: url,
+      estado_justificante: 'pendiente', relacion_actividad: 'relacionada', tratamiento_iva: 'normal', desglose_iva: [{pct: 0, base: f.interes, cuota: 0, importe: f.interes, exento: true, nota: 'operación financiera exenta de IVA'}],
+      confianza_extraccion: 'media', metodo_extraccion: 'manual', estado_calidad: 'pendiente', enviado_gestor: false, periodo_fiscal: `${anio}-T${q}`,
+      info_faltante: 'El importe sale del cuadro de amortización del banco; falta el certificado de intereses o el recibo de ese mes.'}; });
+  try{
+    const {data, error} = await sb.from('documentos_economicos').insert(payloads).select('id,numero,fecha_devengo,importe');
+    if(error){ mostrarToast('No se pudieron registrar: ' + errText(error), 'err'); return; }
+    (data || []).forEach(r => { const pl = payloads.find(x => x.numero === r.numero) || {}; const dRaw = new Date(r.fecha_devengo + 'T00:00:00');
+      documentosRealesById[r.id] = {...pl, id: r.id, type: 'gasto', client: (p.entidad || '').toUpperCase(), dateRaw: r.fecha_devengo, dateLabel: formatFechaLabel(dRaw), amountLabel: PR_EUR(r.importe)}; });
+    mostrarToast(`${(data || []).length} gasto(s) de intereses registrados ✓`, 'ok');
+    renderPrestamos();
+    try{ if(typeof renderGastosProResumen === 'function') renderGastosProResumen(); if(typeof renderGastosProLista === 'function') renderGastosProLista(); }catch(e){}
+  }catch(e){ mostrarToast('No se pudieron registrar: ' + errText(e), 'err'); }
+}
 
 /* ================= IMPUESTOS — control fiscal del trimestre (sección independiente) =================
    Solo contabilidad OFICIAL. Nada de márgenes, cobros ni simuladores. Los cálculos salen de los documentos
