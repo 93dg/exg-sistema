@@ -126,7 +126,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.16 · Sistema …</div>
+    <div class="ver" id="ver-subir">Subir S3.17 · Sistema …</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -714,6 +714,44 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     }
   }
 
+  // Resumen del documento donde cayó la entrada (albarán/factura/proforma/...): tipo, número y totales.
+  // Albarán: solo total (no lleva IVA). Con IVA: subtotal, IVA y total. total = importe (ya con IVA), salvo ISP.
+  async function pintarResumenSolucion(elementoId){
+    const texto = document.getElementById("modal-solucion-texto");
+    if (!texto) return;
+    let cont = document.getElementById("modal-solucion-doc");
+    if (!cont){
+      cont = document.createElement("div");
+      cont.id = "modal-solucion-doc";
+      cont.style.cssText = "font-size:13px;line-height:1.7;color:#444;background:#f5f3ef;border-radius:8px;padding:8px 10px;margin-bottom:16px;";
+      texto.insertAdjacentElement("afterend", cont);
+    }
+    cont.textContent = "";
+    cont.style.display = "none";
+    if (!elementoId) return;
+    try {
+      const r = await fetch(SUPABASE_URL+"/rest/v1/rpc/resumen_documento", { method:"POST", headers:{ "Authorization":"Bearer "+SUPABASE_ANON_KEY, "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" }, body: JSON.stringify({ p_id: elementoId }) });
+      const d = await r.json();
+      if (!d || !d.tipo) return;
+      const eur = n => Number(n||0).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+      const fila = (a,b,fuerte) => { const row = document.createElement("div"); row.style.cssText = "display:flex;justify-content:space-between;gap:8px;"+(fuerte?"font-weight:700;":""); const x = document.createElement("span"); x.textContent = a; const y = document.createElement("span"); y.textContent = b; row.appendChild(x); row.appendChild(y); return row; };
+      const nombres = { albaran:"Albarán", factura:"Factura", proforma:"Proforma", presupuesto:"Presupuesto" };
+      const cab = document.createElement("div");
+      cab.style.cssText = "font-weight:700;margin-bottom:2px;";
+      cab.textContent = (nombres[d.tipo]||d.tipo)+(d.numero?" · "+d.numero:"");
+      cont.appendChild(cab);
+      const total = Number(d.total||0);
+      const pct = Number(d.iva_pct||0);
+      const conIva = d.tipo !== "albaran" && pct > 0 && d.tratamiento_iva !== "isp";
+      if (conIva){
+        const sub = Math.round(total/(1+pct/100)*100)/100;
+        cont.appendChild(fila("Subtotal", eur(sub)));
+        cont.appendChild(fila("IVA "+pct+"%", eur(Math.round((total-sub)*100)/100)));
+      }
+      cont.appendChild(fila(d.tratamiento_iva === "isp" ? "Total (ISP, sin IVA)" : "Total", eur(total), true));
+      cont.style.display = "block";
+    } catch(e) { /* sin resumen: el modal sigue igual que antes */ }
+  }
   async function mostrarSolucionPorIds(docIdsStr){
     const ids = docIdsStr.split(',').map(x=>x.trim()).filter(Boolean);
     if(!ids.length) return;
@@ -721,7 +759,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     const filas = await resp.json();
     const label = (filas.find(f => f.linked_label)||{}).linked_label || "—";
     const interp = (filas.find(f => f.interpretacion)||{}).interpretacion || {};
-    const elementoId = interp.elemento_id || null;
+    const elementoId = interp.elemento_id || interp.albaran_id || null;
     const tipo = interp.elemento_tipo || "albaran";
     let ov = document.getElementById("modal-solucion");
     if (!ov){
@@ -748,6 +786,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
       document.body.appendChild(ov);
     }
     document.getElementById("modal-solucion-texto").textContent = label;
+    await pintarResumenSolucion(elementoId);
     const btnDiv = document.getElementById("modal-solucion-btn");
     btnDiv.innerHTML = "";
     if (elementoId){
@@ -767,7 +806,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     const filas = await resp.json();
     const label = (filas.find(f => f.linked_label)||{}).linked_label || "—";
     const interp = (filas.find(f => f.interpretacion)||{}).interpretacion || {};
-    const elementoId = interp.elemento_id || null;
+    const elementoId = interp.elemento_id || interp.albaran_id || null;
     const tipo = interp.elemento_tipo || "albaran";
     let ov = document.getElementById("modal-solucion");
     if (!ov){
@@ -794,6 +833,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
       document.body.appendChild(ov);
     }
     document.getElementById("modal-solucion-texto").textContent = label;
+    await pintarResumenSolucion(elementoId);
     const btnDiv = document.getElementById("modal-solucion-btn");
     btnDiv.innerHTML = "";
     if (elementoId){
@@ -901,7 +941,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   window.abrirMenuAnadir = abrirMenuAnadir;
   // Versión del sistema desde BD (no hay que actualizarla a mano)
   fetch(SUPABASE_URL+"/rest/v1/arranque?clave=eq.web_version_actual&select=valor",{headers:{"Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY}})
-    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.16 · Sistema '+d[0].valor; }).catch(()=>{});
+    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.17 · Sistema '+d[0].valor; }).catch(()=>{});
   window.mostrarSolucionPorIds = mostrarSolucionPorIds;
   window.abrirEnlaceDesdeSubir = abrirEnlaceDesdeSubir;
   window.toggleMsgVerificado = toggleMsgVerificado;
