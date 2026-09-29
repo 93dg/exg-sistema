@@ -1971,6 +1971,14 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
   #view-economia table.tbl tbody td[colspan]{display:block;text-align:center;}
   #view-economia table.tbl tbody tr:has(> td.empty){background:transparent;border:none;}
 }
+.ct-g{padding:10px 16px;border-bottom:1px solid var(--line);}
+.ct-g:last-child{border-bottom:none;}
+.ct-g1{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-weight:600;}
+.ct-g1 .ct-prov{min-width:0;overflow-wrap:anywhere;}
+.ct-g1 .mono{white-space:nowrap;}
+.ct-g2{font-size:12.5px;color:var(--ink-soft);margin-top:2px;overflow-wrap:anywhere;}
+.ct-g3{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+.ct-g3 b{color:var(--ink);font-weight:600;}
 </style>
 <style>
 /* required styles */
@@ -3048,7 +3056,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.17</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.18</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3126,7 +3134,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.17</div>
+        <div class="sub" id="version-badge">V6.18</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4620,6 +4628,19 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="panel-head"><h3>Gastos del trimestre</h3></div>
             <div class="panel-body" id="ct-gastos-det"></div>
           </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3>Gastos incluidos en este trimestre</h3><span class="count" id="ct-gastos-count">0</span></div>
+          <div class="panel-body" style="padding:0;">
+            <div id="ct-gastos-lista"></div>
+            <div id="ct-gastos-total" style="padding:10px 16px;border-top:1px solid var(--line);"></div>
+          </div>
+        </div>
+
+        <div class="panel" id="ct-fuera-panel" style="display:none;">
+          <div class="panel-head"><h3>Gastos que NO cuentan en este trimestre</h3><span class="count" id="ct-fuera-count">0</span></div>
+          <div class="panel-body" style="padding:0;"><div id="ct-fuera-lista"></div></div>
         </div>
 
         <div class="panel">
@@ -18219,6 +18240,26 @@ function calcularCierre(q){
   $('ct-gastos-det').innerHTML = linea(`Gastos (${D.gq.length}, con IVA)`, ctEur(D.gastosTotal)) + linea('IVA deducible', ctEur(D.ivaSop)) + linea('Gasto sin IVA', ctEur(D.gastos)) +
     (D.inversiones.length ? linea(`Fuera: compra de vehículos (${D.inversiones.length}, es inversión)`, ctEur(D.inversiones.reduce((s,d)=>s+Number(d.importe||d.total||0),0)), 'border-top:1px solid var(--line);margin-top:6px;padding-top:6px;color:var(--ink-soft);') : '') +
     (D.dudosos.length ? linea(`Fuera: dudosos (${D.dudosos.length})`, ctEur(D.dudosos.reduce((s,d)=>s+Number(d.importe||d.total||0),0)), 'color:var(--ink-soft);') : '');
+
+  // reparto de los gastos por categoría (sin IVA)
+  const porCat = new Map();
+  D.gq.forEach(d => { const k = d.categoria || 'Sin categoría'; porCat.set(k, (porCat.get(k) || 0) + (Number(d.importe || d.total || 0) - ctIvaGasto(d))); });
+  const repCat = Array.from(porCat.entries()).sort((a, b) => b[1] - a[1]);
+  if(repCat.length) $('ct-gastos-det').innerHTML += `<div style="border-top:1px solid var(--line);margin-top:8px;padding-top:6px;font-size:11.5px;color:var(--ink-soft);">Por categoría (sin IVA)</div>` + repCat.map(([k, v]) => linea(escHtml(k) + ` <span style="color:var(--ink-soft);font-size:11px;">${D.gastos > 0 ? Math.round(v / D.gastos * 100) : 0} %</span>`, ctEur(v))).join('');
+
+  // gastos incluidos, uno a uno
+  const ordenar = (a, b) => String(b.dateRaw || '').localeCompare(String(a.dateRaw || ''));
+  const lineaGasto = d => { const tot = Number(d.importe || d.total || 0), iva = ctIvaGasto(d);
+    return `<div class="ct-g"${d.id ? ` onclick="openDocumentViewer('${d.id}')" style="cursor:pointer;"` : ''}><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}</span><span class="mono">${ctEur(tot)}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(d.categoria || 'Sin categoría')}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div><div class="ct-g3">Sin IVA <b>${ctEur(tot - iva)}</b> · IVA deducible <b>${ctEur(iva)}</b></div></div>`; };
+  $('ct-gastos-count').textContent = D.gq.length;
+  $('ct-gastos-lista').innerHTML = D.gq.length ? D.gq.slice().sort(ordenar).map(lineaGasto).join('') : '<div class="empty" style="padding:16px;">Sin gastos oficiales en este trimestre</div>';
+  $('ct-gastos-total').innerHTML = D.gq.length ? `<div class="econ-line"><span><b>Total incluido (${D.gq.length})</b></span><span class="v mono">${ctEur(D.gastosTotal)}</span></div><div class="econ-line" style="color:var(--ink-soft);"><span>de los que IVA deducible</span><span class="v mono">${ctEur(D.ivaSop)}</span></div><div class="econ-line"><span><b>Gasto que cuenta (sin IVA)</b></span><span class="v mono">${ctEur(D.gastos)}</span></div>` : '';
+  // los que no cuentan y por qué
+  const fuera = D.inversiones.map(d => ({d, motivo: 'Compra de vehículo: es inversión, no gasto del trimestre' + (Array.isArray(d.desglose_iva) && d.desglose_iva.some(x => /alem[aá]n|extranjer/i.test(String(x.nota||''))) ? '; el IVA alemán no se deduce' : '')}))
+    .concat(D.dudosos.map(d => ({d, motivo: 'Dudoso: falta decidir si es válido'})));
+  $('ct-fuera-panel').style.display = fuera.length ? '' : 'none';
+  $('ct-fuera-count').textContent = fuera.length;
+  $('ct-fuera-lista').innerHTML = fuera.sort((a, b) => ordenar(a.d, b.d)).map(({d, motivo}) => `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}</span><span class="mono">${ctEur(d.importe || d.total)}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div><div class="ct-g3">${escHtml(motivo)}</div></div>`).join('');
 
   // cómo está de preparado
   const gDelQ = D.gq.concat(D.dudosos);
