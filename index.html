@@ -3004,7 +3004,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.15</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.16</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3082,7 +3082,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.15</div>
+        <div class="sub" id="version-badge">V6.16</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4396,7 +4396,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="client-tab" data-sub="cobros">Cobros</div>
         <div class="client-tab" data-sub="gastos">Gastos</div>
         <div class="client-tab" data-sub="rentabilidad">Rentabilidad</div>
-        <div class="client-tab" data-sub="cierre">Cierre trimestral</div>
+        <div class="client-tab" data-sub="cierre">Trimestre</div>
       </div>
 
       <!-- RESUMEN -->
@@ -4517,27 +4517,81 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div class="chip-filter" data-q="1">1º Trimestre (ene-mar)</div>
           <div class="chip-filter" data-q="2">2º Trimestre (abr-jun)</div>
           <div class="chip-filter" data-q="3">3º Trimestre (jul-sept)</div>
-          <div class="chip-filter active" data-q="4">4º Trimestre (oct-dic)</div>
+          <div class="chip-filter" data-q="4">4º Trimestre (oct-dic)</div>
+        </div>
+        <div id="cierre-plazo" style="font-size:12.5px;color:var(--ink-soft);margin:-4px 0 12px;line-height:1.5;"></div>
+
+        <div class="kpi-strip">
+          <div class="kpi"><div class="lbl">Ingresos (sin IVA)</div><div class="val" id="ct-kpi-ingresos">—</div></div>
+          <div class="kpi"><div class="lbl">Gastos (sin IVA)</div><div class="val" id="ct-kpi-gastos">—</div></div>
+          <div class="kpi"><div class="lbl">Margen</div><div class="val green" id="ct-kpi-margen">—</div><div style="font-size:11px;color:var(--ink-soft);" id="ct-kpi-margen-pct"></div></div>
+          <div class="kpi"><div class="lbl">Impuestos a pagar</div><div class="val orange" id="ct-kpi-imp">—</div><div style="font-size:11px;color:var(--ink-soft);">IVA + IRPF</div></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3>¿Y si…? Prueba antes de meterlo</h3></div>
+          <div class="panel-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+              <label style="font-size:12px;color:var(--ink-soft);">Gasto (total con IVA)<input class="search-box" type="number" step="0.01" id="ct-sim-gasto" placeholder="0,00" oninput="calcularCierre()"></label>
+              <label style="font-size:12px;color:var(--ink-soft);">Factura de ingreso (sin IVA)<input class="search-box" type="number" step="0.01" id="ct-sim-fact" placeholder="0,00" oninput="calcularCierre()"></label>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+              <button type="button" class="btn" style="font-size:12px;padding:4px 10px;" onclick="simularPendienteFacturar()">Añadir lo que falta por facturar</button>
+              <button type="button" class="btn" style="font-size:12px;padding:4px 10px;" onclick="limpiarSimulacion()">Borrar</button>
+            </div>
+            <div id="ct-sim-res"></div>
+            <div style="font-size:11.5px;color:var(--ink-soft);margin-top:8px;line-height:1.5;">Si una factura se emite en octubre cuenta en el 4º trimestre, no en este. El IVA de la simulación es el 21%.</div>
+          </div>
         </div>
 
         <div class="grid-2">
           <div class="panel">
-            <div class="panel-head"><h3>Modelo 303 — IVA trimestral</h3></div>
+            <div class="panel-head"><h3>Modelo 303 — IVA</h3></div>
             <div class="panel-body">
-              <div class="econ-line"><span>IVA repercutido (de tus facturas emitidas)</span><span class="v mono" id="c303-repercutido">0,00 €</span></div>
-              <div class="econ-line" style="font-size:12px;color:var(--sub);"><span>· de las cuales, base con Inversión del sujeto pasivo (informativo — recuerda declarar en el modelo 303 casilla 122)</span><span class="v mono" id="c303-isp">0,00 €</span></div>
-              <div class="econ-line"><span>IVA soportado (de tus gastos/compras)</span><span class="v mono" id="c303-soportado">0,00 €</span></div>
-              <div class="econ-line"><span>RESULTADO — a ingresar / a compensar</span><span class="v mono" id="c303-resultado">0,00 €</span></div>
+              <div class="econ-line"><span>IVA repercutido (facturas emitidas)</span><span class="v mono" id="c303-repercutido">0,00 €</span></div>
+              <div class="econ-line"><span>IVA soportado (gastos deducibles)</span><span class="v mono" id="c303-soportado">0,00 €</span></div>
+              <div class="econ-line"><span id="c303-etiqueta">RESULTADO</span><span class="v mono" id="c303-resultado">0,00 €</span></div>
+              <div class="econ-line" style="font-size:12px;color:var(--sub);"><span>· base con inversión del sujeto pasivo (informativo)</span><span class="v mono" id="c303-isp">0,00 €</span></div>
             </div>
           </div>
           <div class="panel">
-            <div class="panel-head"><h3>Modelo 130 — Pago fraccionado IRPF</h3></div>
+            <div class="panel-head"><h3>Modelo 130 — IRPF (acumulado del año)</h3></div>
             <div class="panel-body">
-              <div class="econ-line"><span>Ingresos del trimestre (base, sin IVA)</span><span class="v mono" id="c130-ingresos">0,00 €</span></div>
-              <div class="econ-line"><span>Gastos deducibles del trimestre</span><span class="v mono" id="c130-gastos">0,00 €</span></div>
-              <div class="econ-line"><span>Rendimiento neto</span><span class="v mono" id="c130-neto">0,00 €</span></div>
-              <div class="econ-line"><span>20% a ingresar (estimación)</span><span class="v mono" id="c130-pago">0,00 €</span></div>
+              <div class="econ-line"><span>Ingresos del año hasta este trimestre</span><span class="v mono" id="c130-ingresos">0,00 €</span></div>
+              <div class="econ-line"><span>Gastos deducibles del año</span><span class="v mono" id="c130-gastos">0,00 €</span></div>
+              <div class="econ-line"><span>Rendimiento neto acumulado</span><span class="v mono" id="c130-neto">0,00 €</span></div>
+              <div class="econ-line"><span id="c130-pct-txt">20% del rendimiento</span><span class="v mono" id="c130-bruto">0,00 €</span></div>
+              <div class="econ-line"><span>− ya pagado en trimestres anteriores y retenciones</span><span class="v mono" id="c130-previos">0,00 €</span></div>
+              <div class="econ-line"><span>A ingresar este trimestre (estimación)</span><span class="v mono" id="c130-pago">0,00 €</span></div>
             </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head"><h3>Ingresos del trimestre</h3></div>
+            <div class="panel-body" id="ct-ingresos-det"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Gastos del trimestre</h3></div>
+            <div class="panel-body" id="ct-gastos-det"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3>Cómo está de preparado</h3><span class="count" id="ct-prep-count">0/0</span></div>
+          <div class="panel-body" id="ct-prep-lista"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3>Tus datos fiscales (para el cálculo)</h3></div>
+          <div class="panel-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <label style="font-size:12px;color:var(--ink-soft);">% del 130<input class="search-box" type="number" step="0.5" id="ct-aj-pct" onchange="guardarAjustesTrimestre()"></label>
+              <label style="font-size:12px;color:var(--ink-soft);">Ya pagado en el 130 (1T y 2T)<input class="search-box" type="number" step="0.01" id="ct-aj-pagado" onchange="guardarAjustesTrimestre()"></label>
+              <label style="font-size:12px;color:var(--ink-soft);">Retenciones soportadas<input class="search-box" type="number" step="0.01" id="ct-aj-ret" onchange="guardarAjustesTrimestre()"></label>
+            </div>
+            <div style="font-size:11.5px;color:var(--ink-soft);margin-top:8px;line-height:1.5;">Pídeselos al gestor. Sin ellos el 130 sale como si no hubieras pagado nada antes.</div>
           </div>
         </div>
 
@@ -4559,7 +4613,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           </div>
         </div>
 
-        <div class="two-col-note">Esto calcula el IVA y la base del IRPF a partir de tus facturas y gastos ya registrados en el sistema — es una estimación de control interno, no una declaración oficial. Qué gastos son deducibles y cómo aplican casos especiales (inversión del sujeto pasivo con ayuntamientos, retenciones, etc.) lo debe confirmar tu gestor antes de presentar.</div>
+        <div class="two-col-note">Estimación de control interno con las facturas y gastos oficiales ya registrados; no es una declaración. Las compras de vehículos no cuentan como gasto del trimestre (son inversiones) y el IVA de otros países no se deduce. Confírmalo con el gestor antes de presentar.</div>
       </div>
     </div>
 
@@ -6551,7 +6605,7 @@ function setupSubtabs(navId, prefix, mapping, opts){
   });
 }
 setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimiento:'flota-mantenimiento',averias:'flota-averias',documentacion:'flota-documentacion',repuestos:'flota-repuestos',historial:'flota-historial'});
-setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',cobros:'econ-cobros',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad',cierre:'econ-cierre'});
+setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',cobros:'econ-cobros',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad',cierre:'econ-cierre'},{onSwitch:{cierre:()=>iniciarCierreTrimestre()}});
 setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',control:'gpro-control',combustible:'gpro-comb',revisar:'gpro-revisar'},{onSwitch:{revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible(), control:()=>renderGastosProControl()}});
 document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filters .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
@@ -18010,63 +18064,194 @@ function quarterOfDate(dateRaw){
   return Math.floor(d.getMonth()/3)+1;
 }
 
+// ----- Trimestre: solo contabilidad OFICIAL (lo que declara el gestor). Nada en B. -----
+let _ajustesCierre = {pct: 20, pagado: 0, ret: 0}, _ajustesCierreCargados = false, _cierreQ = null;
+const CT_PLAZOS = {1: [3, 20], 2: [6, 20], 3: [9, 20], 4: [0, 30]};   // mes (0-11) y día del plazo del 303/130; el 4T es el 30 de enero del año siguiente
+function ctEur(n){ return Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
+function ctFecha(d){ const x = new Date(d); return isNaN(x) ? null : x; }
+function ctEnTrimestre(dateRaw, q, anio){ const x = ctFecha(dateRaw); return !!x && x.getFullYear() === anio && Math.floor(x.getMonth()/3)+1 === q; }
+function ctHastaTrimestre(dateRaw, q, anio){ const x = ctFecha(dateRaw); return !!x && x.getFullYear() === anio && Math.floor(x.getMonth()/3)+1 <= q; }
+function ctEsOficial(d){ return (d.contabilidad || 'oficial') === 'oficial'; }
+function ctBaseFactura(d){ if(d.base != null && !isNaN(d.base)) return Number(d.base); return Number(d.total||0) - Number(d.iva||0); }
+function ctIvaFactura(d){ return d.tratamientoIva === 'isp' ? 0 : Number(d.iva || 0); }
+// IVA soportado deducible de un gasto: solo el IVA español con cuota; el de otros países (nota "alemán") no se deduce
+function ctIvaGasto(d){
+  const total = Number(d.importe || d.total || 0);
+  const des = Array.isArray(d.desglose_iva) ? d.desglose_iva : [];
+  if(des.length) return des.filter(x => Number(x.pct) > 0 && !/alem[aá]n|extranjer/i.test(String(x.nota||''))).reduce((s, x) => s + Number(x.cuota || 0), 0);
+  const pct = Number(d.iva_pct || 0);
+  return pct > 0 ? total - total/(1+pct/100) : 0;
+}
+function ctDatosTrimestre(q, anio){
+  const todos = Object.values(documentosRealesById);
+  const facturas = todos.filter(d => d.type === 'factura' && d.estado !== 'borrador' && d.status !== 'Borrador' && d.estado !== 'anulado' && d.estado_cobro !== 'nula' && ctEsOficial(d));
+  const gastosTodos = todos.filter(d => d.type === 'gasto' && d.estado !== 'anulado' && ctEsOficial(d));
+  const gastosOk = gastosTodos.filter(d => (d.relacion_actividad == null || d.relacion_actividad === 'relacionada') && d.categoria !== 'Compra de vehículos');
+  const inversiones = gastosTodos.filter(d => d.categoria === 'Compra de vehículos' && ctEnTrimestre(d.dateRaw, q, anio));
+  const dudosos = gastosTodos.filter(d => d.relacion_actividad === 'dudosa' && ctEnTrimestre(d.dateRaw, q, anio));
+  const fq = facturas.filter(d => ctEnTrimestre(d.dateRaw, q, anio));
+  const gq = gastosOk.filter(d => ctEnTrimestre(d.dateRaw, q, anio));
+  const fAcum = facturas.filter(d => ctHastaTrimestre(d.dateRaw, q, anio));
+  const gAcum = gastosOk.filter(d => ctHastaTrimestre(d.dateRaw, q, anio));
+  const sum = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
+  const gastoContable = d => Number(d.importe || d.total || 0) - ctIvaGasto(d);
+  const cobrado = d => d.estado_cobro === 'cobrado' ? Number(d.total||0) : Number(d.cobrado_importe||0);
+  const albaranes = todos.filter(d => d.type === 'albaran' && d.estado !== 'anulado' && (d.estado_albaran === 'en_proceso' || d.estado_albaran === 'entregado') && ctFecha(d.dateRaw) && ctFecha(d.dateRaw).getFullYear() === anio);   // solo los de este año: los albaranes antiguos en proceso son datos viejos, no trabajo por facturar
+  return {
+    q, anio, fq, gq, fAcum, gAcum, inversiones, dudosos, albaranes,
+    ingresos: sum(fq, ctBaseFactura), ivaRep: sum(fq, ctIvaFactura), baseIsp: sum(fq.filter(d => d.tratamientoIva === 'isp'), ctBaseFactura),
+    facturado: sum(fq, d => Number(d.total||0)), cobrado: sum(fq, cobrado),
+    gastos: sum(gq, gastoContable), ivaSop: sum(gq, ctIvaGasto), gastosTotal: sum(gq, d => Number(d.importe || d.total || 0)),
+    ingAcum: sum(fAcum, ctBaseFactura), gasAcum: sum(gAcum, gastoContable),
+    porFacturar: sum(albaranes, d => Number(d.importe || d.total || 0))
+  };
+}
+function ctCalculo(D, simGasto, simFact){
+  const sg = Number(simGasto||0), sf = Number(simFact||0);
+  const baseSg = sg / 1.21, ivaSg = sg - baseSg, ivaSf = sf * 0.21;
+  const ingresos = D.ingresos + sf, gastos = D.gastos + baseSg;
+  const ivaRep = D.ivaRep + ivaSf, ivaSop = D.ivaSop + ivaSg;
+  const res303 = ivaRep - ivaSop;
+  const ingAcum = D.ingAcum + sf, gasAcum = D.gasAcum + baseSg;
+  const neto130 = ingAcum - gasAcum;
+  const bruto = Math.max(0, neto130 * (_ajustesCierre.pct/100));
+  const previos = D.q > 1 ? (Number(_ajustesCierre.pagado||0) + Number(_ajustesCierre.ret||0)) : Number(_ajustesCierre.ret||0);
+  const pago130 = Math.max(0, bruto - previos);
+  const impuestos = Math.max(0, res303) + pago130;
+  const margen = ingresos - gastos;
+  return {ingresos, gastos, ivaRep, ivaSop, res303, ingAcum, gasAcum, neto130, bruto, previos, pago130, impuestos, margen, pct: ingresos > 0 ? margen/ingresos*100 : 0, queda: margen - pago130};
+}
 function calcularCierre(q){
-  // Facturas reales creadas en esta sesión, filtradas por trimestre
-  const realDocs = Object.values(documentosRealesById).filter(d => d.type==='factura' && d.status!=='Borrador' && quarterOfDate(d.dateRaw)===q);
-  const usarDemo = realDocs.length===0 && q===4;
-  const facturas = usarDemo
-    ? FACTURAS_DEMO_Q4.map(f=>({num:f.num, client:f.cliente, dateLabel:f.fecha, base:f.total/1.21, iva:f.total-f.total/1.21, total:f.total}))
-    : realDocs.map(d=>({num:d.num, client:d.client, dateLabel:d.dateLabel, base:d.base, iva:d.iva, total:d.total}));
+  if(q == null) q = _cierreQ || (Math.floor(new Date().getMonth()/3)+1);
+  _cierreQ = q;
+  const anio = new Date().getFullYear();
+  document.querySelectorAll('#cierre-filters .chip-filter').forEach(e => e.classList.toggle('active', Number(e.dataset.q) === q));
+  const $ = id => document.getElementById(id);
+  const D = ctDatosTrimestre(q, anio);
+  const base = ctCalculo(D, 0, 0);
+  const simG = $('ct-sim-gasto')?.value, simF = $('ct-sim-fact')?.value;
+  const conSim = ctCalculo(D, simG, simF), haySim = Number(simG||0) !== 0 || Number(simF||0) !== 0;
+  const R = haySim ? conSim : base;
 
-  const ivaRepercutido = facturas.reduce((s,f)=>s+f.iva,0);
-  const baseIngresos = facturas.reduce((s,f)=>s+f.base,0);
-  const baseIsp = realDocs.filter(d=>d.tratamientoIva==='isp').reduce((s,d)=>s+(d.base||0),0);
+  // plazo
+  const hoy = new Date(), plazo = new Date(anio + (q === 4 ? 1 : 0), CT_PLAZOS[q][0], CT_PLAZOS[q][1]);
+  const dias = Math.ceil((plazo - new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())) / 86400000);
+  const finQ = new Date(anio, q*3, 0);
+  $('cierre-plazo').textContent = `Plazo del 303 y del 130: ${plazo.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})} — ` + (dias > 0 ? `faltan ${dias} día${dias===1?'':'s'}.` : dias === 0 ? 'es hoy.' : 'ya ha pasado.') + (hoy <= finQ ? ` El trimestre acaba el ${finQ.toLocaleDateString('es-ES',{day:'numeric',month:'long'})}: aún puedes meter facturas y gastos de estos días.` : '');
 
-  const gastos = (q===4) ? GASTOS_DEMO_Q4 : [];
-  const gastosConIva = gastos.map(g=>({...g, base:g.total/1.21, iva:g.total-g.total/1.21}));
-  const ivaSoportado = gastosConIva.reduce((s,g)=>s+g.iva,0);
-  const baseGastos = gastosConIva.reduce((s,g)=>s+g.base,0);
+  // cabecera
+  $('ct-kpi-ingresos').textContent = ctEur(R.ingresos);
+  $('ct-kpi-gastos').textContent = ctEur(R.gastos);
+  $('ct-kpi-margen').textContent = ctEur(R.margen);
+  $('ct-kpi-margen-pct').textContent = R.ingresos > 0 ? Math.round(R.pct) + ' % de lo facturado' : '';
+  $('ct-kpi-imp').textContent = ctEur(R.impuestos);
 
-  const resultado303 = ivaRepercutido - ivaSoportado;
-  const neto130 = baseIngresos - baseGastos;
-  const pago130 = Math.max(0, neto130 * 0.20);
+  // 303 y 130 (con la simulación si la hay)
+  $('c303-repercutido').textContent = ctEur(R.ivaRep);
+  $('c303-soportado').textContent = ctEur(R.ivaSop);
+  $('c303-etiqueta').textContent = R.res303 >= 0 ? 'A INGRESAR (303)' : 'A COMPENSAR (303)';
+  $('c303-resultado').textContent = ctEur(Math.abs(R.res303));
+  $('c303-isp').textContent = ctEur(D.baseIsp);
+  $('c130-ingresos').textContent = ctEur(R.ingAcum);
+  $('c130-gastos').textContent = ctEur(R.gasAcum);
+  $('c130-neto').textContent = ctEur(R.neto130);
+  $('c130-pct-txt').textContent = `${_ajustesCierre.pct}% del rendimiento`;
+  $('c130-bruto').textContent = ctEur(R.bruto);
+  $('c130-previos').textContent = '− ' + ctEur(R.previos);
+  $('c130-pago').textContent = ctEur(R.pago130);
 
-  document.getElementById('c303-repercutido').textContent = ivaRepercutido.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  document.getElementById('c303-soportado').textContent = ivaSoportado.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  document.getElementById('c303-resultado').textContent = resultado303.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  const c303IspEl = document.getElementById('c303-isp');
-  if(c303IspEl) c303IspEl.textContent = baseIsp.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  document.getElementById('c130-ingresos').textContent = baseIngresos.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  document.getElementById('c130-gastos').textContent = baseGastos.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  document.getElementById('c130-neto').textContent = neto130.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  document.getElementById('c130-pago').textContent = pago130.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  // simulador: hoy / con lo simulado
+  const fila = (t, a, b, malo) => { const d = b - a; return `<div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:6px;font-size:12.5px;padding:3px 0;border-bottom:1px solid var(--line);"><span>${t}</span><span class="mono">${ctEur(a)}</span><span class="mono" style="font-weight:700;color:${Math.abs(d)<0.005?'inherit':(d>0)===malo?'var(--orange)':'var(--green)'};">${ctEur(b)}</span></div>`; };
+  $('ct-sim-res').innerHTML = haySim
+    ? `<div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:6px;font-size:11px;color:var(--ink-soft);padding-bottom:3px;"><span></span><span>Hoy</span><span>Con esto</span></div>` +
+      fila('Margen', base.margen, conSim.margen, false) + fila('IVA a ingresar', Math.max(0, base.res303), Math.max(0, conSim.res303), true) + fila('IRPF (130)', base.pago130, conSim.pago130, true) + fila('Impuestos totales', base.impuestos, conSim.impuestos, true) + fila('Margen tras IRPF', base.queda, conSim.queda, false)
+    : '<div style="font-size:12.5px;color:var(--ink-soft);">Escribe un gasto o una factura y verás al momento cómo cambian el margen, el IVA y el IRPF.</div>';
 
-  document.getElementById('cierre-fact-count').textContent = facturas.length;
-  document.getElementById('cierre-facturas-tbody').innerHTML = facturas.length
-    ? facturas.map(f=>`<tr><td class="mono">${f.num}</td><td><span onclick="event.stopPropagation();openClientDrawer('${(f.client||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${f.client}</span></td><td>${f.dateLabel}</td><td class="num">${f.base.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</td><td class="num">${f.iva.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</td><td class="num">${f.total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</td></tr>`).join('')
+  // ingresos y gastos del trimestre
+  const linea = (t, v, extra) => `<div class="econ-line"${extra?` style="${extra}"`:''}><span>${t}</span><span class="v mono">${v}</span></div>`;
+  const pend = D.facturado - D.cobrado;
+  $('ct-ingresos-det').innerHTML = linea(`Facturado (${D.fq.length} factura${D.fq.length===1?'':'s'}, con IVA)`, ctEur(D.facturado)) + linea('Cobrado', ctEur(D.cobrado)) + linea('Pendiente de cobrar', ctEur(pend)) +
+    linea(`Por facturar (${D.albaranes.length} ${D.albaranes.length===1?'albarán':'albaranes'} en curso, sin IVA)`, ctEur(D.porFacturar), 'border-top:1px solid var(--line);margin-top:6px;padding-top:6px;');
+  $('ct-gastos-det').innerHTML = linea(`Gastos (${D.gq.length}, con IVA)`, ctEur(D.gastosTotal)) + linea('IVA deducible', ctEur(D.ivaSop)) + linea('Gasto sin IVA', ctEur(D.gastos)) +
+    (D.inversiones.length ? linea(`Fuera: compra de vehículos (${D.inversiones.length}, es inversión)`, ctEur(D.inversiones.reduce((s,d)=>s+Number(d.importe||d.total||0),0)), 'border-top:1px solid var(--line);margin-top:6px;padding-top:6px;color:var(--ink-soft);') : '') +
+    (D.dudosos.length ? linea(`Fuera: dudosos (${D.dudosos.length})`, ctEur(D.dudosos.reduce((s,d)=>s+Number(d.importe||d.total||0),0)), 'color:var(--ink-soft);') : '');
+
+  // cómo está de preparado
+  const gDelQ = D.gq.concat(D.dudosos);
+  const sinJust = gDelQ.filter(d => d.estado_justificante !== 'completo');
+  const sinEnviar = D.gq.filter(d => !d.enviado_gestor);
+  const borradores = Object.values(documentosRealesById).filter(d => d.type === 'factura' && (d.estado === 'borrador' || d.status === 'Borrador') && ctEsOficial(d) && ctEnTrimestre(d.dateRaw, q, anio));
+  const sumImp = arr => arr.reduce((s, d) => s + Number(d.importe || d.total || 0), 0);
+  const items = [
+    {ok: D.fq.length > 0, t: D.fq.length ? `${D.fq.length} factura(s) emitida(s) en el trimestre` : 'No hay ninguna factura emitida en el trimestre'},
+    {ok: borradores.length === 0, t: borradores.length ? `${borradores.length} factura(s) en borrador sin emitir` : 'Sin facturas en borrador'},
+    {ok: sinJust.length === 0, t: sinJust.length ? `${sinJust.length} gasto(s) sin justificante completo (${ctEur(sumImp(sinJust))})` : 'Todos los gastos tienen justificante'},
+    {ok: D.dudosos.length === 0, t: D.dudosos.length ? `${D.dudosos.length} gasto(s) dudosos por decidir` : 'Sin gastos dudosos'},
+    {ok: sinEnviar.length === 0, t: sinEnviar.length ? `${sinEnviar.length} gasto(s) aún sin enviar al gestor (${ctEur(sumImp(sinEnviar))})` : 'Todos los gastos enviados al gestor'},
+    {ok: pend < 0.005, t: pend >= 0.005 ? `${ctEur(pend)} de facturas pendientes de cobro` : 'Todo lo facturado está cobrado'},
+    {ok: D.albaranes.length === 0, t: D.albaranes.length ? `${D.albaranes.length} albarán(es) sin facturar (${ctEur(D.porFacturar)})` : 'Sin albaranes por facturar'}
+  ];
+  $('ct-prep-count').textContent = items.filter(x => x.ok).length + '/' + items.length;
+  $('ct-prep-lista').innerHTML = items.map(x => `<div style="display:flex;gap:8px;padding:5px 0;font-size:13px;border-bottom:1px solid var(--line);"><span style="color:${x.ok?'var(--green)':'var(--orange)'};font-weight:700;">${x.ok?'✓':'!'}</span><span>${escHtml(x.t)}</span></div>`).join('');
+
+  // facturas incluidas
+  $('cierre-fact-count').textContent = D.fq.length;
+  $('cierre-facturas-tbody').innerHTML = D.fq.length
+    ? D.fq.map(f => `<tr><td class="mono">${escHtml(f.num||'—')}</td><td>${escHtml(f.client||'—')}</td><td>${escHtml(f.dateLabel||'—')}</td><td class="num">${ctEur(ctBaseFactura(f))}</td><td class="num">${ctEur(ctIvaFactura(f))}</td><td class="num">${ctEur(f.total)}</td></tr>`).join('')
     : '<tr><td colspan="6" class="empty">Sin facturas en este trimestre</td></tr>';
 
+  // resumen para el gestor (con lo real, sin simulación)
   const qLabel = {1:'1º trimestre (ene-mar)',2:'2º trimestre (abr-jun)',3:'3º trimestre (jul-sept)',4:'4º trimestre (oct-dic)'}[q];
-  const resumen = `CIERRE ${qLabel} 2026 — Excavaciones Gómez (Rafael Gómez Martínez, NIF 75706590C)
-${usarDemo ? '(datos de ejemplo de la demo — sustituir por las facturas reales creadas en el sistema)' : ''}
+  $('cierre-resumen-texto').value = `CIERRE ${qLabel} ${anio} — Excavaciones Gómez (Rafael Gómez Martínez)
+
+INGRESOS: ${ctEur(base.ingresos)} sin IVA (${D.fq.length} facturas, ${ctEur(D.facturado)} con IVA; cobrado ${ctEur(D.cobrado)})
+GASTOS DEDUCIBLES: ${ctEur(base.gastos)} sin IVA (${D.gq.length} gastos)
+MARGEN: ${ctEur(base.margen)} (${Math.round(base.pct)} %)
 
 MODELO 303 — IVA
-  IVA repercutido: ${ivaRepercutido.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €
-  IVA soportado:   ${ivaSoportado.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €
-  Resultado:       ${resultado303.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} € ${resultado303>=0?'(a ingresar)':'(a compensar)'}
+  IVA repercutido: ${ctEur(base.ivaRep)}
+  IVA soportado:   ${ctEur(base.ivaSop)}
+  Resultado:       ${ctEur(Math.abs(base.res303))} ${base.res303>=0?'(a ingresar)':'(a compensar)'}
 
-MODELO 130 — IRPF
-  Ingresos (base):        ${baseIngresos.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €
-  Gastos deducibles:      ${baseGastos.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €
-  Rendimiento neto:       ${neto130.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €
-  20% a ingresar (est.):  ${pago130.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €
+MODELO 130 — IRPF (acumulado del año)
+  Ingresos: ${ctEur(base.ingAcum)} · Gastos: ${ctEur(base.gasAcum)} · Rendimiento: ${ctEur(base.neto130)}
+  ${_ajustesCierre.pct}%: ${ctEur(base.bruto)} − pagado antes y retenciones ${ctEur(base.previos)}
+  A ingresar (estimación): ${ctEur(base.pago130)}
 
-Facturas incluidas: ${facturas.map(f=>f.num).join(', ') || '—'}
-Gastos incluidos: ${gastos.map(g=>g.concepto).join(', ') || '—'}
+Fuera de las cuentas: compra de vehículos (inversión) y gastos dudosos. Facturas: ${D.fq.map(f => f.num).join(', ') || '—'}
 
 Nota: estimación de control interno. Revisar deducibilidad de gastos y casos especiales antes de presentar.`;
-  document.getElementById('cierre-resumen-texto').value = resumen;
 }
+async function guardarAjustesTrimestre(){
+  _ajustesCierre = {pct: Number(document.getElementById('ct-aj-pct').value) || 20, pagado: Number(document.getElementById('ct-aj-pagado').value) || 0, ret: Number(document.getElementById('ct-aj-ret').value) || 0};
+  calcularCierre();
+  if(!sb) return;
+  try{
+    const {data: fila} = await sb.from('sistema').select('id').eq('tipo','ajustes_trimestre').limit(1);
+    if(fila && fila[0]) await sb.from('sistema').update({data: _ajustesCierre}).eq('id', fila[0].id);
+    else await sb.from('sistema').insert({tipo:'ajustes_trimestre', data: _ajustesCierre});
+    mostrarToast('Datos fiscales guardados ✓', 'ok');
+  }catch(e){ mostrarToast('No se pudieron guardar: '+errText(e), 'err'); }
+}
+async function iniciarCierreTrimestre(){
+  if(!_ajustesCierreCargados && sb){
+    try{
+      const {data: fila} = await sb.from('sistema').select('data').eq('tipo','ajustes_trimestre').limit(1);
+      if(fila && fila[0] && fila[0].data) _ajustesCierre = {pct: Number(fila[0].data.pct)||20, pagado: Number(fila[0].data.pagado)||0, ret: Number(fila[0].data.ret)||0};
+    }catch(e){}
+    _ajustesCierreCargados = true;
+  }
+  document.getElementById('ct-aj-pct').value = _ajustesCierre.pct;
+  document.getElementById('ct-aj-pagado').value = _ajustesCierre.pagado || '';
+  document.getElementById('ct-aj-ret').value = _ajustesCierre.ret || '';
+  calcularCierre(_cierreQ || (Math.floor(new Date().getMonth()/3)+1));
+}
+function simularPendienteFacturar(){
+  const D = ctDatosTrimestre(_cierreQ || (Math.floor(new Date().getMonth()/3)+1), new Date().getFullYear());
+  document.getElementById('ct-sim-fact').value = D.porFacturar ? D.porFacturar.toFixed(2) : '';
+  calcularCierre();
+}
+function limpiarSimulacion(){ document.getElementById('ct-sim-gasto').value = ''; document.getElementById('ct-sim-fact').value = ''; calcularCierre(); }
 
 function copiarResumenCierre(){
   const ta = document.getElementById('cierre-resumen-texto');
@@ -18075,13 +18260,8 @@ function copiarResumenCierre(){
 }
 
 document.querySelectorAll('#cierre-filters .chip-filter').forEach(el=>{
-  el.addEventListener('click',()=>{
-    document.querySelectorAll('#cierre-filters .chip-filter').forEach(e=>e.classList.remove('active'));
-    el.classList.add('active');
-    calcularCierre(Number(el.dataset.q));
-  });
+  el.addEventListener('click',()=>{ calcularCierre(Number(el.dataset.q)); });
 });
-calcularCierre(4);
 
 
 /* ---------------- FORMULARIO GENÉRICO — para pedir uno o varios campos, en vez de prompt() ---------------- */
