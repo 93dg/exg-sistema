@@ -868,6 +868,9 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .ie-actions-secondary{margin-bottom:16px;}
 .ie-actions-secondary > *{flex:1;}
 /* PASAR A… — bloque propio, claramente distinto de guardar */
+.ie-estado-modo{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 20px 10px 20px;font-size:11px;color:var(--ink-soft);}
+.ie-estado-modo label{display:flex;align-items:center;gap:5px;}
+.ie-estado-modo select{font-size:11px;padding:3px 6px;height:auto;width:auto;min-width:0;}
 .ie-pasar-a{display:flex;gap:8px;align-items:stretch;margin:0 20px 16px 20px;padding:8px 10px;background:var(--concrete);border-radius:var(--radius);}
 .btn-flecha{flex:0 0 auto;width:42px;font-size:18px;font-weight:800;line-height:1;border:none;border-radius:var(--radius);background:var(--orange);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .btn-flecha:hover{filter:brightness(1.08);}
@@ -3000,7 +3003,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.12</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.13</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3078,7 +3081,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.12</div>
+        <div class="sub" id="version-badge">V6.13</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5929,6 +5932,16 @@ Esa tabla puede cambiar en cualquier momento (por Daniel, por mí, o por otro ch
       </select>
       <span class="ie-doc-explain ie-edit-only" id="ni-explain" style="display:none;"></span>
       <button class="close-x" onclick="intentarCerrarNewInvoiceModal()">✕</button>
+    </div>
+
+    <!-- ESTADO y CÓMO MOSTRAR EL PDF — pequeños, arriba; solo con el documento ya guardado. Cambian y guardan al instante. -->
+    <div class="ie-estado-modo ie-edit-only" id="ni-estado-modo-wrap" style="display:none;">
+      <label>Estado <select class="search-box" id="ni-estado-cobro" onchange="cambiarEstadoDesdeEditor(this.value)"></select></label>
+      <label>PDF <select class="search-box" id="ni-modo-pdf" onchange="cambiarModoPdfDesdeEditor(this.value)">
+        <option value="completo">Completo</option>
+        <option value="sin_fechas">Sin fechas en conceptos</option>
+        <option value="simplificado">Simplificado (1 línea)</option>
+      </select></label>
     </div>
 
     <!-- PASAR A… — desplegable único, mismo criterio para presupuesto/albarán/proforma/factura.
@@ -17489,11 +17502,12 @@ function abrirMenuPdfMovil(){
     </div>
   `);
 }
-function generarPDFDocumento(accion){
+function generarPDFDocumento(accion, modoForzado){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'mm', format:'a4'});
   const type = document.getElementById('ni-doctype').value;
-  const cfg = DOC_TYPES[type];
+  const modoPdf = modoForzado || document.getElementById('ni-modo-pdf')?.value || 'completo';
+  const cfg = modoPdf==='simplificado' ? {...DOC_TYPES[type], hasPrecios:false} : DOC_TYPES[type];
   const client = MAY(document.getElementById('ni-client').value || '—');
   const nif = document.getElementById('ni-client-nif').value;
   const addr = MAY(document.getElementById('ni-client-addr').value);
@@ -17506,13 +17520,14 @@ function generarPDFDocumento(accion){
   const num = document.getElementById('ni-docnum').value;
   const dateRaw = document.getElementById('ni-date').value || '';
   const {base, iva, total} = recalcTotals();
-  const items = Array.from(document.querySelectorAll('#ie-items-body tr')).map(tr=>({
+  const items0 = Array.from(document.querySelectorAll('#ie-items-body tr')).map(tr=>({
     fecha: tr.querySelector('.ie-linea-fecha')?.value || '',
     qty: tr.querySelector('.ie-qty').value,
     unidad: tr.querySelector('.ie-unidad')?.value || 'ud',
     concept: MAY(tr.querySelector('.ie-concept').value),
     price: Number(tr.querySelector('.ie-price').value)||0,
   }));
+  const items = aplicarModoPdfAItems(items0, modoPdf, base);
   const payment = MAY(document.getElementById('ni-payment').value);
   const iban = document.getElementById('ni-iban').value;
   const titular = MAY(document.getElementById('ni-titular').value);
@@ -17619,7 +17634,7 @@ function generarPDFDocumento(accion){
       doc.addPage(); y = dibujarCabeceraPDF(); altoAcumuladoPagina = 0;
     }
     altoAcumuladoPagina += altoFila;
-    const lineTotal = (Number(it.qty)||0)*it.price;
+    const lineTotal = it.totalFijo != null ? it.totalFijo : (Number(it.qty)||0)*it.price;
     if(hayFechas) doc.text(it.fecha ? formatFechaCorta(it.fecha) : '—', 15, y);
     doc.text(formatCantidad(it.qty), hayFechas ? 40 : 15, y);
     doc.text(lineasConcepto, xConcepto + (hayFechas?0:20), y);
@@ -17701,6 +17716,8 @@ function generarPDFDocumento(accion){
     const url = doc.output('bloburl');
     const ventana = window.open(url, '_blank');
     if(!ventana){ mostrarToast('El navegador ha bloqueado la ventana — permite ventanas emergentes para imprimir.'); }
+  } else if(accion==='blob'){
+    return doc.output('blob');
   } else {
     doc.save(`${num || 'documento'}.pdf`);
   }
@@ -17721,7 +17738,8 @@ function togglePreview(){
   }
   contenedor?.classList.add('ie-modo-preview');
   const type = document.getElementById('ni-doctype').value;
-  const cfg = DOC_TYPES[type];
+  const modoPdf = document.getElementById('ni-modo-pdf')?.value || 'completo';
+  const cfg = modoPdf==='simplificado' ? {...DOC_TYPES[type], hasPrecios:false} : DOC_TYPES[type];
   const client = MAY(document.getElementById('ni-client').value || '—');
   const nif = document.getElementById('ni-client-nif').value;
   const addr = MAY(document.getElementById('ni-client-addr').value);
@@ -17729,7 +17747,7 @@ function togglePreview(){
   const num = document.getElementById('ni-docnum').value;
   const dateRaw = document.getElementById('ni-date').value;
   const {base, iva, total} = recalcTotals();
-  const items = Array.from(document.querySelectorAll('#ie-items-body tr')).map(tr=>({
+  const items0 = Array.from(document.querySelectorAll('#ie-items-body tr')).map(tr=>({
     fecha: tr.querySelector('.ie-linea-fecha')?.value || '',
     qty: tr.querySelector('.ie-qty').value,
     unidad: tr.querySelector('.ie-unidad')?.value || 'ud',
@@ -17737,6 +17755,7 @@ function togglePreview(){
     price: Number(tr.querySelector('.ie-price').value)||0,
     total: (Number(tr.querySelector('.ie-qty').value)||0) * (Number(tr.querySelector('.ie-price').value)||0),
   }));
+  const items = aplicarModoPdfAItems(items0, modoPdf, base);
   const payment = MAY(document.getElementById('ni-payment').value);
   const iban = document.getElementById('ni-iban').value;
   const titular = MAY(document.getElementById('ni-titular').value);
@@ -20140,6 +20159,7 @@ function openNewInvoiceModal(contexto, forzarEditorCompleto){
     return;
   }
   editingDocId = null;
+  { const w = document.getElementById('ni-estado-modo-wrap'); if(w) w.style.display = 'none'; }
   document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview');
   document.getElementById('ni-doctype').value = contexto.tipo || 'factura';
   document.getElementById('ni-doctype').disabled = false;
@@ -20275,7 +20295,7 @@ async function guardarGasto(){
     cerrarRegistrarGasto();
   }catch(err){ statusEl.textContent = 'Error de red: '+errText(err); statusEl.style.color = 'var(--red)'; }
 }
-function closeNewInvoiceModal(){ document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); document.getElementById('ie-dictado').classList.remove('open'); document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview'); window.__newInvoiceDirty = false; }
+function closeNewInvoiceModal(){ { const w = document.getElementById('ni-estado-modo-wrap'); if(w) w.style.display = 'none'; } document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); document.getElementById('ie-dictado').classList.remove('open'); document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview'); window.__newInvoiceDirty = false; }
 // aviso de cambios sin guardar — solo se llama desde los cierres iniciados por el usuario
 // (botón ✕ y clic fuera), nunca desde el cierre automático tras guardar con éxito
 async function intentarCerrarNewInvoiceModal(){
@@ -20564,6 +20584,7 @@ function openDocumentViewer(id){
   editingDocId = id;
   document.getElementById('ni-doctype').value = doc.type;
   document.getElementById('ni-doctype').disabled = true; // no cambiar tipo de un documento ya creado
+  actualizarControlesEditor(doc);
   document.getElementById('ie-items-body').innerHTML = '';
   document.getElementById('ie-iva-pct').value = doc.ivaPct;
   document.getElementById('ie-tratamiento-iva').value = doc.tratamientoIva || 'normal';
@@ -21159,6 +21180,65 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   mostrarToast('Estado actualizado ✓', 'ok');
   renderControlDocs();
 }
+// ===== Editor: estado y cómo mostrar el PDF =====
+function actualizarControlesEditor(doc){
+  const wrap = document.getElementById('ni-estado-modo-wrap');
+  if(!wrap) return;
+  const sel = document.getElementById('ni-estado-cobro');
+  sel.innerHTML = ESTADOS_DOCUMENTO.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  sel.value = doc.estado_cobro || 'pendiente_enviar';
+  document.getElementById('ni-modo-pdf').value = doc.modo_pdf || 'completo';
+  wrap.style.display = 'flex';
+}
+async function cambiarEstadoDesdeEditor(valor){
+  const id = editingDocId;
+  if(!id) return;
+  await cambiarEstadoDocumento(documentosRealesById[id]?.tipo || documentosRealesById[id]?.type, id, valor, null);
+  // si no se pudo guardar, el desplegable vuelve al valor real
+  const real = documentosRealesById[id]?.estado_cobro || 'pendiente_enviar';
+  const sel = document.getElementById('ni-estado-cobro');
+  if(sel) sel.value = real;
+}
+async function cambiarModoPdfDesdeEditor(valor){
+  const id = editingDocId;
+  if(!id || !sb) return;
+  if(!exigirNivelDoc(id,'editar')){ document.getElementById('ni-modo-pdf').value = documentosRealesById[id]?.modo_pdf || 'completo'; return; }
+  const {error} = await sb.from('documentos_economicos').update({modo_pdf: valor}).eq('id', id);
+  if(error){ mostrarToast('Error: '+errText(error), 'err'); document.getElementById('ni-modo-pdf').value = documentosRealesById[id]?.modo_pdf || 'completo'; return; }
+  if(documentosRealesById[id]) documentosRealesById[id].modo_pdf = valor;
+  mostrarToast('PDF: '+({completo:'completo', sin_fechas:'sin fechas', simplificado:'simplificado'}[valor]||valor)+' ✓', 'ok');
+}
+// Aplica el modo elegido a las líneas del PDF/vista previa. Simplificado = UNA línea fija con la
+// suma de cantidades y el total (base) del documento. Sin fechas = quita solo la fecha de cada concepto.
+function aplicarModoPdfAItems(items, modo, base){
+  if(modo==='sin_fechas') return items.map(it=>({...it, fecha:''}));
+  if(modo==='simplificado'){
+    const qty = items.reduce((s,it)=>s+(Number(it.qty)||0), 0);
+    return [{fecha:'', qty, unidad:'h', concept:'TRABAJOS VARIOS CON MAQUINARIA', price: qty ? base/qty : 0, total: base, totalFijo: base}];
+  }
+  return items;
+}
+// PDF que se manda al gestor: SIEMPRE con el modo guardado en el documento. Se genera, se guarda en
+// Storage (pdf-gestor/<id>.pdf, se sobrescribe) y se devuelve el enlace. Si el editor ya está abierto con
+// ese documento se usa tal cual (sin reabrirlo, para no perder cambios sin guardar).
+async function generarYSubirPdfGestor(id){
+  const d = documentosRealesById[id];
+  if(!d || !sb) return null;
+  const abiertoAhora = document.getElementById('newinvoice-overlay').classList.contains('active') && editingDocId === id;
+  if(!abiertoAhora){
+    openDocumentViewer(id);
+    await new Promise(r=>setTimeout(r, 700));
+  }
+  const blob = generarPDFDocumento('blob', d.modo_pdf || 'completo');
+  if(!abiertoAhora) closeNewInvoiceModal();
+  if(!blob) throw new Error('no se pudo generar el PDF');
+  const path = `pdf-gestor/${id}.pdf`;
+  const {error} = await sb.storage.from('documentos-exg').upload(path, blob, {upsert:true, contentType:'application/pdf'});
+  if(error) throw error;
+  await sb.from('documentos_economicos').update({pdf_gestor_path: path}).eq('id', id);
+  d.pdf_gestor_path = path;
+  return `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${path}?v=${Date.now()}`;
+}
 function editarCobrado(id){
   if(!exigirNivelDoc(id,'editar')) return;
   const celda = document.querySelector('.celda-cobrado-'+id);
@@ -21458,7 +21538,7 @@ function imprimirDocumento(id){
   openDocumentViewer(id);
   setTimeout(()=> imprimirPDF(), 300);
 }
-function enviarAlGestorDoc(id){
+async function enviarAlGestorDoc(id){
   if(!exigirNivelDoc(id,'editar')) return;
   const doc = documentosRealesById[id];
   if(!doc) return;
@@ -21472,7 +21552,13 @@ function enviarAlGestorDoc(id){
   }
   const email = getGestorEmail();
   if(!email) return;
-  const archivoUrl = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
+  let archivoUrl = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
+  // el PDF que recibe el gestor es SIEMPRE el generado con el modo elegido en el documento (completo / sin fechas / simplificado)
+  if(doc.tipo!=='gasto'){
+    mostrarToast('Preparando el PDF para el gestor…');
+    try{ archivoUrl = await generarYSubirPdfGestor(id) || archivoUrl; }
+    catch(e){ mostrarToast('No se pudo preparar el PDF ('+errText(e)+'). Se usa el archivo guardado si lo hay.', 'err'); }
+  }
   document.getElementById('mail-to').value = email;
   document.getElementById('mail-subject').value = `Factura ${doc.numero||''} — ${doc.client||''}`.trim();
   document.getElementById('mail-body').value = `Adjunto factura${doc.numero?' Nº '+doc.numero:''} de ${doc.client||'cliente'}.\n\n${archivoUrl ? 'Archivo: '+archivoUrl : '(sin archivo adjuntado)'}`;
@@ -21523,10 +21609,16 @@ async function enviarSeleccionadasAlGestor(claseChk){
   const docs = ids.map(id=>documentosRealesById[id]).filter(Boolean);
   const email = getGestorEmail();
   if(!email) return;
+  mostrarToast(`Preparando ${docs.length} PDF(s) para el gestor…`);
+  const urlsGestor = {};
+  for(const d of docs){
+    if(d.tipo==='gasto') continue;
+    try{ urlsGestor[d.id] = await generarYSubirPdfGestor(d.id); }catch(e){ mostrarToast('No se pudo preparar el PDF de '+(d.numero||'un documento')+': '+errText(e), 'err'); }
+  }
   document.getElementById('mail-to').value = email;
   document.getElementById('mail-subject').value = `Facturas (${docs.length}) — envío al gestor`;
   document.getElementById('mail-body').value = 'Adjunto las siguientes facturas:\n\n' + docs.map(d=>{
-    const url = d.archivo_url || (d.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${d.archivo_path}` : null);
+    const url = urlsGestor[d.id] || d.archivo_url || (d.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${d.archivo_path}` : null);
     return `- Factura ${d.numero||''} (${d.client||''})${url?': '+url:' (sin archivo)'}`;
   }).join('\n');
   composeOnSentCallback = async () => {
