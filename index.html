@@ -3127,7 +3127,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.32</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.33</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3205,7 +3205,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.32</div>
+        <div class="sub" id="version-badge">V6.33</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18317,6 +18317,9 @@ async function prRegistrarPendientes(id){
    registrados; si falta un dato necesario (p. ej. el pago del 130 de un trimestre anterior) el resultado se marca
    "Estimación incompleta" en vez de asumir 0. */
 const IMP_PLAZOS = {1: [3, 20], 2: [6, 20], 3: [9, 20], 4: [0, 30]};   // mes (0-11) y día límite del 303/130; el 4T es el 30 de enero del año siguiente
+// La web empezó en julio de 2026: desde el 3T la app tiene TODOS los documentos. Antes solo vale lo que presentó el gestor.
+const IMP_INICIO_APP = {anio: 2026, q: 3};
+function impTrimCompleto(k, anio){ return anio > IMP_INICIO_APP.anio || (anio === IMP_INICIO_APP.anio && k >= IMP_INICIO_APP.q); }
 const IMP_PORC_130 = 20;   // porcentaje del modelo 130 (estimación directa)
 let _impQ = null, _impPagos = {}, _impPagosCargados = false, _impDeclaraciones = [];
 function impColor(el, valor, modo){   // 'coste': positivo = malo (se paga); 'signo': positivo = bueno; 'ingreso' e 'gasto': verde o rojo si hay importe; 'aviso': naranja; null: sin color
@@ -18404,6 +18407,8 @@ function impDatos(q, anio){
   const sum = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
   const fq = F.filter(enQ), gq = gOk.filter(enQ), fA = F.filter(hastaQ), gA = gOk.filter(hastaQ);
   const excluidos = G.filter(enQ).filter(d => impMotivoExclusion(d)).map(d => ({d, motivo: impMotivoExclusion(d)}));
+  // suma de un año entero por trimestre (por el trimestre en que cuenta cada documento; el IRPF solo cuenta lo devengado en el año)
+  const porQ = (arr, f, filtro) => { const r = [0, 0, 0, 0, 0]; arr.forEach(d => { const p = impPeriodo(d); if(impAnioDe(d.dateRaw) === anio && p.anio === anio && p.q >= 1 && p.q <= 4 && (!filtro || filtro(d))) r[p.q] += f(d); }); return r; };
   return {
     q, anio, fq, gq, excluidos,
     rep: sum(fq, impIvaFactura), ded: sum(gq, impIvaDeducible),
@@ -18413,18 +18418,33 @@ function impDatos(q, anio){
     gIsp: gq.filter(d => impDesgloseGasto(d).some(x => x.isp)), baseGIsp: sum(gq.filter(d => impDesgloseGasto(d).some(x => x.isp)), d => impDesgloseGasto(d).filter(x => x.isp).reduce((s, x) => s + Number(x.base || 0), 0)),
     ingAcum: sum(fA, impBaseFactura), gasAcum: sum(gA, impGastoDeducible),
     gastosSinIva: gA.filter(d => !impGastoTieneIva(d)).length + 0,
-    gastosSinIvaQ: gq.filter(d => !impGastoTieneIva(d))
+    gastosSinIvaQ: gq.filter(d => !impGastoTieneIva(d)),
+    ingPorQ: porQ(F, impBaseFactura), gasPorQ: porQ(gOk, impGastoDeducible), gasFinPorQ: porQ(gOk, impGastoDeducible, d => d.categoria === 'Gastos financieros'),
+    sinIvaPorQ: porQ(gOk, () => 1, d => !impGastoTieneIva(d))
   };
 }
 function impRes303(D){ return D.rep - D.ded; }
+// Base del 130 acumulado: hasta el último trimestre presentado vale lo DECLARADO por el gestor (la app no tiene todos los documentos de antes de julio)
+// más los intereses del préstamo de esos trimestres, que el gestor no contó; después se suman los trimestres siguientes con los datos de la app.
+function impRend130(q, anio, D){
+  const decl = _impDeclaraciones.filter(d => d.modelo === '130' && Number(d.anio) === anio && Number(d.trimestre) <= q).sort((a, b) => Number(b.trimestre) - Number(a.trimestre))[0];
+  const suma = (arr, a, b) => { let s = 0; for(let k = a; k <= b; k++) s += arr[k] || 0; return s; };
+  if(decl && !impTrimCompleto(Number(decl.trimestre), anio)){
+    const p = Number(decl.trimestre), ajuste = suma(D.gasFinPorQ, 1, p), ingN = suma(D.ingPorQ, p + 1, q), gasN = suma(D.gasPorQ, p + 1, q);
+    const ing = Number(decl.ingresos) + ingN, gas = Number(decl.gastos) + ajuste + gasN;
+    return {desdeDecl: true, p, ingDecl: Number(decl.ingresos), gasDecl: Number(decl.gastos), ajuste, ingN, gasN, ing, gas, rend: ing - gas, sinIva: suma(D.sinIvaPorQ, p + 1, q)};
+  }
+  return {desdeDecl: false, p: 0, ing: D.ingAcum, gas: D.gasAcum, rend: D.ingAcum - D.gasAcum, sinIva: D.gastosSinIva};
+}
 function impCalc130(q, anio, D){
-  const rend = D.ingAcum - D.gasAcum;
+  const R = impRend130(q, anio, D);
+  const rend = R.rend;
   const bruto = Math.max(0, rend * IMP_PORC_130 / 100);
   const faltan = []; let previos = 0;
   for(let k = 1; k < q; k++){ if(_impPagos[k] == null) faltan.push(k); else previos += Number(_impPagos[k]); }
-  const completo = faltan.length === 0 && D.gastosSinIva === 0;
+  const completo = faltan.length === 0 && R.sinIva === 0;
   const dif = bruto - previos;
-  return {rend, bruto, previos, faltan, completo, resultado: completo ? Math.max(0, dif) : null, negativo: completo && dif < 0, sinIva: D.gastosSinIva};
+  return {R, rend, bruto, previos, faltan, completo, resultado: completo ? Math.max(0, dif) : null, negativo: completo && dif < 0, sinIva: R.sinIva};
 }
 // Lo que saldría el 130 del trimestre k si se pagó lo calculado hasta ahí: solo como SUGERENCIA al registrar un pago
 function impSugerenciaPago(k, anio){
@@ -18438,7 +18458,7 @@ function impIncidencias(q, anio, D, c130){
   const enQ = d => { const p = impPeriodo(d); return p.anio === anio && p.q === q; };
   const n = (k, s, p) => `${k} ${k === 1 ? s : p}`;
   if(q > 1 && c130.faltan.length) out.push({tipo: 'pago130', txt: 'Falta introducir el pago del modelo 130 del ' + c130.faltan.map(k => k + 'T').join(', ')});
-  for(let k = 1; k < q; k++){ const Dk = impDatos(k, anio); if(impRes303(Dk) < -0.005) out.push({txt: `El 303 del ${k}T salió a compensar (${impEur(-impRes303(Dk))}): confirma con el gestor si se compensa en este trimestre. No está aplicado`}); }
+  for(let k = 1; k < q; k++){ if(!impTrimCompleto(k, anio)) continue; const Dk = impDatos(k, anio); if(impRes303(Dk) < -0.005) out.push({txt: `El 303 del ${k}T salió a compensar (${impEur(-impRes303(Dk))}): confirma con el gestor si se compensa en este trimestre. No está aplicado`}); }
   const borr = impFacturasBorrador().filter(enQ);
   if(borr.length) out.push({txt: n(borr.length, 'factura sin emitir (borrador)', 'facturas sin emitir (borrador)')});
   const sinNum = D.fq.filter(d => !String(d.num || '').trim());
@@ -18466,9 +18486,33 @@ function impMostrarCargando(){
   const t = document.getElementById('imp-estado-tit'); if(t) t.textContent = 'Cargando los documentos…';
   const s = document.getElementById('imp-estado'); if(s) s.innerHTML = '<div class="imp-inc"><span class="ic">·</span><span>Un momento: se están leyendo tus facturas y gastos. Las cifras aparecen solas.</span></div>';
 }
+function impBloquesTrimestre(mostrar){
+  ['imp-det-303', 'imp-det-130', 'imp-det-fact', 'imp-det-gast', 'imp-gestor-btn'].forEach(id => { const e = document.getElementById(id); if(e) e.style.display = mostrar ? '' : 'none'; });
+  if(!mostrar){ const f = document.getElementById('imp-det-fis'); if(f) f.style.display = 'none'; }
+}
+// Trimestre anterior a la web: la app no tiene todos sus documentos, así que se enseña lo que presentó el gestor
+function impMostrarPresentado(q, anio){
+  const $ = id => document.getElementById(id), decl = _impDeclaraciones.find(d => d.modelo === '130' && Number(d.anio) === anio && Number(d.trimestre) === q);
+  const plazo = impPlazo(q, anio), fmt = d => d.toLocaleDateString('es-ES', {day: 'numeric', month: 'long', year: 'numeric'});
+  $('imp-fechas').innerHTML = `<b>${q}º trimestre</b> · ya presentado. Plazo que tuvo: hasta el ${fmt(plazo)}.`;
+  ['imp-rep', 'imp-ded'].forEach(id => { $(id).textContent = '—'; impColor($(id), null, null); });
+  $('imp-303').textContent = '—'; $('imp-303-s').textContent = 'no consta en la app'; impColor($('imp-303'), null, null);
+  $('imp-k303').classList.remove('aviso'); $('imp-k130').classList.remove('aviso');
+  if(decl){ $('imp-130').textContent = impEur(decl.resultado); $('imp-130-s').textContent = 'presentado el ' + new Date(decl.fecha_presentacion).toLocaleDateString('es-ES', {day: 'numeric', month: 'short'}) + (decl.negativa ? ' · sin pago' : ''); impColor($('imp-130'), decl.resultado, 'coste'); }
+  else { $('imp-130').textContent = '—'; $('imp-130-s').textContent = 'no consta en la app'; impColor($('imp-130'), null, null); }
+  $('imp-total-l').textContent = 'Presentado por el gestor';
+  $('imp-total').textContent = decl ? impEur(decl.resultado) : '—'; impColor($('imp-total'), decl ? decl.resultado : null, decl ? 'coste' : null);
+  $('imp-total-s').textContent = decl ? 'Modelo 130 de este trimestre. El 303 lo llevó el gestor.' : '';
+  const b = $('imp-total-baja'); if(b){ b.style.display = 'none'; b.innerHTML = ''; }
+  $('imp-estado-tit').textContent = 'Antes de julio la app no tiene todos los documentos';
+  $('imp-estado').innerHTML = '<div class="imp-inc ok"><span class="ic">·</span><span>Empezaste a subir las facturas en julio, así que el 1T y el 2T valen lo que presentó el gestor. Lo ves completo en la pestaña Presentadas.</span></div>';
+  impBloquesTrimestre(false);
+}
 function renderImpuestos(q){
   if(q == null) q = _impQ || (Math.floor(new Date().getMonth()/3)+1);
   if(!_docsListos){ impMostrarCargando(); return; }
+  if(!impTrimCompleto(q, new Date().getFullYear())){ _impQ = q; try{ localStorage.setItem('imp_q', String(q)); }catch(e){}; document.querySelectorAll('#imp-q button').forEach(b => b.classList.toggle('active', Number(b.dataset.q) === q)); impMostrarPresentado(q, new Date().getFullYear()); return; }
+  impBloquesTrimestre(true);
   _impQ = q; try{ localStorage.setItem('imp_q', String(q)); }catch(e){}
   const anio = new Date().getFullYear(), $ = id => document.getElementById(id);
   document.querySelectorAll('#imp-q button').forEach(b => b.classList.toggle('active', Number(b.dataset.q) === q));
@@ -18496,17 +18540,17 @@ function renderImpuestos(q){
   $('imp-total').textContent = futuro ? '—' : total != null ? impEur(total) : 'Incompleto';
   $('imp-total-s').textContent = futuro ? 'este trimestre aún no ha empezado' : total != null ? ('IVA ' + impEur(Math.max(0, r303)) + ' + IRPF adelantado ' + impEur(c130.resultado) + ' · se paga antes del ' + plazo.toLocaleDateString('es-ES',{day:'numeric',month:'long'})) : ('303: ' + (incompleto303 ? 'incompleto' : (r303 >= 0 ? impEur(r303) + ' a pagar' : impEur(-r303) + ' a compensar')) + ' · 130: ' + (c130.completo ? impEur(c130.resultado) : 'incompleto'));
   $('imp-total-l').textContent = futuro ? 'Total impuestos (303 + 130)' : 'A pagar ahora (303 + 130)';
-  // cuánto puede bajar y por qué (solo si hay razones concretas)
+  // cuánto puede bajar y por qué (solo motivos concretos de este trimestre)
   const baja = $('imp-total-baja'); let bajaIva = 0, bajaIrpf = 0; const motivos = [];
-  if(!futuro && total != null && r303 > 0.004){
-    const comp = []; for(let k = 1; k < q; k++){ const Dk = impDatos(k, anio); if(impRes303(Dk) < -0.005) comp.push([k, -impRes303(Dk)]); }
-    const sc = comp.reduce((s, x) => s + x[1], 0); bajaIva = Math.min(sc, r303);
-    if(bajaIva > 0.5) motivos.push(`IVA: hasta −${impEur(bajaIva)} si el ${comp.map(x => x[0] + 'T').join(' y ')} salió a compensar y el gestor aún no lo ha aplicado`);
-  }
-  if(!futuro && total != null && c130.completo && c130.resultado > 0.004){
-    const dp = _impDeclaraciones.filter(d => d.modelo === '130' && Number(d.anio) === anio && Number(d.trimestre) < q).sort((a, b) => Number(b.trimestre) - Number(a.trimestre))[0];
-    if(dp){ const Dp = impDatos(Number(dp.trimestre), anio), dif = Number(dp.gastos) - Dp.gasAcum;
-      if(dif > 0.5){ bajaIrpf = Math.min(c130.resultado, dif * IMP_PORC_130 / 100); motivos.push(`IRPF: hasta −${impEur(bajaIrpf)} porque en el ${dp.trimestre}T el gestor declaró ${impEur(dif)} más de gastos de los que tiene la app`); } }
+  if(!futuro && total != null){
+    const tardB = impGastosTardios(q, anio);
+    if(tardB.length){
+      const base = tardB.reduce((s, d) => s + impGastoDeducible(d), 0), iva = tardB.reduce((s, d) => s + impIvaDeducible(d), 0);
+      bajaIva += Math.min(Math.max(0, r303), iva); bajaIrpf += Math.min(c130.resultado || 0, base * IMP_PORC_130 / 100);
+      motivos.push(`Si cuentas en el ${q}T los ${tardB.length} gastos con fecha anterior que aún no has decidido (${impEur(tardB.reduce((s, d) => s + impTotalGasto(d), 0))}): IVA −${impEur(Math.min(Math.max(0, r303), iva))} e IRPF −${impEur(Math.min(c130.resultado || 0, base * IMP_PORC_130 / 100))}`);
+    }
+    const reta = D.gq.filter(d => d.categoria === 'Seguridad Social autónomos'), meses = hoy < fin ? 3 - reta.length : 0;
+    if(meses > 0 && reta.length){ const cuota = reta.reduce((s, d) => s + impTotalGasto(d), 0) / reta.length, r = Math.min(Math.max(0, (c130.resultado || 0) - bajaIrpf), meses * cuota * IMP_PORC_130 / 100); if(r > 0.5){ bajaIrpf += r; motivos.push(`IRPF −${impEur(r)} cuando entre la cuota de autónomos que falta (${meses} mes${meses === 1 ? '' : 'es'} del trimestre)`); } }
   }
   if(baja){ if(motivos.length && !futuro){ baja.style.display = ''; baja.innerHTML = `<div style="color:#fff;font-weight:700;font-size:13.5px;">Puede bajar hasta unos ${impEur(Math.max(0, total - bajaIva - bajaIrpf))}</div>` + motivos.map(m => `<div style="margin-top:3px;">· ${escHtml(m)}</div>`).join('') + `<div style="margin-top:6px;opacity:.8;">El IRPF de aquí es un adelanto de la Renta: cuando hagas la declaración de la Renta se te resta. La Renta es aparte y no está en este total.</div>`; } else { baja.style.display = 'none'; baja.innerHTML = ''; } }
   box.style.opacity = total != null ? '1' : '.85';
@@ -18530,11 +18574,11 @@ function renderImpuestos(q){
   // cálculo del 303
   $('imp-303-calc').innerHTML = `<div class="imp-linea"><span>IVA repercutido (${D.fq.length} facturas)</span><span class="mono">${impEur(D.rep)}</span></div><div class="imp-linea"><span>IVA deducible (${D.gq.length} gastos)</span><span class="mono n-pos">− ${impEur(D.ded)}</span></div><div class="imp-linea tot"><span>Resultado 303 (${r303 >= 0 ? 'a pagar' : 'a compensar'})</span><span class="mono ${r303 > 0.004 ? 'n-neg' : 'n-pos'}">${impEur(Math.abs(r303))}</span></div>`;
   // cálculo del 130
-  $('imp-130-calc').innerHTML = `<div class="imp-linea sub"><span>Ingresos del año hasta el ${q}T (sin IVA)</span><span class="mono n-pos">${impEur(D.ingAcum)}</span></div><div class="imp-linea sub"><span>Gastos deducibles del año</span><span class="mono n-neg">− ${impEur(D.gasAcum)}</span></div>` +
+  $('imp-130-calc').innerHTML = (c130.R.desdeDecl ? `<div class="imp-linea sub"><span>Presentado hasta el ${c130.R.p}T: ingresos</span><span class="mono n-pos">${impEur(c130.R.ingDecl)}</span></div><div class="imp-linea sub"><span>Presentado hasta el ${c130.R.p}T: gastos</span><span class="mono n-neg">− ${impEur(c130.R.gasDecl)}</span></div>` + (c130.R.ajuste > 0.004 ? `<div class="imp-linea sub"><span>Intereses del préstamo de esos trimestres que el gestor no contó</span><span class="mono n-neg">− ${impEur(c130.R.ajuste)}</span></div>` : '') + `<div class="imp-linea sub"><span>${c130.R.p + 1 === q ? q + 'T' : 'Del ' + (c130.R.p + 1) + 'T al ' + q + 'T'} según la app: ingresos</span><span class="mono n-pos">${impEur(c130.R.ingN)}</span></div><div class="imp-linea sub"><span>${c130.R.p + 1 === q ? q + 'T' : 'Del ' + (c130.R.p + 1) + 'T al ' + q + 'T'} según la app: gastos</span><span class="mono n-neg">− ${impEur(c130.R.gasN)}</span></div>` : `<div class="imp-linea sub"><span>Ingresos del año hasta el ${q}T (sin IVA)</span><span class="mono n-pos">${impEur(D.ingAcum)}</span></div><div class="imp-linea sub"><span>Gastos deducibles del año</span><span class="mono n-neg">− ${impEur(D.gasAcum)}</span></div>`) +
     `<div class="imp-linea"><span>Rendimiento acumulado</span><span class="mono ${c130.rend >= 0 ? 'n-pos' : 'n-neg'}">${impEur(c130.rend)}</span></div><div class="imp-linea"><span>${IMP_PORC_130} %</span><span class="mono">${impEur(c130.bruto)}</span></div>` +
     `<div class="imp-linea"><span>Pagos anteriores del modelo 130</span><span class="mono">${q === 1 ? '— (no hay)' : c130.faltan.length ? 'faltan datos' : '− ' + impEur(c130.previos)}</span></div>` +
     `<div class="imp-linea tot"><span>Resultado estimado 130</span><span class="mono ${!c130.completo ? 'n-warn' : c130.resultado > 0.004 ? 'n-neg' : 'n-pos'}">${c130.completo ? impEur(c130.resultado) : 'Estimación incompleta'}</span></div>` +
-    (q > 1 ? `<div style="margin-top:8px;font-size:12px;color:var(--ink-soft);">Pagos del 130 registrados (del año ${anio}):</div>` + Array.from({length: q-1}, (_, i) => impPagoHtml(i+1, anio, (_impPagos[i+1] == null) ? impSugerenciaPago(i+1, anio) : null)).join('') : '');
+    (q > 1 ? `<div style="margin-top:8px;font-size:12px;color:var(--ink-soft);">Pagos del 130 registrados (del año ${anio}):</div>` + Array.from({length: q-1}, (_, i) => _impDeclaraciones.some(d => d.modelo === '130' && Number(d.anio) === anio && Number(d.trimestre) === i+1) ? `<div class="imp-linea sub"><span>${i+1}T: presentado por el gestor</span><span class="mono">${impEur(_impPagos[i+1])}</span></div>` : impPagoHtml(i+1, anio, (_impPagos[i+1] == null) ? impSugerenciaPago(i+1, anio) : null)).join('') : '');
   // facturas y gastos incluidos (plegados)
   $('imp-fact-sum').textContent = `Ver facturas incluidas (${D.fq.length})`;
   $('imp-fact-lista').innerHTML = D.fq.length ? D.fq.slice().sort((a, b) => String(b.dateRaw||'').localeCompare(String(a.dateRaw||''))).map(d => `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(d.num ? 'Nº ' + d.num : 'Sin número')} · ${escHtml(d.client || '—')}</span><span class="mono">${impEur(d.total)}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratFactura(d))}</div><div class="ct-g3">Base <b>${impEur(impBaseFactura(d))}</b> · IVA <b>${impEur(impIvaFactura(d))}</b></div></div>`).join('') : '<div class="empty" style="padding:12px;">Ninguna factura en este trimestre.</div>';
@@ -18664,11 +18708,6 @@ function renderImpPresentadas(){
   const f = iso => { const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}) + ' a las ' + d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}); };
   cont.innerHTML = lista.map(d => {
     const q = Number(d.trimestre), anio = Number(d.anio); let cmp = '';
-    if(d.modelo === '130' && q){ const D = impDatos(q, anio); const dif = D.gasAcum - Number(d.gastos || 0);
-      cmp = `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);"><div style="font-size:11.5px;color:var(--ink-soft);margin-bottom:2px;">Comparado con la app hoy (acumulado hasta el ${q}T)</div>
-        <div class="imp-linea sub"><span>Ingresos en la app</span><span class="mono">${impEur(D.ingAcum)}</span></div>
-        <div class="imp-linea sub"><span>Gastos en la app</span><span class="mono">${impEur(D.gasAcum)}</span></div>
-        <div class="imp-linea"><span>${Math.abs(dif) < 0.5 ? 'Gastos: coinciden' : dif < 0 ? 'Gastos que declaró de más que la app' : 'Gastos que la app tiene de más'}</span><span class="mono" style="color:${Math.abs(dif) < 0.5 ? 'var(--green)' : 'var(--orange)'};">${Math.abs(dif) < 0.5 ? '✓' : impEur(Math.abs(dif))}</span></div></div>`; }
     return `<div class="panel" style="margin-bottom:10px;"><div class="panel-head" style="flex-wrap:wrap;gap:6px;"><h3>Modelo ${escHtml(d.modelo)} · ${escHtml(d.periodo || '')} ${anio}</h3><span class="count">${d.negativa ? 'negativa' : 'a ingresar'}</span></div>
       <div class="panel-body">
         <div class="imp-linea tot"><span>Resultado de la autoliquidación</span><span class="mono ${Number(d.resultado) > 0.004 ? 'n-neg' : 'n-pos'}">${impEur(d.resultado)}</span></div>
@@ -18682,12 +18721,12 @@ function renderImpPresentadas(){
 function renderImpAnual(){
   if(!_docsListos){ ['imp-a-ing', 'imp-a-gas', 'imp-a-rend'].forEach(id => { const e = document.getElementById(id); if(e) e.textContent = '…'; }); ['imp-a-pagado', 'imp-a-est', 'imp-a-def', 'imp-a-evol'].forEach(id => { const e = document.getElementById(id); if(e) e.innerHTML = '<div class="empty" style="padding:10px;">Cargando los documentos…</div>'; }); return; }
   const $ = id => document.getElementById(id), anio = new Date().getFullYear(), hoy = new Date();
-  const qAct = Math.floor(hoy.getMonth()/3)+1, D = impDatos(qAct, anio), rend = D.ingAcum - D.gasAcum;
+  const qAct = Math.floor(hoy.getMonth()/3)+1, D = impDatos(qAct, anio), R0 = impRend130(qAct, anio, D), rend = R0.rend;
   $('imp-a-fechas').innerHTML = `<b>Ejercicio ${anio}</b> · del 1 ene hasta hoy (${qAct}T en curso)<br>Solo contabilidad oficial. Es un control y una estimación, no la declaración.`;
-  $('imp-a-ing').textContent = impEur(D.ingAcum);
-  $('imp-a-gas').textContent = impEur(D.gasAcum);
+  $('imp-a-ing').textContent = impEur(R0.ing);
+  $('imp-a-gas').textContent = impEur(R0.gas);
   $('imp-a-rend').textContent = impEur(rend);
-  impColor($('imp-a-ing'), D.ingAcum, 'ingreso'); impColor($('imp-a-gas'), D.gasAcum, 'gasto'); impColor($('imp-a-rend'), rend, 'signo');
+  impColor($('imp-a-ing'), R0.ing, 'ingreso'); impColor($('imp-a-gas'), R0.gas, 'gasto'); impColor($('imp-a-rend'), rend, 'signo');
   // pagado a cuenta
   const regs = [1,2,3,4].filter(k => _impPagos[k] != null), pagado = regs.reduce((s, k) => s + Number(_impPagos[k]), 0);
   const cerrados = []; for(let k = 1; k < qAct; k++) cerrados.push(k);
@@ -18706,8 +18745,8 @@ function renderImpAnual(){
   $('imp-a-def').innerHTML = '<div style="font-size:13.5px;line-height:1.5;"><b>No se calcula aquí.</b> El IRPF definitivo es anual (modelo 100) y depende de datos personales y fiscales que esta aplicación no tiene: otros ingresos, mínimo personal y familiar, deducciones, reducciones, retenciones de fuera de la actividad, etc. Lo determina el gestor, y esta información empresarial se le prepara desde Trimestres → Preparar para el gestor.</div>';
   // evolución por trimestres
   let evo = '';
-  for(let k = 1; k <= 4; k++){ const Dk = impDatos(k, anio), ini = new Date(anio, (k-1)*3, 1); if(ini > hoy) break;
-    evo += `<div class="imp-linea"><span><b>${k}T</b> · ingresos ${impEur(Dk.ingAcum)} − gastos ${impEur(Dk.gasAcum)}</span><span class="mono">${impEur(Dk.ingAcum - Dk.gasAcum)}</span></div><div class="imp-linea sub"><span>rendimiento acumulado · 130 pagado: ${_impPagos[k] != null ? impEur(_impPagos[k]) : 'sin registrar'}</span><span></span></div>`; }
+  for(let k = 1; k <= 4; k++){ const Dk = impDatos(k, anio), Rk = impRend130(k, anio, Dk), ini = new Date(anio, (k-1)*3, 1); if(ini > hoy) break;
+    evo += `<div class="imp-linea"><span><b>${k}T</b> · ingresos ${impEur(Rk.ing)} − gastos ${impEur(Rk.gas)}${Rk.desdeDecl ? ' (según lo presentado' + (k > Rk.p ? ' + la app' : '') + ')' : ''}</span><span class="mono">${impEur(Rk.ing - Rk.gas)}</span></div><div class="imp-linea sub"><span>rendimiento acumulado · 130 pagado: ${_impPagos[k] != null ? impEur(_impPagos[k]) : 'sin registrar'}</span><span></span></div>`; }
   $('imp-a-evol').innerHTML = evo || '<div class="empty" style="padding:12px;">Sin datos.</div>';
 }
 
