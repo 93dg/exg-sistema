@@ -1926,6 +1926,7 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .sis-card .t{font-weight:700;font-size:13.5px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
 .sis-card .steps{margin:0;padding-left:18px;font-size:12.5px;color:var(--ink-soft);line-height:1.6;}
 .sis-card .meta{font-size:11.5px;color:var(--ink-soft);margin-top:6px;}
+.ctl-det summary{list-style:none;cursor:pointer;}.ctl-det summary::-webkit-details-marker{display:none;}.ctl-det summary:active{opacity:.7;}
 </style>
 <style>
 /* required styles */
@@ -3003,7 +3004,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.14</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.15</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3081,7 +3082,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.14</div>
+        <div class="sub" id="version-badge">V6.15</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4137,6 +4138,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <div class="client-tabs" id="gpro-subtabs">
         <div class="client-tab active" data-sub="resumen">Resumen</div>
         <div class="client-tab" data-sub="lista">Gastos</div>
+        <div class="client-tab" data-sub="control">Control</div>
         <div class="client-tab" data-sub="combustible">Combustible</div>
         <div class="client-tab" data-sub="revisar">Revisar</div>
       </div>
@@ -4211,6 +4213,30 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
             <div class="lista-movil-solo"><div id="gpro-lista-movil" style="padding:10px;"></div></div>
           </div>
         </div>
+      </div>
+
+      <!-- CONTROL: a qué se va el dinero (solo control interno: no es fiscal; sale de las líneas de cada gasto) -->
+      <div class="sub-view" id="gpro-control" style="display:none;">
+        <div class="filters" id="gpro-control-chips" style="margin-bottom:12px;">
+          <div class="chip-filter" data-per="trim">Trimestre</div>
+          <div class="chip-filter" data-per="anio">Año</div>
+          <div class="chip-filter active" data-per="12m">12 meses</div>
+          <div class="chip-filter" data-per="todo">Todo</div>
+        </div>
+        <div class="filters" id="gpro-control-vista" style="margin-bottom:16px;">
+          <div class="chip-filter active" data-vista="categoria">Por categoría</div>
+          <div class="chip-filter" data-vista="maquina">Por máquina</div>
+        </div>
+        <div class="kpi-strip">
+          <div class="kpi"><div class="lbl">Gasto del periodo</div><div class="val" id="gpro-ctl-kpi-total">—</div></div>
+          <div class="kpi"><div class="lbl" id="gpro-ctl-lbl-mayor">Mayor partida</div><div class="val" id="gpro-ctl-kpi-mayor">—</div></div>
+          <div class="kpi"><div class="lbl">Sin detalle</div><div class="val orange" id="gpro-ctl-kpi-sindet">—</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3 id="gpro-ctl-titulo">A qué se va el dinero</h3></div>
+          <div class="panel-body" id="gpro-ctl-lista"></div>
+        </div>
+        <div id="gpro-ctl-aviso" style="font-size:11.5px;color:var(--ink-soft);margin-top:8px;line-height:1.5;"></div>
       </div>
 
       <!-- REVISAR: lo que llega del correo y los gastos dudosos -->
@@ -6526,7 +6552,7 @@ function setupSubtabs(navId, prefix, mapping, opts){
 }
 setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimiento:'flota-mantenimiento',averias:'flota-averias',documentacion:'flota-documentacion',repuestos:'flota-repuestos',historial:'flota-historial'});
 setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',cobros:'econ-cobros',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad',cierre:'econ-cierre'});
-setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',combustible:'gpro-comb',revisar:'gpro-revisar'},{onSwitch:{revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible()}});
+setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',control:'gpro-control',combustible:'gpro-comb',revisar:'gpro-revisar'},{onSwitch:{revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible(), control:()=>renderGastosProControl()}});
 document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filters .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     chip.parentElement.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
@@ -6535,6 +6561,7 @@ document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filter
     if(chip.closest('#gpro-lista')) renderGastosProLista();
     if(chip.closest('#gpro-dudosos-chips')) renderGastosProDudosos();
     if(chip.closest('#gpro-comb-chips') || chip.closest('#gpro-comb-tipos')) renderGastosProCombustible();
+    if(chip.closest('#gpro-control-chips') || chip.closest('#gpro-control-vista')) renderGastosProControl();
   });
 });
 document.addEventListener('click', ev => {
@@ -7612,6 +7639,74 @@ function filtrarMesesPorTipo(meses, tipo){
   return meses.filter(m => m.tipos[tipo]).map(m => { const t = m.tipos[tipo]; return {...m, litros: t.litros, importe: t.importe, precio: t.precio, otros: 0, tipos: {[tipo]: t}}; });
 }
 function nombreMesComb(m){ return `${MESES_ES[m.mes]} ${m.anio}`; }
+// ===================== CONTROL — a qué se va el dinero =====================
+// Solo control interno (no es fiscal): suma el gasto por categoría, subcategoría y máquina a partir de las LÍNEAS
+// (conceptos) de cada gasto. El importe de cada línea lleva su parte del IVA y de lo que no es línea, para que la
+// suma coincida siempre con el total de la factura. Un gasto sin líneas cuenta con su categoría y "Sin detalle".
+function maquinaControl(m){
+  if(!m) return 'Sin asignar';
+  const s = String(m).split(/[(,]/)[0].trim();
+  return s || 'Sin asignar';
+}
+function lineasControlGasto(docs){
+  const out = [];
+  docs.forEach(d => {
+    const total = Number(d.importe || d.total || 0);
+    if(!total) return;
+    const cs = (Array.isArray(d.conceptos) ? d.conceptos : []).filter(c => Number(c.importe) > 0);
+    const suma = cs.reduce((s, c) => s + Number(c.importe || 0), 0);
+    if(!cs.length || suma <= 0){
+      out.push({cat: d.categoria || 'Sin categoría', sub: 'Sin detalle', maq: 'Sin asignar', imp: total, sinDetalle: true, doc: d});
+      return;
+    }
+    const f = total / suma;
+    cs.forEach(c => {
+      const esComb = c.grupo === 'combustible';
+      const cat = (esComb || (c.grupo === 'otros' && d.categoria === 'Combustible')) ? 'Combustible' : (c.categoria || d.categoria || 'Sin categoría');
+      const sub = c.subcategoria || (esComb ? (c.etiqueta || c.descripcion || 'Combustible') : (c.grupo === 'otros' ? (c.descripcion || 'Otros artículos') : (c.categoria ? (c.descripcion || 'General') : 'Sin detalle')));
+      out.push({cat, sub, maq: maquinaControl(c.maquina), imp: Number(c.importe) * f, sinDetalle: sub === 'Sin detalle', doc: d});
+    });
+  });
+  return out;
+}
+function agruparControl(lineas, vista){
+  const grupos = new Map();
+  lineas.forEach(l => {
+    const g = vista === 'maquina' ? l.maq : l.cat;
+    const s = vista === 'maquina' ? (l.cat + ' · ' + l.sub) : l.sub;
+    if(!grupos.has(g)) grupos.set(g, {nombre: g, imp: 0, subs: new Map()});
+    const gr = grupos.get(g); gr.imp += l.imp;
+    gr.subs.set(s, (gr.subs.get(s) || 0) + l.imp);
+  });
+  return Array.from(grupos.values()).sort((a, b) => b.imp - a.imp);
+}
+function renderGastosProControl(){
+  const vistaEl = document.getElementById('gpro-control');
+  if(!vistaEl) return;
+  const $ = id => document.getElementById(id);
+  const per = vistaEl.querySelector('#gpro-control-chips .chip-filter.active')?.dataset.per || '12m';
+  const modo = vistaEl.querySelector('#gpro-control-vista .chip-filter.active')?.dataset.vista || 'categoria';
+  const docs = filtrarDocsPeriodoComb(gastosProDocs(), per, new Date());
+  const lineas = lineasControlGasto(docs);
+  const total = lineas.reduce((s, l) => s + l.imp, 0);
+  const sinDet = lineas.filter(l => l.sinDetalle).reduce((s, l) => s + l.imp, 0);
+  const grupos = agruparControl(lineas, modo);
+  const eur = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  const pc = (v, t) => t ? Math.round(v / t * 100) : 0;
+  $('gpro-ctl-kpi-total').textContent = eur(total);
+  $('gpro-ctl-lbl-mayor').textContent = modo === 'maquina' ? 'Máquina que más gasta' : 'Mayor partida';
+  $('gpro-ctl-kpi-mayor').textContent = grupos.length ? grupos[0].nombre : '—';
+  $('gpro-ctl-kpi-sindet').textContent = eur(sinDet);
+  $('gpro-ctl-titulo').textContent = modo === 'maquina' ? 'A qué máquina se va el dinero' : 'A qué se va el dinero';
+  $('gpro-ctl-lista').innerHTML = grupos.length ? grupos.map(g => {
+    const subs = Array.from(g.subs.entries()).sort((a, b) => b[1] - a[1]).map(([s, v]) =>
+      `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0 0 14px;font-size:12.5px;color:var(--ink-soft);"><span>${escHtml(s)} <span style="font-size:11px;">${pc(v, g.imp)} %</span></span><span class="mono">${eur(v)}</span></div>`).join('');
+    const p = pc(g.imp, total);
+    return `<details class="ctl-det" style="border-bottom:1px solid var(--line);padding:9px 0;"><summary><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:600;">${escHtml(g.nombre)} <span style="color:var(--ink-soft);font-weight:400;font-size:11.5px;">${p} %</span></span><span class="mono">${eur(g.imp)}</span></div><div style="height:5px;background:var(--concrete);border-radius:3px;margin-top:6px;"><div style="height:5px;width:${Math.max(2, p)}%;background:var(--orange);border-radius:3px;"></div></div></summary>${subs}</details>`;
+  }).join('') : '<div class="empty" style="padding:16px;">Sin gastos en este periodo.</div>';
+  const sinLineas = docs.filter(d => !(Array.isArray(d.conceptos) && d.conceptos.some(c => Number(c.importe) > 0))).length;
+  $('gpro-ctl-aviso').textContent = 'Incluye Oficial y En B, con IVA. Toca una fila para ver el detalle.' + (sinLineas ? ` ${sinLineas} gasto(s) no tienen líneas: cuentan con su categoría y como "Sin detalle".` : '');
+}
 function renderGastosProCombustible(){
   const vista = document.getElementById('gpro-comb');
   if(!vista) return;
