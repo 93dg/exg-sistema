@@ -3127,7 +3127,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.30</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.31</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3205,7 +3205,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.30</div>
+        <div class="sub" id="version-badge">V6.31</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4665,10 +4665,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <div class="imp-k"><div class="l">IVA deducible</div><div class="v" id="imp-ded">—</div></div>
         </div>
         <div class="imp-grid">
-          <div class="imp-k imp-big" id="imp-k303"><div class="l">Modelo 303</div><div class="v" id="imp-303">—</div><div class="s" id="imp-303-s"></div></div>
-          <div class="imp-k imp-big" id="imp-k130"><div class="l">Modelo 130</div><div class="v" id="imp-130">—</div><div class="s" id="imp-130-s"></div></div>
+          <div class="imp-k imp-big" id="imp-k303"><div class="l">Modelo 303 · IVA</div><div class="v" id="imp-303">—</div><div class="s" id="imp-303-s"></div></div>
+          <div class="imp-k imp-big" id="imp-k130"><div class="l">Modelo 130 · IRPF</div><div class="v" id="imp-130">—</div><div class="s" id="imp-130-s"></div></div>
         </div>
-        <div class="imp-total" id="imp-total-box"><div class="l">Total impuestos (303 + 130)</div><div class="v" id="imp-total">—</div><div class="s" id="imp-total-s"></div></div>
+        <div class="imp-total" id="imp-total-box"><div class="l" id="imp-total-l">A pagar ahora (303 + 130)</div><div class="v" id="imp-total">—</div><div class="s" id="imp-total-s"></div><div class="s" id="imp-total-baja" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.18);display:none;"></div></div>
 
         <div class="panel" id="imp-estado-panel">
           <div class="panel-head"><h3 id="imp-estado-tit">Antes de cerrar</h3></div>
@@ -18483,7 +18483,21 @@ function renderImpuestos(q){
   const total = futuro ? null : (!incompleto303 && c130.completo) ? Math.max(0, r303) + c130.resultado : null;
   const box = $('imp-total-box');
   $('imp-total').textContent = futuro ? '—' : total != null ? impEur(total) : 'Incompleto';
-  $('imp-total-s').textContent = futuro ? 'este trimestre aún no ha empezado' : total != null ? (r303 < 0 ? 'el 303 sale a compensar: solo cuenta el 130' : 'IVA ' + impEur(Math.max(0, r303)) + ' + IRPF ' + impEur(c130.resultado)) : ('303: ' + (incompleto303 ? 'incompleto' : (r303 >= 0 ? impEur(r303) + ' a pagar' : impEur(-r303) + ' a compensar')) + ' · 130: ' + (c130.completo ? impEur(c130.resultado) : 'incompleto'));
+  $('imp-total-s').textContent = futuro ? 'este trimestre aún no ha empezado' : total != null ? ('IVA ' + impEur(Math.max(0, r303)) + ' + IRPF adelantado ' + impEur(c130.resultado) + ' · se paga antes del ' + plazo.toLocaleDateString('es-ES',{day:'numeric',month:'long'})) : ('303: ' + (incompleto303 ? 'incompleto' : (r303 >= 0 ? impEur(r303) + ' a pagar' : impEur(-r303) + ' a compensar')) + ' · 130: ' + (c130.completo ? impEur(c130.resultado) : 'incompleto'));
+  $('imp-total-l').textContent = futuro ? 'Total impuestos (303 + 130)' : 'A pagar ahora (303 + 130)';
+  // cuánto puede bajar y por qué (solo si hay razones concretas)
+  const baja = $('imp-total-baja'); let bajaIva = 0, bajaIrpf = 0; const motivos = [];
+  if(!futuro && total != null && r303 > 0.004){
+    const comp = []; for(let k = 1; k < q; k++){ const Dk = impDatos(k, anio); if(impRes303(Dk) < -0.005) comp.push([k, -impRes303(Dk)]); }
+    const sc = comp.reduce((s, x) => s + x[1], 0); bajaIva = Math.min(sc, r303);
+    if(bajaIva > 0.5) motivos.push(`IVA: hasta −${impEur(bajaIva)} si el ${comp.map(x => x[0] + 'T').join(' y ')} salió a compensar y el gestor aún no lo ha aplicado`);
+  }
+  if(!futuro && total != null && c130.completo && c130.resultado > 0.004){
+    const dp = _impDeclaraciones.filter(d => d.modelo === '130' && Number(d.anio) === anio && Number(d.trimestre) < q).sort((a, b) => Number(b.trimestre) - Number(a.trimestre))[0];
+    if(dp){ const Dp = impDatos(Number(dp.trimestre), anio), dif = Number(dp.gastos) - Dp.gasAcum;
+      if(dif > 0.5){ bajaIrpf = Math.min(c130.resultado, dif * IMP_PORC_130 / 100); motivos.push(`IRPF: hasta −${impEur(bajaIrpf)} porque en el ${dp.trimestre}T el gestor declaró ${impEur(dif)} más de gastos de los que tiene la app`); } }
+  }
+  if(baja){ if(motivos.length && !futuro){ baja.style.display = ''; baja.innerHTML = `<div style="color:#fff;font-weight:700;font-size:13.5px;">Puede bajar hasta unos ${impEur(Math.max(0, total - bajaIva - bajaIrpf))}</div>` + motivos.map(m => `<div style="margin-top:3px;">· ${escHtml(m)}</div>`).join('') + `<div style="margin-top:6px;opacity:.8;">El IRPF de aquí es un adelanto de la Renta: cuando hagas la declaración de la Renta se te resta. La Renta es aparte y no está en este total.</div>`; } else { baja.style.display = 'none'; baja.innerHTML = ''; } }
   box.style.opacity = total != null ? '1' : '.85';
   impColor($('imp-ded'), D.ded, 'ingreso');
   impColor($('imp-303'), Math.max(0, r303), (incompleto303 || futuro) ? null : 'coste');
