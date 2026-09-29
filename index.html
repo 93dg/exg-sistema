@@ -2042,6 +2042,14 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .pr-ic{font-weight:700;}
 .pr-ok .pr-ic{color:var(--green);} .pr-sin .pr-ic{color:var(--orange);} .pr-pend{color:var(--ink-soft);}
 .pr-sin{background:rgba(232,93,4,.06);}
+/* Colores de las cifras: verde = bueno o positivo, rojo = malo o negativo, naranja = por revisar */
+.n-pos{color:var(--green) !important;}
+.n-neg{color:var(--red) !important;}
+.n-warn{color:var(--orange) !important;}
+.imp-total .v.n-pos{color:#7ddf9a !important;}
+.imp-total .v.n-neg{color:#ff8b7d !important;}
+.imp-total .v.n-warn{color:#ffb35c !important;}
+.imp-linea .mono.n-pos, .imp-linea .mono.n-neg, .imp-linea .mono.n-warn{font-weight:700;}
 </style>
 <style>
 /* required styles */
@@ -3119,7 +3127,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.29</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.30</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3197,7 +3205,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.29</div>
+        <div class="sub" id="version-badge">V6.30</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6701,6 +6709,7 @@ function setupSubtabs(navId, prefix, mapping, opts){
     tab.addEventListener('click',()=>{
       document.querySelectorAll('#'+navId+' .client-tab').forEach(t=>t.classList.remove('active'));
       tab.classList.add('active');
+      try{ localStorage.setItem('subtab_' + navId, tab.dataset.sub); }catch(e){}   // al recargar se vuelve a esta pestaña
       if(navId==='gpro-subtabs' && tab.scrollIntoView) tab.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'});
       Object.keys(mapping).forEach(key=>{
         const el=document.getElementById(mapping[key]); if(el) el.style.display=(key===tab.dataset.sub)?'block':'none';
@@ -18250,12 +18259,12 @@ function renderPrestamos(){
       <div class="panel-body">
         <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:10px;">${escHtml(p.entidad || '')} · nº ${escHtml(p.num_acuerdo || '')} · ${Number(p.tipo_interes).toLocaleString('es-ES')} % ${escHtml((p.modalidad || '').toLowerCase())} · formalizado el ${prFechaCorta(p.fecha_formalizacion)} · vence el ${prFechaCorta(p.vencimiento)} · cuenta ${escHtml(p.cuenta_cargo || '')}</div>
         <div style="height:10px;background:var(--concrete);border-radius:5px;overflow:hidden;"><div style="height:10px;width:${Math.max(2, pct)}%;background:var(--green);"></div></div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin:4px 0 12px;"><span>Pagado ${PR_EUR(capPagado)} (${pct} %)</span><span>Concedido ${PR_EUR(p.capital)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin:4px 0 12px;"><span class="n-pos" style="font-weight:600;">Pagado ${PR_EUR(capPagado)} (${pct} %)</span><span>Concedido ${PR_EUR(p.capital)}</span></div>
         <div class="imp-grid">
-          <div class="imp-k"><div class="l">Pendiente</div><div class="v">${PR_EUR(saldo)}</div></div>
+          <div class="imp-k"><div class="l">Pendiente</div><div class="v n-neg">${PR_EUR(saldo)}</div></div>
           <div class="imp-k"><div class="l">Próximo recibo</div><div class="v">${prox ? PR_EUR(prox.cuota) : '—'}</div><div class="s">${prox ? prFechaCorta(prox.iso) : 'préstamo terminado'}</div></div>
           <div class="imp-k"><div class="l">Cuotas pendientes</div><div class="v">${pendientes.length}</div><div class="s">de ${cuadro.length}</div></div>
-          <div class="imp-k"><div class="l">Intereses ${anio}</div><div class="v">${PR_EUR(sum(deEsteAnio, 'interes'))}</div><div class="s">${deEsteAnio.length} recibo${deEsteAnio.length === 1 ? '' : 's'} pagado${deEsteAnio.length === 1 ? '' : 's'}</div></div>
+          <div class="imp-k"><div class="l">Intereses ${anio}</div><div class="v n-warn">${PR_EUR(sum(deEsteAnio, 'interes'))}</div><div class="s">${deEsteAnio.length} recibo${deEsteAnio.length === 1 ? '' : 's'} pagado${deEsteAnio.length === 1 ? '' : 's'}</div></div>
         </div>
         <div class="imp-linea" style="margin-top:6px;"><span>Intereses de ${anio} ya contados como gasto</span><span class="mono">${PR_EUR(sum(contadas, 'interes'))}</span></div>
         <div class="imp-linea"><span>Intereses de ${anio} sin contar como gasto (${sinContar.length} recibo${sinContar.length === 1 ? '' : 's'})</span><span class="mono" style="color:${sinContar.length ? 'var(--orange)' : 'inherit'};">${PR_EUR(sum(sinContar, 'interes'))}</span></div>
@@ -18307,6 +18316,15 @@ async function prRegistrarPendientes(id){
 const IMP_PLAZOS = {1: [3, 20], 2: [6, 20], 3: [9, 20], 4: [0, 30]};   // mes (0-11) y día límite del 303/130; el 4T es el 30 de enero del año siguiente
 const IMP_PORC_130 = 20;   // porcentaje del modelo 130 (estimación directa)
 let _impQ = null, _impPagos = {}, _impPagosCargados = false, _impDeclaraciones = [];
+function impColor(el, valor, modo){   // 'coste': positivo = malo (se paga); 'signo': positivo = bueno; 'ingreso' e 'gasto': verde o rojo si hay importe; 'aviso': naranja; null: sin color
+  if(!el) return; el.classList.remove('n-pos', 'n-neg', 'n-warn');
+  if(modo == null) return;
+  if(modo === 'aviso'){ el.classList.add('n-warn'); return; }
+  if(modo === 'ingreso'){ if(valor > 0.004) el.classList.add('n-pos'); return; }
+  if(modo === 'gasto'){ if(valor > 0.004) el.classList.add('n-neg'); return; }
+  const bueno = modo === 'coste' ? valor <= 0.004 : valor >= 0;
+  el.classList.add(bueno ? 'n-pos' : 'n-neg');
+}
 function impEur(n){ return Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
 function impFecha(v){ const x = new Date(v); return isNaN(x) ? null : x; }
 function impTrim(v){ const x = impFecha(v); return x ? Math.floor(x.getMonth()/3)+1 : null; }
@@ -18440,7 +18458,7 @@ function impPagoHtml(k, anio, sugerido){
 }
 function renderImpuestos(q){
   if(q == null) q = _impQ || (Math.floor(new Date().getMonth()/3)+1);
-  _impQ = q;
+  _impQ = q; try{ localStorage.setItem('imp_q', String(q)); }catch(e){}
   const anio = new Date().getFullYear(), $ = id => document.getElementById(id);
   document.querySelectorAll('#imp-q button').forEach(b => b.classList.toggle('active', Number(b.dataset.q) === q));
   const D = impDatos(q, anio), c130 = impCalc130(q, anio, D), r303 = impRes303(D);
@@ -18467,6 +18485,10 @@ function renderImpuestos(q){
   $('imp-total').textContent = futuro ? '—' : total != null ? impEur(total) : 'Incompleto';
   $('imp-total-s').textContent = futuro ? 'este trimestre aún no ha empezado' : total != null ? (r303 < 0 ? 'el 303 sale a compensar: solo cuenta el 130' : 'IVA ' + impEur(Math.max(0, r303)) + ' + IRPF ' + impEur(c130.resultado)) : ('303: ' + (incompleto303 ? 'incompleto' : (r303 >= 0 ? impEur(r303) + ' a pagar' : impEur(-r303) + ' a compensar')) + ' · 130: ' + (c130.completo ? impEur(c130.resultado) : 'incompleto'));
   box.style.opacity = total != null ? '1' : '.85';
+  impColor($('imp-ded'), D.ded, 'ingreso');
+  impColor($('imp-303'), Math.max(0, r303), (incompleto303 || futuro) ? null : 'coste');
+  impColor($('imp-130'), c130.resultado, (c130.completo && !futuro) ? 'coste' : null);
+  impColor($('imp-total'), total, futuro ? null : (total != null ? 'coste' : 'aviso'));
 
   // antes de cerrar
   const inc = ini > hoy ? [] : impIncidencias(q, anio, D, c130);
@@ -18481,12 +18503,12 @@ function renderImpuestos(q){
     : '<div class="imp-inc ok"><span class="ic">✓</span><span>No hay incidencias que impidan preparar el trimestre.</span></div>';
 
   // cálculo del 303
-  $('imp-303-calc').innerHTML = `<div class="imp-linea"><span>IVA repercutido (${D.fq.length} facturas)</span><span class="mono">${impEur(D.rep)}</span></div><div class="imp-linea"><span>IVA deducible (${D.gq.length} gastos)</span><span class="mono">− ${impEur(D.ded)}</span></div><div class="imp-linea tot"><span>Resultado 303 (${r303 >= 0 ? 'a pagar' : 'a compensar'})</span><span class="mono">${impEur(Math.abs(r303))}</span></div>`;
+  $('imp-303-calc').innerHTML = `<div class="imp-linea"><span>IVA repercutido (${D.fq.length} facturas)</span><span class="mono">${impEur(D.rep)}</span></div><div class="imp-linea"><span>IVA deducible (${D.gq.length} gastos)</span><span class="mono n-pos">− ${impEur(D.ded)}</span></div><div class="imp-linea tot"><span>Resultado 303 (${r303 >= 0 ? 'a pagar' : 'a compensar'})</span><span class="mono ${r303 > 0.004 ? 'n-neg' : 'n-pos'}">${impEur(Math.abs(r303))}</span></div>`;
   // cálculo del 130
-  $('imp-130-calc').innerHTML = `<div class="imp-linea sub"><span>Ingresos del año hasta el ${q}T (sin IVA)</span><span class="mono">${impEur(D.ingAcum)}</span></div><div class="imp-linea sub"><span>Gastos deducibles del año</span><span class="mono">− ${impEur(D.gasAcum)}</span></div>` +
-    `<div class="imp-linea"><span>Rendimiento acumulado</span><span class="mono">${impEur(c130.rend)}</span></div><div class="imp-linea"><span>${IMP_PORC_130} %</span><span class="mono">${impEur(c130.bruto)}</span></div>` +
+  $('imp-130-calc').innerHTML = `<div class="imp-linea sub"><span>Ingresos del año hasta el ${q}T (sin IVA)</span><span class="mono n-pos">${impEur(D.ingAcum)}</span></div><div class="imp-linea sub"><span>Gastos deducibles del año</span><span class="mono n-neg">− ${impEur(D.gasAcum)}</span></div>` +
+    `<div class="imp-linea"><span>Rendimiento acumulado</span><span class="mono ${c130.rend >= 0 ? 'n-pos' : 'n-neg'}">${impEur(c130.rend)}</span></div><div class="imp-linea"><span>${IMP_PORC_130} %</span><span class="mono">${impEur(c130.bruto)}</span></div>` +
     `<div class="imp-linea"><span>Pagos anteriores del modelo 130</span><span class="mono">${q === 1 ? '— (no hay)' : c130.faltan.length ? 'faltan datos' : '− ' + impEur(c130.previos)}</span></div>` +
-    `<div class="imp-linea tot"><span>Resultado estimado 130</span><span class="mono">${c130.completo ? impEur(c130.resultado) : 'Estimación incompleta'}</span></div>` +
+    `<div class="imp-linea tot"><span>Resultado estimado 130</span><span class="mono ${!c130.completo ? 'n-warn' : c130.resultado > 0.004 ? 'n-neg' : 'n-pos'}">${c130.completo ? impEur(c130.resultado) : 'Estimación incompleta'}</span></div>` +
     (q > 1 ? `<div style="margin-top:8px;font-size:12px;color:var(--ink-soft);">Pagos del 130 registrados (del año ${anio}):</div>` + Array.from({length: q-1}, (_, i) => impPagoHtml(i+1, anio, (_impPagos[i+1] == null) ? impSugerenciaPago(i+1, anio) : null)).join('') : '');
   // facturas y gastos incluidos (plegados)
   $('imp-fact-sum').textContent = `Ver facturas incluidas (${D.fq.length})`;
@@ -18537,13 +18559,13 @@ async function impGuardarPago(k){
   }catch(e){ mostrarToast('No se pudo guardar: ' + errText(e), 'err'); }
 }
 async function iniciarImpuestos(){
-  if(!_impPagosCargados) await impCargarPagos();
+  if(!_impPagosCargados){ try{ const pg = localStorage.getItem('imp_pag'), qq = Number(localStorage.getItem('imp_q')); if(pg) _impPag = pg; if(qq >= 1 && qq <= 4) _impQ = qq; }catch(e){} await impCargarPagos(); impPestana(_impPag); return; }
   if(_impPag === 'anual') renderImpAnual(); else if(_impPag === 'presentadas') renderImpPresentadas(); else if(_impPag === 'deudas') iniciarDeudas(); else renderImpuestos(_impQ || (Math.floor(new Date().getMonth()/3)+1));
 }
 // ===== Pestañas de Impuestos: Trimestres / IRPF anual =====
 let _impPag = 'trim';
 function impPestana(p){
-  _impPag = p;
+  _impPag = p; try{ localStorage.setItem('imp_pag', p); }catch(e){}
   document.querySelectorAll('#imp-tabs button').forEach(b => b.classList.toggle('active', b.dataset.p === p));
   document.getElementById('imp-pag-trim').style.display = p === 'trim' ? '' : 'none';
   document.getElementById('imp-pag-anual').style.display = p === 'anual' ? '' : 'none';
@@ -18601,12 +18623,12 @@ function renderImpDeudas(){
   D.planes.forEach((p, i) => { const d = dias(p.ultimo.fecha); if(d > 40 && d < 150 && D.planes.slice(0, i).some(q => q.ultimo.fecha > p.ultimo.fecha)) avisos.push(`El aplazamiento ${p.expediente} no tiene plazos posteriores al ${f(p.ultimo.fecha)} en los correos del banco y hay uno más nuevo. Comprueba en la sede de la AEAT si sigue activo o si se sustituyó: un plazo sin pagar acaba en apremio.`); });
   if(D.embargos.length && dias(D.embargos[0].fecha) < 45) avisos.push(`Hay un embargo reciente (${f(D.embargos[0].fecha)}, ${impEur(D.embargos[0].cobrado)}). Mira en la sede de Hacienda Local qué deuda era y si queda alguna pendiente.`);
   cont.innerHTML = (D.error ? '<div class="imp-av aviso"><span class="ic">!</span><span>No se pudieron leer los correos del banco.</span></div>' : '') +
-    `<div class="imp-grid"><div class="imp-k"><div class="l">Cobrado por embargos</div><div class="v">${impEur(cobrados)}</div><div class="s">${D.embargos.length} desde ${D.embargos.length ? f(D.embargos[D.embargos.length-1].fecha) : '—'}</div></div><div class="imp-k"><div class="l">Aplazamientos ${anio}</div><div class="v">${impEur(aplaz26)}</div><div class="s">pagado a la AEAT</div></div></div>` +
+    `<div class="imp-grid"><div class="imp-k"><div class="l">Cobrado por embargos</div><div class="v ${cobrados > 0.004 ? 'n-neg' : ''}">${impEur(cobrados)}</div><div class="s">${D.embargos.length} desde ${D.embargos.length ? f(D.embargos[D.embargos.length-1].fecha) : '—'}</div></div><div class="imp-k"><div class="l">Aplazamientos ${anio}</div><div class="v ${aplaz26 > 0.004 ? 'n-warn' : ''}">${impEur(aplaz26)}</div><div class="s">pagado a la AEAT</div></div></div>` +
     (avisos.length ? `<div class="panel"><div class="panel-head"><h3>A revisar</h3></div><div class="panel-body">${avisos.map(a => `<div class="imp-av aviso"><span class="ic">!</span><span>${escHtml(a)}</span></div>`).join('')}</div></div>` : '') +
     `<div class="panel"><div class="panel-head"><h3>Aplazamientos de la AEAT</h3><span class="count">${D.planes.length}</span></div><div class="panel-body">` +
     (D.planes.length ? D.planes.map(p => `<details class="imp-det" style="margin-bottom:6px;"><summary><span>${escHtml(p.expediente)}${p.modelo002 ? ' · modelo 002' : ''}<span style="display:block;font-size:11.5px;color:var(--ink-soft);font-weight:400;">${p.plazos.length} plazo${p.plazos.length === 1 ? '' : 's'} · ${impEur(p.total)} · último ${f(p.ultimo.fecha)}</span></span></summary><div class="imp-det-body">${p.plazos.map(x => `<div class="imp-linea"><span>Plazo ${String(x.plazo).padStart(2, '0')} · ${f(x.fecha)}</span><span class="mono">${impEur(x.importe)}</span></div>`).join('')}</div></details>`).join('') : '<div class="empty" style="padding:12px;">Sin aplazamientos en los correos.</div>') +
     `</div></div><div class="panel"><div class="panel-head"><h3>Embargos cobrados en la cuenta</h3><span class="count">${D.embargos.length}</span></div><div class="panel-body">` +
-    (D.embargos.length ? D.embargos.map(e => `<div class="ct-g" style="padding:8px 0;"><div class="ct-g1"><span class="ct-prov">${escHtml(/SEGURIDAD SOCIAL/i.test(e.organismo) ? 'Seguridad Social' : 'Hacienda Local')}</span><span class="mono">${impEur(e.cobrado)}</span></div><div class="ct-g2">Cobrado el ${f(e.fecha)}${e.retencion ? ' · retenido el ' + f(e.retencion) : ''}${e.expediente ? ' · expediente ' + escHtml(e.expediente) : ''}</div>${e.levantado > 0.005 ? `<div class="ct-g3">Se liberaron ${impEur(e.levantado)} de lo retenido</div>` : ''}</div>`).join('') : '<div class="empty" style="padding:12px;">Sin embargos en los correos.</div>') +
+    (D.embargos.length ? D.embargos.map(e => `<div class="ct-g" style="padding:8px 0;"><div class="ct-g1"><span class="ct-prov">${escHtml(/SEGURIDAD SOCIAL/i.test(e.organismo) ? 'Seguridad Social' : 'Hacienda Local')}</span><span class="mono n-neg">${impEur(e.cobrado)}</span></div><div class="ct-g2">Cobrado el ${f(e.fecha)}${e.retencion ? ' · retenido el ' + f(e.retencion) : ''}${e.expediente ? ' · expediente ' + escHtml(e.expediente) : ''}</div>${e.levantado > 0.005 ? `<div class="ct-g3">Se liberaron ${impEur(e.levantado)} de lo retenido</div>` : ''}</div>`).join('') : '<div class="empty" style="padding:12px;">Sin embargos en los correos.</div>') +
     `</div></div><div class="two-col-note">Sale de los correos que manda Caja Rural. Es un control: lo que se debe hoy lo dicen las sedes electrónicas de Hacienda Local y de la AEAT.</div>`;
 }
 function renderImpPresentadas(){
@@ -18623,8 +18645,8 @@ function renderImpPresentadas(){
         <div class="imp-linea"><span>${Math.abs(dif) < 0.5 ? 'Gastos: coinciden' : dif < 0 ? 'Gastos que declaró de más que la app' : 'Gastos que la app tiene de más'}</span><span class="mono" style="color:${Math.abs(dif) < 0.5 ? 'var(--green)' : 'var(--orange)'};">${Math.abs(dif) < 0.5 ? '✓' : impEur(Math.abs(dif))}</span></div></div>`; }
     return `<div class="panel" style="margin-bottom:10px;"><div class="panel-head" style="flex-wrap:wrap;gap:6px;"><h3>Modelo ${escHtml(d.modelo)} · ${escHtml(d.periodo || '')} ${anio}</h3><span class="count">${d.negativa ? 'negativa' : 'a ingresar'}</span></div>
       <div class="panel-body">
-        <div class="imp-linea tot"><span>Resultado de la autoliquidación</span><span class="mono">${impEur(d.resultado)}</span></div>
-        ${d.ingresos != null ? `<div class="imp-linea sub"><span>Ingresos declarados</span><span class="mono">${impEur(d.ingresos)}</span></div><div class="imp-linea sub"><span>Gastos declarados</span><span class="mono">${impEur(d.gastos)}</span></div><div class="imp-linea sub"><span>Rendimiento neto</span><span class="mono">${impEur(d.rendimiento)}</span></div>` : ''}
+        <div class="imp-linea tot"><span>Resultado de la autoliquidación</span><span class="mono ${Number(d.resultado) > 0.004 ? 'n-neg' : 'n-pos'}">${impEur(d.resultado)}</span></div>
+        ${d.ingresos != null ? `<div class="imp-linea sub"><span>Ingresos declarados</span><span class="mono">${impEur(d.ingresos)}</span></div><div class="imp-linea sub"><span>Gastos declarados</span><span class="mono">${impEur(d.gastos)}</span></div><div class="imp-linea sub"><span>Rendimiento neto</span><span class="mono ${Number(d.rendimiento) >= 0 ? 'n-pos' : 'n-neg'}">${impEur(d.rendimiento)}</span></div>` : ''}
         <div style="font-size:12px;color:var(--ink-soft);line-height:1.6;margin-top:8px;">Presentada el ${f(d.fecha_presentacion)}<br>Por ${escHtml(d.presentador || '—')}${d.via ? ' · ' + escHtml(d.via) : ''}<br>Nº de justificante ${escHtml(d.justificante || '—')} · expediente ${escHtml(d.expediente || '—')}<br>CSV ${escHtml(d.csv || '—')}</div>
         ${(d.documentos || []).length ? `<div style="margin-top:8px;">${d.documentos.map(x => `<div class="imp-linea"><a href="${escHtml(x.url)}" target="_blank" rel="noopener">📄 ${escHtml(x.nombre)}</a><span></span></div>`).join('')}</div>` : ''}
         ${cmp}
@@ -18638,6 +18660,7 @@ function renderImpAnual(){
   $('imp-a-ing').textContent = impEur(D.ingAcum);
   $('imp-a-gas').textContent = impEur(D.gasAcum);
   $('imp-a-rend').textContent = impEur(rend);
+  impColor($('imp-a-ing'), D.ingAcum, 'ingreso'); impColor($('imp-a-gas'), D.gasAcum, 'gasto'); impColor($('imp-a-rend'), rend, 'signo');
   // pagado a cuenta
   const regs = [1,2,3,4].filter(k => _impPagos[k] != null), pagado = regs.reduce((s, k) => s + Number(_impPagos[k]), 0);
   const cerrados = []; for(let k = 1; k < qAct; k++) cerrados.push(k);
@@ -18650,7 +18673,7 @@ function renderImpAnual(){
   const bruto = Math.max(0, rend * IMP_PORC_130 / 100);
   $('imp-a-est').innerHTML = `<div class="imp-linea"><span>${IMP_PORC_130} % del rendimiento (pago fraccionado acumulado que correspondería hasta hoy)</span><span class="mono">${impEur(bruto)}</span></div>` +
     (faltan.length ? `<div class="imp-linea tot"><span>Pendiente de pagar a cuenta</span><span class="mono">Estimación incompleta</span></div><div class="imp-av info"><span class="ic">·</span><span>Falta registrar pagos del 130 para poder calcularlo.</span></div>`
-      : `<div class="imp-linea"><span>Ya pagado a cuenta</span><span class="mono">− ${impEur(pagado)}</span></div><div class="imp-linea tot"><span>Pendiente de pagar a cuenta (estimado)</span><span class="mono">${impEur(Math.max(0, bruto - pagado))}</span></div>`) +
+      : `<div class="imp-linea"><span>Ya pagado a cuenta</span><span class="mono">− ${impEur(pagado)}</span></div><div class="imp-linea tot"><span>Pendiente de pagar a cuenta (estimado)</span><span class="mono ${bruto - pagado > 0.004 ? 'n-neg' : 'n-pos'}">${impEur(Math.max(0, bruto - pagado))}</span></div>`) +
     `<div style="font-size:12px;color:var(--ink-soft);margin-top:6px;line-height:1.45;">Estimado con el ${IMP_PORC_130} % de los pagos fraccionados. No es la cuota final de la Renta.</div>`;
   // definitivo
   $('imp-a-def').innerHTML = '<div style="font-size:13.5px;line-height:1.5;"><b>No se calcula aquí.</b> El IRPF definitivo es anual (modelo 100) y depende de datos personales y fiscales que esta aplicación no tiene: otros ingresos, mínimo personal y familiar, deducciones, reducciones, retenciones de fuera de la actividad, etc. Lo determina el gestor, y esta información empresarial se le prepara desde Trimestres → Preparar para el gestor.</div>';
@@ -22847,11 +22870,24 @@ cargarDocumentosEconomicosReales().then(()=>{
   }catch(e){}
 });
 (function(){
+  // Al recargar (Safari, actualizar) se vuelve a la pantalla y a la pestaña en las que estabas.
+  // Impuestos es solo del administrador y la sesión tarda un momento en saberse: se espera a que esté antes de abrirla
+  // (antes se intentaba abrir demasiado pronto, se rechazaba y acababas en el Centro de control).
   const vistaGuardada = localStorage.getItem('vista_activa');
-  if(vistaGuardada){
+  if(!vistaGuardada) return;
+  const restaurar = () => {
     const btn = document.querySelector(`.nav button[data-view="${vistaGuardada}"]`);
-    if(btn) btn.click();
-  }
+    if(!btn) return;
+    btn.click();
+    const vistaId = 'view-' + (VISTA_ALIAS[vistaGuardada] || vistaGuardada);
+    document.querySelectorAll(`#${vistaId} [id$="-subtabs"]`).forEach(nav => {
+      let s = null; try{ s = localStorage.getItem('subtab_' + nav.id); }catch(e){}
+      const tab = s && nav.querySelector(`.client-tab[data-sub="${s}"]`);
+      if(tab && !tab.classList.contains('active')) tab.click();
+    });
+  };
+  if(vistaGuardada === 'impuestos'){ let n = 0; const t = setInterval(() => { if(esAdminSesion){ clearInterval(t); restaurar(); } else if(++n > 100) clearInterval(t); }, 150); }
+  else restaurar();
 })();
 
 const MOTIVOS_CANCELACION = [
