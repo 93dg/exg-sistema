@@ -3119,7 +3119,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.25</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.26</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3197,7 +3197,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.25</div>
+        <div class="sub" id="version-badge">V6.26</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18210,6 +18210,15 @@ async function cargarPrestamos(){
   }catch(e){ console.error(e); }
   _prestamosCargados = true;
 }
+// Recibos del préstamo que el banco manda por correo cada mes y que ya están guardados en gastos_correo (clasificados como recibo de banco)
+async function prRecibosDelBanco(){
+  const mapa = {};
+  try{
+    const {data} = await sb.from('gastos_correo').select('id,storage_path,nombre_archivo,texto_extraido').ilike('nombre_archivo', '%Recibo de prestamo%');
+    (data || []).forEach(r => { const m = /FUENTE OBEJUNA\s+\d+\s+(\d\d)-(\d\d)-(\d{4})/.exec(r.texto_extraido || ''); if(m) mapa[`${m[3]}-${m[2]}-${m[1]}`] = {id: r.id, path: r.storage_path}; });
+  }catch(e){ console.error(e); }
+  return mapa;
+}
 async function iniciarPrestamos(){ if(!_prestamosCargados) await cargarPrestamos(); renderPrestamos(); }
 function renderPrestamos(){
   const cont = document.getElementById('prest-lista'); if(!cont) return;
@@ -18238,7 +18247,7 @@ function renderPrestamos(){
         </div>
         <div class="imp-linea" style="margin-top:6px;"><span>Intereses de ${anio} ya contados como gasto</span><span class="mono">${PR_EUR(sum(contadas, 'interes'))}</span></div>
         <div class="imp-linea"><span>Intereses de ${anio} sin contar como gasto (${sinContar.length} recibo${sinContar.length === 1 ? '' : 's'})</span><span class="mono" style="color:${sinContar.length ? 'var(--orange)' : 'inherit'};">${PR_EUR(sum(sinContar, 'interes'))}</span></div>
-        ${sinContar.length ? `<button type="button" class="btn primary" style="width:100%;margin:10px 0 4px;padding:12px;" onclick="prRegistrarPendientes('${p.id}')">Registrar ${sinContar.length} recibo${sinContar.length === 1 ? '' : 's'} como gasto (${PR_EUR(sum(sinContar, 'interes'))})</button><div style="font-size:11.5px;color:var(--ink-soft);line-height:1.45;">Solo los intereses. Los de años anteriores no se tocan. Los recibos anteriores a septiembre no tienen justificante en la app: quedan pendientes de justificante hasta que pidas al banco el certificado de intereses.</div>` : ''}
+        ${sinContar.length ? `<button type="button" class="btn primary" style="width:100%;margin:10px 0 4px;padding:12px;" onclick="prRegistrarPendientes('${p.id}')">Registrar ${sinContar.length} recibo${sinContar.length === 1 ? '' : 's'} como gasto (${PR_EUR(sum(sinContar, 'interes'))})</button><div style="font-size:11.5px;color:var(--ink-soft);line-height:1.45;">Solo los intereses. Los de años anteriores no se tocan. Cada gasto lleva adjunto el recibo del banco que llegó por correo; si falta alguno queda pendiente de justificante.</div>` : ''}
         <details class="imp-det" style="margin-top:10px;"><summary>Cuadro de amortización (${cuadro.length} cuotas)</summary><div class="imp-det-body" style="padding:0 0 8px;">
           <div class="pr-fila pr-cab"><span></span><span>Fecha</span><span>Capital</span><span>Interés</span><span>Pendiente</span></div>
           ${cuadro.map(f => { const e = estado(f); return `<div class="pr-fila ${e[1]}" title="${e[2]}"><span class="pr-ic">${e[0]}</span><span>${prFechaCorta(f.iso)}<span class="pr-cuota">cuota ${f.cuota.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></span><span class="mono">${f.capital.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span><span class="mono">${f.interes.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span><span class="mono">${f.pendiente.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>`; }).join('')}
@@ -18256,21 +18265,24 @@ async function prRegistrarPendientes(id){
   if(!lista.length) return;
   const total = lista.reduce((s, f) => s + f.interes, 0);
   if(!window.confirm(`Se crearán ${lista.length} gasto(s) de intereses del préstamo de ${p.entidad} (${PR_EUR(total)} en total). No se cuenta nada de amortización. ¿Continuar?`)) return;
-  const url = 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/prestamos/' + p.num_acuerdo + '/cuadro-amortizacion-2026.png';
-  const payloads = lista.map(f => { const q = Math.floor((Number(f.iso.slice(5,7)) - 1) / 3) + 1;
+  const recibos = await prRecibosDelBanco();
+  const urlRecibo = f => recibos[f.iso] ? urlPublicaGastoCorreo(recibos[f.iso].path) : null;
+  const payloads = lista.map(f => { const q = Math.floor((Number(f.iso.slice(5,7)) - 1) / 3) + 1, rec = recibos[f.iso] || null;
     return {tipo: 'gasto', estado: 'emitido', numero: prNumeroGasto(p, f.iso), fecha_devengo: f.iso, entidad_id: p.entidad_id || null, importe: f.interes, iva_pct: 0,
       concepto: `Intereses del préstamo de ${p.entidad} (nº ${p.num_acuerdo}), recibo del ${prFechaCorta(f.iso)}: cuota ${PR_EUR(f.cuota)} = ${PR_EUR(f.capital)} de amortización (no es gasto) + ${PR_EUR(f.interes)} de intereses`,
       conceptos: [{descripcion: `INTERESES DEL PRÉSTAMO (cuota ${f.n} de ${p.n_cuotas}), TIPO ${p.tipo_interes} %`, cantidad: 1, unidad: 'ud', precio_unitario: f.interes, importe: f.interes, categoria: 'Gastos financieros', subcategoria: 'Intereses de préstamo', maquina: null}],
-      contabilidad: 'oficial', categoria: 'Gastos financieros', forma_pago: 'Domiciliado', archivo_url: url, justificante_url: url,
-      estado_justificante: 'pendiente', relacion_actividad: 'relacionada', tratamiento_iva: 'normal', desglose_iva: [{pct: 0, base: f.interes, cuota: 0, importe: f.interes, exento: true, nota: 'operación financiera exenta de IVA'}],
+      contabilidad: 'oficial', categoria: 'Gastos financieros', forma_pago: 'Domiciliado', archivo_path: rec ? rec.path : null, archivo_url: urlRecibo(f), justificante_url: urlRecibo(f),
+      estado_justificante: rec ? 'completo' : 'pendiente', relacion_actividad: 'relacionada', tratamiento_iva: 'normal', desglose_iva: [{pct: 0, base: f.interes, cuota: 0, importe: f.interes, exento: true, nota: 'operación financiera exenta de IVA'}],
       confianza_extraccion: 'media', metodo_extraccion: 'manual', estado_calidad: 'pendiente', enviado_gestor: false, periodo_fiscal: `${anio}-T${q}`,
-      info_faltante: 'El importe sale del cuadro de amortización del banco; falta el certificado de intereses o el recibo de ese mes.'}; });
+      info_faltante: rec ? null : 'El importe sale del cuadro de amortización del banco; falta el recibo de ese mes.'}; });
   try{
     const {data, error} = await sb.from('documentos_economicos').insert(payloads).select('id,numero,fecha_devengo,importe');
     if(error){ mostrarToast('No se pudieron registrar: ' + errText(error), 'err'); return; }
     (data || []).forEach(r => { const pl = payloads.find(x => x.numero === r.numero) || {}; const dRaw = new Date(r.fecha_devengo + 'T00:00:00');
       documentosRealesById[r.id] = {...pl, id: r.id, type: 'gasto', client: (p.entidad || '').toUpperCase(), dateRaw: r.fecha_devengo, dateLabel: formatFechaLabel(dRaw), amountLabel: PR_EUR(r.importe)}; });
-    mostrarToast(`${(data || []).length} gasto(s) de intereses registrados ✓`, 'ok');
+    for(const r of (data || [])){ const pl = payloads.find(x => x.numero === r.numero) || {}; const rec = recibos[pl.fecha_devengo]; if(rec) await sb.from('gastos_correo').update({gasto_id: r.id}).eq('id', rec.id); }
+    const sinRecibo = payloads.filter(x => x.estado_justificante !== 'completo').length;
+    mostrarToast(`${(data || []).length} gasto(s) de intereses registrados con su recibo ✓` + (sinRecibo ? ` (${sinRecibo} sin recibo)` : ''), 'ok');
     renderPrestamos();
     try{ if(typeof renderGastosProResumen === 'function') renderGastosProResumen(); if(typeof renderGastosProLista === 'function') renderGastosProLista(); }catch(e){}
   }catch(e){ mostrarToast('No se pudieron registrar: ' + errText(e), 'err'); }
