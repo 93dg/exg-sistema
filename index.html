@@ -3194,7 +3194,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.36</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.37</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3272,7 +3272,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.36</div>
+        <div class="sub" id="version-badge">V6.37</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3308,7 +3308,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <button data-view="tarifas"><span class="ico">💶</span><span class="label"> Tarifas</span></button>
       <button data-view="economia"><span class="ico">€</span><span class="label"> Economía</span></button>
       <button data-view="impuestos" class="admin-only"><span class="ico">🏛</span><span class="label"> Impuestos</span></button>
-      <button data-view="trabajos-prueba" class="admin-only"><span class="ico">🧪</span><span class="label"> Trabajos (prueba)</span></button>
       <button data-view="correo"><span class="ico">✉</span><span class="label"> Correo</span></button>
       <div class="grp-label" data-view="__label_cuenta">Cuenta</div>
       <button data-view="sistema" class="admin-only"><span class="ico">◉</span><span class="label"> Sistema</span></button>
@@ -3616,7 +3615,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     </div>
 
     <!-- ================= TRABAJOS ================= -->
-    <div class="view" id="view-trabajos">
+    <div class="view" id="view-trabajos-antiguo" hidden>
       <!-- ESCRITORIO -->
       <div class="topbar tabla-escritorio-solo">
         <div><h1>Trabajos</h1><div class="desc">Todos los trabajos de la empresa</div></div>
@@ -4797,9 +4796,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     </div>
 
     <!-- ================= TRABAJOS (prueba): cola de trabajos para móvil ================= -->
-    <div class="view" id="view-trabajos-prueba">
+    <div class="view" id="view-trabajos">
       <div class="topbar">
-        <div><h1>Trabajos <span style="font-size:12px;font-weight:600;color:var(--orange);vertical-align:middle;">PRUEBA</span></h1><div class="desc" id="tb-resumen">Cola de trabajos, en el orden que tú decidas</div></div>
+        <div><h1>Trabajos</h1><div class="desc" id="tb-resumen">Cola de trabajos, en el orden que tú decidas</div></div>
       </div>
       <div class="tb-barra" id="tb-barra">
         <div class="tb-seg" id="tb-seg"><button type="button" data-v="activos" class="active">Pendientes <b id="tb-n-act">0</b></button><button type="button" data-v="historial">Historial <b id="tb-n-his">0</b></button></div>
@@ -6634,7 +6633,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
   btn.addEventListener('click',()=>{
     // Vista sin permiso (definida en Configuración): no se abre venga el clic de donde venga
     // (menú, pestañas de documentos, atajos, asistente...)
-    if((btn.dataset.view==='impuestos' || btn.dataset.view==='trabajos-prueba') && !esAdminSesion){ mostrarToast('No tienes acceso a esta sección.'); return; }   // Impuestos y Trabajos (prueba): solo administrador
+    if(btn.dataset.view==='impuestos' && !esAdminSesion){ mostrarToast('No tienes acceso a esta sección.'); return; }   // Impuestos: solo administrador
     if(typeof vistasBloqueadas!=='undefined' && vistasBloqueadas.has(btn.dataset.view)){
       mostrarToast('No tienes acceso a esta sección.');
       return;
@@ -6656,7 +6655,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
       setTimeout(()=>realMap.invalidateSize(), 50);
     }
     if(btn.dataset.view==='impuestos') iniciarImpuestos();
-    if(btn.dataset.view==='trabajos-prueba') iniciarTrabajosPrueba();
+    if(btn.dataset.view==='trabajos') iniciarTrabajosPrueba();   // la nueva lista de trabajos (el nombre interno se queda)
     if(btn.dataset.view==='backup') cargarPapelera();
     if(btn.dataset.view==='control') cargarNotificaciones();
     if(btn.dataset.view==='clientes'){ cargarCasosRevision(); requestAnimationFrame(()=>{ ajustarSpacerClientes(); setTimeout(ajustarSpacerClientes,120); }); }
@@ -23271,7 +23270,8 @@ cargarDocumentosEconomicosReales().then(()=>{
   // Al recargar (Safari, actualizar) se vuelve a la pantalla y a la pestaña en las que estabas.
   // Impuestos es solo del administrador y la sesión tarda un momento en saberse: se espera a que esté antes de abrirla
   // (antes se intentaba abrir demasiado pronto, se rechazaba y acababas en el Centro de control).
-  const vistaGuardada = localStorage.getItem('vista_activa');
+  let vistaGuardada = localStorage.getItem('vista_activa');
+  if(vistaGuardada === 'trabajos-prueba') vistaGuardada = 'trabajos';   // la sección de prueba pasó a ser Trabajos
   if(!vistaGuardada) return;
   const restaurar = () => {
     const btn = document.querySelector(`.nav button[data-view="${vistaGuardada}"]`);
@@ -23284,7 +23284,7 @@ cargarDocumentosEconomicosReales().then(()=>{
       if(tab && !tab.classList.contains('active')) tab.click();
     });
   };
-  if(vistaGuardada === 'impuestos' || vistaGuardada === 'trabajos-prueba'){ let n = 0; const t = setInterval(() => { if(esAdminSesion){ clearInterval(t); restaurar(); } else if(++n > 100) clearInterval(t); }, 150); }
+  if(vistaGuardada === 'impuestos'){ let n = 0; const t = setInterval(() => { if(esAdminSesion){ clearInterval(t); restaurar(); } else if(++n > 100) clearInterval(t); }, 150); }
   else restaurar();
 })();
 
