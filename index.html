@@ -2117,6 +2117,11 @@ body.tb-modal{overflow:hidden;}
 .tb-igual button{flex:1;}
 .tb-dur{flex-wrap:nowrap;gap:4px;}
 .tb-dur button{flex:1;min-width:0;padding:10px 0;font-size:12.5px;}
+.tb-cab{position:sticky;top:-10px;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--paper);margin:-4px -16px 8px;padding:6px 16px 8px;border-bottom:1px solid var(--line);}
+.tb-cab h3{margin:0;font-size:17px;}
+.tb-cab-btns{display:flex;gap:8px;}
+.tb-ico{width:46px;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--concrete);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;font-family:inherit;}
+.tb-ico-ok{background:var(--orange);border-color:var(--orange);color:#fff;}
 </style>
 <style>
 /* required styles */
@@ -3194,7 +3199,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.37</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.38</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3272,7 +3277,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.37</div>
+        <div class="sub" id="version-badge">V6.38</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18487,7 +18492,8 @@ function tbAbrirEditor(id){
   const pr = tbPrioridades(j), fl = tbFlota(j), nM = fl.filter(x => x === 'mixta').length;
   const flActivos = TB_FLOTA.filter(f => f.id === 'mixta1' ? nM >= 1 : f.id === 'mixta2' ? nM >= 2 : fl.includes(f.tipo)).map(f => f.id);
   const pill = (v, txt, cls, activo, style) => `<button type="button" data-v="${escHtml(v)}" class="cc ${cls} ${activo ? 'active' : ''}" ${style ? `style="${style}"` : ''}>${escHtml(txt)}</button>`;
-  hoja.innerHTML = `<div class="tb-hoja-asa"></div><h3 style="margin:0 0 10px;">${id ? 'Editar trabajo' : 'Nuevo trabajo'}</h3>
+  const disquete = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>';
+  hoja.innerHTML = `<div class="tb-hoja-asa"></div><div class="tb-cab"><h3>${id ? 'Editar trabajo' : 'Nuevo trabajo'}</h3><div class="tb-cab-btns"><button type="button" class="tb-ico tb-ico-ok" onclick="tbGuardarEditor()" aria-label="Guardar" title="Guardar">${disquete}</button><button type="button" class="tb-ico" onclick="tbCerrarEditor()" aria-label="Cancelar" title="Cancelar"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button></div></div>
     <label>Cliente<input id="tb-f-cliente" class="search-box" type="text" value="${escHtml(j.cliente)}" placeholder="Nombre del cliente" autocomplete="off"></label>
     <label>Trabajo<input id="tb-f-trabajo" class="search-box" type="text" value="${escHtml(j.trabajo)}" placeholder="Qué hay que hacer" autocomplete="off"></label>
     <label>Lugar<select id="tb-f-lugar" class="search-box"><option value="">— SIN LUGAR —</option>${TB_LUGARES.map(l => `<option value="${escHtml(tbMay(l))}" ${tbMay(j.lugar) === tbMay(l) ? 'selected' : ''}>${escHtml(tbMay(l))}</option>`).join('')}</select></label>
@@ -18497,7 +18503,7 @@ function tbAbrirEditor(id){
     <div class="tb-etq">Flota <span>(las que hagan falta)</span></div><div class="tb-pills" data-campo="flota">${TB_FLOTA.map(f => pill(f.id, f.t, 'cc-' + f.c, flActivos.includes(f.id))).join('')}</div>
     ${id ? `<div class="tb-etq">Estado</div><div class="tb-pills" data-campo="estado">${TB_ESTADOS.map(e => pill(e, e, 'cc-' + TB_ESTADO_CLASE[e], tbEstado(j.estado) === e)).join('')}</div>${TB_ESTADO_AYUDA[tbEstado(j.estado)] ? '' : ''}` : ''}
     <label>Nota (opcional)<textarea id="tb-f-nota" class="search-box" rows="2" placeholder="Nota">${escHtml(j.nota)}</textarea></label>
-    <div class="tb-acciones"><button type="button" class="btn primary" onclick="tbGuardarEditor()">Guardar</button><button type="button" class="btn" onclick="tbCerrarEditor()">Cancelar</button></div>`;
+`;
   const grupo = campo => hoja.querySelector(`.tb-pills[data-campo="${campo}"]`);
   hoja.dataset.durActual = j.duracion || '';
   // prioridad: se eligen hasta 2 (al elegir una tercera sale la más antigua); siempre queda al menos una
