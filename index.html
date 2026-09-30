@@ -2069,11 +2069,10 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .tb-l1 .t{font-weight:500;color:var(--ink-soft);}
 .tb-l2{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;align-items:center;}
 .tb-chip{padding:3px 9px;border-radius:999px;border:1px solid var(--line);font-size:11.5px;font-weight:600;background:var(--concrete);color:var(--ink);font-family:inherit;line-height:1.3;}
-button.tb-prio{cursor:pointer;}
 .tb-prio.p-Alta{color:var(--red);border-color:var(--red);background:transparent;} .tb-prio.p-Media{color:var(--orange);border-color:var(--orange);background:transparent;} .tb-prio.p-Baja{color:#5f7a90;border-color:#7b93a8;background:transparent;}
 .tb-curso{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8;}
 .tb-nota{font-size:12px;color:var(--ink-soft);margin-top:4px;overflow-wrap:anywhere;}
-.tb-ok{flex:0 0 52px;border:none;border-left:1px solid var(--line);background:transparent;font-size:22px;color:var(--green);cursor:pointer;font-family:inherit;}
+.tb-ok{flex:0 0 46px;border:none;border-left:1px solid var(--line);background:transparent;font-size:22px;color:var(--green);cursor:pointer;font-family:inherit;}
 .tb-reabrir{color:var(--ink-soft);}
 .tb-card.levantada{opacity:.3;}
 .tb-flota{position:fixed;z-index:10000;margin:0 !important;box-shadow:0 12px 30px rgba(0,0,0,.35);transform:scale(1.02);pointer-events:none;opacity:.98;}
@@ -2094,6 +2093,15 @@ body.tb-modal{overflow:hidden;}
 .tb-acciones{display:flex;gap:8px;margin-top:6px;}
 .tb-acciones .btn{flex:1;padding:13px 6px;font-size:14.5px;}
 .tb-borrar{color:var(--red);border-color:var(--red);}
+.tb-x{color:var(--red);font-size:17px;}
+.tb-dif.d-Fácil{background:#dcfce7;border-color:#86efac;color:#166534;} .tb-dif.d-Medio{background:#fef3c7;border-color:#fcd34d;color:#92400e;} .tb-dif.d-Difícil{background:#fee2e2;border-color:#fca5a5;color:#991b1b;}
+.tb-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.tb-pills button{padding:10px 14px;font-size:14px;font-weight:600;border:1px solid var(--line);border-radius:999px;background:var(--concrete);color:var(--ink-soft);font-family:inherit;cursor:pointer;min-height:42px;}
+.tb-pills button.active{background:var(--asphalt);color:#fff;border-color:var(--asphalt);}
+.tb-pills button.p-Alta.active{background:var(--red);border-color:var(--red);} .tb-pills button.p-Media.active{background:var(--orange);border-color:var(--orange);} .tb-pills button.p-Baja.active{background:#7b93a8;border-color:#7b93a8;}
+.tb-pills button.d-Fácil.active{background:#16a34a;border-color:#16a34a;} .tb-pills button.d-Medio.active{background:#d97706;border-color:#d97706;} .tb-pills button.d-Difícil.active{background:#dc2626;border-color:#dc2626;}
+.tb-etq span{opacity:.7;}
+.tb-hoja select.search-box{width:100%;box-sizing:border-box;font-size:16px;margin-top:3px;}
 </style>
 <style>
 /* required styles */
@@ -3171,7 +3179,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.34</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.35</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3249,7 +3257,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.34</div>
+        <div class="sub" id="version-badge">V6.35</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18377,11 +18385,17 @@ async function prRegistrarPendientes(id){
 
 /* ================= TRABAJOS (prueba) =================
    Cada trabajo es una fila de sistema con tipo "trabajo_cola" y su ficha en data:
-   {prioridad, duracion, cliente, trabajo, nota, estado, orden, terminado_at}.
+   {prioridad, prioridades, dificultad, lugar, duracion, cliente, trabajo, nota, estado, orden, terminado_at}.
+   prioridades: hasta 2 de Alta/Media/Baja; prioridad es la más alta de ellas (color, filtros y compatibilidad).
    El orden manual es un número (orden): al mover un trabajo solo se guarda ese y queda entre sus dos vecinos. */
-const TB_PRIO = ['Alta', 'Media', 'Baja'], TB_ESTADOS = ['Pendiente', 'En curso', 'Terminado'], TB_DURACIONES = ['2h', '4h', '6h', '1d', '1,5d', '2d', '1s'];
+const TB_PRIO = ['Alta', 'Media', 'Baja'], TB_ESTADOS = ['Pendiente', 'En curso', 'Terminado'], TB_DIFICULTADES = ['Fácil', 'Medio', 'Difícil'];
+const TB_DURACIONES = ['4H', '6H', '1D', '1,5D', '2D', '1S'];   // las más usadas en la lista real (28 de 35 trabajos con duración); lo demás, con OTRO
+const TB_LUGARES = ['Fuente Obejuna', 'Alcornocal', 'Argallón', 'Cañada del Gamo', 'La Cardenchosa', 'La Coronada', 'Cuenca', 'Los Morenos', 'Navalcuervo', 'Ojuelos Altos', 'Ojuelos Bajos', 'Los Pánchez', 'Piconcillo', 'El Porvenir', 'Posadilla'];   // el pueblo y sus 14 aldeas, por nombre
+const tbMay = s => String(s || '').toUpperCase();
 let _tbJobs = [], _tbCargado = false, _tbFiltro = 'todos', _tbVista = 'activos', _tbEditando = null, _tbIgnorarClic = 0;
-function tbDatos(j){ return {prioridad: j.prioridad, duracion: j.duracion || '', cliente: j.cliente || '', trabajo: j.trabajo || '', nota: j.nota || '', estado: j.estado, orden: j.orden, terminado_at: j.terminado_at || null}; }
+function tbPrioridades(j){ const l = (Array.isArray(j.prioridades) && j.prioridades.length ? j.prioridades : [j.prioridad || 'Media']).filter(x => TB_PRIO.includes(x)).slice(0, 2); return l.length ? l : ['Media']; }
+function tbPrioPrincipal(l){ return TB_PRIO.find(p => l.includes(p)) || 'Media'; }
+function tbDatos(j){ const pr = tbPrioridades(j); return {prioridad: tbPrioPrincipal(pr), prioridades: pr, dificultad: j.dificultad || '', lugar: tbMay(j.lugar), duracion: tbMay(j.duracion), cliente: tbMay(j.cliente), trabajo: tbMay(j.trabajo), nota: tbMay(j.nota), estado: j.estado, orden: j.orden, terminado_at: j.terminado_at || null}; }
 function tbActivos(){ return _tbJobs.filter(j => j.estado !== 'Terminado').sort((a, b) => a.orden - b.orden); }
 function tbHistorial(){ return _tbJobs.filter(j => j.estado === 'Terminado').sort((a, b) => String(b.terminado_at || '').localeCompare(String(a.terminado_at || ''))); }
 async function iniciarTrabajosPrueba(){ if(!_tbCargado){ document.getElementById('tb-lista').innerHTML = '<div class="empty" style="padding:24px;">Cargando…</div>'; await tbCargar(); } tbRender(); }
@@ -18390,7 +18404,12 @@ async function tbCargar(){
   try{
     const {data, error} = await sb.from('sistema').select('id,tipo,data').eq('tipo', 'trabajo_cola');
     if(error) throw error;
-    _tbJobs = (data || []).filter(r => r.tipo === 'trabajo_cola' && r.data).map((r, i) => ({id: r.id, ...r.data, orden: Number(r.data.orden) || (i + 1) * 1000}));
+    _tbJobs = (data || []).filter(r => r.tipo === 'trabajo_cola' && r.data).map((r, i) => { const j = {id: r.id, ...r.data, orden: Number(r.data.orden) || (i + 1) * 1000}; j.prioridades = tbPrioridades(j); j.prioridad = tbPrioPrincipal(j.prioridades); return j; });
+    // lo que se guardó en minúsculas pasa a mayúsculas (una sola vez, en segundo plano)
+    const CAMPOS = ['duracion', 'cliente', 'trabajo', 'nota', 'lugar'];
+    const aMay = _tbJobs.filter(j => CAMPOS.some(k => j[k] && j[k] !== tbMay(j[k])));
+    aMay.forEach(j => CAMPOS.forEach(k => { j[k] = tbMay(j[k]); }));
+    if(aMay.length) (async () => { for(const j of aMay) await tbPersistir(j); })();
   }catch(e){ console.error(e); mostrarToast('No se pudieron cargar los trabajos: ' + errText(e), 'err'); }
   _tbCargado = true;
 }
@@ -18399,6 +18418,7 @@ async function tbPersistir(j){
   if(error){ mostrarToast('No se pudo guardar: ' + errText(error), 'err'); return false; }
   return true;
 }
+const TB_COLOR = {Alta: 'var(--red)', Media: 'var(--orange)', Baja: '#7b93a8'};
 function tbRender(){
   const lista = document.getElementById('tb-lista'); if(!lista) return;
   const act = tbActivos(), his = tbHistorial();
@@ -18409,44 +18429,78 @@ function tbRender(){
   const ayuda = document.getElementById('tb-ayuda');
   ayuda.style.display = _tbVista === 'activos' ? '' : 'none';
   ayuda.textContent = _tbFiltro === 'todos' ? 'Mantén pulsado un trabajo y arrástralo para cambiarlo de sitio.' : 'Para mover trabajos, quita el filtro (Todos).';
-  const cuenta = p => act.filter(j => j.prioridad === p).length;
+  const cuenta = p => act.filter(j => tbPrioridades(j).includes(p)).length;
   document.getElementById('tb-resumen').textContent = `${act.length} pendientes · ${cuenta('Alta')} alta · ${cuenta('Media')} media · ${cuenta('Baja')} baja`;
   const carta = (j, esHis) => {
-    const nota = j.nota ? `<div class="tb-nota">📝 ${escHtml(j.nota)}</div>` : '';
+    const pr = tbPrioridades(j), nota = j.nota ? `<div class="tb-nota">📝 ${escHtml(j.nota)}</div>` : '';
     const titulo = j.cliente ? `${escHtml(j.cliente)}${j.trabajo ? ` <span class="t">· ${escHtml(j.trabajo)}</span>` : ''}` : escHtml(j.trabajo || 'Sin nombre');
-    return `<div class="tb-card" data-id="${j.id}"><div class="tb-bp p-${j.prioridad}"></div><div class="tb-cuerpo"><div class="tb-l1">${titulo}</div><div class="tb-l2"><button type="button" class="tb-chip tb-prio p-${j.prioridad}" data-a="prio" title="Cambiar prioridad">● ${j.prioridad}</button>${j.duracion ? `<span class="tb-chip">⏱ ${escHtml(j.duracion)}</span>` : ''}${j.estado === 'En curso' ? '<span class="tb-chip tb-curso">En curso</span>' : ''}${esHis ? `<span class="tb-chip">Terminado ${j.terminado_at ? new Date(j.terminado_at).toLocaleDateString('es-ES', {day: 'numeric', month: 'short'}) : ''}</span>` : ''}</div>${nota}</div>${esHis ? '<button type="button" class="tb-ok tb-reabrir" data-a="reabrir" title="Volver a pendientes">↩</button>' : '<button type="button" class="tb-ok" data-a="fin" title="Marcar como terminado">✓</button>'}</div>`;
+    const barra = pr.length === 2 ? `linear-gradient(to bottom, ${TB_COLOR[pr[0]]} 50%, ${TB_COLOR[pr[1]]} 50%)` : TB_COLOR[pr[0]];
+    const chips = pr.map(p => `<span class="tb-chip tb-prio p-${p}">● ${p}</span>`).join('') +
+      (j.dificultad ? `<span class="tb-chip tb-dif d-${j.dificultad}">${escHtml(j.dificultad)}</span>` : '') +
+      (j.duracion ? `<span class="tb-chip">⏱ ${escHtml(j.duracion)}</span>` : '') +
+      (j.lugar ? `<span class="tb-chip">📍 ${escHtml(j.lugar)}</span>` : '') +
+      (j.estado === 'En curso' ? '<span class="tb-chip tb-curso">En curso</span>' : '') +
+      (esHis ? `<span class="tb-chip">Terminado ${j.terminado_at ? new Date(j.terminado_at).toLocaleDateString('es-ES', {day: 'numeric', month: 'short'}) : ''}</span>` : '');
+    const botones = `<button type="button" class="tb-ok tb-x" data-a="borrar" title="Quitar este trabajo">✕</button>` + (esHis ? '<button type="button" class="tb-ok tb-reabrir" data-a="reabrir" title="Volver a pendientes">↩</button>' : '<button type="button" class="tb-ok" data-a="fin" title="Marcar como terminado">✓</button>');
+    return `<div class="tb-card" data-id="${j.id}"><div class="tb-bp" style="background:${barra};"></div><div class="tb-cuerpo"><div class="tb-l1">${titulo}</div><div class="tb-l2">${chips}</div>${nota}</div>${botones}</div>`;
   };
   if(_tbVista === 'historial'){ lista.innerHTML = his.length ? his.map(j => carta(j, true)).join('') : '<div class="empty" style="padding:24px;">Aún no hay trabajos terminados.</div>'; return; }
-  const ver = _tbFiltro === 'todos' ? act : act.filter(j => j.prioridad === _tbFiltro);
+  const ver = _tbFiltro === 'todos' ? act : act.filter(j => tbPrioridades(j).includes(_tbFiltro));
   lista.innerHTML = ver.length ? ver.map(j => carta(j, false)).join('') : '<div class="empty" style="padding:24px;">No hay trabajos pendientes. Pulsa + Trabajo para añadir uno.</div>';
 }
 // ---- editor (hoja desde abajo) ----
-// Los campos de esta sección llevan data-no-mayus: la lista se escribe como la pides (6h, 1,5d, 1s, 2m…) y no debe pasar a mayúsculas como los documentos.
+// Todo el texto de esta sección va en mayúsculas, como el resto de la web (regla global al escribir, y tbDatos lo fuerza al guardar).
 function tbAbrirEditor(id){
-  _tbEditando = id || null; const j = id ? _tbJobs.find(x => x.id === id) : {prioridad: 'Media', estado: 'Pendiente', cliente: '', trabajo: '', duracion: '', nota: ''};
+  _tbEditando = id || null; const j = id ? _tbJobs.find(x => x.id === id) : {prioridad: 'Media', prioridades: ['Media'], estado: 'Pendiente', dificultad: '', lugar: '', cliente: '', trabajo: '', duracion: '', nota: ''};
   if(!j) return;
   const fondo = document.getElementById('tb-fondo'), hoja = document.getElementById('tb-hoja');
-  const seg = (nombre, opciones, actual) => `<div class="tb-segm" data-campo="${nombre}">${opciones.map(o => `<button type="button" data-v="${o}" class="${o === actual ? 'active' : ''} ${nombre === 'prioridad' ? 'p-' + o : ''}">${o}</button>`).join('')}</div>`;
+  const pr = tbPrioridades(j), durEnLista = TB_DURACIONES.includes(tbMay(j.duracion)), durOtro = !!j.duracion && !durEnLista;
+  const pills = (campo, opciones, activos, extra) => `<div class="tb-pills" data-campo="${campo}">${opciones.map(o => `<button type="button" data-v="${escHtml(o)}" class="${activos.includes(o) ? 'active' : ''} ${extra ? extra(o) : ''}">${escHtml(o)}</button>`).join('')}</div>`;
   hoja.innerHTML = `<div class="tb-hoja-asa"></div><h3 style="margin:0 0 10px;">${id ? 'Editar trabajo' : 'Nuevo trabajo'}</h3>
-    <label>Cliente<input id="tb-f-cliente" class="search-box" data-no-mayus type="text" value="${escHtml(j.cliente)}" placeholder="Nombre del cliente" autocomplete="off"></label>
-    <label>Trabajo<input id="tb-f-trabajo" class="search-box" data-no-mayus type="text" value="${escHtml(j.trabajo)}" placeholder="Qué hay que hacer" autocomplete="off"></label>
-    <label>Duración estimada<input id="tb-f-duracion" class="search-box" data-no-mayus type="text" value="${escHtml(j.duracion)}" placeholder="6h, 1d, 1,5d, 1s, 2m…" autocomplete="off"></label>
-    <div class="tb-rapidas">${TB_DURACIONES.map(d => `<button type="button" data-d="${d}">${d}</button>`).join('')}</div>
-    <div class="tb-etq">Prioridad</div>${seg('prioridad', TB_PRIO, j.prioridad)}
-    <div class="tb-etq">Estado</div>${seg('estado', TB_ESTADOS, j.estado)}
-    <label>Nota (opcional)<textarea id="tb-f-nota" class="search-box" data-no-mayus rows="2" placeholder="Nota">${escHtml(j.nota)}</textarea></label>
-    <div class="tb-acciones"><button type="button" class="btn primary" onclick="tbGuardarEditor()">Guardar</button><button type="button" class="btn" onclick="tbCerrarEditor()">Cancelar</button>${id ? '<button type="button" class="btn tb-borrar" onclick="tbEliminar()">Eliminar</button>' : ''}</div>`;
-  hoja.querySelectorAll('.tb-segm button').forEach(b => b.addEventListener('click', () => { b.parentElement.querySelectorAll('button').forEach(x => x.classList.remove('active')); b.classList.add('active'); }));
-  hoja.querySelectorAll('.tb-rapidas button').forEach(b => b.addEventListener('click', () => { document.getElementById('tb-f-duracion').value = b.dataset.d; }));
+    <label>Cliente<input id="tb-f-cliente" class="search-box" type="text" value="${escHtml(j.cliente)}" placeholder="Nombre del cliente" autocomplete="off"></label>
+    <label>Trabajo<input id="tb-f-trabajo" class="search-box" type="text" value="${escHtml(j.trabajo)}" placeholder="Qué hay que hacer" autocomplete="off"></label>
+    <label>Lugar<select id="tb-f-lugar" class="search-box"><option value="">— SIN LUGAR —</option>${TB_LUGARES.map(l => `<option value="${escHtml(tbMay(l))}" ${tbMay(j.lugar) === tbMay(l) ? 'selected' : ''}>${escHtml(tbMay(l))}</option>`).join('')}</select></label>
+    <div class="tb-etq">Prioridad <span>(hasta 2)</span></div>${pills('prioridad', TB_PRIO, pr, o => 'p-' + o)}
+    <div class="tb-etq">Dificultad</div>${pills('dificultad', TB_DIFICULTADES, j.dificultad ? [j.dificultad] : [], o => 'd-' + o)}
+    <div class="tb-etq">Duración estimada</div>
+    <div class="tb-pills" data-campo="duracion">${TB_DURACIONES.map(d => `<button type="button" data-v="${d}" class="${tbMay(j.duracion) === d ? 'active' : ''}">${d}</button>`).join('')}<button type="button" data-v="__otro" class="${durOtro ? 'active' : ''}">OTRO</button></div>
+    <input id="tb-f-duracion" class="search-box" type="text" value="${durOtro ? escHtml(j.duracion) : ''}" placeholder="Duración: 5H, 3D, 2M…" autocomplete="off" style="${durOtro ? '' : 'display:none;'}margin:-2px 0 10px;width:100%;box-sizing:border-box;font-size:16px;">
+    ${id ? `<div class="tb-etq">Estado</div>${pills('estado', TB_ESTADOS, [j.estado])}` : ''}
+    <label>Nota (opcional)<textarea id="tb-f-nota" class="search-box" rows="2" placeholder="Nota">${escHtml(j.nota)}</textarea></label>
+    <div class="tb-acciones"><button type="button" class="btn primary" onclick="tbGuardarEditor()">Guardar</button><button type="button" class="btn" onclick="tbCerrarEditor()">Cancelar</button></div>`;
+  const grupo = campo => hoja.querySelector(`.tb-pills[data-campo="${campo}"]`);
+  // prioridad: se eligen hasta 2 (al elegir una tercera sale la más antigua); siempre queda al menos una
+  const ordenPrio = pr.slice();
+  grupo('prioridad').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    const v = b.dataset.v, i = ordenPrio.indexOf(v);
+    if(i >= 0){ if(ordenPrio.length > 1) ordenPrio.splice(i, 1); } else { ordenPrio.push(v); if(ordenPrio.length > 2) ordenPrio.shift(); }
+    grupo('prioridad').querySelectorAll('button').forEach(x => x.classList.toggle('active', ordenPrio.includes(x.dataset.v)));
+    grupo('prioridad').dataset.sel = ordenPrio.join(',');
+  }));
+  grupo('prioridad').dataset.sel = ordenPrio.join(',');
+  // dificultad y duración: una sola; tocar la marcada la quita
+  ['dificultad', 'duracion', 'estado'].forEach(campo => { const g = grupo(campo); if(!g) return;
+    g.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      const ya = b.classList.contains('active');
+      g.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+      if(campo === 'estado'){ b.classList.add('active'); return; }
+      if(!ya) b.classList.add('active');
+      if(campo === 'duracion'){ const otro = !ya && b.dataset.v === '__otro', t = document.getElementById('tb-f-duracion'); t.style.display = otro ? '' : 'none'; if(otro) setTimeout(() => t.focus(), 50); else t.value = ''; }
+    }));
+  });
   fondo.style.display = 'flex'; document.body.classList.add('tb-modal');
   if(!id) setTimeout(() => document.getElementById('tb-f-cliente')?.focus(), 80);
 }
 function tbCerrarEditor(){ document.getElementById('tb-fondo').style.display = 'none'; document.body.classList.remove('tb-modal'); _tbEditando = null; }
 async function tbGuardarEditor(){
-  const v = id => (document.getElementById(id)?.value || '').trim(), activo = c => document.querySelector(`#tb-hoja .tb-segm[data-campo="${c}"] button.active`)?.dataset.v;
+  const v = id => (document.getElementById(id)?.value || '').trim(), activo = c => document.querySelector(`#tb-hoja .tb-pills[data-campo="${c}"] button.active`)?.dataset.v;
   const cliente = v('tb-f-cliente'), trabajo = v('tb-f-trabajo');
   if(!cliente && !trabajo){ mostrarToast('Escribe al menos el cliente o el trabajo.', 'err'); return; }
-  const datos = {cliente, trabajo, duracion: v('tb-f-duracion'), nota: v('tb-f-nota'), prioridad: activo('prioridad') || 'Media', estado: activo('estado') || 'Pendiente'};
+  const pr = (document.querySelector('#tb-hoja .tb-pills[data-campo="prioridad"]')?.dataset.sel || 'Media').split(',').filter(x => TB_PRIO.includes(x)).slice(0, 2);
+  const dur = activo('duracion'), duracion = dur === '__otro' ? v('tb-f-duracion') : (dur || '');
+  const datos = {cliente, trabajo, lugar: v('tb-f-lugar'), duracion, nota: v('tb-f-nota'), dificultad: activo('dificultad') || '', prioridades: pr.length ? pr : ['Media']};
+  datos.prioridad = tbPrioPrincipal(datos.prioridades);
+  datos.estado = _tbEditando ? (activo('estado') || 'Pendiente') : 'Pendiente';
   if(_tbEditando){
     const j = _tbJobs.find(x => x.id === _tbEditando); if(!j) return;
     const eraTerminado = j.estado === 'Terminado';
@@ -18455,23 +18509,23 @@ async function tbGuardarEditor(){
     if(datos.estado !== 'Terminado' && eraTerminado){ j.terminado_at = null; j.orden = ((tbActivos()[0] || {}).orden || 1000) - 1000; }
     if(await tbPersistir(j)){ tbCerrarEditor(); tbRender(); mostrarToast('Guardado ✓', 'ok'); }
   } else {
-    const primero = tbActivos()[0], j = {...datos, orden: (primero ? primero.orden : 1000) - 1000, terminado_at: datos.estado === 'Terminado' ? new Date().toISOString() : null};   // el nuevo entra arriba del todo
+    const primero = tbActivos()[0], j = {...datos, orden: (primero ? primero.orden : 1000) - 1000, terminado_at: null};   // el nuevo entra arriba del todo
     const {data, error} = await sb.from('sistema').insert({tipo: 'trabajo_cola', data: tbDatos(j)}).select('id').single();
     if(error || !data){ mostrarToast('No se pudo añadir: ' + errText(error), 'err'); return; }
     j.id = data.id; _tbJobs.push(j); _tbVista = 'activos'; _tbFiltro = 'todos'; tbCerrarEditor(); tbRender(); window.scrollTo(0, 0); mostrarToast('Trabajo añadido ✓', 'ok');
   }
 }
-async function tbEliminar(){
-  const j = _tbJobs.find(x => x.id === _tbEditando); if(!j) return;
-  if(!window.confirm(`¿Eliminar "${j.cliente || j.trabajo}"? No se puede deshacer.`)) return;
+async function tbEliminar(id){
+  const j = _tbJobs.find(x => x.id === (id || _tbEditando)); if(!j) return;
+  if(!window.confirm(`¿Quitar "${j.cliente || j.trabajo}"? No se puede deshacer.`)) return;
   const {error} = await sb.from('sistema').delete().eq('id', j.id);
-  if(error){ mostrarToast('No se pudo eliminar: ' + errText(error), 'err'); return; }
-  _tbJobs = _tbJobs.filter(x => x.id !== j.id); tbCerrarEditor(); tbRender(); mostrarToast('Eliminado', 'ok');
+  if(error){ mostrarToast('No se pudo quitar: ' + errText(error), 'err'); return; }
+  _tbJobs = _tbJobs.filter(x => x.id !== j.id); if(_tbEditando) tbCerrarEditor(); tbRender(); mostrarToast('Trabajo quitado', 'ok');
 }
 async function tbAccion(id, a){
   const j = _tbJobs.find(x => x.id === id); if(!j) return;
-  if(a === 'prio'){ j.prioridad = TB_PRIO[(TB_PRIO.indexOf(j.prioridad) + 1) % 3]; tbRender(); await tbPersistir(j); }
-  else if(a === 'fin'){ j.estado = 'Terminado'; j.terminado_at = new Date().toISOString(); tbRender(); if(await tbPersistir(j)) mostrarToast('Terminado ✓ · está en el historial', 'ok'); }
+  if(a === 'borrar') return tbEliminar(id);
+  if(a === 'fin'){ j.estado = 'Terminado'; j.terminado_at = new Date().toISOString(); tbRender(); if(await tbPersistir(j)) mostrarToast('Terminado ✓ · está en el historial', 'ok'); }
   else if(a === 'reabrir'){ j.estado = 'Pendiente'; j.terminado_at = null; j.orden = ((tbActivos()[0] || {}).orden || 1000) - 1000; tbRender(); if(await tbPersistir(j)) mostrarToast('Vuelve a pendientes, arriba del todo', 'ok'); }
 }
 // ---- arrastrar con pulsación larga ----
