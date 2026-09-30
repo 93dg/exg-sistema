@@ -3248,7 +3248,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.46</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.47</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3326,7 +3326,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.46</div>
+        <div class="sub" id="version-badge">V6.47</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -22715,14 +22715,34 @@ document.addEventListener('click', (ev)=>{
 async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   if(!exigirNivelDoc(id,'editar')) return;
   if(!sb) return;
+  const docAct = documentosRealesById[id];
+  const totalDoc = Number(docAct?.importe ?? docAct?.total ?? 0), yaCobrado = Number(docAct?.cobrado_importe || 0);
+  const eur = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
+  const cerrarMenus = () => document.querySelectorAll(`.estado-cobro-dd[data-doc-id="${id}"]`).forEach(dd => dd.classList.remove('open'));
   const payload = {estado_cobro: valor};
   // COBRADO = cobrado entero, en TODOS los tipos de documento (no solo facturas)
   if(valor==='cobrado'){
-    const doc = documentosRealesById[id];
-    payload.cobrado_importe = doc?.total || 0;
+    payload.cobrado_importe = docAct?.total || 0;
+  } else if(valor==='parcial'){
+    // Cobro parcial: hay que decir cuánto se ha cobrado. Sin importe la base de datos lo devuelve a Pendiente de cobrar.
+    cerrarMenus();
+    const r = await pedirCampos('Cobro parcial · ' + (docAct?.client || 'documento'), [{id: 'importe', label: '¿Cuánto te ha pagado en total? (el documento es de ' + eur(totalDoc) + ')', tipo: 'number', valor: yaCobrado > 0 ? yaCobrado : '', placeholder: 'Importe en euros', requerido: true}]);
+    if(!r){ renderControlDocs(); return; }
+    const n = Math.round(Number(String(r.importe).replace(',', '.')) * 100) / 100;
+    if(!(n > 0)){ mostrarToast('Escribe lo que te ha pagado, más de 0 €.', 'err'); renderControlDocs(); return; }
+    payload.cobrado_importe = n;
+  } else if(valor==='pendiente_cobrar' && yaCobrado > 0 && docAct && ['parcial','cobrado'].includes(docAct.estado_cobro)){
+    // Con algo cobrado la base de datos no deja Pendiente de cobrar: hay que poner lo cobrado a 0
+    cerrarMenus();
+    const ok = await confirmarAccion('Ya hay ' + eur(yaCobrado) + ' cobrados. Para dejarlo en Pendiente de cobrar se pone lo cobrado a 0 €. ¿Seguro?');
+    if(!ok){ renderControlDocs(); return; }
+    payload.cobrado_importe = 0;
   }
-  const {error} = await sb.from('documentos_economicos').update(payload).eq('id', id);
+  const {data: guardado, error} = await sb.from('documentos_economicos').update(payload).eq('id', id).select('estado_cobro,cobrado_importe').single();
   if(error){ mostrarToast('Error: '+errText(error), 'err'); return; }
+  // lo que vale es lo que dejó la base de datos (calcula el estado según lo cobrado), no lo que se pidió
+  if(guardado){ payload.estado_cobro = guardado.estado_cobro; if(guardado.cobrado_importe != null) payload.cobrado_importe = Number(guardado.cobrado_importe); }
+  const pedido = valor; valor = payload.estado_cobro;
   if(documentosRealesById[id]){ Object.assign(documentosRealesById[id], payload); }
   if(payload.cobrado_importe != null){
     const filaDoc = document.getElementById('docrow-'+id); if(filaDoc) filaDoc.dataset.cobrado = Number(payload.cobrado_importe)||0;
@@ -22739,7 +22759,9 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
     if(pillEl){ pillEl.className = 'pill '+valor; pillEl.textContent = label; }
     dd.classList.remove('open');
   });
-  mostrarToast('Estado actualizado ✓', 'ok');
+  if(pedido !== valor){ const nom = ESTADOS_DOCUMENTO.find(o=>o[0]===valor)?.[1] || valor; mostrarToast('Quedó como ' + nom + ' porque hay ' + eur(payload.cobrado_importe) + ' cobrados de ' + eur(totalDoc) + '.', 'ok'); }
+  else if(valor==='parcial'){ mostrarToast('Cobro parcial guardado: ' + eur(payload.cobrado_importe) + ' cobrados, faltan ' + eur(Math.max(0, totalDoc - payload.cobrado_importe)) + ' ✓', 'ok'); }
+  else mostrarToast('Estado actualizado ✓', 'ok');
   renderControlDocs();
 }
 // ===== Editor: estado y cómo mostrar el PDF =====
@@ -22978,7 +23000,10 @@ function totalBlockHtml(doc){
     ivaHtml = `<div class="fc-total-mini"><span class="fc-total-label">IVA ${Number(pct)}%</span><span class="fc-total-sub">${ivaLabel}</span></div>`;
     subtotalHtml = `<div class="fc-total-mini"><span class="fc-total-label">Subtotal</span><span class="fc-total-sub">${baseLabel}</span></div>`;
   }
-  return `${ivaHtml}${subtotalHtml}<div class="fc-total-mini"><span class="fc-total-label">Total</span><span class="fc-total-valor">${totalLabel}</span></div>`;
+  const cob = Number(doc.cobrado_importe || 0);
+  const cobroHtml = (doc.estado_cobro === 'parcial' && cob > 0 && cob < total)
+    ? `<div class="fc-total-mini"><span class="fc-total-label">Cobrado</span><span class="fc-total-sub n-pos">${cob.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</span></div><div class="fc-total-mini"><span class="fc-total-label">Falta</span><span class="fc-total-sub n-neg">${(total - cob).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</span></div>` : '';
+  return `${ivaHtml}${subtotalHtml}<div class="fc-total-mini"><span class="fc-total-label">Total</span><span class="fc-total-valor">${totalLabel}</span></div>${cobroHtml}`;
 }
 function ivaLineHtml(doc){
   const pct = (DOC_TYPES[doc.type] && DOC_TYPES[doc.type].hasIva===false) ? null : doc.iva_pct;
