@@ -126,7 +126,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.21 · Sistema …</div>
+    <div class="ver" id="ver-subir">Subir S3.22 · Sistema …</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -857,7 +857,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
       if (!resp.ok) return null;
       const filas = await resp.json();
       if (!Array.isArray(filas)) return null;
-      const lotes = new Map(), idOk = s => typeof s === "string" && /^[\w-]+$/.test(s);
+      const lotes = new Map(), idOk = s => (typeof s === "number" && Number.isFinite(s)) || (typeof s === "string" && /^[\w-]+$/.test(s));
       filas.slice().reverse().forEach(f => {   // del más antiguo al más nuevo: el primer adjunto es el primero
         if (!idOk(f.id)) return;
         const clave = f.lote_id && idOk(f.lote_id) ? f.lote_id : "solo-" + f.id;
@@ -870,9 +870,11 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
           m.attachments.push({ documento_id: f.id, kind: f.source, file_url: url, storage_path: f.storage_path || null });
         }
       });
-      return Array.from(lotes.values()).map(m => { if (m.attachments.length === 0) m.kind = "texto"; return m; })
-        .filter(m => m.kind === "texto" ? !!m.documento_id : m.attachments.length > 0)
+      const lista = Array.from(lotes.values()).map(m => { if (m.attachments.length === 0) m.kind = "texto"; return m; })
+        .filter(m => m.kind === "texto" ? m.documento_id != null : m.attachments.length > 0)
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 200);
+      if (filas.length > 0 && lista.length === 0) return null;   // llegaron filas pero no se pudo leer ninguna: es un fallo, no una lista vacía
+      return lista;
     } catch(e){ return null; }
   }
   const firmaLista = l => l.map(m => m.msg_id + ":" + (m.attachments || []).length + ":" + (m.nota || "")).join("|");
@@ -884,7 +886,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   async function sincronizarConLaBase(){
     if (subiendo) return;
     const bd = await leerHistorialDeBD();
-    if (!bd) return;   // sin conexión: se queda lo que había
+    if (!bd) return;   // sin conexión o respuesta ilegible: se queda lo que había
     if (firmaLista(bd) === firmaLista(leerHistorial())) return;
     guardarHistorial(bd);
     repintarFeed(bd);
@@ -902,7 +904,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   window.abrirMenuAnadir = abrirMenuAnadir;
   // Versión del sistema desde BD (no hay que actualizarla a mano)
   fetch(SUPABASE_URL+"/rest/v1/arranque?clave=eq.web_version_actual&select=valor",{headers:{"Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY}})
-    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.21 · Sistema '+d[0].valor; }).catch(()=>{});
+    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.22 · Sistema '+d[0].valor; }).catch(()=>{});
   window.abrirEnlaceDesdeSubir = abrirEnlaceDesdeSubir;
   window.toggleMsgVerificado = toggleMsgVerificado;
   menuAnadir.addEventListener("click", (e) => { if (e.target === menuAnadir) menuAnadir.classList.remove("activo"); });
