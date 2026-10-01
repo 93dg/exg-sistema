@@ -1909,8 +1909,18 @@ body.rb-oculta-fab #report-bug-btn, body:has(#asistente-ia-fab.hide) #report-bug
 #rb-herr{display:flex;justify-content:center;gap:8px;padding:8px 12px 4px;}
 .rb-t{border:1px solid #3a3a40;background:#1d1d21;color:#ddd;border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
 .rb-t.act{background:#fff;color:#111;border-color:#fff;}
+#rb-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;padding:4px 12px;}
+.rb-c{border:1px solid #3a3a40;background:#1d1d21;color:#ddd;border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.rb-c.act{background:var(--orange);border-color:var(--orange);color:#fff;}
+#rb-texto{display:flex;gap:8px;align-items:center;padding:4px 12px;}
+#rb-txt{flex:1;min-width:0;background:#fff;color:#111;border:none;border-radius:999px;padding:11px 16px;font-size:16px !important;font-family:inherit;}
+#rb-marcar.escribiendo #rb-herr, #rb-marcar.escribiendo #rb-chips{display:none;}
 #rb-inf{display:flex;gap:10px;padding:8px 12px calc(env(safe-area-inset-bottom,0px) + 14px);}
-#rb-inf .btn{flex:1;padding:13px 10px !important;font-size:14.5px !important;}
+#rb-inf .btn{padding:14px 10px !important;font-size:15px !important;}
+#rb-inf .btn.primary{flex:2;}
+#rb-inf .btn:not(.primary){flex:1.2;}
+#rb-inf .btn:disabled{opacity:.5;}
+body:has(#rb-marcar.abierto) #toast-stack{top:calc(env(safe-area-inset-top,0px) + 64px);bottom:auto;left:12px;right:12px;align-items:center;z-index:9999;}   /* el aviso de enviado arriba, para que no tape los botones */
 #report-bug-miniatura{display:none;height:34px;width:auto;border-radius:6px;border:1px solid rgba(255,255,255,.35);}
 #report-bug-bar{
   display:none;position:fixed;left:0;right:0;bottom:0;z-index:9999;
@@ -3498,10 +3508,12 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
 <div id="repro-badge" style="display:none;position:fixed;bottom:90px;right:20px;z-index:9998;background:var(--asphalt,#232323);color:#fff;padding:7px 12px;border-radius:20px;font-size:12px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,.3);cursor:pointer;" onclick="document.querySelector('.nav button[data-view=\'reportes\']')?.click()">🔁 Reprocesando…</div>
 
 <div id="rb-marcar">
-  <div id="rb-sup"><button type="button" class="rb-b" onclick="rbCancelar()" title="Cancelar" aria-label="Cancelar">✕</button><span>Marca con el dedo lo que quieres decir<br><small style="opacity:.65;font-weight:400;">(es opcional)</small></span><button type="button" class="rb-b" onclick="rbDeshacer()" title="Deshacer" aria-label="Deshacer">↶</button><button type="button" class="rb-b" onclick="rbBorrarMarcas()" title="Borrar marcas" aria-label="Borrar marcas">🗑</button></div>
+  <div id="rb-sup"><button type="button" class="rb-b" onclick="rbCancelar()" title="Cancelar" aria-label="Cancelar">✕</button><span>Marca lo que quieras<br><small style="opacity:.65;font-weight:400;">(todo lo de abajo es opcional)</small></span><button type="button" class="rb-b" onclick="rbDeshacer()" title="Deshacer" aria-label="Deshacer">↶</button><button type="button" class="rb-b" onclick="rbBorrarMarcas()" title="Borrar marcas" aria-label="Borrar marcas">🗑</button></div>
   <div id="rb-caja"><canvas id="rb-lienzo"></canvas></div>
   <div id="rb-herr"><button type="button" class="rb-t act" data-h="trazo" onclick="rbHerramienta('trazo')">✏️ Pintar</button><button type="button" class="rb-t" data-h="rect" onclick="rbHerramienta('rect')">▭ Recuadro</button></div>
-  <div id="rb-inf"><button type="button" class="btn" onclick="rbContinuar()">💬 Escribir lo que pasa</button><button type="button" class="btn primary" onclick="rbMejorarDiseno()">🎨 Mejorar diseño</button></div>
+  <div id="rb-chips"><button type="button" class="rb-c" data-c="diseno" onclick="this.classList.toggle('act')">Diseño</button><button type="button" class="rb-c" data-c="colores" onclick="this.classList.toggle('act')">Colores</button><button type="button" class="rb-c" data-c="tamano" onclick="this.classList.toggle('act')">Tamaño</button><button type="button" class="rb-c" data-c="texto" onclick="this.classList.toggle('act')">Texto</button><button type="button" class="rb-c" data-c="posicion" onclick="this.classList.toggle('act')">Posición</button><button type="button" class="rb-c" data-c="fallo" onclick="this.classList.toggle('act')">Fallo</button></div>
+  <div id="rb-texto"><input type="text" id="rb-txt" placeholder="Qué pasa (si quieres)…" autocomplete="off" enterkeyhint="send" onfocus="document.getElementById('rb-marcar').classList.add('escribiendo')" onblur="document.getElementById('rb-marcar').classList.remove('escribiendo')" onkeydown="if(event.key==='Enter'){event.preventDefault();rbEnviar(false);}"><button type="button" id="rb-mic" class="rb-b" onclick="toggleDictado('rb-txt','rb-mic')" title="Dictar" aria-label="Dictar">🎤</button></div>
+  <div id="rb-inf"><button type="button" class="btn primary" onclick="rbEnviar(false)">Enviar</button><button type="button" class="btn" onclick="rbEnviar(true)">Enviar y marcar otro</button></div>
 </div>
 <div id="report-bug-bar">
   <span class="sub-t" id="report-bug-seccion" style="white-space:nowrap;"></span>
@@ -11657,7 +11669,7 @@ function renderMejora(){
     const estadoLabel = ESTADO_LABEL[estadoExg] || estadoExg;
     const tieneProtocolo = !!m.protocolo_exg;
     return `<tr onclick="abrirDetalleReporte('${m.id}')" style="cursor:pointer;">
-      <td>${m.categoria === 'mejorar_diseno' ? '<span class="pill porconfirmar pill-sm">Mejorar diseño</span> ' : ''}${cuerpo}${tieneProtocolo?` <span style="font-size:10px;color:var(--orange);">EXG</span>`:''}${m.captura_url ? ` — <a href="${m.captura_url}" target="_blank" onclick="event.stopPropagation();">📷</a>` : ''}</td>
+      <td>${m.categoria === 'mejorar_diseno' && !(m.etiquetas && m.etiquetas.length) ? '<span class="pill porconfirmar pill-sm">Mejorar diseño</span> ' : ''}${(m.etiquetas || []).map(e => '<span class="pill porconfirmar pill-sm">' + ({diseno: 'Diseño', colores: 'Colores', tamano: 'Tamaño', texto: 'Texto', posicion: 'Posición', fallo: 'Fallo'}[e] || e) + '</span>').join(' ')}${(m.etiquetas && m.etiquetas.length) ? ' ' : ''}${cuerpo}${tieneProtocolo?` <span style="font-size:10px;color:var(--orange);">EXG</span>`:''}${m.captura_url ? ` — <a href="${m.captura_url}" target="_blank" onclick="event.stopPropagation();">📷</a>` : ''}</td>
       <td style="font-size:12px;">${seccion}</td>
       <td style="font-size:12px;">${fecha}</td>
       <td onclick="event.stopPropagation();">
@@ -11897,7 +11909,7 @@ document.addEventListener('click', e=>{
   }
 });
 /* ===== REPORTAR CON MARCAS: se hace la captura de lo que se ve, se puede pintar o recuadrar encima, y se escribe lo que pasa o se manda directo como Mejorar diseño ===== */
-const _rb = {cap: null, marcas: [], herr: 'trazo', actual: null, blob: null, meta: null, ocupado: false};
+const _rb = {cap: null, marcas: [], herr: 'trazo', actual: null, blob: null, meta: null, ocupado: false, enviando: false};
 async function rbCapturar(){
   try{ await cargarLib('html2canvas'); }catch(e){ console.warn(e); }
   if(typeof html2canvas !== 'function') return null;
@@ -11921,7 +11933,8 @@ async function openReportBug(){
   _rb.cap = cap; _rb.marcas = []; _rb.actual = null; _rb.blob = null; _rb.meta = null;
   const lz = document.getElementById('rb-lienzo'); lz.width = cap.width; lz.height = cap.height;
   rbHerramienta('trazo'); rbPintar();
-  document.getElementById('rb-marcar').classList.add('abierto');
+  document.querySelectorAll('#rb-chips .rb-c').forEach(b => b.classList.remove('act')); document.getElementById('rb-txt').value = '';
+  document.getElementById('rb-marcar').classList.add('abierto'); rbAjustarVisual();
 }
 function rbAbrirBarra(){
   document.getElementById('report-bug-seccion').textContent = seccionActualNombre();
@@ -11950,30 +11963,50 @@ function rbPunto(ev){ const lz = document.getElementById('rb-lienzo'), r = lz.ge
 })();
 function rbDeshacer(){ _rb.marcas.pop(); rbPintar(); }
 function rbBorrarMarcas(){ _rb.marcas = []; rbPintar(); }
-function rbCancelar(){ document.getElementById('rb-marcar').classList.remove('abierto'); _rb.cap = null; _rb.marcas = []; }
+function rbCancelar(){ const ov = document.getElementById('rb-marcar'); ov.classList.remove('abierto', 'escribiendo'); ov.style.inset = ''; ov.style.left = ''; ov.style.right = ''; ov.style.top = ''; ov.style.height = ''; _rb.cap = null; _rb.marcas = []; }
 function rbMarcasResumen(){   // dónde se marcó, en fracciones de la pantalla (0 a 1), para que quien lea el reporte sepa a qué zona se refiere
   const lz = document.getElementById('rb-lienzo'), W = lz.width, H = lz.height;
   return _rb.marcas.map(m => { const xs = m.t === 'rect' ? [m.x0, m.x1] : m.pts.map(q => q[0]), ys = m.t === 'rect' ? [m.y0, m.y1] : m.pts.map(q => q[1]); const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys); return {tipo: m.t === 'rect' ? 'recuadro' : 'trazo', x: +(x0 / W).toFixed(3), y: +(y0 / H).toFixed(3), ancho: +((x1 - x0) / W).toFixed(3), alto: +((y1 - y0) / H).toFixed(3)}; });
 }
-async function rbPrepararImagen(){
-  rbPintar();
-  const lz = document.getElementById('rb-lienzo');
-  _rb.blob = await new Promise(res => lz.toBlob(res, 'image/jpeg', 0.82));
-  _rb.meta = {marcas: rbMarcasResumen(), pantalla: {ancho: window.innerWidth, alto: window.innerHeight}};
-  document.getElementById('rb-marcar').classList.remove('abierto');
+const RB_ETQ = {diseno: 'Diseño', colores: 'Colores', tamano: 'Tamaño', texto: 'Texto', posicion: 'Posición', fallo: 'Fallo'};
+function rbAjustarVisual(){   // con el teclado abierto la pantalla se ajusta a lo que se ve, para que Enviar no quede tapado
+  const ov = document.getElementById('rb-marcar'), vv = window.visualViewport; if(!ov || !vv || !ov.classList.contains('abierto')) return;
+  ov.style.inset = 'auto'; ov.style.left = '0'; ov.style.right = '0'; ov.style.top = vv.offsetTop + 'px'; ov.style.height = vv.height + 'px';
 }
-async function rbContinuar(){
-  await rbPrepararImagen();
-  const mini = document.getElementById('report-bug-miniatura'); if(mini && _rb.blob){ mini.src = URL.createObjectURL(_rb.blob); mini.style.display = 'block'; }
-  rbAbrirBarra();
-}
-async function rbMejorarDiseno(){   // directo: la captura con lo marcado y el aviso de que es para mejorar el diseño, sin escribir nada
-  await rbPrepararImagen();
-  _rb.meta.categoria = 'mejorar_diseno';
-  document.getElementById('report-bug-seccion').textContent = seccionActualNombre();
-  document.getElementById('report-bug-text').value = 'Mejorar el diseño de esta pantalla' + (_rb.marcas.length ? ' (mira la zona marcada en la captura)' : '');
-  document.getElementById('report-bug-bar').classList.add('active');
-  await guardarReporteBug();
+if(window.visualViewport){ window.visualViewport.addEventListener('resize', rbAjustarVisual); window.visualViewport.addEventListener('scroll', rbAjustarVisual); }
+async function rbEnviar(otro){   // un solo toque: la captura con lo marcado + las etiquetas que se hayan tocado + el texto si se escribió
+  if(_rb.enviando) return;
+  if(!sb){ mostrarToast('Supabase no está conectado.'); return; }
+  _rb.enviando = true;
+  const botones = Array.from(document.querySelectorAll('#rb-inf .btn')); botones.forEach(b => { b.disabled = true; });
+  const original = botones[0].textContent; botones[0].textContent = 'Enviando…';
+  try{
+    if(dictadoActivo) toggleDictado('rb-txt', 'rb-mic');
+    document.getElementById('rb-txt').blur();
+    rbPintar();
+    const lz = document.getElementById('rb-lienzo');
+    const blob = await new Promise(res => lz.toBlob(res, 'image/jpeg', 0.82));
+    const marcas = rbMarcasResumen(), etiquetas = Array.from(document.querySelectorAll('#rb-chips .rb-c.act')).map(b => b.dataset.c), texto = document.getElementById('rb-txt').value.trim();
+    let capturaUrl = null;
+    if(blob){
+      const path = `sin-clasificar/reportes/${Date.now()}.jpg`;
+      const {error: upErr} = await sb.storage.from(DOC_BUCKET).upload(path, blob, {contentType: 'image/jpeg'});
+      if(!upErr) capturaUrl = sb.storage.from(DOC_BUCKET).getPublicUrl(path).data.publicUrl;
+    }
+    const seccion = seccionActualNombre(), nombres = etiquetas.map(e => RB_ETQ[e]);
+    const cuerpo = nombres.join(', ') + (texto ? (nombres.length ? ': ' : '') + texto : '');
+    const categoria = etiquetas.includes('fallo') ? 'fallo' : etiquetas.length ? 'mejorar_diseno' : texto ? 'fallo' : 'marcado';
+    const {error} = await sb.from('sistema').insert({tipo: 'mejora', data: {
+      texto: `[${seccion}] ${cuerpo || (marcas.length ? 'Revisar lo marcado en la captura' : 'Revisar esta pantalla')}`,
+      captura_url: capturaUrl, estado: 'pendiente', protocolo_exg: PROTOCOLO_EXG_REPORTE, seccion, categoria, etiquetas: etiquetas.length ? etiquetas : null, marcas: marcas.length ? marcas : null,
+      created_context: {url: window.location.href, timestamp: new Date().toISOString(), pantalla: {ancho: window.innerWidth, alto: window.innerHeight}}}});
+    if(error){ mostrarToast('No se pudo enviar: ' + errText(error), 'err'); return; }
+    mostrarToast('Reporte enviado ✓', 'ok');
+    if(otro){   // se queda la misma captura para marcar otra cosa: se limpian marcas, etiquetas y texto
+      _rb.marcas = []; _rb.actual = null; rbPintar(); document.querySelectorAll('#rb-chips .rb-c').forEach(b => b.classList.remove('act')); document.getElementById('rb-txt').value = '';
+    } else rbCancelar();
+  }catch(e){ mostrarToast('No se pudo enviar: ' + errText(e), 'err'); }
+  finally{ _rb.enviando = false; botones.forEach(b => { b.disabled = false; }); botones[0].textContent = original; }
 }
 function anadirAReporte(id){
   const m = SISTEMA_CACHE.mejora.find(x=>x.id===id);
@@ -11992,8 +12025,8 @@ function closeReportBug(){
   const mini = document.getElementById('report-bug-miniatura'); if(mini){ mini.style.display = 'none'; mini.removeAttribute('src'); }
 }
 
-function toggleDictado(){
-  const micBtn = document.getElementById('report-bug-mic');
+function toggleDictado(inputId, micId){
+  const micBtn = document.getElementById(micId || 'report-bug-mic'), destinoId = inputId || 'report-bug-text';
   const Reconocedor = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!Reconocedor){
     mostrarToast('Este navegador no permite dictar por voz. Escribe el fallo a mano.');
@@ -12010,7 +12043,7 @@ function toggleDictado(){
   reconocimientoVoz.continuous = true;
   reconocimientoVoz.interimResults = false;
   reconocimientoVoz.onresult = (event)=>{
-    const textarea = document.getElementById('report-bug-text');
+    const textarea = document.getElementById(destinoId);
     let nuevoTexto = '';
     for(let i=event.resultIndex; i<event.results.length; i++){
       nuevoTexto += event.results[i][0].transcript;
@@ -12348,6 +12381,24 @@ async function cierreEXG({descripcion, origen='CHAT_DIRECTO', versionFinal, secc
 // FIN SISTEMA EXG
 // ════════════════════════════════════════════════════════════
 
+const PROTOCOLO_EXG_REPORTE = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PROTOCOLO EXG — REPORTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Este reporte forma parte del sistema de aprendizaje de EXG.
+No te limites a solucionar el problema concreto.
+Después de investigar, implementar y comprobar:
+• Determina la causa raíz
+• Identifica si existe un patrón reutilizable
+• Si hay aprendizaje generalizable → regístralo en conocimiento_exg
+• Indica cómo detectarlo en el futuro sin IA
+• Determina en qué otras secciones puede aparecer el mismo problema
+• Clasifica alcance: LOCAL / COMPONENTE / GLOBAL
+• Registra el cambio en cambios_exg con origen REPORTE_WEB
+• Ejecuta CIERRE EXG antes de terminar
+• Actualiza y sincroniza la versión obligatoriamente
+El objetivo no es solo reparar. Es que EXG aprenda para no volver a necesitarte en este patrón.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 async function guardarReporteBug(){
   const texto = document.getElementById('report-bug-text').value.trim();
   const statusEl = document.getElementById('report-bug-status');
@@ -12394,24 +12445,7 @@ async function guardarReporteBug(){
       setTimeout(closeReportBug, 800);
       return;
     }
-    const protocoloEXG = `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PROTOCOLO EXG — REPORTE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Este reporte forma parte del sistema de aprendizaje de EXG.
-No te limites a solucionar el problema concreto.
-Después de investigar, implementar y comprobar:
-• Determina la causa raíz
-• Identifica si existe un patrón reutilizable
-• Si hay aprendizaje generalizable → regístralo en conocimiento_exg
-• Indica cómo detectarlo en el futuro sin IA
-• Determina en qué otras secciones puede aparecer el mismo problema
-• Clasifica alcance: LOCAL / COMPONENTE / GLOBAL
-• Registra el cambio en cambios_exg con origen REPORTE_WEB
-• Ejecuta CIERRE EXG antes de terminar
-• Actualiza y sincroniza la versión obligatoriamente
-El objetivo no es solo reparar. Es que EXG aprenda para no volver a necesitarte en este patrón.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    const protocoloEXG = PROTOCOLO_EXG_REPORTE;
     const {error} = await sb.from('sistema').insert({tipo:'mejora', data:{
       texto: `[${seccion}] ${texto}`,
       captura_url: capturaUrl,
