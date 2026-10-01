@@ -47,10 +47,11 @@
     const url = typeof input === 'string' ? input : (input && input.url) || '';
     if(!/\/(rest|auth|functions)\/v1\//.test(url)) return orig(input, init);
     const t = performance.now(), rec = {url: url.replace(/^https?:\/\/[^/]+/, ''), method: String((init && init.method) || (input && input.method) || 'GET').toUpperCase(), inicio: Math.round(t), ms: null, msTotal: null, bytes: null, estado: null};
+    rec.pesar = M.reqs.length < 70 && /\/rest\/v1\//.test(url);   // se decide al pedirla: las 70 primeras de datos se pesan, el resto solo se cronometra
     if(M.reqs.length < 600) M.reqs.push(rec);
     return orig(input, init).then(res => {
       rec.ms = Math.round(performance.now() - t); rec.estado = res.status;
-      try{ res.clone().arrayBuffer().then(b => { rec.bytes = b.byteLength; rec.msTotal = Math.round(performance.now() - t); }).catch(() => {}); }catch(e){}
+      if(rec.pesar){ try{ res.clone().arrayBuffer().then(b => { rec.bytes = b.byteLength; rec.msTotal = Math.round(performance.now() - t); }).catch(() => {}); }catch(e){} }   // solo las primeras 70: clonar cada respuesta duplica su memoria
       return res;
     }, err => { rec.ms = Math.round(performance.now() - t); rec.estado = 'error'; throw err; });
   };
@@ -3326,7 +3327,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.56</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.57</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3404,7 +3405,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.56</div>
+        <div class="sub" id="version-badge">V6.57</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
