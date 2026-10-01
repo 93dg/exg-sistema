@@ -2298,6 +2298,7 @@ body.tb-modal{overflow:hidden;}
 .pleg .chip-filter.active[data-n]:not([data-n=""])::after{color:#fff;opacity:.9;}
 .pleg .chip-filter{padding:6px 10px;font-size:12.5px;line-height:1.2;border-radius:999px;white-space:nowrap;}   /* el tamaño de las pastillas de Trabajos: en el móvil las de siempre salían muy grandes */
 .pleg-guardados{display:none;}
+.pleg .reset-filtros-vista{display:none !important;}
 #newinvoice-overlay input, #newinvoice-overlay select, #newinvoice-overlay textarea{border-radius:12px;}   /* cajas con curvas en el editor de documentos */
 #newinvoice-overlay .btn, #newinvoice-overlay .btn-flecha{border-radius:999px;}
 .filters .anio-extra{display:none;}   /* los años más antiguos se esconden tras la pastilla Más, salvo los que estén elegidos */
@@ -3443,7 +3444,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.70</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.71</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3521,7 +3522,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.70</div>
+        <div class="sub" id="version-badge">V6.71</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -16210,9 +16211,7 @@ function toggleColumnaClientes(key, visible){
   localStorage.setItem('clientes-columnas-ocultas-v2', JSON.stringify([...ocultas]));
   aplicarVisibilidadColumnasClientes();
 }
-document.querySelectorAll('#clientes-filtro-tipo-chips .chip-filter, #clientes-filtro-prio-chips .chip-filter, #clientes-filtro-extra-chips .chip-filter').forEach(chip=>{
-  chip.addEventListener('click', ()=>{ chip.classList.toggle('active'); renderClientesTable(); });
-});
+/* (quitado en V6.71: este segundo manejador alternaba la pastilla otra vez además del onclick de cada una y las dejaba como estaban: los filtros Tipo, Prioridad y Más de Clientes no funcionaban) */
 function toggleBuscadorClientes(){
   const bar = document.getElementById('cli-bar-buscar');
   const btn = document.getElementById('cli-btn-buscar');
@@ -16249,6 +16248,64 @@ function toggleBuscadorDocumentos(prefijo){
    Las pastillas de siempre (.chip-filter dentro de .filters[id]) son las que mandan: se MUEVEN aquí, no se copian ni se esconden, así el filtrado y lo que se recuerda de cada una
    sigue igual. Lo nuevo: cada grupo tiene su título que se pliega tocándolo (los plegados pasan a una fila de columnas, en el orden en que se plegaron, y se recuerda en el servidor),
    y cada pastilla lleva su cantidad en naranja (cuántos documentos saldrían al elegirla con los otros filtros puestos). */
+/* ===== FILTROS PLEGABLES GENÉRICOS (el mismo estilo que Facturas, Albaranes y Presupuestos) =====
+   cfg: {id, despuesDe: selector tras el que va, quitar: [ids de desplegables viejos a quitar], plegados: [grupos plegados de serie],
+         grupos: [[clave, título, id del contenedor de pastillas, 'unico' si es de orden (no cuenta)]], cuenta(clave, pastilla) -> número}
+   Las pastillas de siempre se MUEVEN al bloque, no se copian: lo que filtran y lo que se recuerda no cambia. Lo plegado se recuerda en el servidor (pleg-<id>). */
+const PLEG2 = {};
+function pleg2Crear(cfg){
+  if(PLEG2[cfg.id]) return;
+  const ref = document.querySelector(cfg.despuesDe); if(!ref) return;
+  const caja = document.createElement('div'); caja.className = 'pleg'; caja.id = 'pleg-' + cfg.id;
+  caja.innerHTML = '<div class="pleg-cols"></div><div class="pleg-filas"></div><div class="pleg-guardados"></div>';
+  ref.insertAdjacentElement('afterend', caja);
+  PLEG2[cfg.id] = {cfg, plegados: (cfg.plegados || []).slice(), caja};
+  cfg.grupos.forEach(g => { const f = document.getElementById(g[2]); if(f) caja.querySelector('.pleg-guardados').appendChild(f); });
+  (cfg.quitar || []).forEach(i => document.getElementById(i)?.remove());
+  caja.addEventListener('click', ev => {
+    const t = ev.target.closest('button[data-pl]'), P = PLEG2[cfg.id];
+    if(t){ const k = t.dataset.pl; P.animar = k; P.plegados = P.plegados.includes(k) ? P.plegados.filter(x => x !== k) : P.plegados.concat(k); pleg2Guardar(cfg.id); pleg2Render(cfg.id); return; }
+    if(ev.target.closest('.chip-filter')) setTimeout(() => pleg2Refrescar(cfg.id), 0);
+  });
+  pleg2Render(cfg.id); pleg2Cargar(cfg.id);
+}
+async function pleg2Cargar(id, intentos){
+  intentos = intentos || 0;
+  if(typeof sb === 'undefined' || !sb){ if(intentos < 40) setTimeout(() => pleg2Cargar(id, intentos + 1), 500); return; }
+  try{
+    const {data} = await sb.from('filtros_persistentes').select('container_id,valor').eq('container_id', 'pleg-' + id);
+    (data || []).forEach(f => { try{ const l = JSON.parse(f.valor); if(Array.isArray(l)){ PLEG2[id].plegados = l.filter(k => PLEG2[id].cfg.grupos.some(g => g[0] === k)); pleg2Render(id); } }catch(e){} });
+  }catch(e){ console.warn('No se pudo leer qué filtros estaban plegados', e); }
+}
+async function pleg2Guardar(id){
+  if(typeof sb === 'undefined' || !sb) return;
+  const {error} = await sb.from('filtros_persistentes').upsert({container_id: 'pleg-' + id, valor: JSON.stringify(PLEG2[id].plegados), actualizado_at: new Date().toISOString()});
+  if(error) console.error('No se pudo guardar qué filtros están plegados', error);
+}
+function pleg2Texto(id, g){
+  const P = PLEG2[id], cont = document.getElementById(g[2]); const act = cont ? Array.from(cont.querySelectorAll('.chip-filter.active')) : [];
+  if(g[3] === 'unico'){ const a = act[0]; return g[1] + (a ? ' <b>' + escHtml(a.textContent.replace(/\s+/g, ' ').trim().replace(/\s*\d+$/, '')) + '</b>' : ''); }
+  return g[1] + (act.length ? ' <b>' + act.length + '</b>' : '');
+}
+function pleg2Render(id){
+  const P = PLEG2[id]; if(!P) return; const {cfg, caja} = P;
+  const guard = caja.querySelector('.pleg-guardados'), filas = caja.querySelector('.pleg-filas'), cols = caja.querySelector('.pleg-cols');
+  const antes = {}; caja.querySelectorAll('[data-pl]').forEach(e => { antes[e.dataset.pl] = e.getBoundingClientRect(); });
+  const claves = cfg.grupos.map(g => g[0]), pleg = P.plegados.filter(k => claves.includes(k)), abiertos = cfg.grupos.filter(g => !pleg.includes(g[0]));
+  const tieneAct = g => { const f = document.getElementById(g[2]); return !!(f && f.querySelector('.chip-filter.active')); };
+  cols.style.cssText = pleg.length ? 'display:grid;gap:6px;margin-bottom:6px;grid-template-columns:repeat(' + Math.max(pleg.length, Math.min(claves.length, 3)) + ', minmax(0, 1fr));' : 'display:none;';   // como mucho 3 columnas salvo que haya más plegados: así cabe el nombre del orden
+  cols.innerHTML = pleg.map((k, i) => { const g = cfg.grupos.find(x => x[0] === k); return `<button type="button" class="tb-ftit tb-plegado ${tieneAct(g) && g[3] !== 'unico' || (g[3] === 'unico' && tieneAct(g)) ? 'con' : ''}" data-pl="${k}" style="grid-column:${i + 1};" title="Desplegar ${escHtml(g[1])}">${pleg2Texto(id, g)}</button>`; }).join('');
+  cfg.grupos.forEach(g => { const f = document.getElementById(g[2]); if(f) guard.appendChild(f); });
+  filas.innerHTML = '';
+  abiertos.forEach(g => { const f = document.getElementById(g[2]); if(!f) return; const fila = document.createElement('div'); fila.className = 'tb-frow'; fila.innerHTML = `<button type="button" class="tb-ftit" data-pl="${g[0]}" title="Plegar ${escHtml(g[1])}">${escHtml(g[1])} <i>▾</i></button>`; fila.appendChild(f); filas.appendChild(fila); });
+  if(P.animar){ const mov = P.animar; P.animar = null; const e = caja.querySelector(`[data-pl="${mov}"]`), o = antes[mov]; if(e && o && e.animate){ const n = e.getBoundingClientRect(); e.animate([{transform: `translate(${o.left - n.left}px, ${o.top - n.top}px)`, zIndex: 3}, {transform: 'none', zIndex: 3}], {duration: 320, easing: 'cubic-bezier(.2,.9,.3,1.15)'}); } }
+  pleg2Refrescar(id);
+}
+function pleg2Refrescar(id){
+  const P = PLEG2[id]; if(!P) return; const {cfg, caja} = P;
+  cfg.grupos.forEach(g => { if(g[3] === 'unico') return; const f = document.getElementById(g[2]); if(!f) return; f.querySelectorAll('.chip-filter').forEach(ch => { const n = cfg.cuenta ? cfg.cuenta(g[0], ch) : null; if(n == null) delete ch.dataset.n; else ch.dataset.n = n; }); });
+  caja.querySelectorAll('.pleg-cols button[data-pl]').forEach(b => { const g = cfg.grupos.find(x => x[0] === b.dataset.pl); b.innerHTML = pleg2Texto(id, g); b.classList.toggle('con', !!(document.getElementById(g[2])?.querySelector('.chip-filter.active'))); });
+}
 const PLEG_CFG = {
   fact: {tbody: 'econ-facturas-tbody', soloPill: true},
   alb: {tbody: 'albaranes-tbody-standalone'},
@@ -16351,6 +16408,21 @@ function restablecerFiltrosDocumentos(prefijo){
   const trimTodos = document.querySelector(`#${prefijo}-filtro-trim-chips [data-trim=""]`); if(trimTodos) trimTodos.classList.add('active');
   renderEconDocs(prefijo);
 }
+function pleg2IniciarClientes(){
+  const sel = () => ({tipo: new Set(Array.from(document.querySelectorAll('#clientes-filtro-tipo-chips .chip-filter.active')).map(c => c.dataset.tipo)), prio: new Set(Array.from(document.querySelectorAll('#clientes-filtro-prio-chips .chip-filter.active')).map(c => c.dataset.prio)), extra: new Set(Array.from(document.querySelectorAll('#clientes-filtro-extra-chips .chip-filter.active')).map(c => c.dataset.extra))});
+  pleg2Crear({id: 'cli', despuesDe: '#cli-sticky-spacer', quitar: ['dd-cli-filtros-all', 'dd-cli-ord2'], plegados: ['orden'],
+    grupos: [['tipo', 'Tipo', 'clientes-filtro-tipo-chips'], ['prio', 'Prioridad', 'clientes-filtro-prio-chips'], ['extra', 'Más', 'clientes-filtro-extra-chips'], ['orden', 'Orden', 'clientes-filtro-orden-chips-m', 'unico']],
+    cuenta(k, ch){
+      if(typeof clientes === 'undefined') return null;
+      const S = sel(), q = (document.getElementById('clientes-search')?.value || '').trim().toLowerCase();
+      if(k === 'tipo') return clientes.filter(c => cliPasa(c, S, q, 'tipo') && (c.type || '').toLowerCase() === ch.dataset.tipo).length;
+      if(k === 'prio') return clientes.filter(c => cliPasa(c, S, q, 'prio') && (c.prio || 'media') === ch.dataset.prio).length;
+      const f = ch.dataset.extra, S2 = {tipo: S.tipo, prio: S.prio, extra: new Set([...S.extra].filter(x => x !== f))};
+      return clientes.filter(c => cliPasa(c, S2, q) && cliExtraOk(c, f)).length;
+    }});
+}
+pleg2IniciarClientes();
+{ const _rct = renderClientesTable; renderClientesTable = function(){ const r = _rct.apply(this, arguments); try{ if(PLEG2.cli) pleg2Refrescar('cli'); }catch(e){} return r; }; }   // las cantidades se refrescan cada vez que se repinta Clientes
 function restablecerFiltrosClientes(){
   document.getElementById('clientes-search').value = '';
   document.querySelectorAll('#clientes-filtro-tipo-chips .chip-filter,#clientes-filtro-prio-chips .chip-filter,#clientes-filtro-extra-chips .chip-filter,#clientes-filtro-extra-chips-m .chip-filter').forEach(c=>c.classList.remove('active'));
@@ -17021,6 +17093,23 @@ async function asignarProvinciaCliente(id, provincia){
 
 const CLI_LOTE = 40; let _cliMostrar = CLI_LOTE, _cliFirma = '';
 function clientesMostrarMas(){ _cliMostrar += CLI_LOTE; renderClientesTable(); }
+/* ===== Clientes: la regla de filtrado en una sola función (la usan la lista y las cantidades de las pastillas) ===== */
+const CLI_BASURA = ['etiqueta', 'emisor', 'poblacion', 'obra', 'direccion', 'contacto', 'titulo'];
+const cliCalidad = c => (c.nif && c.direccion && c.poblacion && (c.telefono || c.email)) ? 'ok' : 'incompleta';
+function cliExtraOk(c, f){
+  if(f === 'deuda') return c.pendiente > 0;
+  if(f === 'sindatos') return cliCalidad(c) === 'incompleta';
+  if(f === 'sindocs') return !((c.facturado || 0) + (c.enB || 0) > 0 || c.ultimoTrabajo);
+  if(f === 'ocultar_basura') return !CLI_BASURA.includes(c.clase_nombre);
+  return true;
+}
+function cliPasa(c, S, q, salvo){   // S = {tipo: Set, prio: Set, extra: Set}; "salvo" deja fuera un grupo (para contar sus pastillas)
+  if(q){ const campo = [c.name, c.nif, c.telefono, c.email, c.poblacion, c.direccion].join(' ').toLowerCase(); if(!campo.includes(q)) return false; }
+  if(salvo !== 'tipo' && S.tipo.size && !S.tipo.has((c.type || '').toLowerCase())) return false;
+  if(salvo !== 'prio' && S.prio.size && !S.prio.has(c.prio || 'media')) return false;
+  if(salvo !== 'extra'){ for(const f of S.extra) if(!cliExtraOk(c, f)) return false; }
+  return true;
+}
 function renderClientesTable(){
   const falta = v => v ? v : '—';
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
@@ -17033,22 +17122,7 @@ function renderClientesTable(){
   const prioSel = new Set(Array.from(document.querySelectorAll('#clientes-filtro-prio-chips .chip-filter.active')).map(c=>c.dataset.prio));
   const extraSel = new Set(Array.from(document.querySelectorAll('#clientes-filtro-extra-chips .chip-filter.active')).map(c=>c.dataset.extra));
 
-  const filtrados = clientes.filter(c=>{
-    if(q){
-      const campo = [c.name,c.nif,c.telefono,c.email,c.poblacion,c.direccion].join(' ').toLowerCase();
-      if(!campo.includes(q)) return false;
-    }
-    if(tiposSel.size && !tiposSel.has((c.type||'').toLowerCase())) return false;
-    if(prioSel.size && !prioSel.has(c.prio||'media')) return false;
-    if(extraSel.has('deuda') && !(c.pendiente>0)) return false;
-    if(extraSel.has('sindatos') && calidadDe(c)!=='incompleta') return false;
-    if(extraSel.has('sindocs') && ((c.facturado||0)+(c.enB||0)>0 || c.ultimoTrabajo)) return false;
-    if(extraSel.has('ocultar_basura')){
-      const claseBasura = ['etiqueta','emisor','poblacion','obra','direccion','contacto','titulo'];
-      if(claseBasura.includes(c.clase_nombre)) return false;
-    }
-    return true;
-  });
+  const filtrados = clientes.filter(c => cliPasa(c, {tipo: tiposSel, prio: prioSel, extra: extraSel}, q));
 
   // Ordenar según el filtro activo
   const ordenCli = document.querySelector('#clientes-filtro-orden-chips .chip-filter.active, #clientes-filtro-orden-chips-m .chip-filter.active')?.dataset.orden || 'nombre';
