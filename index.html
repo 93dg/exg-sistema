@@ -2154,7 +2154,14 @@ body.tb-modal{overflow:hidden;}
 .tb-card{border-color:color-mix(in srgb, var(--pc, var(--line)) 40%, var(--line));margin-left:-10px;}
 .tb-filtros2{margin:0 0 8px;display:flex;flex-direction:column;gap:6px;}
 .tb-frow{display:flex;gap:6px;align-items:flex-start;}
-.tb-frow > span{flex:0 0 58px;font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft);padding-top:7px;text-transform:uppercase;}
+.tb-frow > span{flex:0 0 78px;font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft);padding-top:7px;text-transform:uppercase;}
+.tb-ftit{flex:0 0 78px;width:78px;box-sizing:border-box;border:none;background:transparent;padding:7px 0 7px;margin:0;font-family:inherit;font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft);text-transform:uppercase;text-align:left;cursor:pointer;line-height:1.2;}
+.tb-ftit i{font-style:normal;font-size:9px;opacity:.7;}
+.tb-fcols{display:grid;gap:6px;margin-bottom:2px;}
+.tb-ftit.tb-plegado{width:auto;flex:none;min-width:0;padding:7px 4px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink-soft);text-align:center;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tb-ftit.tb-plegado.con{border-color:var(--orange);color:var(--ink);}
+.tb-ftit.tb-plegado b{color:var(--orange);font-weight:800;font-size:12px;}
+.tb-comp-solo{display:inline-block;font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.03em;margin-left:2px;}
 .tb-frow > div{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0;}
 .tb-fchip{padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}
 .tb-fchip b{font-weight:800;color:var(--orange);margin-left:4px;}   /* la cantidad en naranja para que se aprecie (reporte de Daniel 01/10) */
@@ -3273,7 +3280,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.51</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.52</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3351,7 +3358,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.51</div>
+        <div class="sub" id="version-badge">V6.52</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18517,9 +18524,10 @@ const TB_EST_PENDIENTES = ['Pendiente', 'Empezado', 'Activo'], TB_EST_TRAMITES =
 let _tbJobs = [], _tbCargado = false, _tbFiltro = 'todos', _tbVista = 'activos', _tbEditando = null, _tbIgnorarClic = 0;
 // ---- filtros de lugar, máquina y tiempo + cómputo de tiempo y dinero ----
 // En cada grupo se eligen varios valores (vale cualquiera) y entre grupos tienen que cumplirse todos. Se recuerdan en el servidor (filtros_persistentes), como los demás filtros de la web.
-const TB_FILTRO_ID = {lugar: 'tb-filtro-lugar', maquina: 'tb-filtro-maquina', tiempo: 'tb-filtro-tiempo'}, TB_SIN_LUGAR = 'SIN LUGAR', TB_SIN_DUR = 'SIN DURACIÓN';
+const TB_FILTRO_ID = {lugar: 'tb-filtro-lugar', maquina: 'tb-filtro-maquina', tiempo: 'tb-filtro-tiempo', dificultad: 'tb-filtro-dificultad'}, TB_FILTRO_PLEGADOS = 'tb-filtros-plegados', TB_SIN_LUGAR = 'SIN LUGAR', TB_SIN_DUR = 'SIN DURACIÓN', TB_SIN_DIF = 'SIN DIFICULTAD';
+const TB_GRUPOS = ['lugar', 'maquina', 'tiempo', 'dificultad'], TB_TIT_FILTRO = {lugar: 'Lugar', maquina: 'Flota', tiempo: 'Tiempo', dificultad: 'Dificultad'};   // 'maquina' es el nombre interno (así se siguen leyendo los filtros ya guardados); en pantalla es Flota
 const TB_MAQ_NOM = {mixta: 'Mixta', camion: 'Camión', giratoria: 'Giratoria', niveladora: 'Niveladora'}, TB_MAQ_ORDEN = ['mixta', 'camion', 'giratoria', 'niveladora'];
-let _tbFil = {lugar: [], maquina: [], tiempo: []}, _tbTarifas = null;
+let _tbFil = {lugar: [], maquina: [], tiempo: [], dificultad: []}, _tbTarifas = null, _tbPleg = [];   // _tbPleg: los grupos plegados, en el orden en que se plegaron (cada uno ocupa su columna)
 function tbHayFiltros(){ return Object.values(_tbFil).some(l => l.length); }
 // la duración escrita pasa a horas con las mismas equivalencias que el color (día 8 h, semana 40 h, mes 160 h); un tramo como 2-3D cuenta por su punto medio; null si no se entiende
 function tbDurHoras(txt){
@@ -18528,10 +18536,10 @@ function tbDurHoras(txt){
   return ((a + b) / 2) * ({H: 1, D: 8, S: 40, M: 160})[m[3]];
 }
 function tbTramoTiempo(j){ const i = tbDurIndice(j.duracion); return i >= 0 ? TB_DURACIONES[i] : TB_SIN_DUR; }
-function tbValorFiltro(g, j){ return g === 'lugar' ? [j.lugar ? tbMay(j.lugar) : TB_SIN_LUGAR] : g === 'maquina' ? tbMaquinas(j) : [tbTramoTiempo(j)]; }
-function tbFiltrar(lista, sinGrupo){ return lista.filter(j => ['lugar', 'maquina', 'tiempo'].every(g => g === sinGrupo || !_tbFil[g].length || tbValorFiltro(g, j).some(v => _tbFil[g].includes(v)))); }
+function tbValorFiltro(g, j){ return g === 'lugar' ? [j.lugar ? tbMay(j.lugar) : TB_SIN_LUGAR] : g === 'maquina' ? tbMaquinas(j) : g === 'dificultad' ? (tbDificultades(j).length ? tbDificultades(j) : [TB_SIN_DIF]) : [tbTramoTiempo(j)]; }
+function tbFiltrar(lista, sinGrupo){ return lista.filter(j => TB_GRUPOS.every(g => g === sinGrupo || !_tbFil[g].length || tbValorFiltro(g, j).some(v => _tbFil[g].includes(v)))); }
 function tbOrdenValores(g, vals){
-  const orden = g === 'tiempo' ? [...TB_DURACIONES, TB_SIN_DUR] : g === 'maquina' ? TB_MAQ_ORDEN : null;
+  const orden = g === 'tiempo' ? [...TB_DURACIONES, TB_SIN_DUR] : g === 'maquina' ? TB_MAQ_ORDEN : g === 'dificultad' ? [...TB_DIFICULTADES, TB_SIN_DIF] : null;
   return vals.slice().sort((a, b) => orden ? orden.indexOf(a) - orden.indexOf(b) : (a === TB_SIN_LUGAR) - (b === TB_SIN_LUGAR) || a.localeCompare(b, 'es'));
 }
 function tbOpcionesFiltro(g, todos){   // los valores que hay en esta vista, con cuántos trabajos cumplen cada uno según los otros filtros; los ya elegidos salen siempre para poder quitarlos
@@ -18542,19 +18550,42 @@ function tbOpcionesFiltro(g, todos){   // los valores que hay en esta vista, con
 }
 function tbRenderFiltros(todos){
   const cont = document.getElementById('tb-filtros2'); if(!cont) return;
-  const tit = {lugar: 'Lugar', maquina: 'Máquina', tiempo: 'Tiempo'};
-  const filas = ['lugar', 'maquina', 'tiempo'].map(g => {
-    const ops = tbOpcionesFiltro(g, todos);
-    if(ops.length < 2 && !_tbFil[g].length) return '';   // con un solo valor no hay nada que filtrar
-    return `<div class="tb-frow"><span>${tit[g]}</span><div>${ops.map(o => `<button type="button" class="tb-fchip ${_tbFil[g].includes(o.v) ? 'active' : o.n ? '' : 'cero'}" data-g="${g}" data-v="${escHtml(o.v)}">${escHtml(g === 'maquina' ? TB_MAQ_NOM[o.v] : o.v)} <b>${o.n}</b></button>`).join('')}</div></div>`;
-  }).join('') + (tbHayFiltros() ? '<div class="tb-frow"><span></span><div><button type="button" class="tb-fchip tb-quitar" data-g="todos">↻ Quitar filtros</button></div></div>' : '');
-  cont.innerHTML = filas; cont.style.display = filas ? '' : 'none';
+  // con un solo valor no hay nada que filtrar (salvo que ya haya algo elegido): ese grupo no sale
+  const ops = {}, visibles = TB_GRUPOS.filter(g => { ops[g] = tbOpcionesFiltro(g, todos); return ops[g].length >= 2 || _tbFil[g].length; });
+  _tbPleg = _tbPleg.filter(g => TB_GRUPOS.includes(g));
+  const plegados = _tbPleg.filter(g => visibles.includes(g)), abiertos = visibles.filter(g => !plegados.includes(g));
+  // una columna por filtro que haya: el primero que se pliega ocupa la columna 1, el segundo la 2, y así
+  const cols = plegados.length ? `<div class="tb-fcols" style="grid-template-columns:repeat(${visibles.length}, minmax(0, 1fr));">${plegados.map((g, i) => `<button type="button" class="tb-ftit tb-plegado ${_tbFil[g].length ? 'con' : ''}" data-t="${g}" style="grid-column:${i + 1};" title="Desplegar ${escHtml(TB_TIT_FILTRO[g])}">${escHtml(TB_TIT_FILTRO[g])}${_tbFil[g].length ? ` <b>${_tbFil[g].length}</b>` : ''} <i>▸</i></button>`).join('')}</div>` : '';
+  const filas = abiertos.map(g => `<div class="tb-frow"><button type="button" class="tb-ftit" data-t="${g}" title="Plegar ${escHtml(TB_TIT_FILTRO[g])}">${escHtml(TB_TIT_FILTRO[g])} <i>▾</i></button><div>${ops[g].map(o => `<button type="button" class="tb-fchip ${_tbFil[g].includes(o.v) ? 'active' : o.n ? '' : 'cero'}" data-g="${g}" data-v="${escHtml(o.v)}">${escHtml(g === 'maquina' ? TB_MAQ_NOM[o.v] : o.v)} <b>${o.n}</b></button>`).join('')}</div></div>`).join('');
+  const quitar = tbHayFiltros() ? '<div class="tb-frow"><span></span><div><button type="button" class="tb-fchip tb-quitar" data-g="todos">↻ Quitar filtros</button></div></div>' : '';
+  const html = cols + filas + quitar;
+  const antes = {}; cont.querySelectorAll('.tb-ftit[data-t]').forEach(e => { antes[e.dataset.t] = e.getBoundingClientRect(); });   // dónde estaba cada título, para que vuele hasta su sitio nuevo
+  cont.innerHTML = html; cont.style.display = html ? '' : 'none';
+  if(_tbAnimar && html){
+    const moviendo = _tbAnimar; _tbAnimar = null;
+    const e = cont.querySelector(`.tb-ftit[data-t="${moviendo}"]`), o = antes[moviendo];
+    if(e && o && e.animate){ const n = e.getBoundingClientRect(), dx = o.left - n.left, dy = o.top - n.top;
+      e.animate([{transform: `translate(${dx}px, ${dy}px) scale(${moviendo && e.classList.contains('tb-plegado') ? 1.08 : 1})`, zIndex: 3}, {transform: 'translate(0, 0) scale(1)', zIndex: 3}], {duration: 320, easing: 'cubic-bezier(.2,.9,.3,1.15)'}); }
+    cont.querySelectorAll('.tb-frow > div > .tb-fchip').forEach((x, i) => { if(!e || !e.classList.contains('tb-plegado')) x.animate && x.animate([{opacity: 0, transform: 'translateY(-6px)'}, {opacity: 1, transform: 'none'}], {duration: 220, delay: Math.min(i * 12, 160), easing: 'ease-out', fill: 'backwards'}); });
+  }
 }
+let _tbAnimar = null;
 function tbClicFiltro(ev){
+  const t = ev.target.closest('button[data-t]');
+  if(t){   // tocar el título de un filtro lo pliega o lo despliega, y se recuerda
+    const g = t.dataset.t; _tbAnimar = g;
+    if(_tbPleg.includes(g)) _tbPleg = _tbPleg.filter(x => x !== g); else _tbPleg.push(g);
+    tbGuardarPlegados(); tbRender(); return;
+  }
   const b = ev.target.closest('button[data-g]'); if(!b) return;
   if(b.dataset.g === 'todos'){ Object.keys(_tbFil).forEach(g => { if(_tbFil[g].length){ _tbFil[g] = []; tbGuardarFiltro(g); } }); }
   else { const g = b.dataset.g, v = b.dataset.v, i = _tbFil[g].indexOf(v); if(i >= 0) _tbFil[g].splice(i, 1); else _tbFil[g].push(v); tbGuardarFiltro(g); }
   tbRender();
+}
+async function tbGuardarPlegados(){
+  if(!sb) return;
+  const {error} = await sb.from('filtros_persistentes').upsert({container_id: TB_FILTRO_PLEGADOS, valor: JSON.stringify(_tbPleg), actualizado_at: new Date().toISOString()});
+  if(error) console.error('No se pudo guardar qué filtros están plegados', error);
 }
 async function tbGuardarFiltro(g){
   if(!sb) return;
@@ -18570,8 +18601,8 @@ async function tbCargarExtras(){   // tarifas (precio por hora de cada máquina)
     _tbTarifas = t;
   }catch(e){ console.error(e); }
   try{
-    const {data} = await sb.from('filtros_persistentes').select('container_id,valor').in('container_id', Object.values(TB_FILTRO_ID));
-    (data || []).forEach(r => { const g = Object.keys(TB_FILTRO_ID).find(k => TB_FILTRO_ID[k] === r.container_id); if(!g) return; try{ const l = JSON.parse(r.valor); if(Array.isArray(l)) _tbFil[g] = l.filter(x => typeof x === 'string'); }catch(_){} });
+    const {data} = await sb.from('filtros_persistentes').select('container_id,valor').in('container_id', [...Object.values(TB_FILTRO_ID), TB_FILTRO_PLEGADOS]);
+    (data || []).forEach(r => { if(r.container_id === TB_FILTRO_PLEGADOS){ try{ const l = JSON.parse(r.valor); if(Array.isArray(l)) _tbPleg = l.filter(x => TB_GRUPOS.includes(x)); }catch(_){} return; } const g = Object.keys(TB_FILTRO_ID).find(k => TB_FILTRO_ID[k] === r.container_id); if(!g) return; try{ const l = JSON.parse(r.valor); if(Array.isArray(l)) _tbFil[g] = l.filter(x => typeof x === 'string'); }catch(_){} });
   }catch(e){ console.error(e); }
 }
 // ---- máquinas fusionadas (vale cualquiera) en el formulario ----
@@ -18651,15 +18682,17 @@ let _tbFusIgnorarClic = 0;
 const tbN = (n, d = 1) => { const [e, dec] = (Math.round(Number(n) * 10 ** d) / 10 ** d).toString().split('.'); return e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec ? ',' + dec : ''); };   // 1.250,5 (con punto desde el millar, también en 4 cifras)
 const tbFmtH = h => h < 8 ? `${tbN(h)} h` : `${tbN(h)} h · ${tbN(h / 8)} d`;
 const tbEur = e => '≈ ' + tbN(e, 0) + ' €';
-function tbPrecioHora(j, m){   // por hora: las que hacen falta suman (2 mixtas cuentan dos veces); de cada grupo de alternativas cuenta la media de sus tarifas. Con una máquina m (desglose por máquina): lo que costaría si lo hace ella.
-  const t = x => (_tbTarifas && _tbTarifas[x]) || 0;
-  let s = tbFlota(j).filter(x => !m || x === m).reduce((a, x) => a + t(x), 0);
-  tbAlternativas(j).forEach(g => { if(m){ if(g.includes(m)) s += t(m); } else { const con = g.filter(x => t(x) > 0); if(con.length) s += con.reduce((a, x) => a + t(x), 0) / con.length; } });
+function tbPrecioHora(j, sel){   // por hora. sel = las máquinas elegidas en el filtro de Flota (o una sola, en el desglose); vacío = todas las del trabajo.
+  // Las que hacen falta suman (2 mixtas, dos veces). De cada grupo "vale cualquiera" cuenta la media de las tarifas de sus máquinas (de las elegidas, si hay elegidas).
+  // Con máquinas elegidas solo se cuenta lo de ellas: lo que generaría esa flota, no el resto de máquinas del trabajo.
+  const t = x => (_tbTarifas && _tbTarifas[x]) || 0, S = Array.isArray(sel) ? sel : sel ? [sel] : [], vale = x => !S.length || S.includes(x);
+  let s = tbFlota(j).filter(vale).reduce((a, x) => a + t(x), 0);
+  tbAlternativas(j).forEach(g => { const con = g.filter(x => vale(x) && t(x) > 0); if(con.length) s += con.reduce((a, x) => a + t(x), 0) / con.length; });
   return s;
 }
-function tbSuma(lista, m){
-  const l = m ? lista.filter(j => tbMaquinas(j).includes(m)) : lista; let h = 0, e = 0, sin = 0;
-  l.forEach(j => { const hh = tbDurHoras(j.duracion); if(hh == null){ sin++; return; } h += hh; e += hh * tbPrecioHora(j, m); });
+function tbSuma(lista, m){   // m: una sola máquina (desglose). Sin m: todo lo de la lista, contando solo la flota elegida en el filtro si la hay
+  const sel = m ? [m] : _tbFil.maquina, l = m ? lista.filter(j => tbMaquinas(j).includes(m)) : lista; let h = 0, e = 0, sin = 0;
+  l.forEach(j => { const hh = tbDurHoras(j.duracion); if(hh == null){ sin++; return; } h += hh; e += hh * tbPrecioHora(j, sel); });
   return {n: l.length, h, e, sin};
 }
 function tbRenderComputo(lista){   // encima de Alta/Media/Baja: solo sale con algún filtro puesto
@@ -18668,11 +18701,12 @@ function tbRenderComputo(lista){   // encima de Alta/Media/Baja: solo sale con a
   const conEur = !!(_tbTarifas && Object.keys(_tbTarifas).length), t = tbSuma(lista), trab = n => n === 1 ? '1 trabajo' : n + ' trabajos';
   const fila = (nom, s) => `<div class="tb-comp-f"><span>${escHtml(nom)}</span><span>${trab(s.n)} · ${tbFmtH(s.h)}${conEur ? ' · ' + tbEur(s.e) : ''}</span></div>`;
   const nombre = (g, v) => g === 'maquina' ? TB_MAQ_NOM[v] : v;
-  const parte = {lugar: (v) => tbSuma(lista.filter(j => tbValorFiltro('lugar', j)[0] === v)), maquina: (v) => tbSuma(lista, v), tiempo: (v) => tbSuma(lista.filter(j => tbTramoTiempo(j) === v))};
-  const tit = {lugar: 'Por lugar', maquina: 'Por máquina', tiempo: 'Por tiempo'};
-  const grupos = ['lugar', 'maquina', 'tiempo'].filter(g => _tbFil[g].length > 1).map(g => `<div class="tb-comp-g"><b>${tit[g]}</b>${tbOrdenValores(g, _tbFil[g]).map(v => fila(nombre(g, v), parte[g](v))).join('')}</div>`).join('');
+  const parte = {lugar: (v) => tbSuma(lista.filter(j => tbValorFiltro('lugar', j)[0] === v)), maquina: (v) => tbSuma(lista, v), tiempo: (v) => tbSuma(lista.filter(j => tbTramoTiempo(j) === v)), dificultad: (v) => tbSuma(lista.filter(j => tbValorFiltro('dificultad', j).includes(v)))};
+  const tit = {lugar: 'Por lugar', maquina: 'Por flota', tiempo: 'Por tiempo', dificultad: 'Por dificultad'};
+  const soloFlota = _tbFil.maquina.length ? tbOrdenValores('maquina', _tbFil.maquina).map(v => TB_MAQ_NOM[v]).join(' + ') : '';
+  const grupos = TB_GRUPOS.filter(g => _tbFil[g].length > 1).map(g => `<div class="tb-comp-g"><b>${tit[g]}</b>${tbOrdenValores(g, _tbFil[g]).map(v => fila(nombre(g, v), parte[g](v))).join('')}</div>`).join('');
   el.style.display = '';
-  el.innerHTML = `<div class="tb-comp-t">${trab(t.n)} · ${tbFmtH(t.h)}${conEur ? ' · ' + tbEur(t.e) : ''}</div>${grupos}<div class="tb-comp-nota">${conEur ? 'Importe aproximado: horas de cada trabajo × precio por hora de sus máquinas (Tarifas); no incluye materiales.' : 'No se pudieron leer las tarifas: sin importe.'}${lista.some(j => tbAlternativas(j).length) ? ' Con máquinas alternativas cuenta la media de sus tarifas.' : ''}${t.sin ? ` ${t.sin} sin duración no ${t.sin === 1 ? 'cuenta' : 'cuentan'}.` : ''}</div>`;
+  el.innerHTML = `<div class="tb-comp-t">${trab(t.n)} · ${tbFmtH(t.h)}${conEur ? ' · ' + tbEur(t.e) : ''}${conEur && soloFlota ? ` <span class="tb-comp-solo">solo ${escHtml(soloFlota)}</span>` : ''}</div>${grupos}<div class="tb-comp-nota">${conEur ? (soloFlota ? `Importe aproximado de lo que generaría solo ${soloFlota}: horas de cada trabajo × su precio por hora (Tarifas), sin contar el resto de máquinas de esos trabajos ni materiales.` : 'Importe aproximado: horas de cada trabajo × precio por hora de sus máquinas (Tarifas); no incluye materiales.') : 'No se pudieron leer las tarifas: sin importe.'}${lista.some(j => tbAlternativas(j).length) ? ' Con máquinas alternativas cuenta la media de sus tarifas.' : ''}${t.sin ? ` ${t.sin} sin duración no ${t.sin === 1 ? 'cuenta' : 'cuentan'}.` : ''}</div>`;
 }
 
 function tbPrioridades(j){ const l = (Array.isArray(j.prioridades) && j.prioridades.length ? j.prioridades : [j.prioridad || 'Media']).filter(x => TB_PRIO.includes(x)).slice(0, 2); return l.length ? l : ['Media']; }
