@@ -3345,7 +3345,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.63</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.64</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3423,7 +3423,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.63</div>
+        <div class="sub" id="version-badge">V6.64</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8598,6 +8598,7 @@ function histNecesarioAlElegir(contenedor){   // la selección de años puede in
   if(!act.length || act.some(a => a < hoy)) asegurarHistorico();
 }
 function poblarFiltroAniosChips(tbodyId, contenedorId){
+  const _pref = contenedorId.split('-')[0];
   const tbody = document.getElementById(tbodyId);
   const contenedor = document.getElementById(contenedorId);
   if(!tbody || !contenedor) return;
@@ -8606,7 +8607,8 @@ function poblarFiltroAniosChips(tbodyId, contenedorId){
   contenedor.innerHTML = `<div class="chip-filter ${activos.size===0?'active':''}" data-anio="">Todos los años</div>` +
     anios.map(a=>`<div class="chip-filter ${activos.has(a)?'active':''}" data-anio="${a}">${a}</div>`).join('');
   contenedor.querySelectorAll('.chip-filter').forEach(chip=>{
-    chip.addEventListener('click', ()=>{
+    chip.addEventListener('click', (ev)=>{
+      if(ev && ev.isTrusted) _anioTocado[_pref] = true;
       if(chip.dataset.anio===''){
         contenedor.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
         chip.classList.add('active');
@@ -8798,13 +8800,12 @@ const HISTORICO_VISTAS = ['economia', 'ayuntamiento', 'archivos'];   // seccione
 // Construye, en trozos pequeños, las filas de los documentos antiguos que faltan. Solo la primera vez que hace falta.
 const HIST_AVISOS = [['facturas', 'factura', 'Facturas'], ['albaranes', 'albaran', 'Albaranes'], ['presupuestos', 'presupuesto', 'Presupuestos']];
 function histDesde(){ const h = new Date(); return new Date(h.getFullYear() - 1, h.getMonth(), 1); }
-const _anioDefecto = {};
-function histAnioPorDefecto(){   // al abrir la web, Facturas, Albaranes y Presupuestos arrancan con el año actual elegido (solo la primera vez)
+const _anioTocado = {fact: false, alb: false, pres: false};   // se pone a true cuando la persona toca una pastilla de año (un toque de verdad, no el automático)
+function histAnioPorDefecto(){   // Facturas, Albaranes y Presupuestos arrancan con el año actual elegido, mientras la persona no haya tocado ese filtro
   const hoy = String(new Date().getFullYear());
   [['fact', 'fact-filtro-anio-chips'], ['alb', 'alb-filtro-anio-chips'], ['pres', 'pres-filtro-anio-chips']].forEach(([p, id]) => {
-    if(_anioDefecto[p]) return; const cont = document.getElementById(id); if(!cont) return;
+    if(_anioTocado[p]) return; const cont = document.getElementById(id); if(!cont) return;
     const chip = cont.querySelector('.chip-filter[data-anio="' + hoy + '"]'); if(!chip) return;
-    _anioDefecto[p] = true;
     if(!cont.querySelector('.chip-filter.active[data-anio]:not([data-anio=""])')) chip.click();
   });
 }
@@ -8939,7 +8940,8 @@ function poblarFiltroAniosChipsGenerico(tbodyId, contenedorId, prefijo){
   contenedor.innerHTML = `<div class="chip-filter ${soloTodos?'active':''}" data-anio="">Todos los años</div>` +
     anios.map(a=>`<div class="chip-filter ${activos.has(a)?'active':''}" data-anio="${a}">${a}</div>`).join('');
   contenedor.querySelectorAll('.chip-filter').forEach(chip=>{
-    chip.addEventListener('click', ()=>{
+    chip.addEventListener('click', (ev)=>{
+      if(ev && ev.isTrusted) _anioTocado[prefijo] = true;
       if(chip.dataset.anio===''){
         contenedor.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
         chip.classList.add('active');
@@ -23955,7 +23957,12 @@ async function cargarDocumentosEconomicosReales(){
     _diferirTarjetas = false;
     _historico.procesar = procesar; _historico.finalizar = finalizarCargaDocs;
     antiguos.forEach(d => _historico.pendientes.set(d.id, d));
-    _cargaMarcas.historico = _historico.pendientes.size; informarCarga(); renderAvisoHistorico();
+    _cargaMarcas.historico = _historico.pendientes.size; informarCarga();
+    try{   // las pastillas de año se hicieron antes de saber qué faltaba por cargar: se rehacen ahora, con los años anteriores
+      poblarFiltroAniosChips('econ-facturas-tbody', 'fact-filtro-anio-chips'); poblarFiltroAniosChipsGenerico('albaranes-tbody-standalone', 'alb-filtro-anio-chips', 'alb'); poblarFiltroAniosChipsGenerico('presupuestos-tbody-standalone', 'pres-filtro-anio-chips', 'pres');
+      histAnioPorDefecto(); plegRefrescarTodo();
+    }catch(e){ console.warn('pastillas de año', e); }
+    renderAvisoHistorico();
   }catch(err){ _diferirTarjetas = false; _docsListos = true; document.dispatchEvent(new Event('exg-docs-listos')); console.error('No se pudieron cargar los documentos reales', err); }
 }
 // Datos maestros de la empresa: única fuente de verdad para IBAN/titular al pasar a factura.
