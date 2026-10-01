@@ -2162,6 +2162,13 @@ body.tb-modal{overflow:hidden;}
 .tb-fchip.active b{color:#FF9A5C;}   /* sobre el fondo oscuro de la pastilla elegida, el mismo naranja más claro */
 .tb-fchip.tb-quitar{border-style:dashed;}
 .tb-fchip.cero{opacity:.45;}
+.tb-pills[data-campo="flota"] button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+.tb-pills button.cc.active.tb-fus{color:var(--k);border-style:dashed;border-color:var(--s);}   /* más específico que .cc.active, que pone el texto en blanco */
+.tb-pills button.levantada{opacity:.3;}
+.tb-fus-clon{box-shadow:0 8px 22px rgba(0,0,0,.28);transform:scale(1.06);opacity:.96;}
+.tb-pills button.tb-fus-destino{outline:3px solid var(--orange);outline-offset:2px;}
+.tb-pista-fus{font-size:11.5px;color:var(--ink-soft);margin:-4px 0 10px;line-height:1.35;}
+.tb-chip.tb-alt{border-style:dashed;}
 .tb-comp{background:var(--concrete);border:1px solid var(--line);border-radius:12px;padding:9px 12px;margin:0 0 10px;}
 .tb-comp-t{font-size:15px;font-weight:700;line-height:1.3;}
 .tb-comp-g{margin-top:6px;border-top:1px solid var(--line);padding-top:4px;}
@@ -3266,7 +3273,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.49</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.50</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3344,7 +3351,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.49</div>
+        <div class="sub" id="version-badge">V6.50</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18521,7 +18528,7 @@ function tbDurHoras(txt){
   return ((a + b) / 2) * ({H: 1, D: 8, S: 40, M: 160})[m[3]];
 }
 function tbTramoTiempo(j){ const i = tbDurIndice(j.duracion); return i >= 0 ? TB_DURACIONES[i] : TB_SIN_DUR; }
-function tbValorFiltro(g, j){ return g === 'lugar' ? [j.lugar ? tbMay(j.lugar) : TB_SIN_LUGAR] : g === 'maquina' ? [...new Set(tbFlota(j))] : [tbTramoTiempo(j)]; }
+function tbValorFiltro(g, j){ return g === 'lugar' ? [j.lugar ? tbMay(j.lugar) : TB_SIN_LUGAR] : g === 'maquina' ? tbMaquinas(j) : [tbTramoTiempo(j)]; }
 function tbFiltrar(lista, sinGrupo){ return lista.filter(j => ['lugar', 'maquina', 'tiempo'].every(g => g === sinGrupo || !_tbFil[g].length || tbValorFiltro(g, j).some(v => _tbFil[g].includes(v)))); }
 function tbOrdenValores(g, vals){
   const orden = g === 'tiempo' ? [...TB_DURACIONES, TB_SIN_DUR] : g === 'maquina' ? TB_MAQ_ORDEN : null;
@@ -18567,12 +18574,89 @@ async function tbCargarExtras(){   // tarifas (precio por hora de cada máquina)
     (data || []).forEach(r => { const g = Object.keys(TB_FILTRO_ID).find(k => TB_FILTRO_ID[k] === r.container_id); if(!g) return; try{ const l = JSON.parse(r.valor); if(Array.isArray(l)) _tbFil[g] = l.filter(x => typeof x === 'string'); }catch(_){} });
   }catch(e){ console.error(e); }
 }
+// ---- máquinas fusionadas (vale cualquiera) en el formulario ----
+const TB_FUS_TINTES = ['#E9E5FB', '#D6CFF6', '#C4BAF1', '#B3A6EC'];
+function tbFondoFusion(n){ const p = 100 / n; return `linear-gradient(90deg, ${Array.from({length: n}, (_, i) => `${TB_FUS_TINTES[i]} ${i * p}% ${(i + 1) * p}%`).join(', ')})`; }
+function tbFlotaHtml(m){   // m = {req: [ids de las que hacen falta], fus: [[ids] de cada grupo "vale cualquiera"]}
+  const enFus = new Set(m.fus.flat()), nombre = id => TB_FLOTA.find(f => f.id === id).t;
+  return TB_FLOTA.filter(f => !enFus.has(f.id)).map(f => `<button type="button" data-v="${f.id}" class="cc cc-purple ${m.req.includes(f.id) ? 'active' : ''}">${escHtml(f.t)}</button>`).join('') +
+    m.fus.map(g => `<button type="button" data-v="${g.join('+')}" data-fus="1" class="cc cc-purple active tb-fus" style="background:${tbFondoFusion(g.length)}">${g.map(id => escHtml(nombre(id))).join(' / ')}</button>`).join('');
+}
+function tbFlotaModelo(grupoEl){   // se lee de lo que hay pintado: así no hay dos copias que puedan descuadrarse
+  const req = [], fus = [];
+  grupoEl.querySelectorAll('button.active').forEach(b => { const ids = b.dataset.v.split('+'); if(ids.length > 1) fus.push(ids); else req.push(ids[0]); });
+  return {req, fus};
+}
+function tbFlotaDesdeTrabajo(j){   // trabajo guardado -> pastillas del formulario (mixta1/mixta2 son la 1ª y la 2ª mixta)
+  const fl = tbFlota(j), nM = fl.filter(x => x === 'mixta').length, req = TB_FLOTA.filter(f => f.id === 'mixta1' ? nM >= 1 : f.id === 'mixta2' ? nM >= 2 : fl.includes(f.tipo)).map(f => f.id), usados = new Set(req), fus = [];
+  tbAlternativas(j).forEach(g => { const ids = g.map(t => TB_FLOTA.filter(f => f.tipo === t).map(f => f.id).find(id => !usados.has(id))).filter(Boolean); if(ids.length >= 2){ ids.forEach(id => usados.add(id)); fus.push(ids); } });
+  return {req, fus};
+}
+function tbFlotaGuardable(grupoEl){   // pastillas del formulario -> {flota, alternativas} para guardar
+  const m = tbFlotaModelo(grupoEl), tipo = id => TB_FLOTA.find(f => f.id === id)?.tipo;
+  return {flota: TB_FLOTA.filter(f => m.req.includes(f.id)).map(f => f.tipo), alternativas: m.fus.map(g => [...new Set(g.map(tipo))]).filter(g => g.length >= 2)};
+}
+let _tbFusIgnorarClic = 0;
+(function tbActivarFusion(){
+  let d = null;
+  const grupoDe = el => el && el.closest ? el.closest('#tb-hoja .tb-pills[data-campo="flota"]') : null;
+  const botonDe = el => { const g = grupoDe(el); return g ? el.closest('button') : null; };
+  const quitarMarcas = () => document.querySelectorAll('#tb-hoja .tb-fus-destino').forEach(b => b.classList.remove('tb-fus-destino'));
+  const cancelar = () => { if(!d) return; clearTimeout(d.timer); if(d.clone) d.clone.remove(); quitarMarcas(); d.btn.classList.remove('levantada'); d = null; };
+  const bajo = (x, y) => { const el = document.elementFromPoint(x, y); return {btn: botonDe(el), grupo: grupoDe(el)}; };
+  const activar = () => {
+    if(!d || d.activo) return; d.activo = true; const r = d.btn.getBoundingClientRect(); d.dx = d.x - r.left; d.dy = d.y - r.top;
+    d.clone = d.btn.cloneNode(true); d.clone.classList.add('tb-fus-clon'); d.clone.style.cssText += `;position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;z-index:10000;pointer-events:none;margin:0;`;
+    document.body.appendChild(d.clone); d.btn.classList.add('levantada');
+    try{ if(navigator.vibrate) navigator.vibrate(18); }catch(e){}
+  };
+  const empezar = (x, y, ev) => { const b = botonDe(ev.target); if(!b) return; d = {btn: b, grupo: grupoDe(b), x0: x, y0: y, x, y, activo: false, timer: setTimeout(activar, 380)}; };
+  const mover = (x, y, ev) => {
+    if(!d) return; d.x = x; d.y = y;
+    if(!d.activo){ if(Math.hypot(x - d.x0, y - d.y0) > 10) cancelar(); return; }   // se movió antes de tiempo: es un desplazamiento normal
+    if(ev.cancelable) ev.preventDefault();
+    d.clone.style.left = (x - d.dx) + 'px'; d.clone.style.top = (y - d.dy) + 'px';
+    quitarMarcas(); const o = bajo(x, y); if(o.btn && o.btn !== d.btn) o.btn.classList.add('tb-fus-destino');
+  };
+  const soltar = () => {
+    if(!d) return; clearTimeout(d.timer);
+    if(!d.activo){ d = null; return; }
+    const o = bajo(d.x, d.y), g = d.grupo, origen = d.btn; _tbFusIgnorarClic = Date.now();
+    d.clone.remove(); quitarMarcas(); origen.classList.remove('levantada'); d = null;
+    if(!g || !g.isConnected) return;
+    const m = tbFlotaModelo(g), ids = b => b.dataset.v.split('+');
+    if(o.btn && o.btn !== origen){   // soltada encima de otra: se fusionan (si una de las dos ya era una fusión, se unen todas)
+      const juntas = [...new Set([...ids(o.btn), ...ids(origen)])], tipos = new Set(juntas.map(id => TB_FLOTA.find(f => f.id === id).tipo));
+      if(tipos.size < 2){ mostrarToast('Son la misma máquina: no hace falta fusionarlas.', 'err'); return; }
+      m.fus = m.fus.filter(f => !f.some(id => juntas.includes(id))); m.req = m.req.filter(id => !juntas.includes(id));
+      m.fus.push(TB_FLOTA.filter(f => juntas.includes(f.id)).map(f => f.id)); g.innerHTML = tbFlotaHtml(m);
+    } else if(o.grupo === g && !o.btn && origen.dataset.fus){   // fusionada soltada en un hueco de la fila: se separan y quedan como necesarias
+      const sueltas = ids(origen); m.fus = m.fus.filter(f => f.join('+') !== origen.dataset.v); m.req.push(...sueltas); g.innerHTML = tbFlotaHtml(m);
+    }
+  };
+  document.addEventListener('touchstart', ev => { const t = ev.touches[0]; if(t) empezar(t.clientX, t.clientY, ev); }, {passive: true});
+  document.addEventListener('touchmove', ev => { const t = ev.touches[0]; if(t) mover(t.clientX, t.clientY, ev); }, {passive: false});
+  document.addEventListener('touchend', soltar); document.addEventListener('touchcancel', cancelar);
+  document.addEventListener('mousedown', ev => { if(ev.button === 0) empezar(ev.clientX, ev.clientY, ev); });
+  document.addEventListener('mousemove', ev => mover(ev.clientX, ev.clientY, ev)); document.addEventListener('mouseup', soltar);
+  document.addEventListener('contextmenu', ev => { if(botonDe(ev.target)) ev.preventDefault(); });
+  // tocar: una suelta se marca o se desmarca; una fusionada se quita (sus máquinas quedan sin marcar)
+  document.addEventListener('click', ev => {
+    const b = botonDe(ev.target); if(!b) return; if(Date.now() - _tbFusIgnorarClic < 350) return;
+    if(b.dataset.fus){ const g = grupoDe(b), m = tbFlotaModelo(g); m.fus = m.fus.filter(f => f.join('+') !== b.dataset.v); g.innerHTML = tbFlotaHtml(m); } else b.classList.toggle('active');
+  });
+})();
 const tbN = (n, d = 1) => { const [e, dec] = (Math.round(Number(n) * 10 ** d) / 10 ** d).toString().split('.'); return e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec ? ',' + dec : ''); };   // 1.250,5 (con punto desde el millar, también en 4 cifras)
 const tbFmtH = h => h < 8 ? `${tbN(h)} h` : `${tbN(h)} h · ${tbN(h / 8)} d`;
 const tbEur = e => '≈ ' + tbN(e, 0) + ' €';
-function tbPrecioHora(j, m){ return tbFlota(j).filter(x => !m || x === m).reduce((s, x) => s + ((_tbTarifas && _tbTarifas[x]) || 0), 0); }   // suma de las tarifas por hora de las máquinas del trabajo (2 mixtas cuentan dos veces)
+function tbPrecioHora(j, m){   // por hora: las que hacen falta suman (2 mixtas cuentan dos veces); de cada grupo de alternativas cuenta la media de sus tarifas. Con una máquina m (desglose por máquina): lo que costaría si lo hace ella.
+  const t = x => (_tbTarifas && _tbTarifas[x]) || 0;
+  let s = tbFlota(j).filter(x => !m || x === m).reduce((a, x) => a + t(x), 0);
+  tbAlternativas(j).forEach(g => { if(m){ if(g.includes(m)) s += t(m); } else { const con = g.filter(x => t(x) > 0); if(con.length) s += con.reduce((a, x) => a + t(x), 0) / con.length; } });
+  return s;
+}
 function tbSuma(lista, m){
-  const l = m ? lista.filter(j => tbFlota(j).includes(m)) : lista; let h = 0, e = 0, sin = 0;
+  const l = m ? lista.filter(j => tbMaquinas(j).includes(m)) : lista; let h = 0, e = 0, sin = 0;
   l.forEach(j => { const hh = tbDurHoras(j.duracion); if(hh == null){ sin++; return; } h += hh; e += hh * tbPrecioHora(j, m); });
   return {n: l.length, h, e, sin};
 }
@@ -18586,7 +18670,7 @@ function tbRenderComputo(lista){   // encima de Alta/Media/Baja: solo sale con a
   const tit = {lugar: 'Por lugar', maquina: 'Por máquina', tiempo: 'Por tiempo'};
   const grupos = ['lugar', 'maquina', 'tiempo'].filter(g => _tbFil[g].length > 1).map(g => `<div class="tb-comp-g"><b>${tit[g]}</b>${tbOrdenValores(g, _tbFil[g]).map(v => fila(nombre(g, v), parte[g](v))).join('')}</div>`).join('');
   el.style.display = '';
-  el.innerHTML = `<div class="tb-comp-t">${trab(t.n)} · ${tbFmtH(t.h)}${conEur ? ' · ' + tbEur(t.e) : ''}</div>${grupos}<div class="tb-comp-nota">${conEur ? 'Importe aproximado: horas de cada trabajo × precio por hora de sus máquinas (Tarifas); no incluye materiales.' : 'No se pudieron leer las tarifas: sin importe.'}${t.sin ? ` ${t.sin} sin duración no ${t.sin === 1 ? 'cuenta' : 'cuentan'}.` : ''}</div>`;
+  el.innerHTML = `<div class="tb-comp-t">${trab(t.n)} · ${tbFmtH(t.h)}${conEur ? ' · ' + tbEur(t.e) : ''}</div>${grupos}<div class="tb-comp-nota">${conEur ? 'Importe aproximado: horas de cada trabajo × precio por hora de sus máquinas (Tarifas); no incluye materiales.' : 'No se pudieron leer las tarifas: sin importe.'}${lista.some(j => tbAlternativas(j).length) ? ' Con máquinas alternativas cuenta la media de sus tarifas.' : ''}${t.sin ? ` ${t.sin} sin duración no ${t.sin === 1 ? 'cuenta' : 'cuentan'}.` : ''}</div>`;
 }
 
 function tbPrioridades(j){ const l = (Array.isArray(j.prioridades) && j.prioridades.length ? j.prioridades : [j.prioridad || 'Media']).filter(x => TB_PRIO.includes(x)).slice(0, 2); return l.length ? l : ['Media']; }
@@ -18594,6 +18678,9 @@ function tbPrioPrincipal(l){ return TB_PRIO.find(p => l.includes(p)) || 'Media';
 function tbDificultades(j){ const l = (Array.isArray(j.dificultades) ? j.dificultades : (j.dificultad ? [j.dificultad] : [])).filter(x => TB_DIFICULTADES.includes(x)); return TB_DIFICULTADES.filter(d => l.includes(d)).slice(0, 2); }
 function tbEstado(e){ return TB_ESTADOS.includes(e) ? e : (e === 'En curso' ? 'Activo' : e === 'Terminado' ? 'Cobrado' : 'Pendiente'); }
 function tbFlota(j){ return (Array.isArray(j.flota) ? j.flota : []).filter(x => ['mixta', 'camion', 'giratoria', 'niveladora'].includes(x)); }
+// alternativas: grupos de 2 o más máquinas distintas de las que vale CUALQUIERA (flota son las que hacen falta todas). Mixta puede estar en las dos cosas (una fija y otra alternativa).
+function tbAlternativas(j){ const out = []; (Array.isArray(j.alternativas) ? j.alternativas : []).forEach(g => { const l = [...new Set((Array.isArray(g) ? g : []).filter(x => ['mixta', 'camion', 'giratoria', 'niveladora'].includes(x)))]; if(l.length >= 2) out.push(['mixta', 'camion', 'giratoria', 'niveladora'].filter(t => l.includes(t))); }); return out; }
+function tbMaquinas(j){ return [...new Set([...tbFlota(j), ...tbAlternativas(j).flat()])]; }   // todas las que pueden intervenir, para filtrar
 // la duración escrita (6H, 1,5D, 1S, 2M…) se pasa a horas de trabajo para darle su color: día = 8 h, semana = 40 h, mes = 160 h
 function tbDurIndice(txt){
   const t = tbMay(txt).replace(/\s/g, ''), k = TB_DURACIONES.indexOf(t); if(k >= 0) return k;
@@ -18601,7 +18688,7 @@ function tbDurIndice(txt){
   const h = Number(m[1].replace(',', '.')) * ({H: 1, D: 8, S: 40, M: 160})[m[2]];
   return h <= 2 ? 0 : h <= 6 ? 1 : h <= 8 ? 2 : h <= 24 ? 3 : h <= 40 ? 4 : h <= 80 ? 5 : h <= 160 ? 6 : 7;
 }
-function tbDatos(j){ const pr = tbPrioridades(j); return {prioridad: tbPrioPrincipal(pr), prioridades: pr, dificultad: tbDificultades(j)[0] || '', dificultades: tbDificultades(j), flota: tbFlota(j), lugar: tbMay(j.lugar), duracion: tbMay(j.duracion), cliente: tbMay(j.cliente), trabajo: tbMay(j.trabajo), nota: tbMay(j.nota), estado: tbEstado(j.estado), orden: j.orden, terminado_at: j.terminado_at || null}; }
+function tbDatos(j){ const pr = tbPrioridades(j); return {prioridad: tbPrioPrincipal(pr), prioridades: pr, dificultad: tbDificultades(j)[0] || '', dificultades: tbDificultades(j), flota: tbFlota(j), alternativas: tbAlternativas(j), lugar: tbMay(j.lugar), duracion: tbMay(j.duracion), cliente: tbMay(j.cliente), trabajo: tbMay(j.trabajo), nota: tbMay(j.nota), estado: tbEstado(j.estado), orden: j.orden, terminado_at: j.terminado_at || null}; }
 function tbActivos(){ return _tbJobs.filter(j => j.estado !== 'Cobrado').sort((a, b) => a.orden - b.orden); }
 function tbPendientes(){ return tbActivos().filter(j => TB_EST_PENDIENTES.includes(j.estado)); }
 function tbTramites(){ return tbActivos().filter(j => TB_EST_TRAMITES.includes(j.estado)); }
@@ -18612,7 +18699,7 @@ async function tbCargar(){
   try{
     const {data, error} = await sb.from('sistema').select('id,tipo,data').eq('tipo', 'trabajo_cola');
     if(error) throw error;
-    _tbJobs = (data || []).filter(r => r.tipo === 'trabajo_cola' && r.data).map((r, i) => { const j = {id: r.id, ...r.data, orden: Number(r.data.orden) || (i + 1) * 1000}; j.prioridades = tbPrioridades(j); j.prioridad = tbPrioPrincipal(j.prioridades); j.estado = tbEstado(j.estado); j.flota = tbFlota(j); j.dificultades = tbDificultades(j); return j; });
+    _tbJobs = (data || []).filter(r => r.tipo === 'trabajo_cola' && r.data).map((r, i) => { const j = {id: r.id, ...r.data, orden: Number(r.data.orden) || (i + 1) * 1000}; j.prioridades = tbPrioridades(j); j.prioridad = tbPrioPrincipal(j.prioridades); j.estado = tbEstado(j.estado); j.flota = tbFlota(j); j.alternativas = tbAlternativas(j); j.dificultades = tbDificultades(j); return j; });
     // lo que se guardó en minúsculas pasa a mayúsculas (una sola vez, en segundo plano)
     const CAMPOS = ['duracion', 'cliente', 'trabajo', 'nota', 'lugar'];
     const aMay = _tbJobs.filter(j => CAMPOS.some(k => j[k] && j[k] !== tbMay(j[k])));
@@ -18654,6 +18741,7 @@ function tbRender(){
       (dif.length ? `<span class="tb-chip ${dif.length === 2 ? 'tb-fusion' : 'cc cc-' + TB_CLASE_DIF[dif[0]]}" ${dif.length === 2 ? `style="background:linear-gradient(90deg, ${TB_TINTE_DIF[dif[0]]} 50%, ${TB_TINTE_DIF[dif[1]]} 50%)"` : ''}>${dif.map(escHtml).join(' / ')}</span>` : '') +
       (j.duracion ? `<span class="tb-chip cc ${di >= 0 ? 'cc-h' : 'cc-gray'}" ${di >= 0 ? `style="--h:${TB_DUR_HUE[di]}"` : ''}>⏱ ${escHtml(j.duracion)}</span>` : '') +
       (nombresFlota.length ? `<span class="tb-chip cc cc-purple">${nombresFlota.join(' + ')}</span>` : '') +
+      tbAlternativas(j).map(g => `<span class="tb-chip cc cc-purple tb-alt" style="background:${tbFondoFusion(g.length)}">${g.map(t => TB_MAQ_NOM[t]).join(' / ')}</span>`).join('') +
       (j.lugar ? `<span class="tb-chip">${escHtml(j.lugar)}</span>` : '');
     const botones = `<button type="button" class="tb-ok tb-x" data-a="borrar" title="Quitar este trabajo">✕</button>` + (esHis ? '<button type="button" class="tb-ok tb-reabrir" data-a="reabrir" title="Volver a pendientes">↩</button>' : `<button type="button" class="tb-ok" data-a="fin" title="Pasar al siguiente estado">✓</button>`);
     return `<div class="tb-card" data-id="${j.id}" style="--pc:${TB_COLOR_PRIO[tbPrioPrincipal(pr)]}"><div class="tb-bp" style="background:${barra};"></div><div class="tb-cuerpo"><div class="tb-l1">${titulo}</div>${chips ? `<div class="tb-l2">${chips}</div>` : ''}${nota}</div>${botones}</div>`;
@@ -18670,7 +18758,7 @@ function tbAbrirEditor(id){
   if(!j) return;
   const fondo = document.getElementById('tb-fondo'), hoja = document.getElementById('tb-hoja');
   const pr = tbPrioridades(j), fl = tbFlota(j), nM = fl.filter(x => x === 'mixta').length;
-  const flActivos = TB_FLOTA.filter(f => f.id === 'mixta1' ? nM >= 1 : f.id === 'mixta2' ? nM >= 2 : fl.includes(f.tipo)).map(f => f.id);
+  const modeloFlota = tbFlotaDesdeTrabajo(j);
   const pill = (v, txt, cls, activo, style) => `<button type="button" data-v="${escHtml(v)}" class="cc ${cls} ${activo ? 'active' : ''}" ${style ? `style="${style}"` : ''}>${escHtml(txt)}</button>`;
   const disquete = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>';
   hoja.innerHTML = `<div class="tb-hoja-asa"></div><div class="tb-cab"><h3>${id ? 'Editar trabajo' : 'Nuevo trabajo'}</h3><div class="tb-cab-btns"><button type="button" class="tb-ico tb-ico-ok" onclick="tbGuardarEditor()" aria-label="Guardar" title="Guardar">${disquete}</button><button type="button" class="tb-ico" onclick="tbIntentarCerrar()" aria-label="Cerrar" title="Cerrar"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button></div></div>
@@ -18680,7 +18768,7 @@ function tbAbrirEditor(id){
     <div class="tb-etq">Prioridad <span>(hasta 2)</span></div><div class="tb-pills tb-igual" data-campo="prioridad">${['Baja', 'Media', 'Alta'].map(p => pill(p, p, 'cc-' + TB_CLASE_PRIO[p], pr.includes(p))).join('')}</div>
     <div class="tb-etq">Dificultad <span>(hasta 2)</span></div><div class="tb-pills tb-igual" data-campo="dificultad">${TB_DIFICULTADES.map(d => pill(d, d, 'cc-' + TB_CLASE_DIF[d], tbDificultades(j).includes(d))).join('')}</div>
     <div class="tb-etq">Duración estimada${j.duracion && tbDurIndice(j.duracion) >= 0 && !TB_DURACIONES.includes(tbMay(j.duracion)) ? ` <span>(ahora: ${escHtml(j.duracion)})</span>` : ''}</div><div class="tb-pills tb-dur" data-campo="duracion">${TB_DURACIONES.map((d, i) => pill(d, d, 'cc-h', tbMay(j.duracion) === d, `--h:${TB_DUR_HUE[i]}`)).join('')}</div>
-    <div class="tb-etq">Flota <span>(las que hagan falta)</span></div><div class="tb-pills" data-campo="flota">${TB_FLOTA.map(f => pill(f.id, f.t, 'cc-' + f.c, flActivos.includes(f.id))).join('')}</div>
+    <div class="tb-etq">Flota <span>(las que hagan falta)</span></div><div class="tb-pills" data-campo="flota">${tbFlotaHtml(modeloFlota)}</div><div class="tb-pista-fus">Mantén una máquina pulsada y suéltala encima de otra: vale cualquiera de las dos. Para separarlas, suelta la fusionada en un hueco; para quitarla, tócala.</div>
     ${id ? `<div class="tb-etq">Estado</div><div class="tb-pills" data-campo="estado">${TB_ESTADOS.map(e => pill(e, e, 'cc-' + TB_ESTADO_CLASE[e], tbEstado(j.estado) === e)).join('')}</div>${TB_ESTADO_AYUDA[tbEstado(j.estado)] ? '' : ''}` : ''}
     <label>Nota (opcional)<textarea id="tb-f-nota" class="search-box" rows="2" placeholder="Nota">${escHtml(j.nota)}</textarea></label>
 `;
@@ -18712,7 +18800,6 @@ function tbAbrirEditor(id){
       if(campo === 'duracion') hoja.dataset.durActual = '';   // tocar una pastilla sustituye la duración escrita antes
     }));
   });
-  grupo('flota').querySelectorAll('button').forEach(b => b.addEventListener('click', () => b.classList.toggle('active')));
   fondo.style.display = 'flex'; document.body.classList.add('tb-modal');
   hoja.scrollTop = 0; _tbInicial = tbFotoFormulario();
   if(!id) setTimeout(() => document.getElementById('tb-f-cliente')?.focus(), 80);
@@ -18740,11 +18827,10 @@ async function tbGuardarEditor(){
   const cliente = v('tb-f-cliente'), trabajo = v('tb-f-trabajo');
   if(!cliente && !trabajo){ mostrarToast('Escribe al menos el cliente o el trabajo.', 'err'); return; }
   const pr = (document.querySelector('#tb-hoja .tb-pills[data-campo="prioridad"]')?.dataset.sel || 'Media').split(',').filter(x => TB_PRIO.includes(x)).slice(0, 2);
-  const marcadas = [...document.querySelectorAll('#tb-hoja .tb-pills[data-campo="flota"] button.active')].map(b => b.dataset.v);
-  const flota = TB_FLOTA.filter(f => marcadas.includes(f.id)).map(f => f.tipo);
+  const {flota, alternativas} = tbFlotaGuardable(document.querySelector('#tb-hoja .tb-pills[data-campo="flota"]'));
   const duracion = activo('duracion') || document.getElementById('tb-hoja').dataset.durActual || '';
   const dif = (document.querySelector('#tb-hoja .tb-pills[data-campo="dificultad"]')?.dataset.sel || '').split(',').filter(x => TB_DIFICULTADES.includes(x)).slice(0, 2);
-  const datos = {cliente, trabajo, lugar: v('tb-f-lugar'), duracion, nota: v('tb-f-nota'), dificultad: dif[0] || '', dificultades: dif, flota, prioridades: pr.length ? pr : ['Media']};
+  const datos = {cliente, trabajo, lugar: v('tb-f-lugar'), duracion, nota: v('tb-f-nota'), dificultad: dif[0] || '', dificultades: dif, flota, alternativas, prioridades: pr.length ? pr : ['Media']};
   datos.prioridad = tbPrioPrincipal(datos.prioridades);
   datos.estado = _tbEditando ? (activo('estado') || 'Pendiente') : 'Pendiente';
   if(_tbEditando){
