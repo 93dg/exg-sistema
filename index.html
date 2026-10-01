@@ -42,6 +42,19 @@
     }, err => { rec.ms = Math.round(performance.now() - t); rec.estado = 'error'; throw err; });
   };
   try{ new PerformanceObserver(l => l.getEntries().forEach(e => { M.largas++; M.largasMs += Math.round(e.duration); })).observe({type: 'longtask', buffered: true}); }catch(e){}
+  M.bloqueos = []; M.lentas = []; M.ultimo = null;
+  const vista = () => { const v = document.querySelector('.view.active'); return v ? v.id.replace('view-', '') : '—'; };
+  const quien = (el, tipo) => { if(!el || !el.tagName) return tipo; const t = el.tagName.toLowerCase(), id = el.id ? '#' + el.id : '', cl = (el.className && typeof el.className === 'string') ? '.' + el.className.trim().split(/\s+/)[0] : '', ph = el.placeholder ? ' "' + String(el.placeholder).slice(0, 18) + '"' : ''; return tipo + ' ' + t + (id || cl) + ph; };
+  // el móvil se queda "bloqueado" cuando no puede ni atender un temporizador de 100 ms: se apunta cuánto y qué se tocó justo antes
+  let ult = performance.now();
+  setInterval(() => { const t = performance.now(), d = t - ult - 100; ult = t; if(document.visibilityState === 'hidden') return; if(d > 150){ M.bloqueos.push({en: Math.round(t), ms: Math.round(d), tras: M.ultimo && t - M.ultimo.t < 3000 ? M.ultimo.que : null, vista: vista()}); if(M.bloqueos.length > 60) M.bloqueos.shift(); } }, 100);
+  document.addEventListener('visibilitychange', () => { ult = performance.now(); });
+  ['pointerdown', 'focusin', 'input', 'change', 'keydown'].forEach(tp => document.addEventListener(tp, e => { M.ultimo = {t: performance.now(), que: quien(e.target, tp)}; }, true));
+  // lo que más se nota: desde que tocas (o escribes) hasta que el móvil dibuja el resultado
+  ['pointerup', 'focusin', 'input', 'change'].forEach(tp => document.addEventListener(tp, e => {
+    const t0 = e.timeStamp || performance.now(), el = e.target;
+    requestAnimationFrame(() => requestAnimationFrame(() => { const d = performance.now() - t0; if(d > 120){ M.lentas.push({en: Math.round(performance.now()), ms: Math.round(d), que: quien(el, tp), vista: vista()}); if(M.lentas.length > 60) M.lentas.shift(); } }));
+  }, true));
 })();
 </script>
 <style>
@@ -3299,7 +3312,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.53</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.54</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3377,7 +3390,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.53</div>
+        <div class="sub" id="version-badge">V6.54</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8487,7 +8500,8 @@ function velDatos(){
   const ext = performance.getEntriesByType('resource').filter(e => /cdn\.jsdelivr|cdnjs|fonts\.g|accounts\.google/.test(e.name)).map(e => ({nombre: e.name.replace(/^https?:\/\//, '').split('?')[0].slice(0, 60), ms: Math.round(e.duration), tipo: e.initiatorType}));
   const reqs = M.reqs.filter(r => r.ms != null).map(r => { const m = /\/rest\/v1\/([^?]+)(\?(.*))?/.exec(r.url); return {...r, que: m ? (r.method === 'GET' ? '' : r.method + ' ') + m[1] + (m[3] && /(^|&)select=\*(&|$)/.test(m[3]) ? ' (todo)' : '') : r.url.split('?')[0].replace('/functions/v1/', 'función ').replace('/auth/v1/', 'auth ')}; });
   const fin = reqs.reduce((a, r) => Math.max(a, r.inicio + (r.msTotal != null ? r.msTotal : r.ms)), 0), bytes = reqs.reduce((a, r) => a + (r.bytes || 0), 0);
-  return {nav, fcp, ext, reqs, fin, bytes, M, red: (navigator.connection || {}).effectiveType || '?', nodo: (navigator.userAgent.match(/(iPhone|iPad|Android|Windows|Macintosh)/) || ['?'])[0]};
+  const largasOk = !!(window.PerformanceObserver && (PerformanceObserver.supportedEntryTypes || []).includes('longtask'));
+  return {nav, fcp, ext, reqs, fin, bytes, M, largasOk, red: (navigator.connection || {}).effectiveType || '?', nodo: (navigator.userAgent.match(/(iPhone|iPad|Android|Windows|Macintosh)/) || ['?'])[0]};
 }
 const velColor = ms => ms >= 1000 ? 'var(--red, #a32d2d)' : ms <= 300 ? 'var(--green, #3b6d11)' : 'inherit';
 const velSeg = ms => ms == null ? '—' : (ms / 1000).toLocaleString('es-ES', {maximumFractionDigits: 1}) + ' s';
@@ -8504,8 +8518,11 @@ function renderVelocidad(){
     fila('Código listo (evento de carga)', velSeg(d.nav.loadEventEnd), velColor(d.nav.loadEventEnd)) +
     fila('Última carga de datos terminada', velSeg(d.fin), velColor(d.fin)) +
     fila('Peticiones a los datos', d.reqs.length + ' · ' + velKb(d.bytes)) +
-    fila('Tareas largas (el móvil "pensando")', d.M.largas ? d.M.largas + ' · ' + velSeg(d.M.largasMs) : 'no medible aquí') +
+    fila('Bloqueos del móvil (más de 0,15 s)', (d.M.bloqueos || []).length + (d.M.bloqueos && d.M.bloqueos.length ? ' · peor ' + velSeg(Math.max(...d.M.bloqueos.map(b => b.ms))) : ''), (d.M.bloqueos || []).length ? 'var(--red, #a32d2d)' : '') +
+    fila('Interacciones lentas (más de 0,12 s)', (d.M.lentas || []).length + ((d.M.lentas || []).length ? ' · peor ' + velSeg(Math.max(...d.M.lentas.map(b => b.ms))) : ''), (d.M.lentas || []).length ? 'var(--red, #a32d2d)' : '') +
     fila('Dispositivo y red', d.nodo + ' · ' + d.red) +
+    `<h4 style="margin:14px 0 6px;">Interacciones lentas: de tocar a ver el resultado</h4>` + ((d.M.lentas || []).length ? d.M.lentas.slice().sort((a, b) => b.ms - a.ms).slice(0, 10).map(r => fila(r.que + ' · ' + r.vista, velSeg(r.ms), velColor(r.ms))).join('') : '<div class="empty">Ninguna todavía: toca buscadores y desplegables y vuelve a mirar.</div>') +
+    `<h4 style="margin:14px 0 6px;">Bloqueos del móvil</h4>` + ((d.M.bloqueos || []).length ? d.M.bloqueos.slice().sort((a, b) => b.ms - a.ms).slice(0, 8).map(r => fila((r.tras || 'sin tocar nada') + ' · ' + r.vista, velSeg(r.ms), velColor(r.ms))).join('') : '<div class="empty">Ninguno.</div>') +
     `<h4 style="margin:14px 0 6px;">Las 10 cargas que más tardaron</h4>` + (top.length ? top.map(r => fila(r.que, velSeg(r.msTotal || r.ms) + ' · ' + velKb(r.bytes), velColor(r.msTotal || r.ms))).join('') : '<div class="empty">Aún no hay peticiones medidas desde que abriste la web.</div>') +
     `<h4 style="margin:14px 0 6px;">Las que más pesan</h4>` + (pesadas.length ? pesadas.map(r => fila(r.que, velKb(r.bytes) + ' · ' + velSeg(r.msTotal || r.ms))).join('') : '<div class="empty">—</div>') +
     `<h4 style="margin:14px 0 6px;">Librerías externas</h4>` + (d.ext.length ? d.ext.map(e => fila(e.nombre, velSeg(e.ms), velColor(e.ms))).join('') : '<div class="empty">—</div>');
@@ -8514,7 +8531,9 @@ function copiarVelocidad(){
   const d = velDatos(), L = [];
   L.push('VELOCIDAD EXG ' + (document.getElementById('version-badge')?.textContent || '') + ' · ' + d.nodo + ' · red ' + d.red + ' · ' + new Date().toLocaleString('es-ES'));
   L.push('Página descargada: ' + velSeg(d.nav.responseEnd) + ' | primer contenido: ' + velSeg(d.fcp) + ' | app a la vista: ' + velSeg(d.M.appVisible) + ' | evento de carga: ' + velSeg(d.nav.loadEventEnd) + ' | datos terminados: ' + velSeg(d.fin));
-  L.push('Peticiones a los datos: ' + d.reqs.length + ' · ' + velKb(d.bytes) + ' | tareas largas: ' + d.M.largas + ' · ' + velSeg(d.M.largasMs));
+  L.push('Peticiones a los datos: ' + d.reqs.length + ' · ' + velKb(d.bytes) + ' | bloqueos: ' + (d.M.bloqueos || []).length + ' | interacciones lentas: ' + (d.M.lentas || []).length);
+  L.push('Interacciones lentas (tocar -> resultado):'); (d.M.lentas || []).slice().sort((a, b) => b.ms - a.ms).slice(0, 10).forEach(r => L.push('  ' + r.que + ' · ' + r.vista + ' · ' + velSeg(r.ms)));
+  L.push('Bloqueos del móvil:'); (d.M.bloqueos || []).slice().sort((a, b) => b.ms - a.ms).slice(0, 8).forEach(r => L.push('  ' + (r.tras || 'sin tocar nada') + ' · ' + r.vista + ' · ' + velSeg(r.ms)));
   L.push('Más lentas:'); d.reqs.slice().sort((a, b) => (b.msTotal || b.ms) - (a.msTotal || a.ms)).slice(0, 10).forEach(r => L.push('  ' + r.que + ' · ' + velSeg(r.msTotal || r.ms) + ' · ' + velKb(r.bytes)));
   L.push('Librerías externas:'); d.ext.forEach(e => L.push('  ' + e.nombre + ' · ' + velSeg(e.ms)));
   const txt = L.join('\n');
@@ -18718,10 +18737,10 @@ let _tbFusIgnorarClic = 0;
   const grupoDe = el => el && el.closest ? el.closest('#tb-hoja .tb-pills[data-campo="flota"]') : null;
   const botonDe = el => { const g = grupoDe(el); return g ? el.closest('button') : null; };
   const quitarMarcas = () => document.querySelectorAll('#tb-hoja .tb-fus-destino').forEach(b => b.classList.remove('tb-fus-destino'));
-  const cancelar = () => { if(!d) return; clearTimeout(d.timer); if(d.clone) d.clone.remove(); quitarMarcas(); d.btn.classList.remove('levantada'); d = null; };
+  const cancelar = () => { document.removeEventListener('touchmove', tmActivo); if(!d) return; clearTimeout(d.timer); if(d.clone) d.clone.remove(); quitarMarcas(); d.btn.classList.remove('levantada'); d = null; };
   const bajo = (x, y) => { const el = document.elementFromPoint(x, y); return {btn: botonDe(el), grupo: grupoDe(el)}; };
   const activar = () => {
-    if(!d || d.activo) return; d.activo = true; const r = d.btn.getBoundingClientRect(); d.dx = d.x - r.left; d.dy = d.y - r.top;
+    if(!d || d.activo) return; d.activo = true; document.addEventListener('touchmove', tmActivo, {passive: false}); const r = d.btn.getBoundingClientRect(); d.dx = d.x - r.left; d.dy = d.y - r.top;
     d.clone = d.btn.cloneNode(true); d.clone.classList.add('tb-fus-clon'); d.clone.style.cssText += `;position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;z-index:10000;pointer-events:none;margin:0;`;
     document.body.appendChild(d.clone); d.btn.classList.add('levantada');
     try{ if(navigator.vibrate) navigator.vibrate(18); }catch(e){}
@@ -18735,6 +18754,7 @@ let _tbFusIgnorarClic = 0;
     quitarMarcas(); const o = bajo(x, y); if(o.btn && o.btn !== d.btn) o.btn.classList.add('tb-fus-destino');
   };
   const soltar = () => {
+    document.removeEventListener('touchmove', tmActivo);
     if(!d) return; clearTimeout(d.timer);
     if(!d.activo){ d = null; return; }
     const o = bajo(d.x, d.y), g = d.grupo, origen = d.btn; _tbFusIgnorarClic = Date.now();
@@ -18750,8 +18770,10 @@ let _tbFusIgnorarClic = 0;
       const sueltas = ids(origen); m.fus = m.fus.filter(f => f.join('+') !== origen.dataset.v); m.req.push(...sueltas); g.innerHTML = tbFlotaHtml(m);
     }
   };
+  const tmActivo = ev => { const t = ev.touches[0]; if(t) mover(t.clientX, t.clientY, ev); };   // este sí bloquea el desplazamiento, pero solo existe mientras se arrastra
+  const tmPasivo = ev => { if(d && !d.activo){ const t = ev.touches[0]; if(t) mover(t.clientX, t.clientY, ev); } };   // antes de activarse solo mira si el dedo se desliza (cancela), sin bloquear el scroll
   document.addEventListener('touchstart', ev => { const t = ev.touches[0]; if(t) empezar(t.clientX, t.clientY, ev); }, {passive: true});
-  document.addEventListener('touchmove', ev => { const t = ev.touches[0]; if(t) mover(t.clientX, t.clientY, ev); }, {passive: false});
+  document.addEventListener('touchmove', tmPasivo, {passive: true});
   document.addEventListener('touchend', soltar); document.addEventListener('touchcancel', cancelar);
   document.addEventListener('mousedown', ev => { if(ev.button === 0) empezar(ev.clientX, ev.clientY, ev); });
   document.addEventListener('mousemove', ev => mover(ev.clientX, ev.clientY, ev)); document.addEventListener('mouseup', soltar);
@@ -18999,7 +19021,7 @@ async function tbGuardarOrden(id){
   const lista = document.getElementById('tb-lista'); if(!lista) return;
   let d = null;
   const puedeArrastrar = () => _tbVista !== 'historial' && _tbFiltro === 'todos' && !tbHayFiltros();
-  const cancelar = () => { if(!d) return; clearTimeout(d.timer); if(d.activo){ d.clone.remove(); d.card.classList.remove('levantada'); document.body.classList.remove('tb-arrastrando'); } d = null; };
+  const cancelar = () => { document.removeEventListener('touchmove', tmActivo); if(!d) return; clearTimeout(d.timer); if(d.activo){ d.clone.remove(); d.card.classList.remove('levantada'); document.body.classList.remove('tb-arrastrando'); } d = null; };
   const posicionar = () => {
     if(!d || !d.activo) return;
     d.clone.style.top = (d.y - d.offY) + 'px';
@@ -19009,7 +19031,7 @@ async function tbGuardarOrden(id){
   };
   const bucle = () => { if(!d || !d.activo) return; if(d.y < 110) window.scrollBy(0, -14); else if(d.y > window.innerHeight - 150) window.scrollBy(0, 14); posicionar(); requestAnimationFrame(bucle); };
   const activar = () => {
-    if(!d || d.activo) return; d.activo = true;
+    if(!d || d.activo) return; d.activo = true; document.addEventListener('touchmove', tmActivo, {passive: false});
     const r = d.card.getBoundingClientRect(); d.offY = d.y - r.top;
     d.clone = d.card.cloneNode(true); d.clone.classList.add('tb-flota'); d.clone.style.width = r.width + 'px'; d.clone.style.left = r.left + 'px'; d.clone.style.top = r.top + 'px';
     document.body.appendChild(d.clone); d.card.classList.add('levantada'); document.body.classList.add('tb-arrastrando');
@@ -19026,12 +19048,15 @@ async function tbGuardarOrden(id){
     if(ev.cancelable) ev.preventDefault(); posicionar();
   };
   const soltar = () => {
+    document.removeEventListener('touchmove', tmActivo);
     if(!d) return; const era = d.activo, id = d.card.dataset.id; clearTimeout(d.timer);
     if(era){ d.clone.remove(); d.card.classList.remove('levantada'); document.body.classList.remove('tb-arrastrando'); _tbIgnorarClic = Date.now(); tbGuardarOrden(id); }
     d = null;
   };
+  const tmActivo = ev => { const t = ev.touches[0]; if(t) mover(t.clientX, t.clientY, ev); };   // bloquea el desplazamiento, pero solo mientras se arrastra
+  const tmPasivo = ev => { if(d && !d.activo){ const t = ev.touches[0]; if(t) mover(t.clientX, t.clientY, ev); } };
   lista.addEventListener('touchstart', ev => { const t = ev.touches[0]; empezar(t.clientX, t.clientY, ev); }, {passive: true});
-  document.addEventListener('touchmove', ev => { const t = ev.touches[0]; if(t) mover(t.clientX, t.clientY, ev); }, {passive: false});
+  document.addEventListener('touchmove', tmPasivo, {passive: true});
   document.addEventListener('touchend', soltar); document.addEventListener('touchcancel', cancelar);
   lista.addEventListener('mousedown', ev => { if(ev.button === 0) empezar(ev.clientX, ev.clientY, ev); });
   document.addEventListener('mousemove', ev => mover(ev.clientX, ev.clientY, ev)); document.addEventListener('mouseup', soltar);
