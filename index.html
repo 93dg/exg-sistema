@@ -57,7 +57,8 @@
   try{ new PerformanceObserver(l => l.getEntries().forEach(e => { M.largas++; M.largasMs += Math.round(e.duration); })).observe({type: 'longtask', buffered: true}); }catch(e){}
   M.bloqueos = []; M.lentas = []; M.ultimo = null;
   const vista = () => { const v = document.querySelector('.view.active'); return v ? v.id.replace('view-', '') : '—'; };
-  const quien = (el, tipo) => { if(!el || !el.tagName) return tipo; const t = el.tagName.toLowerCase(), id = el.id ? '#' + el.id : '', cl = (el.className && typeof el.className === 'string') ? '.' + el.className.trim().split(/\s+/)[0] : '', ph = el.placeholder ? ' "' + String(el.placeholder).slice(0, 18) + '"' : ''; return tipo + ' ' + t + (id || cl) + ph; };
+  const quien = (el, tipo) => { if(!el || !el.tagName) return tipo; const t = el.tagName.toLowerCase(), id = el.id ? '#' + el.id : '', cl = (el.className && typeof el.className === 'string') ? '.' + el.className.trim().split(/\s+/)[0] : '', ph = el.placeholder ? ' "' + String(el.placeholder).slice(0, 18) + '"' : '', tx = !ph && el.textContent && el.textContent.trim().length <= 24 ? ' "' + el.textContent.trim() + '"' : ''; return tipo + ' ' + t + (id || cl) + (ph || tx); };
+  M.pasos = [];
   // el móvil se queda "bloqueado" cuando no puede ni atender un temporizador de 100 ms: se apunta cuánto y qué se tocó justo antes
   let ult = performance.now();
   setInterval(() => { const t = performance.now(), d = t - ult - 100; ult = t; if(document.visibilityState === 'hidden') return; if(d > 150){ M.bloqueos.push({en: Math.round(t), ms: Math.round(d), tras: M.ultimo && t - M.ultimo.t < 3000 ? M.ultimo.que : null, vista: vista()}); if(M.bloqueos.length > 60) M.bloqueos.shift(); } }, 100);
@@ -3325,7 +3326,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.55</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.56</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3403,7 +3404,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.55</div>
+        <div class="sub" id="version-badge">V6.56</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8547,6 +8548,7 @@ function renderVelocidad(){
     fila('Dispositivo y red', d.nodo + ' · ' + d.red) +
     `<h4 style="margin:14px 0 6px;">Interacciones lentas: de tocar a ver el resultado</h4>` + ((d.M.lentas || []).length ? d.M.lentas.slice().sort((a, b) => b.ms - a.ms).slice(0, 10).map(r => fila(r.que + ' · ' + r.vista, velSeg(r.ms), velColor(r.ms))).join('') : '<div class="empty">Ninguna todavía: toca buscadores y desplegables y vuelve a mirar.</div>') +
     `<h4 style="margin:14px 0 6px;">Bloqueos del móvil</h4>` + ((d.M.bloqueos || []).length ? d.M.bloqueos.slice().sort((a, b) => b.ms - a.ms).slice(0, 8).map(r => fila((r.tras || 'sin tocar nada') + ' · ' + r.vista, velSeg(r.ms), velColor(r.ms))).join('') : '<div class="empty">Ninguno.</div>') +
+    `<h4 style="margin:14px 0 6px;">Pasos de la carga de documentos</h4>` + ((d.M.pasos || []).length ? d.M.pasos.slice().sort((a, b) => b.ms - a.ms).slice(0, 12).map(r => fila(r.n, velSeg(r.ms), velColor(r.ms))).join('') : '<div class="empty">Aún no se han cargado los documentos antiguos: abre Facturas o Albaranes y vuelve.</div>') +
     `<h4 style="margin:14px 0 6px;">Las 10 cargas que más tardaron</h4>` + (top.length ? top.map(r => fila(r.que, velSeg(r.msTotal || r.ms) + ' · ' + velKb(r.bytes), velColor(r.msTotal || r.ms))).join('') : '<div class="empty">Aún no hay peticiones medidas desde que abriste la web.</div>') +
     `<h4 style="margin:14px 0 6px;">Las que más pesan</h4>` + (pesadas.length ? pesadas.map(r => fila(r.que, velKb(r.bytes) + ' · ' + velSeg(r.msTotal || r.ms))).join('') : '<div class="empty">—</div>') +
     `<h4 style="margin:14px 0 6px;">Librerías externas</h4>` + (d.ext.length ? d.ext.map(e => fila(e.nombre, velSeg(e.ms), velColor(e.ms))).join('') : '<div class="empty">—</div>');
@@ -8557,6 +8559,7 @@ function copiarVelocidad(){
   L.push('Página descargada: ' + velSeg(d.nav.responseEnd) + ' | primer contenido: ' + velSeg(d.fcp) + ' | app a la vista: ' + velSeg(d.M.appVisible) + ' | evento de carga: ' + velSeg(d.nav.loadEventEnd) + ' | datos terminados: ' + velSeg(d.fin));
   L.push('Peticiones a los datos: ' + d.reqs.length + ' · ' + velKb(d.bytes) + ' | bloqueos: ' + (d.M.bloqueos || []).length + ' | interacciones lentas: ' + (d.M.lentas || []).length);
   L.push('Interacciones lentas (tocar -> resultado):'); (d.M.lentas || []).slice().sort((a, b) => b.ms - a.ms).slice(0, 10).forEach(r => L.push('  ' + r.que + ' · ' + r.vista + ' · ' + velSeg(r.ms)));
+  L.push('Pasos de la carga de documentos:'); (d.M.pasos || []).slice().sort((a, b) => b.ms - a.ms).slice(0, 12).forEach(r => L.push('  ' + r.n + ' · ' + velSeg(r.ms)));
   L.push('Bloqueos del móvil:'); (d.M.bloqueos || []).slice().sort((a, b) => b.ms - a.ms).slice(0, 8).forEach(r => L.push('  ' + (r.tras || 'sin tocar nada') + ' · ' + r.vista + ' · ' + velSeg(r.ms)));
   L.push('Más lentas:'); d.reqs.slice().sort((a, b) => (b.msTotal || b.ms) - (a.msTotal || a.ms)).slice(0, 10).forEach(r => L.push('  ' + r.que + ' · ' + velSeg(r.msTotal || r.ms) + ' · ' + velKb(r.bytes)));
   L.push('Librerías externas:'); d.ext.forEach(e => L.push('  ' + e.nombre + ' · ' + velSeg(e.ms)));
@@ -8732,6 +8735,7 @@ document.querySelectorAll('#pres-filtro-tipo-chips .chip-filter').forEach(chip=>
   });
 });
 function renderEconDocs(prefijo){
+  if(document.body.classList.contains('cargando-historico')) return;   // al terminar la carga (finalizarCargaDocs) se filtra con lo escrito
   if(prefijo==='fact') filtrarTablaOrdenable('econ-facturas-tbody');
   else if(prefijo==='alb') filtrarPorAnioTrim('albaranes-tbody-standalone','alb');
   else if(prefijo==='pres') filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
@@ -8767,12 +8771,14 @@ function asegurarHistorico(){
   const t0 = performance.now(); let i = 0;
   document.body.classList.add('cargando-historico'); _diferirTarjetas = true;
   const terminar = () => { _diferirTarjetas = false; document.body.classList.remove('cargando-historico'); H.enCurso = false;
+    try{ if(window.__exgMed) window.__exgMed.pasos.push({n: 'histórico · TOTAL (' + lista.length + ' documentos)', ms: Math.round(performance.now() - t0)}); }catch(e){}
     try{ aiRegistrarEvento('carga_historico', aiVistaActual(), {docs: lista.length, ms: Math.round(performance.now() - t0), movil: /iPhone|Android/i.test(navigator.userAgent)}); }catch(e){}
     if(H.pendientes.size) asegurarHistorico(); };
   const trozo = () => {
     try{
       const ini = performance.now();
       while(i < lista.length && performance.now() - ini < 12) H.procesar(lista[i++], 'filas');
+      try{ const dur = performance.now() - ini; if(window.__exgMed && dur > 80) window.__exgMed.pasos.push({n: 'histórico · trozo largo (' + Math.round(i) + '/' + lista.length + ')', ms: Math.round(dur)}); }catch(e){}
       if(i < lista.length){ setTimeout(trozo, 30); return; }
       H.finalizar(true).catch(e => console.error('histórico', e)).then(terminar);
     }catch(e){ console.error('histórico', e); terminar(); }
@@ -12366,15 +12372,33 @@ function buscarCorreo(){
 // Usa asunto+remitente+snippet (rápido, sin descargar el cuerpo completo de cada uno).
 // Se relanza sola cuando entra un correo nuevo a la lista; no bloquea la vista.
 let correoAnalizando = new Set();
-async function analizarCorreosVisiblesEnSegundoPlano(){
-  const pendientes = correoMessagesCache.filter(m => !m.estado?.analizado_at && !correoAnalizando.has(m.id)).slice(0, 15);
-  for(const m of pendientes){
-    correoAnalizando.add(m.id);
-    analizarUnCorreo(m, m.snippet).then(analisis=>{
-      if(analisis){ m.estado = {...(m.estado||{}), ...analisis, message_id:m.id, analizado_at:new Date().toISOString()}; renderCorreoInbox(); }
-      correoAnalizando.delete(m.id);
-    }).catch(()=>{ correoAnalizando.delete(m.id); });
+// Antes se lanzaban hasta 15 análisis a la vez y CADA uno, al terminar, repintaba la bandeja entera: con el móvil ocupado el buscador no respondía.
+// Ahora: como mucho 3 a la vez, y los repintados se agrupan (uno cada 1,2 s como mucho, y ninguno mientras se está escribiendo en el buscador).
+let _corrCola = [], _corrActivos = 0, _corrRenderT = null, _corrRenderUlt = 0;
+document.getElementById('correo-search')?.addEventListener('input', () => { window.__corrTecla = Date.now(); });
+function renderCorreoInboxSuave(){
+  if(_corrRenderT) return;
+  const espera = Math.max(0, 1200 - (Date.now() - _corrRenderUlt));
+  _corrRenderT = setTimeout(() => {
+    _corrRenderT = null;
+    const bus = document.getElementById('correo-search');
+    if(bus && document.activeElement === bus && Date.now() - (window.__corrTecla || 0) < 1500){ _corrRenderT = setTimeout(() => { _corrRenderT = null; renderCorreoInboxSuave(); }, 400); return; }
+    _corrRenderUlt = Date.now(); renderCorreoInbox();
+  }, espera);
+}
+function _corrBombear(){
+  while(_corrActivos < 3 && _corrCola.length){
+    const m = _corrCola.shift(); _corrActivos++;
+    analizarUnCorreo(m, m.snippet).then(analisis => {
+      if(analisis){ m.estado = {...(m.estado||{}), ...analisis, message_id:m.id, analizado_at:new Date().toISOString()}; renderCorreoInboxSuave(); }
+    }).catch(()=>{}).finally(() => { correoAnalizando.delete(m.id); _corrActivos--; _corrBombear(); });
   }
+}
+async function analizarCorreosVisiblesEnSegundoPlano(){
+  _corrCola.forEach(m => correoAnalizando.delete(m.id)); _corrCola = [];   // una carga nueva sustituye a lo que aún no había empezado
+  const pendientes = correoMessagesCache.filter(m => !m.estado?.analizado_at && !correoAnalizando.has(m.id)).slice(0, 15);
+  pendientes.forEach(m => { correoAnalizando.add(m.id); _corrCola.push(m); });
+  _corrBombear();
 }
 async function analizarUnCorreo(msg, cuerpoTexto){
   try{
@@ -23711,28 +23735,29 @@ async function cargarDocumentosEconomicosReales(){
     const ceder = ()=>new Promise(r=>setTimeout(r, 0));
     // esFinal: al terminar el histórico solo se repite lo que depende de las filas de las tablas; lo que sale de los datos en memoria ya está bien desde el principio
     const finalizarCargaDocs = async (esFinal)=>{
+      let _tp = performance.now(); const _p = n => { const M = window.__exgMed; if(M){ M.pasos.push({n: (esFinal ? 'histórico · ' : 'arranque · ') + n, ms: Math.round(performance.now() - _tp)}); } _tp = performance.now(); };
       const contAlb = document.getElementById('albaranes-standalone-count');
       if(contAlb) contAlb.textContent = document.querySelectorAll('#albaranes-tbody-standalone tr').length;
       actualizarContadorPresupuestosStandalone();
-      renderFacturasKPIs(); renderAlbaranesKPIs(); renderPresupuestosKPIs();
+      renderFacturasKPIs(); renderAlbaranesKPIs(); renderPresupuestosKPIs(); _p('contadores y KPIs');
       await ceder();
-      if(!esFinal){ renderControlDocs(); calcularKPIsReales(); }
-      poblarFiltroAniosEconomia(); recalcularResumenEconomia();
+      if(!esFinal){ renderControlDocs(); calcularKPIsReales(); _p('control y KPIs reales'); }
+      poblarFiltroAniosEconomia(); recalcularResumenEconomia(); _p('resumen de Economía');
       await ceder();
-      if(!esFinal) renderGraficoFacturacion();
+      if(!esFinal){ renderGraficoFacturacion(); _p('gráfico'); }
       poblarFiltroAniosChipsGenerico('albaranes-tbody-standalone','alb-filtro-anio-chips','alb');
       poblarFiltroAniosChipsGenerico('presupuestos-tbody-standalone','pres-filtro-anio-chips','pres');
-      poblarFiltroAniosChips('econ-facturas-tbody','fact-filtro-anio-chips');
+      poblarFiltroAniosChips('econ-facturas-tbody','fact-filtro-anio-chips'); _p('chips de años');
       await ceder();
-      filtrarTablaOrdenable('econ-facturas-tbody');
-      aplicarOrdenGuardadoSiExiste('econ-facturas-tbody','fact-orden-chips');
-      sincronizarListaMovilFacturas();
+      filtrarTablaOrdenable('econ-facturas-tbody'); _p('filtrar facturas');
+      aplicarOrdenGuardadoSiExiste('econ-facturas-tbody','fact-orden-chips'); _p('ordenar facturas');
+      sincronizarListaMovilFacturas(); _p('tarjetas de facturas');
       await ceder();
-      filtrarPorAnioTrim('albaranes-tbody-standalone','alb');
-      aplicarOrdenGuardadoSiExiste('albaranes-tbody-standalone','alb-orden-chips');
-      filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
-      aplicarOrdenGuardadoSiExiste('presupuestos-tbody-standalone','pres-orden-chips');
-      if(!esFinal){ await ceder(); calcularTotalesClientes(); renderGastosPro(); }
+      filtrarPorAnioTrim('albaranes-tbody-standalone','alb'); _p('filtrar albaranes');
+      aplicarOrdenGuardadoSiExiste('albaranes-tbody-standalone','alb-orden-chips'); _p('ordenar albaranes');
+      filtrarPorAnioTrim('presupuestos-tbody-standalone','pres'); _p('filtrar presupuestos');
+      aplicarOrdenGuardadoSiExiste('presupuestos-tbody-standalone','pres-orden-chips'); _p('ordenar presupuestos');
+      if(!esFinal){ await ceder(); calcularTotalesClientes(); renderGastosPro(); _p('totales de clientes y gastos'); }
     };
     // 1) TODOS los documentos en memoria (rápido) para que totales y buscadores tengan todo; 2) filas y tarjetas solo de lo reciente;
     // 3) el histórico se va construyendo en segundo plano en trozos pequeños, para que la web siga respondiendo a los toques
