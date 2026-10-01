@@ -3345,7 +3345,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.62</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.63</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3423,7 +3423,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.62</div>
+        <div class="sub" id="version-badge">V6.63</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9037,6 +9037,7 @@ function aplicarOrdenDropdown(tbodyId, chipsId, resumenId, clave){
   }
   localStorage.setItem(claveGuardado, JSON.stringify({clave, dir}));
   pintarOrdenActivo(chipsId, resumenId, clave, dir, campos);
+  try{ const pf = chipsId.replace(/-orden-chips$/, ''); if(PLEG_CFG[pf]) plegRefrescar(pf); }catch(e){}
 }
 function pintarOrdenActivo(chipsId, resumenId, clave, dir, campos){
   const cont = document.getElementById(chipsId);
@@ -16047,9 +16048,11 @@ const PLEG_CFG = {
   alb: {tbody: 'albaranes-tbody-standalone'},
   pres: {tbody: 'presupuestos-tbody-standalone'}
 };
-const PLEG_GRUPOS = [['anio', 'Año', 'anio'], ['trim', 'Trimestre', 'trim'], ['estado', 'Estado', 'estado']];   // clave, título, atributo data- de la pastilla
-const _plegEstado = {fact: [], alb: [], pres: []};   // grupos plegados de cada pantalla, en el orden en que se plegaron
+const PLEG_GRUPOS = [['anio', 'Año', 'anio'], ['trim', 'Trimestre', 'trim'], ['estado', 'Estado', 'estado'], ['orden', 'Orden', null]];   // clave, título, atributo data- de la pastilla (Orden no filtra: ordena, y no lleva cantidades)
+const PLEG_FILTROS = PLEG_GRUPOS.filter(g => g[0] !== 'orden');
+const _plegEstado = {fact: ['orden'], alb: ['orden'], pres: ['orden']};   // grupos plegados de cada pantalla, en el orden en que se plegaron; Orden va plegado de serie
 let _plegAnimar = null;
+const plegCont = (p, k) => document.getElementById(k === 'orden' ? p + '-orden-chips' : p + '-filtro-' + k + '-chips');
 function plegEstadoFila(tr, soloPill){
   const el = soloPill ? tr.querySelector('.pill') : tr.querySelector('.pill, select');
   return el ? (el.classList ? Array.from(el.classList).find(x => x !== 'pill') : el.value) : null;
@@ -16062,8 +16065,9 @@ function plegIniciar(){
     const caja = document.createElement('div'); caja.className = 'pleg'; caja.id = 'pleg-' + p;
     caja.innerHTML = '<div class="pleg-cols"></div><div class="pleg-filas"></div><div class="pleg-guardados"></div>';
     cab.insertAdjacentElement('afterend', caja);
-    PLEG_GRUPOS.forEach(([k]) => { const f = document.getElementById(p + '-filtro-' + k + '-chips'); if(f) caja.querySelector('.pleg-guardados').appendChild(f); });   // las pastillas de siempre, tal cual
+    PLEG_GRUPOS.forEach(([k]) => { const f = plegCont(p, k); if(f) caja.querySelector('.pleg-guardados').appendChild(f); });   // las pastillas de siempre, tal cual
     dd.remove();   // el botón Filtros y su panel vacío ya no hacen falta
+    const ddo = document.getElementById('dd-' + p + '-orden'); if(ddo) ddo.remove();   // el desplegable de Ordenar tampoco: sus pastillas ya están en la fila Orden
     caja.addEventListener('click', ev => {
       const t = ev.target.closest('button[data-pl]');
       if(t){ const k = t.dataset.pl; _plegAnimar = k; const l = _plegEstado[p]; if(l.includes(k)) _plegEstado[p] = l.filter(x => x !== k); else l.push(k); plegGuardar(p); plegRender(p); return; }
@@ -16086,20 +16090,25 @@ async function plegGuardar(p){
   const {error} = await sb.from('filtros_persistentes').upsert({container_id: 'pleg-' + p, valor: JSON.stringify(_plegEstado[p]), actualizado_at: new Date().toISOString()});
   if(error) console.error('No se pudo guardar qué filtros están plegados', error);
 }
-function plegSeleccion(p, k){ const f = document.getElementById(p + '-filtro-' + k + '-chips'); return new Set(Array.from(f ? f.querySelectorAll('.chip-filter.active') : []).map(x => x.dataset[k === 'trim' ? 'trim' : k]).filter(Boolean)); }
+function plegSeleccion(p, k){ const f = plegCont(p, k); return new Set(Array.from(f ? f.querySelectorAll('.chip-filter.active') : []).map(x => k === 'orden' ? x.dataset.clave : x.dataset[k === 'trim' ? 'trim' : k]).filter(Boolean)); }
+function plegTextoPlegado(p, k, sel){   // lo que lleva el botón de un grupo plegado: su título y, si hay algo elegido, cuántos (o la flecha del orden)
+  const tit = PLEG_GRUPOS.find(g => g[0] === k)[1];
+  if(k === 'orden'){ const a = document.querySelector('#' + p + '-orden-chips .chip-orden.active .orden-flecha'); return tit + (a && a.textContent.trim() ? ' <b>' + a.textContent.trim() + '</b>' : ''); }
+  return tit + (sel[k].size ? ' <b>' + sel[k].size + '</b>' : '');
+}
 function plegRender(p){
   const caja = document.getElementById('pleg-' + p); if(!caja) return;
   const guard = caja.querySelector('.pleg-guardados'), filas = caja.querySelector('.pleg-filas'), cols = caja.querySelector('.pleg-cols');
   const antes = {}; caja.querySelectorAll('[data-pl]').forEach(e => { antes[e.dataset.pl] = e.getBoundingClientRect(); });
   const claves = PLEG_GRUPOS.map(g => g[0]), pleg = _plegEstado[p].filter(k => claves.includes(k)), abiertos = claves.filter(k => !pleg.includes(k));
-  const sel = {}; claves.forEach(k => { sel[k] = plegSeleccion(p, k).size; });
+  const sel = {}; claves.forEach(k => { sel[k] = plegSeleccion(p, k); });
   const tit = Object.fromEntries(PLEG_GRUPOS.map(g => [g[0], g[1]]));
   cols.style.cssText = pleg.length ? 'display:grid;gap:6px;margin-bottom:6px;grid-template-columns:repeat(' + claves.length + ', minmax(0, 1fr));' : 'display:none;';
-  cols.innerHTML = pleg.map((k, i) => `<button type="button" class="tb-ftit tb-plegado ${sel[k] ? 'con' : ''}" data-pl="${k}" style="grid-column:${i + 1};" title="Desplegar ${tit[k]}">${tit[k]}${sel[k] ? ' <b>' + sel[k] + '</b>' : ''}</button>`).join('');
-  claves.forEach(k => { const f = document.getElementById(p + '-filtro-' + k + '-chips'); if(f) guard.appendChild(f); });   // todas atrás, y ahora salen las abiertas en su fila
+  cols.innerHTML = pleg.map((k, i) => `<button type="button" class="tb-ftit tb-plegado ${sel[k].size ? 'con' : ''}" data-pl="${k}" style="grid-column:${i + 1};" title="Desplegar ${tit[k]}">${plegTextoPlegado(p, k, sel)}</button>`).join('');
+  claves.forEach(k => { const f = plegCont(p, k); if(f) guard.appendChild(f); });   // todas atrás, y ahora salen las abiertas en su fila
   filas.innerHTML = '';
   abiertos.forEach(k => {
-    const f = document.getElementById(p + '-filtro-' + k + '-chips'); if(!f) return;
+    const f = plegCont(p, k); if(!f) return;
     const fila = document.createElement('div'); fila.className = 'tb-frow';
     fila.innerHTML = `<button type="button" class="tb-ftit" data-pl="${k}" title="Plegar ${tit[k]}">${tit[k]} <i>▾</i></button>`;
     fila.appendChild(f); filas.appendChild(fila);
@@ -16115,17 +16124,17 @@ function plegRefrescar(p){
   const sel = {}; PLEG_GRUPOS.forEach(([k]) => { sel[k] = plegSeleccion(p, k); });
   const q = (document.getElementById(p + '-search')?.value || '').trim().toLowerCase();
   const filas = Array.from(tbody.querySelectorAll('tr')).map(tr => ({anio: tr.dataset.anio, trim: tr.dataset.trimestre, estado: plegEstadoFila(tr, cfg.soloPill), busq: tr._busq}));
-  const pasa = (f, salvo) => PLEG_GRUPOS.every(([k]) => k === salvo || !sel[k].size || (k === 'estado' ? (f.estado ? sel.estado.has(f.estado) : true) : sel[k].has(f[k]))) && (!q || f.busq === undefined || f.busq.includes(q));
-  PLEG_GRUPOS.forEach(([k]) => {
+  const pasa = (f, salvo) => PLEG_FILTROS.every(([k]) => k === salvo || !sel[k].size || (k === 'estado' ? (f.estado ? sel.estado.has(f.estado) : true) : sel[k].has(f[k]))) && (!q || f.busq === undefined || f.busq.includes(q));
+  PLEG_FILTROS.forEach(([k]) => {
     const cuenta = {}; let total = 0;
     filas.forEach(f => { if(pasa(f, k)){ total++; if(f[k] != null) cuenta[f[k]] = (cuenta[f[k]] || 0) + 1; } });
-    const cont = document.getElementById(p + '-filtro-' + k + '-chips'); if(!cont) return;
+    const cont = plegCont(p, k); if(!cont) return;
     const hoy = String(new Date().getFullYear()), sinCargar = _historico.pendientes.size > 0;   // mientras los antiguos no estén cargados, las cantidades de 'Todos' y de los años anteriores serían engañosas: no se enseñan
     cont.querySelectorAll('.chip-filter').forEach(ch => { const v = ch.dataset[k]; ch.dataset.n = (k === 'anio' && sinCargar && (!v || v < hoy)) ? '' : (v ? (cuenta[v] || 0) : total); });
   });
   const caja = document.getElementById('pleg-' + p), cols = caja.querySelector('.pleg-cols');
   try{ renderAvisoHistorico(); }catch(e){}
-  cols.querySelectorAll('button[data-pl]').forEach(b => { const n = sel[b.dataset.pl].size, tit = PLEG_GRUPOS.find(g => g[0] === b.dataset.pl)[1]; b.classList.toggle('con', !!n); b.innerHTML = tit + (n ? ' <b>' + n + '</b>' : ''); });
+  cols.querySelectorAll('button[data-pl]').forEach(b => { const k = b.dataset.pl; b.classList.toggle('con', !!sel[k].size); b.innerHTML = plegTextoPlegado(p, k, sel); });
 }
 function plegRefrescarTodo(){ Object.keys(PLEG_CFG).forEach(p => { try{ plegRefrescar(p); }catch(e){ console.warn(e); } }); }
 plegIniciar();
