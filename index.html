@@ -2349,6 +2349,10 @@ body.tb-modal{overflow:hidden;}
 .pleg .chip-filter.active[data-n]:not([data-n=""])::after{color:#fff;opacity:.9;}
 .pleg .chip-filter{padding:6px 10px;font-size:12.5px;line-height:1.2;border-radius:999px;white-space:nowrap;}   /* el tamaño de las pastillas de Trabajos: en el móvil las de siempre salían muy grandes */
 .pleg-guardados{display:none;}
+.gr-subtabs{display:flex;gap:8px;flex-wrap:wrap;margin:-2px 0 14px;}
+.gr-subtabs .tb-fchip b:empty, .docs-tabs .docs-tab b.gs-n:empty{display:none;}
+.docs-tabs .docs-tab b.gs-n{display:inline-block;margin-left:4px;font-size:12px;color:var(--orange);}
+.docs-tabs .docs-tab.active b.gs-n{color:#fff;}
 .gr-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
 .gr-kpi{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:12px 14px;}
 .gr-kpi.gr-grande{grid-column:1 / -1;}
@@ -3581,7 +3585,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.82</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.83</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3669,7 +3673,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.82</div>
+        <div class="sub" id="version-badge">V6.83</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7119,7 +7123,7 @@ document.addEventListener('focusin', e => {   // red de seguridad: una caja de e
 const NAV_GRUPOS = {
   trabajos: [['trabajos', 'Lista'], ['planificacion', 'Calendario'], ['mapa', 'Mapa']],
   economia: [['economia', 'Economía'], ['impuestos', 'Impuestos']],
-  bandeja: [['entradas', 'Entradas'], ['correo', 'Correo'], ['historico', 'Por revisar'], ['reportes', 'Reportes']],
+  bandeja: [['correo', 'Correo'], ['entradas', 'Entradas'], ['historico', 'Por revisar'], ['reportes', 'Reportes']],
   empresa: [['empresa', 'Documentación'], ['archivos', 'Archivos']],
   ajustes: [['config', 'Permisos'], ['backup', 'Copias'], ['sistema', 'Sistema']],
 };
@@ -7130,13 +7134,48 @@ function navVistaPermitida(v){
   if((btn.classList.contains('admin-only') || v === 'impuestos') && !esAdminSesion) return false;
   return true;
 }
+// Bandeja: Entradas, Por revisar y Reportes son «más de lo mismo» (lo que hay que mirar y resolver), así que forman UNA pestaña, «Pendientes», con tres partes y su contador.
+const NAV_SUB = {bandeja: {clave: 'pendientes', texto: 'Pendientes', miembros: ['entradas', 'historico', 'reportes'], textos: {entradas: 'Entradas', historico: 'Por revisar', reportes: 'Reportes'}}};
+let _bandejaCuentas = {t: 0, v: {}};
+function bandejaPintarCuentas(){
+  document.querySelectorAll('.gr-subtabs [data-gsub]').forEach(b => { const n = b.querySelector('.gs-n'), v = _bandejaCuentas.v[b.dataset.gsub]; if(n) n.textContent = v ? v : ''; });
+  const t = Object.values(_bandejaCuentas.v).reduce((s, x) => s + (x || 0), 0);
+  document.querySelectorAll('.docs-tabs[data-grupo="bandeja"] [data-miembros] .gs-n').forEach(n => { n.textContent = t ? t : ''; });
+}
+async function bandejaContadores(forzar){
+  if(typeof sb === 'undefined' || !sb) return;
+  if(!forzar && Date.now() - _bandejaCuentas.t < 30000){ bandejaPintarCuentas(); return; }
+  _bandejaCuentas.t = Date.now();
+  try{
+    const [e, h, r] = await Promise.all([
+      sb.from('documentos').select('id', {count: 'exact', head: true}).eq('status', 'pendiente'),
+      sb.from('historico_revision').select('id', {count: 'exact', head: true}).eq('estado', 'pendiente_revisar'),
+      sb.from('sistema').select('id', {count: 'exact', head: true}).eq('tipo', 'mejora').or('data->>estado.eq.pendiente,data->>estado.is.null')]);
+    _bandejaCuentas.v = {entradas: e.count || 0, historico: h.count || 0, reportes: r.count || 0};
+  }catch(err){ console.warn('contadores de Bandeja', err); }
+  bandejaPintarCuentas();
+}
 function navGruposConstruir(){
   Object.entries(NAV_GRUPOS).forEach(([g, tabs]) => tabs.forEach(([v]) => {
     const vista = document.getElementById('view-' + v); if(!vista || vista.querySelector(':scope > .docs-tabs[data-grupo="' + g + '"]')) return;
-    const barra = document.createElement('div'); barra.className = 'docs-tabs'; barra.dataset.grupo = g;
-    barra.innerHTML = tabs.map(([t, l]) => `<button type="button" class="docs-tab" data-gtab="${t}">${l}</button>`).join('');
-    barra.addEventListener('click', ev => { const b = ev.target.closest('[data-gtab]'); if(b) document.querySelector(`.nav button[data-view="${b.dataset.gtab}"]`)?.click(); });
+    const sub = NAV_SUB[g]; let botones = '', puesto = false;
+    tabs.forEach(([t, l]) => {
+      if(sub && sub.miembros.includes(t)){ if(!puesto){ puesto = true; botones += `<button type="button" class="docs-tab" data-gtab="${sub.clave}" data-miembros="${sub.miembros.join(',')}">${sub.texto} <b class="gs-n"></b></button>`; } }
+      else botones += `<button type="button" class="docs-tab" data-gtab="${t}">${l}</button>`;
+    });
+    const barra = document.createElement('div'); barra.className = 'docs-tabs'; barra.dataset.grupo = g; barra.innerHTML = botones;
+    barra.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-gtab]'); if(!b) return; let destino = b.dataset.gtab;
+      if(b.dataset.miembros){ const ms = b.dataset.miembros.split(',').filter(navVistaPermitida); let ult = null; try{ ult = localStorage.getItem('grupo_sub_' + g); }catch(e){} destino = (ult && ms.includes(ult)) ? ult : ms[0]; }
+      if(destino) document.querySelector(`.nav button[data-view="${destino}"]`)?.click();
+    });
     vista.insertBefore(barra, vista.firstChild);
+    if(sub && sub.miembros.includes(v)){   // segunda fila, dentro de cada una de las tres partes: Entradas · Por revisar · Reportes
+      const fila = document.createElement('div'); fila.className = 'gr-subtabs'; fila.dataset.subgrupo = g;
+      fila.innerHTML = sub.miembros.map(m => `<button type="button" class="tb-fchip" data-gsub="${m}">${sub.textos[m]} <b class="gs-n"></b></button>`).join('');
+      fila.addEventListener('click', ev => { const b = ev.target.closest('[data-gsub]'); if(b) document.querySelector(`.nav button[data-view="${b.dataset.gsub}"]`)?.click(); });
+      barra.after(fila);
+    }
   }));
   document.querySelectorAll('.nav .nav-grupo').forEach(b => b.addEventListener('click', () => {
     const permit = NAV_GRUPOS[b.dataset.grupo].map(t => t[0]).filter(navVistaPermitida), ult = localStorage.getItem('grupo_ultimo_' + b.dataset.grupo);
@@ -7149,14 +7188,20 @@ function navGruposConstruir(){
 function navGruposRefrescar(){
   const act = (document.querySelector('.view.active')?.id || '').replace(/^view-/, '');
   Object.entries(NAV_GRUPOS).forEach(([g, tabs]) => {
-    const permit = tabs.map(t => t[0]).filter(navVistaPermitida), miembros = tabs.map(t => t[0]);
+    const permit = tabs.map(t => t[0]).filter(navVistaPermitida), miembros = tabs.map(t => t[0]), sub = NAV_SUB[g];
     document.querySelectorAll(`.docs-tabs[data-grupo="${g}"]`).forEach(barra => {
       barra.style.display = permit.length > 1 ? '' : 'none';
-      barra.querySelectorAll('[data-gtab]').forEach(b => { b.style.display = permit.includes(b.dataset.gtab) ? '' : 'none'; b.classList.toggle('active', b.dataset.gtab === act); });
+      barra.querySelectorAll('[data-gtab]').forEach(b => {
+        const ms = b.dataset.miembros ? b.dataset.miembros.split(',') : null;
+        b.style.display = (ms ? ms.some(x => permit.includes(x)) : permit.includes(b.dataset.gtab)) ? '' : 'none';
+        b.classList.toggle('active', ms ? ms.includes(act) : b.dataset.gtab === act);
+      });
     });
+    if(sub) document.querySelectorAll(`.gr-subtabs[data-subgrupo="${g}"] [data-gsub]`).forEach(b => { b.style.display = permit.includes(b.dataset.gsub) ? '' : 'none'; b.classList.toggle('active', b.dataset.gsub === act); });
     const gb = document.querySelector(`.nav .nav-grupo[data-grupo="${g}"]`);
     if(gb){ gb.style.display = permit.length ? '' : 'none'; gb.classList.toggle('active', miembros.includes(act)); }
-    if(miembros.includes(act)){ try{ localStorage.setItem('grupo_ultimo_' + g, act); }catch(e){} }
+    if(miembros.includes(act)){ try{ localStorage.setItem('grupo_ultimo_' + g, act); if(sub && sub.miembros.includes(act)){ localStorage.setItem('grupo_sub_' + g, act); } }catch(e){} }
+    if(sub && miembros.includes(act)){ try{ bandejaContadores(); }catch(e){} }
   });
   const nd = document.getElementById('nav-documentos-btn'); if(nd) nd.classList.toggle('active', NAV_DOCS_VISTAS.includes(act));
 }
