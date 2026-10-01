@@ -25,6 +25,19 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <script>
+/* NÚMEROS RÁPIDOS: Number.toLocaleString('es-ES', opciones) crea un formateador nuevo en cada llamada; en el móvil, con cientos de importes en pantalla, pesa mucho.
+   Se guarda un formateador por combinación de opciones. Da exactamente el mismo texto (la especificación define toLocaleString como new Intl.NumberFormat(...).format). */
+(function(){
+  const nativo = Number.prototype.toLocaleString, cache = new Map();
+  Number.prototype.toLocaleString = function(loc, opt){
+    if(loc !== 'es-ES' || arguments.length > 2) return nativo.apply(this, arguments);
+    const k = opt ? JSON.stringify(opt) : ''; let f = cache.get(k);
+    if(!f){ try{ f = new Intl.NumberFormat('es-ES', opt); }catch(e){ return nativo.apply(this, arguments); } cache.set(k, f); }
+    return f.format(Number.prototype.valueOf.call(this));
+  };
+})();
+</script>
+<script>
 /* MEDIDOR DE VELOCIDAD — solo mide, no cambia nada: apunta cuánto tarda cada petición a los datos y cuánto pesa, para ver en Sistema > Velocidad qué frena la web.
    Va antes de crear la conexión para que supabase-js use este fetch. Solo mira las peticiones a /rest, /auth y /functions. */
 (function(){
@@ -3312,7 +3325,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.54</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.55</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3390,7 +3403,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.54</div>
+        <div class="sub" id="version-badge">V6.55</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7926,7 +7939,7 @@ function consumoGastoHtml(d){
   return h;
 }
 function gastoCardHtml(d, modo){
-  const prov = (clientes.find(c => c.id === d.entidad_id) || {}).name || d.client || '—';
+  const prov = (mapaClientes().get(d.entidad_id) || {}).name || d.client || '—';
   const fecha = d.dateRaw ? formatFechaCorta(d.dateRaw) : '—';
   const url = d.archivo_url || d.justificante_url || (d.archivo_path ? urlPublicaGastoCorreo(d.archivo_path) : '');
   const cat = d.categoria ? `<span class="tag">${escHtml(d.categoria)}</span>` : '';
@@ -8289,27 +8302,38 @@ function renderGastosProResumen(){
   const movP = document.getElementById('gpro-proximos-movil');
   if(movP) movP.innerHTML = recurrentes.length ? recurrentes.map(d => tarjetaSencillaGasto(d)).join('') : '<div class="empty" style="padding:16px;">Todavía no hay gastos marcados como recurrentes.</div>';
 }
+let _mapaCli = {ref: null, n: -1, t: 0, m: null};
+function mapaClientes(){ const ahora = Date.now(); if(_mapaCli.ref !== clientes || _mapaCli.n !== clientes.length || ahora - _mapaCli.t > 3000){ _mapaCli = {ref: clientes, n: clientes.length, t: ahora, m: new Map(clientes.map(c => [c.id, c]))}; } return _mapaCli.m; }
+const GP_LOTE = 40, GP_LOTE_TABLA = 100; let _gpMostrar = GP_LOTE, _gpFirma = '';
+function gastosProMostrarMas(){ _gpMostrar += window.matchMedia && window.matchMedia('(max-width:768px)').matches ? GP_LOTE : GP_LOTE_TABLA; renderGastosProLista(); }
 function renderGastosProLista(){
   const buscar = (document.getElementById('gpro-lista-buscar')?.value||'').toLowerCase();
   const cont = document.getElementById('gpro-lista-cont')?.value || '';
   const tipo = document.getElementById('gpro-lista-tipo')?.value || '';
   const soloPendientes = !!document.getElementById('gpro-lista-sinjust')?.checked;
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-  let docs = gastosProDocs().sort((a,b)=> new Date(b.dateRaw||0) - new Date(a.dateRaw||0));
+  const _t = new Map(), tms = d => { let v = _t.get(d); if(v === undefined){ v = +new Date(d.dateRaw||0); _t.set(d, v); } return v; };   // la fecha de cada gasto se calcula una vez, no en cada comparación del orden
+  let docs = gastosProDocs().sort((a,b)=> tms(b) - tms(a));
+  const nombres = mapaClientes();
   if(cont) docs = docs.filter(d=>(d.contabilidad||'oficial')===cont);
   if(tipo && GASTO_TIPOS[tipo]) docs = docs.filter(GASTO_TIPOS[tipo]);
   if(soloPendientes) docs = docs.filter(d=>(d.estado_justificante||'pendiente')!=='completo');
-  if(buscar) docs = docs.filter(d=>(d.concepto||'').toLowerCase().includes(buscar) || (clientes.find(c=>c.id===d.entidad_id)?.name||'').toLowerCase().includes(buscar));
+  if(buscar) docs = docs.filter(d=>(d.concepto||'').toLowerCase().includes(buscar) || (nombres.get(d.entidad_id)?.name||'').toLowerCase().includes(buscar));
   pintarTotalListaGastos(docs, tipo);
-  document.getElementById('gpro-lista-tbody').innerHTML = docs.length ? docs.map(d=>{
-    const nombre = clientes.find(c=>c.id===d.entidad_id)?.name || '—';
+  const esMovil = window.matchMedia ? window.matchMedia('(max-width:768px)').matches : false;   // solo se pinta lo que se ve, y por lotes
+  const firma = [buscar, cont, tipo, soloPendientes].join('|'); if(firma !== _gpFirma){ _gpFirma = firma; _gpMostrar = esMovil ? GP_LOTE : GP_LOTE_TABLA; }
+  const lote = esMovil ? GP_LOTE : GP_LOTE_TABLA; if(_gpMostrar < lote) _gpMostrar = lote;
+  const vis = docs.slice(0, _gpMostrar), faltan = docs.length - vis.length;
+  const masBtn = faltan ? `<button class="btn" onclick="gastosProMostrarMas()">Mostrar más (${faltan})</button>` : '';
+  document.getElementById('gpro-lista-tbody').innerHTML = esMovil ? '' : docs.length ? vis.map(d=>{
+    const nombre = nombres.get(d.entidad_id)?.name || '—';
     const contPill = (d.contabilidad||'oficial')==='en_b' ? '<span class="pill mantenimiento">En B</span>' : '<span class="pill adjudicado">Oficial</span>';
     const justPill = d.estado_justificante==='completo' ? '<span class="pill adjudicado">✓ Justificado</span>' : '<span class="pill noadjudicado">Pendiente</span>';
     return `<tr><td class="mono">${formatFechaCorta ? formatFechaCorta(d.dateRaw) : (d.dateLabel||'—')}</td><td>${d.concepto||'—'}</td><td>${nombre}</td><td>${d.categoria||'—'}</td><td>${contPill}</td><td>${d.recurrencia?`<span class="pill mantenimiento">${d.recurrencia}</span>`:'—'}</td><td class="num">${euro(d.importe||d.total)}</td><td>${justPill}</td><td class="celda-gestor-${d.id}">${gestorPillHtml(d.id, d.enviado_gestor, d.enviado_gestor_fecha)}</td></tr>`;
-  }).join('') : '<tr><td colspan="9" class="empty">Todavía no hay gastos registrados. Usa "+ Registrar gasto" desde Economía para empezar.</td></tr>';
+  }).join('') + (faltan ? `<tr><td colspan="9" style="text-align:center;padding:12px;">${masBtn}</td></tr>` : '') : '<tr><td colspan="9" class="empty">Todavía no hay gastos registrados. Usa "+ Registrar gasto" desde Economía para empezar.</td></tr>';
   const mov = document.getElementById('gpro-lista-movil');
   if(mov){
-    mov.innerHTML = docs.length ? docs.slice(0, 300).map(d=>gastoCardHtml(d, 'normal')).join('') + (docs.length>300 ? `<div class="empty" style="padding:10px;">Se ven los 300 más recientes de ${docs.length}. Usa el buscador para el resto.</div>` : '')
+    mov.innerHTML = !esMovil ? '' : docs.length ? vis.map(d=>gastoCardHtml(d, 'normal')).join('') + (faltan ? `<div style="padding:12px;text-align:center;">${masBtn}</div>` : '')
       : '<div class="empty" style="padding:16px;">Todavía no hay gastos registrados.</div>';
     enlazarTarjetasGasto(mov);
   }
@@ -15891,13 +15915,13 @@ function toggleBuscadorClientes(){
   btn?.classList.toggle('activo', !abierto);
   if(!abierto){
     const inp = document.getElementById('clientes-search');
-    inp?.focus(); inp && (inp.value=''); renderClientesTable();
+    inp?.focus(); if(inp && inp.value !== ''){ inp.value=''; renderClientesTable(); }   // si ya estaba vacío no hay nada que repintar
     // Cuando se abre el buscar, ajustar spacer
     setTimeout(ajustarSpacerClientes, 50);
   } else {
     // Al cerrar, limpiar búsqueda
     const inp = document.getElementById('clientes-search');
-    if(inp){ inp.value=''; renderClientesTable(); }
+    if(inp && inp.value !== ''){ inp.value=''; renderClientesTable(); }
     setTimeout(ajustarSpacerClientes, 50);
   }
 }
@@ -16009,7 +16033,7 @@ function toggleDocsEnCard(id, btn){
   card.after(panel);
   btn.querySelector('span').textContent = '▴';
 }
-function renderClientesMovil(clientesFiltrados){
+function renderClientesMovil(clientesFiltrados, faltan){
   const lista = document.getElementById('clientes-lista-movil');
   if(!lista) return;
   if(!clientesFiltrados.length){
@@ -16050,7 +16074,7 @@ function renderClientesMovil(clientesFiltrados){
       ${pendFmt||'<div class="cc-pend-v"></div>'}
       ${docsBtn}
     </div>`;
-  }).join('');
+  }).join('') + (faltan ? `<div style="padding:12px;text-align:center;"><button class="btn" onclick="clientesMostrarMas()">Mostrar más (${faltan})</button></div>` : '');
 }
 
 // ── NORMALIZACIÓN CANÓNICA DE CLIENTES ──
@@ -16588,6 +16612,8 @@ async function asignarProvinciaCliente(id, provincia){
 }
 // ======== FIN CLIENTES MÓVIL ========
 
+const CLI_LOTE = 40; let _cliMostrar = CLI_LOTE, _cliFirma = '';
+function clientesMostrarMas(){ _cliMostrar += CLI_LOTE; renderClientesTable(); }
 function renderClientesTable(){
   const falta = v => v ? v : '—';
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
@@ -16629,7 +16655,11 @@ function renderClientesTable(){
     return (a.name||'').localeCompare(b.name||'');
   });
 
-  document.getElementById('clientes-tbl').innerHTML = filtrados.map(c=>{
+  const esMovil = window.matchMedia ? window.matchMedia('(max-width:768px)').matches : false;   // solo se pinta lo que se ve: tarjetas en móvil, tabla en escritorio
+  const firma = [q, [...tiposSel].join(), [...prioSel].join(), [...extraSel].join(), ordenCli].join('|');
+  if(firma !== _cliFirma){ _cliFirma = firma; _cliMostrar = CLI_LOTE; }   // otra búsqueda o filtro: vuelve a los primeros 40
+  const visibles = filtrados.slice(0, _cliMostrar), faltan = filtrados.length - visibles.length;
+  document.getElementById('clientes-tbl').innerHTML = esMovil ? '' : visibles.map(c=>{
     const calidad = calidadDe(c);
     const calidadHtml = calidad==='ok' ? `<span class="tag" style="color:var(--green);border-color:var(--green);">OK</span>` : `<span class="tag" style="color:var(--orange);border-color:var(--orange);">Incompleta</span>`;
     const ultimoTxt = c.ultimoTrabajo ? formatFechaCorta(c.ultimoTrabajo) : '—';
@@ -16642,11 +16672,12 @@ function renderClientesTable(){
     <td class="num col-clientes-pendiente" style="color:${c.pendiente>0?'var(--orange)':'inherit'};">${euro(c.pendiente)}</td>
     <td class="col-clientes-ultimo">${ultimoTxt}</td>
     <td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnCliente('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')">🗑</span></td></tr>`;
-  }).join('');
-  aplicarVisibilidadColumnasClientes();
+  }).join('') + (!esMovil && faltan ? `<tr><td colspan="18" style="text-align:center;padding:12px;"><button class="btn" onclick="clientesMostrarMas()">Mostrar más (${faltan})</button></td></tr>` : '');
+  if(!esMovil) aplicarVisibilidadColumnasClientes();
   // Actualizar cards móviles
-  renderClientesMovil(filtrados);
+  if(esMovil) renderClientesMovil(visibles, faltan); else { const lm = document.getElementById('clientes-lista-movil'); if(lm) lm.innerHTML = ''; }
 }
+try{ window.matchMedia('(max-width:768px)').addEventListener('change', () => { if(document.getElementById('view-clientes')?.classList.contains('active')) renderClientesTable(); if(document.getElementById('gpro-lista-tbody') && document.getElementById('view-gastospro')?.classList.contains('active')) renderGastosProLista(); }); }catch(e){}
 function toggleExpandirClienteFila(id){
   const existente = document.getElementById('cliente-detalle-'+id);
   if(existente){ existente.remove(); return; }
