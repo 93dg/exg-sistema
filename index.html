@@ -917,7 +917,14 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 /* PASAR A… — bloque propio, claramente distinto de guardar */
 .ie-estado-modo{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 20px 10px 20px;font-size:11px;color:var(--ink-soft);}
 .ie-estado-modo label{display:flex;align-items:center;gap:5px;}
-.ie-estado-modo select{font-size:11px;padding:3px 6px;height:auto;width:auto;min-width:0;}
+.ie-estado-modo{flex-direction:column;align-items:stretch;gap:8px;}
+.ie-estado-modo .tb-frow{align-items:flex-start;}
+.pillsel{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0;}
+.pillsel .ps-chip{padding:6px 10px;border-radius:999px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}
+.pillsel .ps-chip:not(.pill){border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);}
+.pillsel .ps-chip:not(.pill).active{background:var(--asphalt);border-color:var(--asphalt);color:#fff;}   /* los de Estado (con clase pill) conservan el color de cada estado */
+.pillsel .ps-chip.pill{display:inline-block;border:2px solid transparent;font-size:12.5px;padding:5px 10px;}   /* los de Estado llevan el color propio de cada estado; el elegido se marca con un aro */
+.pillsel .ps-chip.pill.active{border-color:var(--ink);box-shadow:0 0 0 1px var(--paper) inset;}
 .ie-pasar-a{display:flex;gap:8px;align-items:stretch;margin:0 20px 16px 20px;padding:8px 10px;background:var(--concrete);border-radius:var(--radius);}
 .btn-flecha{flex:0 0 auto;width:42px;font-size:18px;font-weight:800;line-height:1;border:none;border-radius:var(--radius);background:var(--orange);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .btn-flecha:hover{filter:brightness(1.08);}
@@ -3348,7 +3355,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.65</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.66</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3426,7 +3433,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.65</div>
+        <div class="sub" id="version-badge">V6.66</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6368,12 +6375,8 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
 
     <!-- ESTADO y CÓMO MOSTRAR EL PDF — pequeños, arriba; solo con el documento ya guardado. Cambian y guardan al instante. -->
     <div class="ie-estado-modo ie-edit-only" id="ni-estado-modo-wrap" style="display:none;">
-      <label>Estado <select class="search-box" id="ni-estado-cobro" onchange="cambiarEstadoDesdeEditor(this.value)"></select></label>
-      <label>PDF <select class="search-box" id="ni-modo-pdf" onchange="cambiarModoPdfDesdeEditor(this.value)">
-        <option value="completo">Completo</option>
-        <option value="sin_fechas">Sin fechas en conceptos</option>
-        <option value="simplificado">Simplificado (1 línea)</option>
-      </select></label>
+      <div class="tb-frow"><span class="tb-ftit" style="cursor:default;">Estado</span><div class="pillsel" id="ni-estado-cobro"></div></div>
+      <div class="tb-frow"><span class="tb-ftit" style="cursor:default;">PDF</span><div class="pillsel" id="ni-modo-pdf"></div></div>
     </div>
 
     <!-- PASAR A… — desplegable único, mismo criterio para presupuesto/albarán/proforma/factura.
@@ -23350,12 +23353,24 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   else mostrarToast('Estado actualizado ✓', 'ok');
   renderControlDocs();
 }
+// ===== Pastillas de elección única que sustituyen a un desplegable (select) =====
+// El elemento conserva su id y tiene la propiedad .value (leer y escribir), igual que el select al que sustituye: todo el código que ya lo lee o lo cambia sigue funcionando.
+function pillsSelIniciar(id, opciones, alElegir, conColor){
+  const el = document.getElementById(id); if(!el) return;
+  const pintar = v => el.querySelectorAll('.ps-chip').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+  el.innerHTML = opciones.map(([v, l]) => `<button type="button" class="ps-chip ${conColor ? 'pill ' + v : ''}" data-v="${v}">${l}</button>`).join('');
+  let valor = '';
+  Object.defineProperty(el, 'value', {configurable: true, get(){ return valor; }, set(v){ valor = v == null ? '' : String(v); el.dataset.value = valor; pintar(valor); }});
+  el.addEventListener('click', ev => { const b = ev.target.closest('.ps-chip'); if(!b || b.dataset.v === valor) return; el.value = b.dataset.v; if(alElegir) alElegir(b.dataset.v); });
+}
+pillsSelIniciar('ni-modo-pdf', [['completo', 'Completo'], ['sin_fechas', 'Sin fechas en conceptos'], ['simplificado', 'Simplificado (1 línea)']], v => cambiarModoPdfDesdeEditor(v));
+pillsSelIniciar('ni-estado-cobro', ESTADOS_DOCUMENTO, v => cambiarEstadoDesdeEditor(v), true);
+document.getElementById('ni-modo-pdf').value = 'completo';
 // ===== Editor: estado y cómo mostrar el PDF =====
 function actualizarControlesEditor(doc){
   const wrap = document.getElementById('ni-estado-modo-wrap');
   if(!wrap) return;
   const sel = document.getElementById('ni-estado-cobro');
-  sel.innerHTML = ESTADOS_DOCUMENTO.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
   sel.value = doc.estado_cobro || 'pendiente_enviar';
   document.getElementById('ni-modo-pdf').value = doc.modo_pdf || 'completo';
   wrap.style.display = 'flex';
