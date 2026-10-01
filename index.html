@@ -23,8 +23,27 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<script>
+/* MEDIDOR DE VELOCIDAD — solo mide, no cambia nada: apunta cuánto tarda cada petición a los datos y cuánto pesa, para ver en Sistema > Velocidad qué frena la web.
+   Va antes de crear la conexión para que supabase-js use este fetch. Solo mira las peticiones a /rest, /auth y /functions. */
+(function(){
+  const M = window.__exgMed = {reqs: [], largas: 0, largasMs: 0, appVisible: null};
+  const orig = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    if(!/\/(rest|auth|functions)\/v1\//.test(url)) return orig(input, init);
+    const t = performance.now(), rec = {url: url.replace(/^https?:\/\/[^/]+/, ''), method: String((init && init.method) || (input && input.method) || 'GET').toUpperCase(), inicio: Math.round(t), ms: null, msTotal: null, bytes: null, estado: null};
+    if(M.reqs.length < 600) M.reqs.push(rec);
+    return orig(input, init).then(res => {
+      rec.ms = Math.round(performance.now() - t); rec.estado = res.status;
+      try{ res.clone().arrayBuffer().then(b => { rec.bytes = b.byteLength; rec.msTotal = Math.round(performance.now() - t); }).catch(() => {}); }catch(e){}
+      return res;
+    }, err => { rec.ms = Math.round(performance.now() - t); rec.estado = 'error'; throw err; });
+  };
+  try{ new PerformanceObserver(l => l.getEntries().forEach(e => { M.largas++; M.largasMs += Math.round(e.duration); })).observe({type: 'longtask', buffered: true}); }catch(e){}
+})();
+</script>
 <style>
 :root{
 
@@ -3280,7 +3299,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.52</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.53</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3358,7 +3377,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.52</div>
+        <div class="sub" id="version-badge">V6.53</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4910,6 +4929,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <div class="client-tab" data-sub="reglas">Reglas</div>
         <div class="client-tab" data-sub="estado">Estado</div>
         <div class="client-tab" data-sub="historial">Historial</div>
+        <div class="client-tab" data-sub="velocidad">Velocidad</div>
+      </div>
+
+      <div class="sub-view" id="sis-velocidad" style="display:none;">
+        <div class="panel" style="margin-bottom:14px;">
+          <div class="panel-head"><h3>Velocidad de carga de este dispositivo</h3><div style="display:flex;gap:6px;"><button class="btn sm" onclick="renderVelocidad()">↻</button><button class="btn sm" onclick="copiarVelocidad()">📋 Copiar</button></div></div>
+          <div class="panel-body" id="vel-cuerpo"><div class="empty">Cargando…</div></div>
+        </div>
+        <p class="two-col-note">Solo mide, no cambia nada. Mira lo que ha tardado <b>desde que abriste la web</b>: la descarga de la página, cuándo se vio la aplicación, y cada petición a los datos con lo que tardó y lo que pesó. Para medir un arranque limpio, cierra la web del todo, ábrela otra vez y entra aquí.</p>
       </div>
 
       <div class="sub-view" id="sis-arranque">
@@ -6534,6 +6562,18 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
 </div>
 
 <script>
+/* ---------------- LIBRERÍAS BAJO DEMANDA ---------------- */
+// Excel (xlsx, casi 1 MB) y la captura de pantalla (html2canvas) ya no se cargan al abrir la web: solo cuando se usan, y una vez.
+const CDN_LIBS = {xlsx: 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', html2canvas: 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'}, _libsCargadas = {};
+function cargarLib(nombre){
+  if(_libsCargadas[nombre]) return _libsCargadas[nombre];
+  return _libsCargadas[nombre] = new Promise((ok, ko) => {
+    const s = document.createElement('script'); s.src = CDN_LIBS[nombre];
+    s.onload = () => ok(); s.onerror = () => { delete _libsCargadas[nombre]; ko(new Error('No se pudo cargar ' + nombre + ': revisa la conexión')); };
+    document.head.appendChild(s);
+  });
+}
+
 /* ---------------- SIDEBAR ---------------- */
 /* ---------------- MODO EDITOR (mover, borrar y redimensionar bloques de cada pantalla) ---------------- */
 let editorModeOn = false;
@@ -8439,7 +8479,47 @@ window.addEventListener('scroll', ev => {
 /* ===================== FIN RECIBOS ===================== */
 
 setupSubtabs('entradas-subtabs','entradas',{bandeja:'sub-bandeja',whatsapp:'sub-whatsapp'});
-setupSubtabs('sistema-subtabs','sis',{arranque:'sis-arranque',reglas:'sis-reglas',estado:'sis-estado',historial:'sis-historial'},{onSwitch:{arranque:()=>{ cargarPromptsSistema(); cargarArranqueSistema(); },reglas:()=>cargarConocimientoEXG(),estado:()=>cargarEstadoSistema(),historial:()=>cargarCambiosEXG()}});
+setupSubtabs('sistema-subtabs','sis',{arranque:'sis-arranque',reglas:'sis-reglas',estado:'sis-estado',historial:'sis-historial',velocidad:'sis-velocidad'},{onSwitch:{arranque:()=>{ cargarPromptsSistema(); cargarArranqueSistema(); },reglas:()=>cargarConocimientoEXG(),estado:()=>cargarEstadoSistema(),historial:()=>cargarCambiosEXG(),velocidad:()=>renderVelocidad()}});
+/* ---------------- VELOCIDAD (Sistema) ---------------- */
+function velDatos(){
+  const M = window.__exgMed || {reqs: [], largas: 0, largasMs: 0, appVisible: null}, nav = performance.getEntriesByType('navigation')[0] || {};
+  const fcp = (performance.getEntriesByType('paint').find(e => e.name === 'first-contentful-paint') || {}).startTime;
+  const ext = performance.getEntriesByType('resource').filter(e => /cdn\.jsdelivr|cdnjs|fonts\.g|accounts\.google/.test(e.name)).map(e => ({nombre: e.name.replace(/^https?:\/\//, '').split('?')[0].slice(0, 60), ms: Math.round(e.duration), tipo: e.initiatorType}));
+  const reqs = M.reqs.filter(r => r.ms != null).map(r => { const m = /\/rest\/v1\/([^?]+)(\?(.*))?/.exec(r.url); return {...r, que: m ? (r.method === 'GET' ? '' : r.method + ' ') + m[1] + (m[3] && /(^|&)select=\*(&|$)/.test(m[3]) ? ' (todo)' : '') : r.url.split('?')[0].replace('/functions/v1/', 'función ').replace('/auth/v1/', 'auth ')}; });
+  const fin = reqs.reduce((a, r) => Math.max(a, r.inicio + (r.msTotal != null ? r.msTotal : r.ms)), 0), bytes = reqs.reduce((a, r) => a + (r.bytes || 0), 0);
+  return {nav, fcp, ext, reqs, fin, bytes, M, red: (navigator.connection || {}).effectiveType || '?', nodo: (navigator.userAgent.match(/(iPhone|iPad|Android|Windows|Macintosh)/) || ['?'])[0]};
+}
+const velColor = ms => ms >= 1000 ? 'var(--red, #a32d2d)' : ms <= 300 ? 'var(--green, #3b6d11)' : 'inherit';
+const velSeg = ms => ms == null ? '—' : (ms / 1000).toLocaleString('es-ES', {maximumFractionDigits: 1}) + ' s';
+const velKb = b => b == null ? '—' : b >= 1048576 ? (b / 1048576).toLocaleString('es-ES', {maximumFractionDigits: 1}) + ' MB' : Math.round(b / 1024) + ' KB';
+function renderVelocidad(){
+  const el = document.getElementById('vel-cuerpo'); if(!el) return; const d = velDatos();
+  const fila = (t, v, c) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);"><span>${escHtml(t)}</span><b style="${c ? 'color:' + c : ''}">${v}</b></div>`;
+  const top = d.reqs.slice().sort((a, b) => (b.msTotal || b.ms) - (a.msTotal || a.ms)).slice(0, 10);
+  const pesadas = d.reqs.filter(r => r.bytes).sort((a, b) => b.bytes - a.bytes).slice(0, 6);
+  el.innerHTML =
+    fila('Página descargada', velSeg(d.nav.responseEnd), velColor(d.nav.responseEnd)) +
+    fila('Primer contenido en pantalla', velSeg(d.fcp), velColor(d.fcp)) +
+    fila('Aplicación a la vista (tras la sesión)', velSeg(d.M.appVisible), velColor(d.M.appVisible)) +
+    fila('Código listo (evento de carga)', velSeg(d.nav.loadEventEnd), velColor(d.nav.loadEventEnd)) +
+    fila('Última carga de datos terminada', velSeg(d.fin), velColor(d.fin)) +
+    fila('Peticiones a los datos', d.reqs.length + ' · ' + velKb(d.bytes)) +
+    fila('Tareas largas (el móvil "pensando")', d.M.largas ? d.M.largas + ' · ' + velSeg(d.M.largasMs) : 'no medible aquí') +
+    fila('Dispositivo y red', d.nodo + ' · ' + d.red) +
+    `<h4 style="margin:14px 0 6px;">Las 10 cargas que más tardaron</h4>` + (top.length ? top.map(r => fila(r.que, velSeg(r.msTotal || r.ms) + ' · ' + velKb(r.bytes), velColor(r.msTotal || r.ms))).join('') : '<div class="empty">Aún no hay peticiones medidas desde que abriste la web.</div>') +
+    `<h4 style="margin:14px 0 6px;">Las que más pesan</h4>` + (pesadas.length ? pesadas.map(r => fila(r.que, velKb(r.bytes) + ' · ' + velSeg(r.msTotal || r.ms))).join('') : '<div class="empty">—</div>') +
+    `<h4 style="margin:14px 0 6px;">Librerías externas</h4>` + (d.ext.length ? d.ext.map(e => fila(e.nombre, velSeg(e.ms), velColor(e.ms))).join('') : '<div class="empty">—</div>');
+}
+function copiarVelocidad(){
+  const d = velDatos(), L = [];
+  L.push('VELOCIDAD EXG ' + (document.getElementById('version-badge')?.textContent || '') + ' · ' + d.nodo + ' · red ' + d.red + ' · ' + new Date().toLocaleString('es-ES'));
+  L.push('Página descargada: ' + velSeg(d.nav.responseEnd) + ' | primer contenido: ' + velSeg(d.fcp) + ' | app a la vista: ' + velSeg(d.M.appVisible) + ' | evento de carga: ' + velSeg(d.nav.loadEventEnd) + ' | datos terminados: ' + velSeg(d.fin));
+  L.push('Peticiones a los datos: ' + d.reqs.length + ' · ' + velKb(d.bytes) + ' | tareas largas: ' + d.M.largas + ' · ' + velSeg(d.M.largasMs));
+  L.push('Más lentas:'); d.reqs.slice().sort((a, b) => (b.msTotal || b.ms) - (a.msTotal || a.ms)).slice(0, 10).forEach(r => L.push('  ' + r.que + ' · ' + velSeg(r.msTotal || r.ms) + ' · ' + velKb(r.bytes)));
+  L.push('Librerías externas:'); d.ext.forEach(e => L.push('  ' + e.nombre + ' · ' + velSeg(e.ms)));
+  const txt = L.join('\n');
+  (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => mostrarToast('Copiado: pégalo en el chat', 'ok'), () => { prompt('Copia este texto:', txt); });
+}
 /* ---------------- TABLAS ORDENABLES Y FILTRABLES POR AÑO/TRIMESTRE — reutilizable en cualquier tabla ---------------- */
 function poblarFiltroAniosChips(tbodyId, contenedorId){
   const tbody = document.getElementById(tbodyId);
@@ -10562,6 +10642,7 @@ async function checkSession(){
     if(data && data.session){
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app').style.display = '';
+      if(window.__exgMed && window.__exgMed.appVisible == null) window.__exgMed.appVisible = Math.round(performance.now());
       const esAdmin = (data.session.user.user_metadata || {}).rol === 'admin';
       esAdminSesion = esAdmin;
       if(!esAdmin){
@@ -11918,6 +11999,7 @@ async function guardarReporteBug(){
   let capturaUrl = null;
   const bar = document.getElementById('report-bug-bar');
   try{
+    try{ await cargarLib('html2canvas'); }catch(e){ console.warn(e); }
     if(typeof html2canvas === 'function'){
       bar.style.visibility = 'hidden'; // que la propia barra no salga en la foto
       const canvas = await html2canvas(document.body, {scale: 0.6, logging:false, useCORS:true});
@@ -12778,6 +12860,7 @@ async function mostrarArchivoEnVisor(url){
   try{
     const resp = await fetch(url);
     const buf = await resp.arrayBuffer();
+    await cargarLib('xlsx');
     const wb = XLSX.read(buf, {type:'array', cellStyles:true});
     const nombreHoja = wb.SheetNames.includes('Factura') ? 'Factura' : wb.SheetNames.find(n=>{
       const s = wb.Sheets[n];
