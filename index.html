@@ -21,8 +21,8 @@
 <link rel="icon" href="icon-192.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <script>
 /* NÚMEROS RÁPIDOS: Number.toLocaleString('es-ES', opciones) crea un formateador nuevo en cada llamada; en el móvil, con cientos de importes en pantalla, pesa mucho.
@@ -41,7 +41,9 @@
 /* MEDIDOR DE VELOCIDAD — solo mide, no cambia nada: apunta cuánto tarda cada petición a los datos y cuánto pesa, para ver en Sistema > Velocidad qué frena la web.
    Va antes de crear la conexión para que supabase-js use este fetch. Solo mira las peticiones a /rest, /auth y /functions. */
 (function(){
-  const M = window.__exgMed = {reqs: [], largas: 0, largasMs: 0, appVisible: null};
+  let ACT = false; try{ ACT = localStorage.getItem('exg_medir') === '1'; }catch(e){}
+  const M = window.__exgMed = {reqs: [], largas: 0, largasMs: 0, appVisible: null, bloqueos: [], lentas: [], pasos: [], ultimo: null, activo: ACT};
+  if(!ACT) return;   // apagado: no se instala nada (ni el fetch envuelto, ni el latido, ni los escuchadores)
   const orig = window.fetch.bind(window);
   window.fetch = function(input, init){
     const url = typeof input === 'string' ? input : (input && input.url) || '';
@@ -56,10 +58,8 @@
     }, err => { rec.ms = Math.round(performance.now() - t); rec.estado = 'error'; throw err; });
   };
   try{ new PerformanceObserver(l => l.getEntries().forEach(e => { M.largas++; M.largasMs += Math.round(e.duration); })).observe({type: 'longtask', buffered: true}); }catch(e){}
-  M.bloqueos = []; M.lentas = []; M.ultimo = null;
   const vista = () => { const v = document.querySelector('.view.active'); return v ? v.id.replace('view-', '') : '—'; };
   const quien = (el, tipo) => { if(!el || !el.tagName) return tipo; const t = el.tagName.toLowerCase(), id = el.id ? '#' + el.id : '', cl = (el.className && typeof el.className === 'string') ? '.' + el.className.trim().split(/\s+/)[0] : '', ph = el.placeholder ? ' "' + String(el.placeholder).slice(0, 18) + '"' : '', tx = !ph && el.textContent && el.textContent.trim().length <= 24 ? ' "' + el.textContent.trim() + '"' : ''; return tipo + ' ' + t + (id || cl) + (ph || tx); };
-  M.pasos = [];
   // el móvil se queda "bloqueado" cuando no puede ni atender un temporizador de 100 ms: se apunta cuánto y qué se tocó justo antes
   let ult = performance.now();
   setInterval(() => { const t = performance.now(), d = t - ult - 100; ult = t; if(document.visibilityState === 'hidden') return; if(d > 150){ M.bloqueos.push({en: Math.round(t), ms: Math.round(d), tras: M.ultimo && t - M.ultimo.t < 3000 ? M.ultimo.que : null, vista: vista()}); if(M.bloqueos.length > 60) M.bloqueos.shift(); } }, 100);
@@ -3327,7 +3327,18 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.57</div>
+<div id="arranque-splash" style="position:fixed;inset:0;z-index:10000;background:#edece7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:-apple-system,system-ui,sans-serif;color:#1b1f24;">
+  <div style="font-weight:800;font-size:30px;letter-spacing:.06em;">EXG</div>
+  <div id="arranque-msg" style="font-size:14px;opacity:.7;">Cargando…</div>
+  <button id="arranque-recargar" onclick="location.reload()" style="display:none;padding:10px 18px;border-radius:8px;border:1px solid #1b1f24;background:transparent;color:#1b1f24;font-size:14px;">Tocar para recargar</button>
+</div>
+<script>
+/* Pantalla de carga: se ve desde el primer momento, antes de la librería de datos y del resto del código. Si algo tarda más de 7 s, ofrece recargar. */
+window.quitarSplash = function(){ var s = document.getElementById('arranque-splash'); if(s) s.remove(); };
+setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
+</script>
+<script src="lib/supabase-2.117.2.js"></script>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.58</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3405,7 +3416,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.57</div>
+        <div class="sub" id="version-badge">V6.58</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8532,8 +8543,11 @@ function velDatos(){
 const velColor = ms => ms >= 1000 ? 'var(--red, #a32d2d)' : ms <= 300 ? 'var(--green, #3b6d11)' : 'inherit';
 const velSeg = ms => ms == null ? '—' : (ms / 1000).toLocaleString('es-ES', {maximumFractionDigits: 1}) + ' s';
 const velKb = b => b == null ? '—' : b >= 1048576 ? (b / 1048576).toLocaleString('es-ES', {maximumFractionDigits: 1}) + ' MB' : Math.round(b / 1024) + ' KB';
+function velActivar(si){ try{ if(si) localStorage.setItem('exg_medir', '1'); else localStorage.removeItem('exg_medir'); }catch(e){} location.reload(); }
 function renderVelocidad(){
-  const el = document.getElementById('vel-cuerpo'); if(!el) return; const d = velDatos();
+  const el = document.getElementById('vel-cuerpo'); if(!el) return;
+  if(!(window.__exgMed && window.__exgMed.activo)){ el.innerHTML = '<p class="two-col-note" style="margin-bottom:12px;">La medición está <b>apagada</b> para que la web no trabaje de más. Actívala solo cuando quieras medir: la web se recarga, la usas un rato como siempre y vuelves aquí.</p><button class="btn primary" onclick="velActivar(true)">Activar la medición y recargar</button>'; return; }
+  const d = velDatos();
   const fila = (t, v, c) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);"><span>${escHtml(t)}</span><b style="${c ? 'color:' + c : ''}">${v}</b></div>`;
   const top = d.reqs.slice().sort((a, b) => (b.msTotal || b.ms) - (a.msTotal || a.ms)).slice(0, 10);
   const pesadas = d.reqs.filter(r => r.bytes).sort((a, b) => b.bytes - a.bytes).slice(0, 6);
@@ -8552,9 +8566,11 @@ function renderVelocidad(){
     `<h4 style="margin:14px 0 6px;">Pasos de la carga de documentos</h4>` + ((d.M.pasos || []).length ? d.M.pasos.slice().sort((a, b) => b.ms - a.ms).slice(0, 12).map(r => fila(r.n, velSeg(r.ms), velColor(r.ms))).join('') : '<div class="empty">Aún no se han cargado los documentos antiguos: abre Facturas o Albaranes y vuelve.</div>') +
     `<h4 style="margin:14px 0 6px;">Las 10 cargas que más tardaron</h4>` + (top.length ? top.map(r => fila(r.que, velSeg(r.msTotal || r.ms) + ' · ' + velKb(r.bytes), velColor(r.msTotal || r.ms))).join('') : '<div class="empty">Aún no hay peticiones medidas desde que abriste la web.</div>') +
     `<h4 style="margin:14px 0 6px;">Las que más pesan</h4>` + (pesadas.length ? pesadas.map(r => fila(r.que, velKb(r.bytes) + ' · ' + velSeg(r.msTotal || r.ms))).join('') : '<div class="empty">—</div>') +
+    `<div style="margin-top:14px;"><button class="btn sm" onclick="velActivar(false)">Apagar la medición y recargar</button></div>` +
     `<h4 style="margin:14px 0 6px;">Librerías externas</h4>` + (d.ext.length ? d.ext.map(e => fila(e.nombre, velSeg(e.ms), velColor(e.ms))).join('') : '<div class="empty">—</div>');
 }
 function copiarVelocidad(){
+  if(!(window.__exgMed && window.__exgMed.activo)){ mostrarToast('La medición está apagada: actívala primero', 'err'); return; }
   const d = velDatos(), L = [];
   L.push('VELOCIDAD EXG ' + (document.getElementById('version-badge')?.textContent || '') + ' · ' + d.nodo + ' · red ' + d.red + ' · ' + new Date().toLocaleString('es-ES'));
   L.push('Página descargada: ' + velSeg(d.nav.responseEnd) + ' | primer contenido: ' + velSeg(d.fcp) + ' | app a la vista: ' + velSeg(d.M.appVisible) + ' | evento de carga: ' + velSeg(d.nav.loadEventEnd) + ' | datos terminados: ' + velSeg(d.fin));
@@ -10688,7 +10704,15 @@ try{
 async function checkSession(){
   if(!sb) return;
   try{
-    const {data} = await sb.auth.getSession();
+    // tiempo máximo: si la sesión no responde en 8 s se recarga una vez; si sigue igual, se enseña la pantalla de entrada en vez de dejar la web en blanco
+    const resp = await Promise.race([sb.auth.getSession(), new Promise(r => setTimeout(() => r({tarda: true}), 8000))]);
+    if(resp && resp.tarda){
+      let ya = false; try{ ya = sessionStorage.getItem('exg_reintento') === '1'; sessionStorage.setItem('exg_reintento', '1'); }catch(e){}
+      if(!ya){ location.reload(); return; }
+      console.warn('La sesión no responde: se enseña la pantalla de entrada'); quitarSplash(); return;
+    }
+    try{ sessionStorage.removeItem('exg_reintento'); }catch(e){}
+    const {data} = resp;
     if(data && data.session){
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app').style.display = '';
@@ -10711,6 +10735,7 @@ async function checkSession(){
       }
     }
   }catch(e){ console.error(e); }
+  quitarSplash();
 }
 checkSession();
 
