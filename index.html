@@ -2205,6 +2205,9 @@ body.tb-modal{overflow:hidden;}
 .pleg .chip-filter.active[data-n]:not([data-n=""])::after{color:#fff;opacity:.9;}
 .pleg .chip-filter{padding:6px 10px;font-size:12.5px;line-height:1.2;border-radius:999px;white-space:nowrap;}   /* el tamaño de las pastillas de Trabajos: en el móvil las de siempre salían muy grandes */
 .pleg-guardados{display:none;}
+.filters .anio-extra{display:none;}   /* los años más antiguos se esconden tras la pastilla Más, salvo los que estén elegidos */
+.filters.anio-abierto .anio-extra, .filters .anio-extra.active{display:inline-block;}
+.filters .chip-mas{border-style:dashed;color:var(--ink);}
 .pleg .pleg-filas{display:flex;flex-direction:column;gap:12px;}
 .tb-filtros2{margin:0 0 8px;display:flex;flex-direction:column;gap:6px;}
 .tb-frow{display:flex;gap:6px;align-items:flex-start;}
@@ -3345,7 +3348,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.64</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.65</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3423,7 +3426,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.64</div>
+        <div class="sub" id="version-badge">V6.65</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8591,6 +8594,18 @@ function copiarVelocidad(){
   (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => mostrarToast('Copiado: pégalo en el chat', 'ok'), () => { prompt('Copia este texto:', txt); });
 }
 /* ---------------- TABLAS ORDENABLES Y FILTRABLES POR AÑO/TRIMESTRE — reutilizable en cualquier tabla ---------------- */
+function anioMasAplicar(cont){   // a la vista solo los 2 últimos años; el resto se despliega con la pastilla Más (los elegidos se ven siempre)
+  if(!cont) return;
+  const chips = Array.from(cont.querySelectorAll('.chip-filter[data-anio]')).filter(c => c.dataset.anio !== '');
+  chips.forEach((c, i) => c.classList.toggle('anio-extra', i >= 2));
+  cont.querySelector('.chip-mas')?.remove();
+  if(chips.length <= 2){ cont.classList.remove('anio-abierto'); return; }
+  const b = document.createElement('div'); b.className = 'chip-filter chip-mas';
+  const txt = () => cont.classList.contains('anio-abierto') ? 'Menos ▴' : 'Más ▾';
+  b.textContent = txt();
+  b.addEventListener('click', () => { cont.classList.toggle('anio-abierto'); b.textContent = txt(); });
+  cont.appendChild(b);
+}
 function histAniosPendientes(tipo){ const s = new Set(); _historico.pendientes.forEach(d => { if(d.tipo === tipo && d.fecha_devengo) s.add(String(d.fecha_devengo).slice(0, 4)); }); return s; }
 function histNecesarioAlElegir(contenedor){   // la selección de años puede incluir documentos que aún no están construidos: se cargan solos
   if(!_historico.pendientes.size) return;
@@ -8622,6 +8637,7 @@ function poblarFiltroAniosChips(tbodyId, contenedorId){
       histNecesarioAlElegir(contenedor);
     });
   });
+  anioMasAplicar(contenedor);
 }
 function toggleChipMultiple(chip, contenedor, dataAttr){
   if(chip.dataset[dataAttr]===''){
@@ -8954,6 +8970,7 @@ function poblarFiltroAniosChipsGenerico(tbodyId, contenedorId, prefijo){
       histNecesarioAlElegir(contenedor);
     });
   });
+  anioMasAplicar(contenedor);
 }
 function poblarFiltroAnios(tbodyId, selectId){
   const tbody = document.getElementById(tbodyId);
@@ -16132,7 +16149,7 @@ function plegRefrescar(p){
     filas.forEach(f => { if(pasa(f, k)){ total++; if(f[k] != null) cuenta[f[k]] = (cuenta[f[k]] || 0) + 1; } });
     const cont = plegCont(p, k); if(!cont) return;
     const hoy = String(new Date().getFullYear()), sinCargar = _historico.pendientes.size > 0;   // mientras los antiguos no estén cargados, las cantidades de 'Todos' y de los años anteriores serían engañosas: no se enseñan
-    cont.querySelectorAll('.chip-filter').forEach(ch => { const v = ch.dataset[k]; ch.dataset.n = (k === 'anio' && sinCargar && (!v || v < hoy)) ? '' : (v ? (cuenta[v] || 0) : total); });
+    cont.querySelectorAll('.chip-filter').forEach(ch => { if(ch.classList.contains('chip-mas')){ delete ch.dataset.n; return; } const v = ch.dataset[k]; ch.dataset.n = (k === 'anio' && sinCargar && (!v || v < hoy)) ? '' : (v ? (cuenta[v] || 0) : total); });
   });
   const caja = document.getElementById('pleg-' + p), cols = caja.querySelector('.pleg-cols');
   try{ renderAvisoHistorico(); }catch(e){}
