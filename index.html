@@ -699,6 +699,23 @@ html.visor-abierto, html.visor-abierto body{overflow:hidden;}
 .visor-pag{background:#fff;border-radius:4px;box-shadow:0 4px 18px rgba(0,0,0,.4);flex:0 0 auto;}
 .visor-marco{width:100%;flex:1;min-height:70vh;border:0;background:#fff;border-radius:6px;}
 .visor-msg{color:#fff;opacity:.85;font-size:14px;padding:40px 20px;text-align:center;}
+.visor-hojas{display:flex;gap:6px;overflow-x:auto;width:100%;flex:0 0 auto;padding:2px 2px 6px;}
+.visor-hojas button{flex:0 0 auto;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.visor-hojas button.on{background:var(--orange,#D8560F);border-color:var(--orange,#D8560F);}
+.visor-doc{background:#fff;color:#111;border-radius:6px;padding:14px;box-sizing:border-box;width:max-content;min-width:100%;max-width:none;flex:0 0 auto;align-self:flex-start;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;}
+.visor-doc.visor-hoja{width:max-content;min-width:0;}
+.visor-doc table{border-collapse:collapse;width:auto;}
+.visor-doc td, .visor-doc th{border:1px solid #cfcfcf;padding:3px 7px;vertical-align:top;font-size:13px;white-space:nowrap;}
+.visor-doc td.largo{white-space:normal;min-width:210px;overflow-wrap:anywhere;}
+.visor-doc td:empty{padding:0;border-color:#ececec;}
+.visor-doc.visor-pagina{align-self:stretch;width:auto;max-width:820px;min-width:0;margin:0 auto;}
+.visor-doc.visor-pagina p{margin:0 0 7px;}
+.visor-doc.visor-pagina p.vacio{margin:0;line-height:.9;}
+.visor-doc.visor-pagina h2{font-size:18px;margin:10px 0 6px;}
+.visor-doc.visor-pagina h3{font-size:15px;margin:8px 0 5px;}
+.visor-doc.visor-pagina table{width:100%;margin:6px 0;}
+.visor-doc.visor-pagina td{white-space:normal;overflow-wrap:anywhere;}
+.visor-aviso{background:#FFF1E8;color:#7a3a10;border-radius:6px;padding:6px 10px;margin-bottom:8px;font-size:12px;}
 .fl-estado{display:flex;gap:8px;flex-wrap:wrap;}
 .fl-estado button{padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;}
 .fl-estado button.act{background:var(--asphalt);border-color:var(--asphalt);color:#fff;}
@@ -3675,7 +3692,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.104</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.105</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3765,7 +3782,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.104</div>
+        <div class="sub" id="version-badge">V6.105</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -15064,7 +15081,7 @@ const flFechaCorta = f => f ? String(f.getDate()).padStart(2, '0') + '/' + Strin
    Se atrapan los enlaces (<a href>) y window.open que apuntan a un archivo (el almacén de Supabase o una dirección que acaba en .pdf o en imagen). Las imágenes se ven con zoom;
    los PDF se dibujan página a página con pdf.js (cdnjs), que en el iPhone se ve mejor que un iframe, y si no carga se enseña el PDF en un marco. */
 const VISOR_EXT = /\.(pdf|png|jpe?g|webp|gif|heic|bmp)$/i;
-let _visorZoom = 1, _visorUrl = '', _visorEsPdf = false, _visorPdf = null, _visorPdfJs = null;
+let _visorZoom = 1, _visorUrl = '', _visorVer = '', _visorEsPdf = false, _visorPdf = null, _visorPdfJs = null;
 function visorEsDoc(href){
   if(!href || typeof href !== 'string') return false;
   try{ const u = new URL(href, location.href); if(!/^https?:$/.test(u.protocol)) return false; if(u.origin === location.origin && !VISOR_EXT.test(u.pathname)) return false;
@@ -15082,7 +15099,7 @@ function visorCrear(){
   return v;
 }
 function visorAbrir(url, titulo){
-  const v = visorCrear(); _visorUrl = url; _visorZoom = 1; _visorPdf = null;
+  const v = visorCrear(); _visorUrl = url; _visorVer = url; _visorZoom = 1; _visorPdf = null;
   const nombre = (titulo || decodeURIComponent(String(url).split('?')[0].split('/').pop() || 'Documento')).replace(/\s+/g, ' ').trim();
   _visorEsPdf = /\.pdf$/i.test(decodeURIComponent(String(url).split('?')[0].split('#')[0]));
   v.querySelector('#visor-t').textContent = nombre;
@@ -15090,20 +15107,24 @@ function visorAbrir(url, titulo){
   visorPintar();
 }
 function visorCerrar(){ const v = document.getElementById('visor'); if(!v) return; v.classList.remove('abierto'); document.documentElement.classList.remove('visor-abierto'); const c = v.querySelector('#visor-c'); if(c) c.innerHTML = ''; _visorPdf = null; }
-function visorZoom(f){ _visorZoom = Math.min(5, Math.max(0.5, _visorZoom * f)); visorPintar(true); }
+function visorZoom(f){ _visorZoom = Math.min(5, Math.max(0.4, _visorZoom * f)); visorPintar(true); }
 async function visorPintar(soloZoom){
   const c = document.getElementById('visor-c'); if(!c) return;
+  const nombreV = decodeURIComponent(String(_visorUrl).split('?')[0]);
+  if(!_visorEsPdf && /\.(doc|rtf|docx)$/i.test(nombreV) && !soloZoom){   // si el Word ya tiene su vista en PDF, se enseña esa (idéntica al original)
+    try{ const h = await fetch(_visorUrl + '.visor.pdf', {method: 'HEAD'}); if(h.ok){ _visorVer = _visorUrl + '.visor.pdf'; _visorEsPdf = true; _visorPdf = null; } }catch(e){}
+  }
+  if(!_visorEsPdf && (VISOR_EXCEL.test(nombreV) || VISOR_WORD.test(nombreV))){ await visorPintarDoc(c, soloZoom); return; }
   if(!_visorEsPdf){
     if(soloZoom){ const im = c.querySelector('img'); if(im) im.style.width = (_visorZoom * 100) + '%'; return; }
     c.innerHTML = '<div class="visor-msg">Abriendo…</div>';
     const im = new Image(); im.alt = ''; im.className = 'visor-img'; im.style.width = (_visorZoom * 100) + '%';
     im.onload = () => { c.innerHTML = ''; c.appendChild(im); };
     im.onerror = () => { visorSinVista(c); };
-    if(/\.(xlsx?|docx?|pptx?|csv|odt|ods)$/i.test(decodeURIComponent(String(_visorUrl).split('?')[0]))){ c.innerHTML = ''; const f = document.createElement('iframe'); f.className = 'visor-marco'; f.src = 'https://view.officeapp.live.com/op/embed.aspx?src=' + encodeURIComponent(_visorUrl); c.appendChild(f); const d = document.createElement('div'); d.className = 'visor-msg'; d.innerHTML = 'Si no se ve, <a href="#" class="fte-lnk" onclick="event.preventDefault();visorDescargar()">Descargar</a>'; c.appendChild(d); return; }
     im.src = _visorUrl; return;
   }
   try{
-    const lib = await visorCargarPdfJs(); const url = _visorUrl;
+    const lib = await visorCargarPdfJs(); const url = _visorVer || _visorUrl;
     if(!_visorPdf || _visorPdf.url !== url){ c.innerHTML = '<div class="visor-msg">Abriendo…</div>'; _visorPdf = {url, doc: await lib.getDocument({url}).promise}; }
     const doc = _visorPdf.doc, ancho = Math.max(240, c.clientWidth - 16), dpr = Math.min(window.devicePixelRatio || 1, 2.5), marca = ++visorPintar._n; c.innerHTML = '';
     for(let i = 1; i <= doc.numPages; i++){
@@ -15114,7 +15135,7 @@ async function visorPintar(soloZoom){
     }
   }catch(e){
     console.warn('visor: pdf.js no pudo, se usa el marco', e);
-    c.innerHTML = ''; const f = document.createElement('iframe'); f.className = 'visor-marco'; f.src = _visorUrl; c.appendChild(f);
+    visorSinVista(c);
   }
 }
 visorPintar._n = 0;
@@ -15128,6 +15149,114 @@ function visorCargarPdfJs(){
     document.head.appendChild(s);
   });
   return _visorPdfJs;
+}
+
+// ===== VISOR PROPIO DE EXCEL, WORD Y RTF: se leen dentro de la web, sin servicios de fuera =====
+const VISOR_EXCEL = /\.(xlsx?|xlsm|xlsb|ods|csv)$/i, VISOR_WORD = /\.(docx|doc|rtf)$/i;
+const visorEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+let _visorAjuste = 1;
+async function visorBuffer(url){ const r = await fetch(url); if(!r.ok) throw new Error('HTTP ' + r.status); return await r.arrayBuffer(); }
+function visorAjustar(c){   // cabe en el ancho de la pantalla; con los botones de lupa se acerca o se aleja
+  const d = c && c.querySelector('.visor-doc'); if(!d) return;
+  d.style.zoom = ''; const w = d.scrollWidth, cw = Math.max(200, c.clientWidth - 20);
+  _visorAjuste = w > cw ? Math.max(d.classList.contains('visor-hoja') ? 0.6 : 0.3, cw / w) : 1; /* las hojas anchas no bajan de 0,6 para que se lea; el resto se mueve con el dedo */ d.style.zoom = String(_visorAjuste * _visorZoom);
+}
+async function visorLeerExcel(c, buf){
+  await cargarLib('xlsx');
+  const wb = XLSX.read(buf, {type: 'array', cellDates: true});
+  const peso = h => { let n = 0; for(const k in h){ if(k[0] !== '!' && h[k] && h[k].v !== undefined && h[k].v !== '' && typeof h[k].v !== 'boolean' && !(typeof h[k].v === 'string' && /^#/.test(h[k].v))) n++; } return n; };
+  const hojas = wb.SheetNames.map(n => ({n, h: wb.Sheets[n]})).filter(x => x.h && x.h['!ref']).map(x => Object.assign(x, {w: /^factura$/i.test(x.n) ? 1e9 : /stub|macros|templateinformation|personalizar/i.test(x.n) ? -1 : peso(x.h)})).sort((a, b) => b.w - a.w);
+  if(!hojas.length) throw new Error('Sin hojas');
+  c.innerHTML = (hojas.length > 1 ? '<div class="visor-hojas">' + hojas.map((x, i) => `<button type="button" data-h="${i}" class="${i === 0 ? 'on' : ''}">${visorEsc(x.n)}</button>`).join('') + '</div>' : '') + '<div class="visor-doc visor-hoja"></div>';
+  const pintar = i => {
+    const h = hojas[i].h, r = XLSX.utils.decode_range(h['!ref']), MAX = 1500; let aviso = '';
+    if(r.e.r - r.s.r > MAX){ const copia = Object.assign({}, h); copia['!ref'] = XLSX.utils.encode_range({s: r.s, e: {r: r.s.r + MAX, c: r.e.c}}); aviso = '<div class="visor-aviso">Se enseñan las primeras ' + MAX + ' filas de ' + (r.e.r - r.s.r + 1) + '. Para verlas todas, Descargar.</div>'; var hoja = copia; } else var hoja = h;
+    let html = XLSX.utils.sheet_to_html(hoja, {editable: false, header: '', footer: ''}); html = html.replace(/^[\s\S]*?(<table)/i, '$1').replace(/<\/body>[\s\S]*$/i, '');
+    const d = c.querySelector('.visor-doc'); d.innerHTML = aviso + html; d.querySelectorAll('td').forEach(td => { if(td.textContent.length > 30) td.classList.add('largo'); }); visorAjustar(c);
+  };
+  c.querySelectorAll('.visor-hojas button').forEach(b => b.addEventListener('click', () => { c.querySelectorAll('.visor-hojas button').forEach(x => x.classList.remove('on')); b.classList.add('on'); pintar(Number(b.dataset.h)); c.scrollTop = 0; }));
+  pintar(0);
+}
+async function visorZipLeer(buf, nombre){   // un .docx es un zip: se abre con lo que ya trae el navegador
+  const dv = new DataView(buf), u8 = new Uint8Array(buf); let e = u8.length - 22; while(e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if(e < 0) throw new Error('No es un zip');
+  const n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true), f = null;
+  for(let i = 0; i < n; i++){
+    const met = dv.getUint16(p + 10, true), csz = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lho = dv.getUint32(p + 42, true);
+    if(new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nl)) === nombre){ f = {met, csz, lho}; break; }
+    p += 46 + nl + el + cl;
+  }
+  if(!f) return null;
+  const lnl = dv.getUint16(f.lho + 26, true), lel = dv.getUint16(f.lho + 28, true), ini = f.lho + 30 + lnl + lel, datos = u8.subarray(ini, ini + f.csz);
+  if(f.met === 0) return new TextDecoder().decode(datos);
+  const ds = new DecompressionStream('deflate-raw'), w = ds.writable.getWriter(); w.write(datos); w.close();
+  return await new Response(ds.readable).text();
+}
+async function visorLeerDocx(c, buf){
+  const xml = await visorZipLeer(buf, 'word/document.xml'); if(!xml) throw new Error('docx vacío');
+  const doc = new DOMParser().parseFromString(xml, 'application/xml'), W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const hijos = (n, t) => [...n.childNodes].filter(x => x.localName === t);
+  const run = r => { let h = ''; for(const x of r.childNodes){ if(x.localName === 't') h += visorEsc(x.textContent); else if(x.localName === 'tab') h += '&emsp;'; else if(x.localName === 'br') h += '<br>'; } if(!h) return ''; const pr = hijos(r, 'rPr')[0]; if(pr){ if(hijos(pr, 'b').length) h = '<b>' + h + '</b>'; if(hijos(pr, 'i').length) h = '<i>' + h + '</i>'; if(hijos(pr, 'u').length) h = '<u>' + h + '</u>'; } return h; };
+  const parr = p => { let h = ''; const rec = n => { for(const x of n.childNodes){ if(x.localName === 'r') h += run(x); else if(['hyperlink', 'smartTag', 'ins', 'sdt', 'sdtContent'].includes(x.localName)) rec(x); } }; rec(p);
+    const pr = hijos(p, 'pPr')[0]; let tag = 'p', st = ''; if(pr){ const ps = hijos(pr, 'pStyle')[0], id = ps ? (ps.getAttributeNS(W, 'val') || '') : ''; if(/Heading1|T[ií]tulo1|^Title/i.test(id)) tag = 'h2'; else if(/Heading[2-9]|T[ií]tulo[2-9]/i.test(id)) tag = 'h3'; const jc = hijos(pr, 'jc')[0]; if(jc){ const v = jc.getAttributeNS(W, 'val'); if(v === 'center' || v === 'right') st = ' style="text-align:' + v + '"'; } }
+    return h.trim() ? `<${tag}${st}>${h}</${tag}>` : '<p class="vacio">&nbsp;</p>'; };
+  const tabla = t => '<table>' + hijos(t, 'tr').map(tr => '<tr>' + hijos(tr, 'tc').map(tc => '<td>' + [...tc.childNodes].map(x => x.localName === 'p' ? parr(x) : x.localName === 'tbl' ? tabla(x) : '').join('') + '</td>').join('') + '</tr>').join('') + '</table>';
+  const body = doc.getElementsByTagNameNS(W, 'body')[0]; if(!body) throw new Error('docx sin cuerpo');
+  c.innerHTML = '<div class="visor-doc visor-pagina">' + [...body.childNodes].map(x => x.localName === 'p' ? parr(x) : x.localName === 'tbl' ? tabla(x) : '').join('') + '</div>'; visorAjustar(c);
+}
+function visorTextoAHtml(t){ return '<div class="visor-doc visor-pagina">' + String(t).split(/\r?\n/).map(l => l.trim() ? '<p>' + visorEsc(l) + '</p>' : '<p class="vacio">&nbsp;</p>').join('') + '</div>'; }
+async function visorLeerDoc(c, buf){   // Word antiguo (.doc): se lee el texto del propio archivo
+  await cargarLib('xlsx');
+  const cfb = XLSX.CFB.read(new Uint8Array(buf), {type: 'array'}), wd = XLSX.CFB.find(cfb, 'WordDocument'); if(!wd) throw new Error('No es un .doc');
+  const a = Uint8Array.from(wd.content), dv = new DataView(a.buffer, a.byteOffset, a.byteLength), flags = dv.getUint16(0x0A, true), tb = XLSX.CFB.find(cfb, (flags & 0x0200) ? '1Table' : '0Table'); if(!tb) throw new Error('sin tabla');
+  const t = Uint8Array.from(tb.content), tv = new DataView(t.buffer, t.byteOffset, t.byteLength), fcClx = dv.getUint32(0x01A2, true), lcbClx = dv.getUint32(0x01A6, true);
+  let i = fcClx; const fin = fcClx + lcbClx; while(i < fin && t[i] === 1){ i += 3 + tv.getUint16(i + 1, true); }   // Prc
+  if(t[i] !== 2) throw new Error('sin piezas'); const lcb = tv.getUint32(i + 1, true), n = Math.floor((lcb - 4) / 12), base = i + 5;
+  let txt = ''; const ansi = new TextDecoder('windows-1252'), u16 = new TextDecoder('utf-16le');
+  for(let k = 0; k < n; k++){
+    const cp0 = tv.getUint32(base + 4 * k, true), cp1 = tv.getUint32(base + 4 * (k + 1), true), pd = base + 4 * (n + 1) + 8 * k, fc = tv.getUint32(pd + 2, true), comp = (fc & 0x40000000) !== 0, off = fc & 0x3FFFFFFF, len = cp1 - cp0;
+    txt += comp ? ansi.decode(a.subarray(off / 2, off / 2 + len)) : u16.decode(a.subarray(off, off + len * 2));
+  }
+  // limpieza: campos (códigos entre \x13 y \x14), marcas de celda y saltos
+  let r = '', prof = 0, mostrar = [];
+  for(const ch of txt){ const cod = ch.charCodeAt(0);
+    if(cod === 0x13){ prof++; mostrar.push(false); continue; } if(cod === 0x14){ if(mostrar.length) mostrar[mostrar.length - 1] = true; continue; } if(cod === 0x15){ prof--; mostrar.pop(); continue; }
+    if(mostrar.length && !mostrar[mostrar.length - 1]) continue;
+    if(cod === 0x0D || cod === 0x0B || cod === 0x0C) r += '\n'; else if(cod === 0x07) r += '\t'; else if(cod >= 32 || cod === 9) r += ch; }
+  c.innerHTML = visorTextoAHtml(r.replace(/\t\n/g, '\n')); visorAjustar(c);
+}
+function visorRtfATexto(s){
+  let sal = '', i = 0, prof = 0, saltar = -1; const pila = [];
+  const OCULTOS = /^(fonttbl|colortbl|stylesheet|info|pict|header|footer|footnote|\*|object|themedata|colorschememapping|latentstyles|datastore|xmlnstbl|listtable|listoverridetable|rsidtbl|generator|fldinst)$/;
+  while(i < s.length){
+    const ch = s[i];
+    if(ch === '{'){ pila.push(saltar); prof++; i++; const m = /^\\\*?\\?([a-z]+)/.exec(s.slice(i, i + 30)); if(saltar < 0 && m && OCULTOS.test(s[i] === '\\' && s[i + 1] === '*' ? '*' : m[1])) saltar = prof; continue; }
+    if(ch === '}'){ if(saltar === prof) saltar = pila[pila.length - 1] === undefined ? -1 : -1; saltar = pila.pop(); prof--; i++; continue; }
+    if(ch === '\\'){
+      const m = /^\\([a-zA-Z]+)(-?\d+)? ?/.exec(s.slice(i, i + 40));
+      if(m){ const w = m[1], num = m[2]; i += m[0].length; if(saltar >= 0) continue;
+        if(w === 'par' || w === 'line' || w === 'row') sal += '\n'; else if(w === 'tab' || w === 'cell') sal += '\t'; else if(w === 'u' && num){ let v = parseInt(num, 10); if(v < 0) v += 65536; sal += String.fromCharCode(v); if(s[i] === '?') i++; } else if(w === 'emdash') sal += '—'; else if(w === 'endash') sal += '–'; else if(w === 'bullet') sal += '•'; continue; }
+      const h = /^\\'([0-9a-fA-F]{2})/.exec(s.slice(i, i + 4)); if(h){ i += 4; if(saltar < 0) sal += new TextDecoder('windows-1252').decode(Uint8Array.of(parseInt(h[1], 16))); continue; }
+      if(s[i + 1] === '\\' || s[i + 1] === '{' || s[i + 1] === '}'){ if(saltar < 0) sal += s[i + 1]; i += 2; continue; }
+      i += 2; continue;
+    }
+    if(saltar < 0 && ch !== '\r' && ch !== '\n') sal += ch; i++;
+  }
+  return sal;
+}
+async function visorLeerRtf(c, buf){ c.innerHTML = visorTextoAHtml(visorRtfATexto(new TextDecoder('windows-1252').decode(buf))); visorAjustar(c); }
+async function visorPintarDoc(c, soloZoom){
+  if(soloZoom){ const d = c.querySelector('.visor-doc'); if(d) d.style.zoom = String(_visorAjuste * _visorZoom); return; }
+  c.innerHTML = '<div class="visor-msg">Abriendo…</div>';
+  const nombre = decodeURIComponent(String(_visorUrl).split('?')[0]), tok = ++visorPintar._n;
+  try{
+    const buf = await visorBuffer(_visorUrl); if(tok !== visorPintar._n) return;
+    if(VISOR_EXCEL.test(nombre)) await visorLeerExcel(c, buf);
+    else if(/\.docx$/i.test(nombre)) await visorLeerDocx(c, buf);
+    else if(/\.doc$/i.test(nombre)) await visorLeerDoc(c, buf);
+    else if(/\.rtf$/i.test(nombre)) await visorLeerRtf(c, buf);
+    else throw new Error('Tipo sin lector');
+  }catch(e){ console.warn('visor: no se pudo leer', e); if(tok === visorPintar._n) visorSinVista(c); }
 }
 function visorSinVista(c){ c.innerHTML = '<div class="visor-msg">Este archivo no se puede ver aquí. <a href="#" class="fte-lnk" onclick="event.preventDefault();visorDescargar()">Descargar</a></div>'; }
 async function visorDescargar(){
