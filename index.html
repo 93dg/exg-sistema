@@ -2465,6 +2465,7 @@ svg.ic{width:1.25em;height:1.25em;flex:0 0 auto;display:inline-block;vertical-al
 .tb-fcols{display:grid;gap:6px;margin-bottom:2px;}
 .tb-ftit.tb-plegado{width:auto;flex:none;min-width:0;padding:7px 4px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink-soft);text-align:center;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tb-ftit.tb-plegado.con{border-color:var(--orange);color:var(--ink);}
+.tb-ftit.tb-plegado.abierto{background:#FFF1E8;border-color:var(--orange);color:var(--ink);}   /* la cabecera de arriba del filtro que está abierto: se queda en su sitio y se marca */
 .tb-ftit.tb-plegado b{color:var(--orange);font-weight:800;font-size:12px;}
 .tb-comp-solo{display:inline-block;font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.03em;margin-left:2px;}
 .tb-frow > div{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0;}
@@ -3596,7 +3597,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.86</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.87</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3684,7 +3685,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.86</div>
+        <div class="sub" id="version-badge">V6.87</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -19693,26 +19694,21 @@ function tbOpcionesFiltro(g, todos){   // los valores que hay en esta vista, con
   todos.forEach(j => tbValorFiltro(g, j).forEach(v => presentes.add(v)));
   return tbOrdenValores(g, [...presentes]).map(v => ({v, n: cuenta[v] || 0}));
 }
+const TB_ORDEN_CAB = ['dificultad', 'tiempo', 'maquina', 'lugar'];   // orden fijo de las cabeceras de arriba: ninguna cambia de sitio al abrir o cerrar otra
 function tbRenderFiltros(todos){
   const cont = document.getElementById('tb-filtros2'); if(!cont) return;
   // con un solo valor no hay nada que filtrar (salvo que ya haya algo elegido): ese grupo no sale
-  const ops = {}, visibles = TB_GRUPOS.filter(g => { ops[g] = tbOpcionesFiltro(g, todos); return ops[g].length >= 2 || _tbFil[g].length; });
+  const ops = {}, visibles = TB_ORDEN_CAB.filter(g => { ops[g] = tbOpcionesFiltro(g, todos); return ops[g].length >= 2 || _tbFil[g].length; });
   _tbPleg = _tbPleg.filter(g => TB_GRUPOS.includes(g));
-  const plegados = _tbPleg.filter(g => visibles.includes(g)), abiertos = visibles.filter(g => !plegados.includes(g));
-  // una columna por filtro que haya: el primero que se pliega ocupa la columna 1, el segundo la 2, y así
-  const cols = plegados.length ? `<div class="tb-fcols" style="grid-template-columns:repeat(${visibles.length}, minmax(0, 1fr));">${plegados.map((g, i) => `<button type="button" class="tb-ftit tb-plegado ${_tbFil[g].length ? 'con' : ''}" data-t="${g}" style="grid-column:${i + 1};" title="Desplegar ${escHtml(TB_TIT_FILTRO[g])}">${escHtml(TB_TIT_FILTRO[g])}${_tbFil[g].length ? ` <b>${_tbFil[g].length}</b>` : ''} <i>▸</i></button>`).join('')}</div>` : '';
+  const abiertos = visibles.filter(g => !_tbPleg.includes(g));
+  // ARRIBA: todas las cabeceras, siempre en su columna y sin moverse; la abierta se marca. ABAJO: cada filtro abierto repite su cabecera a la izquierda de sus opciones. Tocar cualquiera de las dos lo abre o lo pliega.
+  const cols = visibles.length ? `<div class="tb-fcols" style="grid-template-columns:repeat(${visibles.length}, minmax(0, 1fr));">${visibles.map((g, i) => { const ab = abiertos.includes(g); return `<button type="button" class="tb-ftit tb-plegado ${_tbFil[g].length ? 'con' : ''} ${ab ? 'abierto' : ''}" data-t="${g}" style="grid-column:${i + 1};" title="${ab ? 'Plegar' : 'Desplegar'} ${escHtml(TB_TIT_FILTRO[g])}">${escHtml(TB_TIT_FILTRO[g])}${_tbFil[g].length ? ` <b>${_tbFil[g].length}</b>` : ''} <i>${ab ? '▾' : '▸'}</i></button>`; }).join('')}</div>` : '';
   const filas = abiertos.map(g => `<div class="tb-frow"><button type="button" class="tb-ftit" data-t="${g}" title="Plegar ${escHtml(TB_TIT_FILTRO[g])}">${escHtml(TB_TIT_FILTRO[g])} <i>▾</i></button><div>${ops[g].map(o => `<button type="button" class="tb-fchip ${_tbFil[g].includes(o.v) ? 'active' : o.n ? '' : 'cero'}" data-g="${g}" data-v="${escHtml(o.v)}">${escHtml(g === 'maquina' ? TB_MAQ_NOM[o.v] : o.v)} <b>${o.n}</b></button>`).join('')}</div></div>`).join('');
   const quitar = tbHayFiltros() ? '<div class="tb-frow"><span></span><div><button type="button" class="tb-fchip tb-quitar" data-g="todos">↻ Quitar filtros</button></div></div>' : '';
-  const html = cols + filas + quitar;
-  const antes = {}; cont.querySelectorAll('.tb-ftit[data-t]').forEach(e => { antes[e.dataset.t] = e.getBoundingClientRect(); });   // dónde estaba cada título, para que vuele hasta su sitio nuevo
+  const html = cols + filas + quitar, abrio = _tbAnimar; _tbAnimar = null;
   cont.innerHTML = html; cont.style.display = html ? '' : 'none';
-  if(_tbAnimar && html){
-    const moviendo = _tbAnimar; _tbAnimar = null;
-    const e = cont.querySelector(`.tb-ftit[data-t="${moviendo}"]`), o = antes[moviendo];
-    if(e && o && e.animate){ const n = e.getBoundingClientRect(), dx = o.left - n.left, dy = o.top - n.top;
-      e.animate([{transform: `translate(${dx}px, ${dy}px) scale(${moviendo && e.classList.contains('tb-plegado') ? 1.08 : 1})`, zIndex: 3}, {transform: 'translate(0, 0) scale(1)', zIndex: 3}], {duration: 320, easing: 'cubic-bezier(.2,.9,.3,1.15)'}); }
-    cont.querySelectorAll('.tb-frow > div > .tb-fchip').forEach((x, i) => { if(!e || !e.classList.contains('tb-plegado')) x.animate && x.animate([{opacity: 0, transform: 'translateY(-6px)'}, {opacity: 1, transform: 'none'}], {duration: 220, delay: Math.min(i * 12, 160), easing: 'ease-out', fill: 'backwards'}); });
-  }
+  // solo se anima lo que aparece (las opciones del filtro recién abierto); ninguna cabecera se mueve
+  if(abrio && abiertos.includes(abrio)){ const fila = cont.querySelector(`.tb-frow > .tb-ftit[data-t="${abrio}"]`)?.parentElement; if(fila && fila.animate) fila.animate([{opacity: 0, transform: 'translateY(-6px)'}, {opacity: 1, transform: 'none'}], {duration: 200, easing: 'ease-out'}); }
 }
 let _tbAnimar = null;
 function tbClicFiltro(ev){
