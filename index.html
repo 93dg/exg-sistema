@@ -708,6 +708,9 @@ html.visor-abierto, html.visor-abierto body{overflow:hidden;}
 .visor-doc td, .visor-doc th{border:1px solid #cfcfcf;padding:3px 7px;vertical-align:top;font-size:13px;white-space:nowrap;}
 .visor-doc td.largo{white-space:normal;min-width:210px;overflow-wrap:anywhere;}
 .visor-doc td:empty{padding:0;border-color:#ececec;}
+.visor-doc table.vx-t{border-collapse:collapse;table-layout:fixed;width:auto;}
+.visor-doc .vx-t td{border:0;padding:0 2px;vertical-align:bottom;font-size:13.3px;line-height:1.1;white-space:nowrap;overflow:visible;color:#000;min-width:0;}
+.visor-doc .vx-hoja{position:relative;}
 .visor-doc.visor-pagina{align-self:stretch;width:auto;max-width:820px;min-width:0;margin:0 auto;}
 .visor-doc.visor-pagina p{margin:0 0 7px;}
 .visor-doc.visor-pagina p.vacio{margin:0;line-height:.9;}
@@ -3692,7 +3695,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.06</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.07</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3782,7 +3785,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.06</div>
+        <div class="sub" id="version-badge">V7.07</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -15096,7 +15099,7 @@ function visorZoom(f){ _visorZoom = Math.min(5, Math.max(0.4, _visorZoom * f)); 
 async function visorPintar(soloZoom){
   const c = document.getElementById('visor-c'); if(!c) return;
   const nombreV = decodeURIComponent(String(_visorUrl).split('?')[0]);
-  if(!_visorEsPdf && /\.(doc|rtf|docx|xlsx?|xlsm|ods)$/i.test(nombreV) && !soloZoom){   // si el Word o el Excel ya tiene su vista en PDF, se enseña esa (idéntica al original: logo, cuadros, fechas y números en español)
+  if(!_visorEsPdf && /\.(doc|rtf|docx)$/i.test(nombreV) && !soloZoom){   // si el Word ya tiene su vista en PDF, se enseña esa (idéntica al original)
     try{ const h = await fetch(_visorUrl + '.visor.pdf', {method: 'HEAD'}); if(h.ok){ _visorVer = _visorUrl + '.visor.pdf'; _visorEsPdf = true; _visorPdf = null; } }catch(e){}
   }
   if(!_visorEsPdf && (VISOR_EXCEL.test(nombreV) || VISOR_WORD.test(nombreV))){ await visorPintarDoc(c, soloZoom); return; }
@@ -15139,12 +15142,173 @@ function visorCargarPdfJs(){
 // ===== VISOR PROPIO DE EXCEL, WORD Y RTF: se leen dentro de la web, sin servicios de fuera =====
 const VISOR_EXCEL = /\.(xlsx?|xlsm|xlsb|ods|csv)$/i, VISOR_WORD = /\.(docx|doc|rtf)$/i;
 const visorEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-let _visorAjuste = 1;
+let _visorAjuste = 1, _visorNombreActual = '';
 async function visorBuffer(url){ const r = await fetch(url); if(!r.ok) throw new Error('HTTP ' + r.status); return await r.arrayBuffer(); }
 function visorAjustar(c){   // cabe en el ancho de la pantalla; con los botones de lupa se acerca o se aleja
   const d = c && c.querySelector('.visor-doc'); if(!d) return;
   d.style.zoom = ''; const w = d.scrollWidth, cw = Math.max(200, c.clientWidth - 20);
-  _visorAjuste = w > cw ? Math.max(d.classList.contains('visor-hoja') ? 0.6 : 0.3, cw / w) : 1; /* las hojas anchas no bajan de 0,6 para que se lea; el resto se mueve con el dedo */ d.style.zoom = String(_visorAjuste * _visorZoom);
+  _visorAjuste = w > cw ? Math.max(d.classList.contains('visor-hoja') && !d.querySelector('.vx-hoja') ? 0.6 : 0.3, cw / w) : 1; /* las hojas anchas no bajan de 0,6 para que se lea; el resto se mueve con el dedo */ d.style.zoom = String(_visorAjuste * _visorZoom);
+}
+// ===== VISOR DE EXCEL QUE DIBUJA COMO EL ORIGINAL: bordes, fuentes, alineación, anchos, celdas unidas y el logo, leídos del propio archivo (xls y xlsx) =====
+const VX_PAL = ['000000','FFFFFF','FF0000','00FF00','0000FF','FFFF00','FF00FF','00FFFF','000000','FFFFFF','FF0000','00FF00','0000FF','FFFF00','FF00FF','00FFFF','800000','008000','000080','808000','800080','008080','C0C0C0','808080','9999FF','993366','FFFFCC','CCFFFF','660066','FF8080','0066CC','CCCCFF','000080','FF00FF','FFFF00','00FFFF','800080','800000','008080','0000FF','00CCFF','CCFFFF','CCFFCC','FFFF99','99CCFF','FF99CC','CC99FF','FFCC99','3366FF','33CCCC','99CC00','FFCC00','FF9900','FF6600','666699','969696','003366','339966','003300','333300','993300','993366','333399','333333'];
+const VX_BORDE = {1:'1px solid',2:'2px solid',3:'1px dashed',4:'1px dotted',5:'3px solid',6:'3px double',7:'1px solid',8:'2px dashed',9:'1px dashed',10:'2px dashed',11:'1px dotted',12:'2px dotted',13:'2px dashed'};
+const VX_BORDE_X = {thin:1,medium:2,dashed:3,dotted:4,thick:5,double:6,hair:7,mediumDashed:8,dashDot:9,mediumDashDot:10,dashDotDot:11,mediumDashDotDot:12,slantDashDot:13};
+function vxColIdx(pal, i){ if(i == null || i >= 64) return null; const p = pal || VX_PAL; return p[i] ? '#' + p[i] : null; }
+function vxRef(r, c){ let s = '', n = c + 1; while(n > 0){ const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s + (r + 1); }
+function vxB64(u8){ let s = ''; for(let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
+// ---- Excel antiguo (.xls, BIFF8) ----
+async function vxLeerXls(buf){
+  const cfb = XLSX.CFB.read(new Uint8Array(buf), {type: 'array'}), e = XLSX.CFB.find(cfb, 'Workbook') || XLSX.CFB.find(cfb, 'Book'); if(!e) return null;
+  const a = Uint8Array.from(e.content), dv = new DataView(a.buffer), u16 = o => dv.getUint16(o, true), u32 = o => dv.getUint32(o, true);
+  const fonts = [], xfs = [], hojas = [], grupo = []; let pal = null, p = 0;
+  const leerNombre = (o, cch, fl) => { let s = ''; if(fl & 1){ for(let i = 0; i < cch; i++) s += String.fromCharCode(u16(o + i * 2)); } else { for(let i = 0; i < cch; i++) s += String.fromCharCode(a[o + i]); } return s; };
+  while(p + 4 <= a.length){
+    const t = u16(p), n = u16(p + 2), d = p + 4;
+    if(t === 0x0031){ fonts.push({sz: u16(d) / 20, i: !!(u16(d + 2) & 2), col: u16(d + 4), b: u16(d + 6) >= 700, u: a[d + 10] > 0, font: leerNombre(d + 16, a[d + 14], a[d + 15])}); if(fonts.length === 4) fonts.push(null); }
+    else if(t === 0x00E0){ const al = a[d + 6], b1 = u32(d + 10), b2 = u32(d + 14), co = u16(d + 18);
+      xfs.push({f: u16(d), ha: al & 7, wrap: !!(al & 8), va: (al >> 4) & 7, bl: [b1 & 15, (b1 >> 16) & 127], br: [(b1 >> 4) & 15, (b1 >> 23) & 127], bt: [(b1 >> 8) & 15, b2 & 127], bb: [(b1 >> 12) & 15, (b2 >> 7) & 127], fls: (b2 >> 26) & 63, fill: co & 127}); }
+    else if(t === 0x0092){ const c = u16(d); pal = VX_PAL.slice(0, 8); for(let i = 0; i < c; i++) pal.push([a[d + 2 + i * 4], a[d + 3 + i * 4], a[d + 4 + i * 4]].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase()); }
+    else if(t === 0x0085){ hojas.push({off: u32(d), nombre: leerNombre(d + 8, a[d + 6], a[d + 7])}); }
+    else if(t === 0x00EB || (t === 0x003C && grupo.length && grupo._ult)){ grupo.push(a.subarray(d, d + n)); grupo._ult = true; }
+    else { grupo._ult = false; if(t === 0x000A && hojas.length) break; }
+    p = d + n;
+  }
+  // imágenes guardadas en el libro (almacén de dibujos): PNG, JPEG, BMP, EMF y WMF, en el orden en que las numera Excel
+  const g = new Uint8Array(grupo.reduce((s, x) => s + x.length, 0)); let o = 0; grupo.forEach(x => { g.set(x, o); o += x.length; });
+  const gd = new DataView(g.buffer), imgs = [];
+  const blip = i => { const vi = gd.getUint16(i, true), tp = gd.getUint16(i + 2, true), len = gd.getUint32(i + 4, true), ins = vi >> 4, d = i + 8;
+    if(tp === 0xF01A || tp === 0xF01B){ const h = d + ((ins === 0x3D5 || ins === 0x217) ? 32 : 16); return {tipo: tp === 0xF01A ? 'emf' : 'wmf', comp: g[h + 32] === 0, bytes: g.subarray(h + 34, d + len)}; }
+    const extra = {0xF01D: [0x46B, 0x6E3], 0xF01E: [0x6E1], 0xF01F: [0x7A9], 0xF029: [0x6E5]}[tp]; if(!extra) return null;
+    const ini = d + (extra.includes(ins) ? 32 : 16) + 1; return {tipo: tp === 0xF01E ? 'png' : tp === 0xF01F ? 'bmp' : 'jpeg', bytes: g.subarray(ini, d + len)}; };
+  for(let i = 0; i + 8 <= g.length;){ const vi = gd.getUint16(i, true), tp = gd.getUint16(i + 2, true), len = gd.getUint32(i + 4, true);
+    if((vi & 15) === 15){ i += 8; continue; }
+    if(tp === 0xF007){ const cb = g[i + 8 + 33]; imgs.push(len > 36 + cb ? blip(i + 8 + 36 + cb) : null); }
+    i += 8 + len; }
+  for(const im of imgs){ if(!im) continue; try{
+    if(im.comp){ const ds = new DecompressionStream('deflate'), w = ds.writable.getWriter(); w.write(im.bytes); w.close(); im.bytes = new Uint8Array(await new Response(ds.readable).arrayBuffer()); }
+    if(im.tipo === 'bmp'){ const b = new Uint8Array(im.bytes.length + 14), bv = new DataView(b.buffer), hs = new DataView(im.bytes.buffer, im.bytes.byteOffset).getUint32(0, true), bits = new DataView(im.bytes.buffer, im.bytes.byteOffset).getUint16(14, true), nc = new DataView(im.bytes.buffer, im.bytes.byteOffset).getUint32(32, true) || (bits <= 8 ? 1 << bits : 0);
+      b[0] = 66; b[1] = 77; bv.setUint32(2, b.length, true); bv.setUint32(10, 14 + hs + nc * 4, true); b.set(im.bytes, 14); im.bytes = b; }
+    im.url = await vxImagenUrl(im.tipo, im.bytes); }catch(e){ console.warn('imagen Excel', e); } }
+  const res = {};
+  for(const h of hojas){
+    const xf = {}, dib = []; let q = h.off;
+    while(q + 4 <= a.length){
+      const t = u16(q), n = u16(q + 2), d = q + 4;
+      if(t === 0x000A) break;
+      if([0x00FD, 0x0204, 0x0203, 0x027E, 0x0201, 0x0205, 0x0006].includes(t)) xf[vxRef(u16(d), u16(d + 2))] = u16(d + 4);
+      else if(t === 0x00BD || t === 0x00BE){ const r = u16(d), c0 = u16(d + 2), paso = t === 0x00BD ? 6 : 2, cnt = (n - 6) / paso; for(let k = 0; k < cnt; k++) xf[vxRef(r, c0 + k)] = u16(d + 4 + k * paso); }
+      else if(t === 0x00EC) dib.push(a.subarray(d, d + n));
+      q = d + n;
+    }
+    const m = new Uint8Array(dib.reduce((s, x) => s + x.length, 0)); let w = 0; dib.forEach(x => { m.set(x, w); w += x.length; });
+    const md = new DataView(m.buffer), anclas = [];
+    const recorrer = (i, fin) => { while(i + 8 <= fin){ const vi = md.getUint16(i, true), tp = md.getUint16(i + 2, true), len = md.getUint32(i + 4, true);
+      if(tp === 0xF004){ let pib = 0, an = null; const f = Math.min(fin, i + 8 + len);   // cada figura: su imagen (pib) y su sitio (ancla) van juntas
+        for(let j = i + 8; j + 8 <= f;){ const vj = md.getUint16(j, true), tj = md.getUint16(j + 2, true), lj = md.getUint32(j + 4, true);
+          if(tj === 0xF00B || tj === 0xF122){ const np = vj >> 4; for(let k = 0; k < np && j + 14 + k * 6 <= f; k++){ if((md.getUint16(j + 8 + k * 6, true) & 0x3FFF) === 0x104) pib = md.getUint32(j + 10 + k * 6, true); } }
+          else if(tj === 0xF010 && lj === 18){ const r = n => md.getUint16(j + 10 + n * 2, true); an = {c1: r(0), dx1: r(1), r1: r(2), dy1: r(3), c2: r(4), dx2: r(5), r2: r(6), dy2: r(7), u: 'xls'}; }
+          j += 8 + lj; }
+        if(an && pib) anclas.push(Object.assign(an, {pib})); }
+      else if((vi & 15) === 15){ recorrer(i + 8, Math.min(fin, i + 8 + len)); }
+      i += 8 + len; } };
+    recorrer(0, m.length);
+    res[h.nombre] = {xls: true, xf: Object.fromEntries(Object.entries(xf).map(([k, v]) => [k, vxEstiloXls(xfs[v], fonts, pal)])), imgs: anclas.map(an => { const im = imgs[an.pib - 1]; return Object.assign(an, {url: im && im.url}); }).filter(x => x.url)};
+  }
+  return res;
+}
+function vxEstiloXls(x, fonts, pal){
+  if(!x) return null; const f = fonts[x.f] || fonts[0] || {}, col = c => vxColIdx(pal, c) || '#000';
+  const bd = ([s, c]) => s ? VX_BORDE[s] + ' ' + col(c) : '';
+  const ha = [null, 'left', 'center', 'right', 'left', 'justify', 'center'][x.ha] || null;
+  const fondo = x.fls === 1 ? vxColIdx(pal, x.fill) : null;
+  return {b: f.b, i: f.i, u: f.u, sz: f.sz, font: f.font, color: f.col && f.col < 64 && f.col !== 8 ? vxColIdx(pal, f.col) : null, ha, va: ['top', 'middle', 'bottom'][x.va] || 'bottom', wrap: x.wrap, fill: fondo && !/#FFFFFF/i.test(fondo) ? fondo : null, bl: bd(x.bl), br: bd(x.br), bt: bd(x.bt), bb: bd(x.bb)};
+}
+// ---- Excel nuevo (.xlsx): es un zip con XML ----
+async function vxZip(buf){
+  const dv = new DataView(buf), u8 = new Uint8Array(buf); let e = u8.length - 22; while(e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--; if(e < 0) return null;
+  const n = dv.getUint16(e + 10, true), dir = {}; let p = dv.getUint32(e + 16, true);
+  for(let i = 0; i < n; i++){ const nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true); dir[new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nl))] = {met: dv.getUint16(p + 10, true), csz: dv.getUint32(p + 20, true), lho: dv.getUint32(p + 42, true)}; p += 46 + nl + el + cl; }
+  return async (nombre, bin) => { const f = dir[nombre]; if(!f) return null; const ini = f.lho + 30 + dv.getUint16(f.lho + 26, true) + dv.getUint16(f.lho + 28, true), datos = u8.subarray(ini, ini + f.csz);
+    let out; if(f.met === 0) out = datos; else { const ds = new DecompressionStream('deflate-raw'), w = ds.writable.getWriter(); w.write(datos); w.close(); out = new Uint8Array(await new Response(ds.readable).arrayBuffer()); }
+    return bin ? out : new TextDecoder().decode(out); };
+}
+async function vxLeerXlsx(buf){
+  const z = await vxZip(buf); if(!z) return null;
+  const X = s => s ? new DOMParser().parseFromString(s, 'application/xml') : null, tags = (n, t) => n ? [...n.getElementsByTagName('*')].filter(x => x.localName === t) : [], hijo = (n, t) => n && [...n.children].find(x => x.localName === t);
+  const st = X(await z('xl/styles.xml')), col = c => { if(!c) return null; const rgb = c.getAttribute('rgb'), ix = c.getAttribute('indexed'), th = c.getAttribute('theme'); if(rgb) return '#' + rgb.slice(-6); if(ix != null) return vxColIdx(null, +ix); if(th === '0') return '#FFFFFF'; if(th === '1') return '#000000'; return null; };
+  const fonts = tags(hijo(st && st.documentElement, 'fonts'), 'font').map(f => ({b: !!hijo(f, 'b') && hijo(f, 'b').getAttribute('val') !== '0', i: !!hijo(f, 'i'), u: !!hijo(f, 'u'), sz: +(hijo(f, 'sz')?.getAttribute('val') || 11), font: hijo(f, 'name')?.getAttribute('val'), color: col(hijo(f, 'color'))}));
+  const fills = tags(hijo(st && st.documentElement, 'fills'), 'fill').map(f => { const pf = hijo(f, 'patternFill'); return pf && pf.getAttribute('patternType') === 'solid' ? col(hijo(pf, 'fgColor')) : null; });
+  const borders = tags(hijo(st && st.documentElement, 'borders'), 'border').map(b => Object.fromEntries(['left', 'right', 'top', 'bottom'].map(l => { const e = hijo(b, l), s = e && e.getAttribute('style'); return [l, s && VX_BORDE_X[s] ? VX_BORDE[VX_BORDE_X[s]] + ' ' + (col(hijo(e, 'color')) || '#000') : '']; })));
+  const xfs = [...(hijo(st && st.documentElement, 'cellXfs')?.children || [])].map(x => { const al = hijo(x, 'alignment'), f = fonts[+x.getAttribute('fontId') || 0] || {}, b = borders[+x.getAttribute('borderId') || 0] || {}, fi = fills[+x.getAttribute('fillId') || 0];
+    return {b: f.b, i: f.i, u: f.u, sz: f.sz, font: f.font, color: f.color && f.color !== '#000000' ? f.color : null, ha: al?.getAttribute('horizontal') && al.getAttribute('horizontal') !== 'general' ? al.getAttribute('horizontal').replace('centerContinuous', 'center') : null, va: {center: 'middle', top: 'top'}[al?.getAttribute('vertical')] || 'bottom', wrap: al?.getAttribute('wrapText') === '1', fill: fi && !/#FFFFFF/i.test(fi) ? fi : null, bl: b.left, br: b.right, bt: b.top, bb: b.bottom}; });
+  const wb = X(await z('xl/workbook.xml')), rels = X(await z('xl/_rels/workbook.xml.rels')), relDe = (doc, id) => tags(doc, 'Relationship').find(r => r.getAttribute('Id') === id)?.getAttribute('Target'), ruta = (base, t) => { if(!t) return null; if(t[0] === '/') return t.slice(1); const pz = base.split('/').slice(0, -1); t.split('/').forEach(s => s === '..' ? pz.pop() : pz.push(s)); return pz.join('/'); };
+  const res = {};
+  for(const s of tags(wb, 'sheet')){
+    const rid = [...s.attributes].find(a => a.localName === 'id')?.value, f = ruta('xl/workbook.xml', relDe(rels, rid)); if(!f) continue;
+    const doc = X(await z(f)), xf = {}; if(!doc) continue;
+    tags(doc, 'c').forEach(c => { const v = c.getAttribute('s'); if(v) xf[c.getAttribute('r')] = xfs[+v] || null; });
+    const imgs = [], dr = tags(doc, 'drawing')[0];
+    if(dr){ const sr = X(await z(f.replace(/[^/]+$/, '_rels/$&.rels'))), df = ruta(f, relDe(sr, [...dr.attributes].find(a => a.localName === 'id')?.value)), dd = df && X(await z(df)), drr = df && X(await z(df.replace(/[^/]+$/, '_rels/$&.rels')));
+      for(const an of [...tags(dd, 'twoCellAnchor'), ...tags(dd, 'oneCellAnchor')]){ const fr = hijo(an, 'from'), to = hijo(an, 'to'), ext = hijo(an, 'ext'), bl = tags(an, 'blip')[0]; if(!fr || !bl) continue;
+        const g = (n, t) => +(hijo(n, t)?.textContent || 0), emb = [...bl.attributes].find(a => a.localName === 'embed')?.value, mf = ruta(df, relDe(drr, emb)), bin = mf && await z(mf, true); if(!bin) continue;
+        const tipo = (mf.match(/\.(png|jpe?g|gif|bmp|emf|wmf)$/i) || [])[1]; if(!tipo) continue; const url = await vxImagenUrl(tipo.toLowerCase().replace('jpg', 'jpeg'), bin); if(!url) continue;
+        imgs.push({c1: g(fr, 'col'), dx1: g(fr, 'colOff'), r1: g(fr, 'row'), dy1: g(fr, 'rowOff'), c2: to ? g(to, 'col') : null, dx2: to ? g(to, 'colOff') : 0, r2: to ? g(to, 'row') : null, dy2: to ? g(to, 'rowOff') : 0, cx: ext ? +ext.getAttribute('cx') : 0, cy: ext ? +ext.getAttribute('cy') : 0, u: 'emu', url}); } }
+    res[s.getAttribute('name')] = {xf, imgs};
+  }
+  return res;
+}
+async function vxEstilos(buf, nombre){ try{ return /\.xls$/i.test(nombre) ? await vxLeerXls(buf) : await vxLeerXlsx(buf); }catch(e){ console.warn('estilos Excel', e); return null; } }
+// ---- dibujar una hoja como el original ----
+function vxHtmlHoja(h, est){
+  const R = XLSX.utils.decode_range(h['!ref']), cols = h['!cols'] || [], rows = h['!rows'] || [], xf = (est && est.xf) || {}, imgs = (est && est.imgs) || [];
+  const tieneBorde = s => s && (s.bl || s.br || s.bt || s.bb || s.fill);
+  let maxR = 0, maxC = 0;
+  for(let r = R.s.r; r <= R.e.r; r++) for(let c = R.s.c; c <= R.e.c; c++){ const k = vxRef(r, c), cel = h[k]; if((cel && cel.w != null && String(cel.w).trim() !== '') || tieneBorde(xf[k])){ if(r > maxR) maxR = r; if(c > maxC) maxC = c; } }
+  imgs.forEach(i => { if(i.r1 > maxR) maxR = i.r1; if(i.c1 > maxC) maxC = i.c1; });
+  const anchoDef = 64, altoDef = est && est.xls ? 17 : 20;
+  const W = [], H = []; for(let c = 0; c <= maxC; c++){ const x = cols[c]; W.push(x && x.hidden ? 0 : x && x.wpx != null ? Math.max(0, Math.round(x.wpx)) : anchoDef); }
+  for(let r = 0; r <= maxR; r++){ const x = rows[r]; H.push(x && x.hidden ? 0 : x && x.hpx ? Math.round(x.hpx) : altoDef); }
+  const X0 = [0], Y0 = [0]; W.forEach(w => X0.push(X0[X0.length - 1] + w)); H.forEach(hh => Y0.push(Y0[Y0.length - 1] + hh));
+  const tapadas = new Set(), span = {}; (h['!merges'] || []).forEach(m => { if(m.s.r > maxR || m.s.c > maxC) return; span[vxRef(m.s.r, m.s.c)] = [Math.min(m.e.r, maxR) - m.s.r + 1, Math.min(m.e.c, maxC) - m.s.c + 1]; for(let r = m.s.r; r <= Math.min(m.e.r, maxR); r++) for(let c = m.s.c; c <= Math.min(m.e.c, maxC); c++) if(r !== m.s.r || c !== m.s.c) tapadas.add(vxRef(r, c)); });
+  let html = '<div class="vx-hoja" style="position:relative;width:' + X0[X0.length - 1] + 'px"><table class="vx-t" style="width:' + X0[X0.length - 1] + 'px"><colgroup>' + W.map(w => '<col style="width:' + w + 'px">').join('') + '</colgroup>';
+  for(let r = 0; r <= maxR; r++){
+    if(!H[r]){ continue; }
+    html += '<tr style="height:' + H[r] + 'px">';
+    for(let c = 0; c <= maxC; c++){
+      const k = vxRef(r, c); if(tapadas.has(k)) continue;
+      const cel = h[k], s = xf[k] || {}, sp = span[k], txt = cel && cel.w != null ? String(cel.w) : '';
+      const ha = s.ha || (cel && (cel.t === 'n' || cel.t === 'd') ? 'right' : cel && cel.t === 'b' ? 'center' : 'left');
+      let css = 'text-align:' + ha + ';vertical-align:' + (s.va || 'bottom') + ';';
+      if(s.b) css += 'font-weight:700;'; if(s.i) css += 'font-style:italic;'; if(s.u) css += 'text-decoration:underline;';
+      if(s.sz) css += 'font-size:' + (s.sz * 4 / 3).toFixed(1) + 'px;'; if(s.font) css += "font-family:'" + s.font.replace(/['"<>]/g, '') + "'," + (/impact/i.test(s.font) ? "'Arial Narrow'," : '') + 'Arial,sans-serif;' + (/impact/i.test(s.font) ? 'font-stretch:condensed;font-weight:900;' : '');
+      if(s.color) css += 'color:' + s.color + ';'; if(s.fill) css += 'background:' + s.fill + ';';
+      if(s.bl) css += 'border-left:' + s.bl + ';'; if(s.br) css += 'border-right:' + s.br + ';'; if(s.bt) css += 'border-top:' + s.bt + ';'; if(s.bb) css += 'border-bottom:' + s.bb + ';';
+      if(s.wrap) css += 'white-space:pre-wrap;';
+      html += '<td' + (sp ? (sp[0] > 1 ? ' rowspan="' + sp[0] + '"' : '') + (sp[1] > 1 ? ' colspan="' + sp[1] + '"' : '') : '') + ' style="' + css + '">' + visorEsc(txt.trim() ? txt : '') + '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</table>';
+  imgs.forEach(i => { if(i.c1 > maxC || i.r1 > maxR) return;
+    const cw = c => W[Math.min(c, W.length - 1)] || anchoDef, rh = r => H[Math.min(r, H.length - 1)] || altoDef, x = (c, d) => (X0[Math.min(c, maxC + 1)] || 0) + (i.u === 'xls' ? cw(c) * d / 1024 : d / 9525), y = (r, d) => (Y0[Math.min(r, maxR + 1)] || 0) + (i.u === 'xls' ? rh(r) * d / 256 : d / 9525);
+    const l = x(i.c1, i.dx1), t = y(i.r1, i.dy1); let w, hh; if(i.c2 != null){ w = x(i.c2, i.dx2) - l; hh = y(i.r2, i.dy2) - t; } else { w = i.cx / 9525; hh = i.cy / 9525; }
+    if(w > 2 && hh > 2) html += '<img alt="" src="' + i.url + '" style="position:absolute;left:' + l.toFixed(1) + 'px;top:' + t.toFixed(1) + 'px;width:' + w.toFixed(1) + 'px;height:' + hh.toFixed(1) + 'px">'; });
+  return html + '</div>';
+}
+
+// los dibujos vectoriales de Office (EMF y WMF, típicos en logos) se pasan a SVG con un lector propio guardado en la web (lib/), sin servicios de fuera
+async function vxImagenUrl(tipo, bytes){
+  if(tipo === 'png' || tipo === 'jpeg' || tipo === 'gif' || tipo === 'bmp') return 'data:image/' + tipo + ';base64,' + vxB64(bytes);
+  if(tipo !== 'emf' && tipo !== 'wmf') return null;
+  const lib = tipo === 'emf' ? 'EMFJS' : 'WMFJS';
+  if(!window[lib]) await new Promise((ok, mal) => { const sc = document.createElement('script'); sc.src = 'lib/' + lib + '.bundle.min.js'; sc.onload = ok; sc.onerror = mal; document.head.appendChild(sc); });
+  if(window[lib].loggingEnabled) window[lib].loggingEnabled(false);
+  const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), dv = new DataView(ab);
+  let info;
+  if(tipo === 'emf'){ const l = dv.getInt32(8, true), t = dv.getInt32(12, true), r = dv.getInt32(16, true), b = dv.getInt32(20, true); info = {width: (r - l) + 'px', height: (b - t) + 'px', wExt: r - l, hExt: b - t, xExt: r - l, yExt: b - t, mapMode: 8}; }
+  else { const pl = dv.getUint32(0, true) === 0x9AC6CDD7, w = pl ? dv.getInt16(10, true) - dv.getInt16(6, true) : 1000, h = pl ? dv.getInt16(12, true) - dv.getInt16(8, true) : 1000; info = {width: w + 'px', height: h + 'px', xExt: w, yExt: h, mapMode: 8}; }
+  const svg = new window[lib].Renderer(ab).render(info);
+  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(svg))));
 }
 async function visorLeerExcel(c, buf){
   await cargarLib('xlsx');
@@ -15157,12 +15321,13 @@ async function visorLeerExcel(c, buf){
   const hojas = wb.SheetNames.map(n => ({n, h: wb.Sheets[n]})).filter(x => x.h && x.h['!ref']).map(x => Object.assign(x, {w: /^factura$/i.test(x.n) ? 1e9 : /stub|macros|templateinformation|personalizar|^atw$|^lock$/i.test(x.n) ? -1 : peso(x.h)})).sort((a, b) => b.w - a.w);
   if(!hojas.length) throw new Error('Sin hojas');
   if(hojas.some(x => x.w >= 0)) hojas.splice(0, hojas.length, ...hojas.filter(x => x.w >= 0));   // las hojas internas de la plantilla (TemplateInformation…) no se enseñan
+  const estilos = await vxEstilos(buf, _visorNombreActual || '');
   c.innerHTML = (hojas.length > 1 ? '<div class="visor-hojas">' + hojas.map((x, i) => `<button type="button" data-h="${i}" class="${i === 0 ? 'on' : ''}">${visorEsc(x.n)}</button>`).join('') + '</div>' : '') + '<div class="visor-doc visor-hoja"></div>';
   const pintar = i => {
     const h = hojas[i].h, r = XLSX.utils.decode_range(h['!ref']), MAX = 1500; let aviso = '';
     if(r.e.r - r.s.r > MAX){ const copia = Object.assign({}, h); copia['!ref'] = XLSX.utils.encode_range({s: r.s, e: {r: r.s.r + MAX, c: r.e.c}}); aviso = '<div class="visor-aviso">Se enseñan las primeras ' + MAX + ' filas de ' + (r.e.r - r.s.r + 1) + '. Para verlas todas, Descargar.</div>'; var hoja = copia; } else var hoja = h;
-    let html = XLSX.utils.sheet_to_html(hoja, {editable: false, header: '', footer: ''}); html = html.replace(/^[\s\S]*?(<table)/i, '$1').replace(/<\/body>[\s\S]*$/i, '');
-    const d = c.querySelector('.visor-doc'); d.innerHTML = aviso + html; d.querySelectorAll('td').forEach(td => { if(td.textContent.length > 30) td.classList.add('largo'); }); visorAjustar(c);
+    const html = vxHtmlHoja(hoja, estilos && estilos[hojas[i].n]);   // dibujada como el original: bordes, fuentes, anchos, celdas unidas y logo
+    const d = c.querySelector('.visor-doc'); d.innerHTML = aviso + html; visorAjustar(c);
   };
   c.querySelectorAll('.visor-hojas button').forEach(b => b.addEventListener('click', () => { c.querySelectorAll('.visor-hojas button').forEach(x => x.classList.remove('on')); b.classList.add('on'); pintar(Number(b.dataset.h)); c.scrollTop = 0; }));
   pintar(0);
@@ -15241,7 +15406,7 @@ async function visorPintarDoc(c, soloZoom){
   const nombre = decodeURIComponent(String(_visorUrl).split('?')[0]), tok = ++visorPintar._n;
   try{
     const buf = await visorBuffer(_visorUrl); if(tok !== visorPintar._n) return;
-    if(VISOR_EXCEL.test(nombre)) await visorLeerExcel(c, buf);
+    if(VISOR_EXCEL.test(nombre)){ _visorNombreActual = nombre; await visorLeerExcel(c, buf); }
     else if(/\.docx$/i.test(nombre)) await visorLeerDocx(c, buf);
     else if(/\.doc$/i.test(nombre)) await visorLeerDoc(c, buf);
     else if(/\.rtf$/i.test(nombre)) await visorLeerRtf(c, buf);
