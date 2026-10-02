@@ -3692,7 +3692,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.05</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.06</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3782,7 +3782,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.05</div>
+        <div class="sub" id="version-badge">V7.06</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5084,7 +5084,6 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
 
       <div class="client-tabs" id="econ-subtabs">
         <div class="client-tab active" data-sub="resumen">Resumen</div>
-        <div class="client-tab" data-sub="cobros">Cobros</div>
         <div class="client-tab" data-sub="rentabilidad">Rentabilidad</div>
       </div>
 
@@ -5145,20 +5144,6 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
           </div>
         </div>
         <div class="two-col-note">Un presupuesto aceptado puede convertirse en trabajo con un clic, o relacionarse con un trabajo ya existente sin duplicar datos.</div>
-      </div>
-
-      <!-- COBROS -->
-      <div class="sub-view" id="econ-cobros" style="display:none;">
-        <div class="panel">
-          <div class="panel-head"><h3>Cobros registrados</h3></div>
-          <div class="panel-body" style="padding:0;">
-            <table class="tbl">
-              <tr><th>Fecha</th><th>Factura</th><th>Cliente</th><th class="num">Importe</th><th>Forma de pago</th></tr>
-              <tbody id="econ-cobros-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="two-col-note">Los pagos parciales de una factura se registran aquí — importe cobrado y pendiente por separado.</div>
       </div>
 
       <!-- GASTOS -->
@@ -7329,7 +7314,7 @@ function setupSubtabs(navId, prefix, mapping, opts){
   });
 }
 setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimiento:'flota-mantenimiento',averias:'flota-averias',documentacion:'flota-documentacion',repuestos:'flota-repuestos',historial:'flota-historial'});
-setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',cobros:'econ-cobros',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad'});
+setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad'});
 setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',control:'gpro-control',combustible:'gpro-comb',prestamos:'gpro-prestamos',revisar:'gpro-revisar'},{onSwitch:{revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible(), control:()=>renderGastosProControl(), prestamos:()=>iniciarPrestamos()}});
 document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filters .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
@@ -15111,7 +15096,7 @@ function visorZoom(f){ _visorZoom = Math.min(5, Math.max(0.4, _visorZoom * f)); 
 async function visorPintar(soloZoom){
   const c = document.getElementById('visor-c'); if(!c) return;
   const nombreV = decodeURIComponent(String(_visorUrl).split('?')[0]);
-  if(!_visorEsPdf && /\.(doc|rtf|docx)$/i.test(nombreV) && !soloZoom){   // si el Word ya tiene su vista en PDF, se enseña esa (idéntica al original)
+  if(!_visorEsPdf && /\.(doc|rtf|docx|xlsx?|xlsm|ods)$/i.test(nombreV) && !soloZoom){   // si el Word o el Excel ya tiene su vista en PDF, se enseña esa (idéntica al original: logo, cuadros, fechas y números en español)
     try{ const h = await fetch(_visorUrl + '.visor.pdf', {method: 'HEAD'}); if(h.ok){ _visorVer = _visorUrl + '.visor.pdf'; _visorEsPdf = true; _visorPdf = null; } }catch(e){}
   }
   if(!_visorEsPdf && (VISOR_EXCEL.test(nombreV) || VISOR_WORD.test(nombreV))){ await visorPintarDoc(c, soloZoom); return; }
@@ -15163,10 +15148,15 @@ function visorAjustar(c){   // cabe en el ancho de la pantalla; con los botones 
 }
 async function visorLeerExcel(c, buf){
   await cargarLib('xlsx');
-  const wb = XLSX.read(buf, {type: 'array', cellDates: true});
+  const wb = XLSX.read(buf, {type: 'array', cellDates: true, cellNF: true});
+  const es2 = (n, d) => n.toLocaleString('es-ES', {minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: Math.abs(n) >= 1000});
+  for(const nh of wb.SheetNames){ const h = wb.Sheets[nh]; for(const k in h){ const cel = h[k]; if(k[0] === '!' || !cel) continue;   // fechas y números como en España (20/2/26, 1.822,50 €)
+    if(cel.t === 'd' && cel.v instanceof Date){ const f = cel.v; cel.w = /yyyy/i.test(cel.z || '') ? f.toLocaleDateString('es-ES') : f.getDate() + '/' + (f.getMonth() + 1) + '/' + String(f.getFullYear()).slice(2); }
+    else if(cel.t === 'n'){ const z = String(cel.z || ''); if(/General/i.test(z) || !z){ cel.w = String(cel.v).includes('.') ? String(cel.v).replace('.', ',') : String(cel.v); } else { const m = z.match(/0[.,](0+)/), d = m ? m[1].length : 0; cel.w = es2(cel.v, d) + (/%/.test(z) ? ' %' : /€|EUR/.test(z) ? ' €' : ''); } } } }
   const peso = h => { let n = 0; for(const k in h){ if(k[0] !== '!' && h[k] && h[k].v !== undefined && h[k].v !== '' && typeof h[k].v !== 'boolean' && !(typeof h[k].v === 'string' && /^#/.test(h[k].v))) n++; } return n; };
-  const hojas = wb.SheetNames.map(n => ({n, h: wb.Sheets[n]})).filter(x => x.h && x.h['!ref']).map(x => Object.assign(x, {w: /^factura$/i.test(x.n) ? 1e9 : /stub|macros|templateinformation|personalizar/i.test(x.n) ? -1 : peso(x.h)})).sort((a, b) => b.w - a.w);
+  const hojas = wb.SheetNames.map(n => ({n, h: wb.Sheets[n]})).filter(x => x.h && x.h['!ref']).map(x => Object.assign(x, {w: /^factura$/i.test(x.n) ? 1e9 : /stub|macros|templateinformation|personalizar|^atw$|^lock$/i.test(x.n) ? -1 : peso(x.h)})).sort((a, b) => b.w - a.w);
   if(!hojas.length) throw new Error('Sin hojas');
+  if(hojas.some(x => x.w >= 0)) hojas.splice(0, hojas.length, ...hojas.filter(x => x.w >= 0));   // las hojas internas de la plantilla (TemplateInformation…) no se enseñan
   c.innerHTML = (hojas.length > 1 ? '<div class="visor-hojas">' + hojas.map((x, i) => `<button type="button" data-h="${i}" class="${i === 0 ? 'on' : ''}">${visorEsc(x.n)}</button>`).join('') + '</div>' : '') + '<div class="visor-doc visor-hoja"></div>';
   const pintar = i => {
     const h = hojas[i].h, r = XLSX.utils.decode_range(h['!ref']), MAX = 1500; let aviso = '';
