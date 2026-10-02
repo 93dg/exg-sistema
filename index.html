@@ -3713,7 +3713,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.16</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.17</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3803,7 +3803,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.16</div>
+        <div class="sub" id="version-badge">V7.17</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -15120,6 +15120,15 @@ function visorCrear(){
   v.querySelector('#visor-menos').onclick = () => visorZoom(1 / 1.4);
   v.querySelector('#visor-desc').onclick = visorDescargar;
   visorPellizco(v.querySelector('#visor-c'));
+  const top = v.querySelector('.visor-top'), t = v.querySelector('#visor-t');
+  const flecha = (d, p) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'visor-bt visor-nav'; b.title = d < 0 ? 'Anterior' : 'Siguiente'; b.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="' + p + '"/></svg>'; b.onclick = () => visorPasar(d); return b; };
+  const cuenta = document.createElement('span'); cuenta.id = 'visor-cuenta'; cuenta.style.cssText = 'font-size:13px;font-weight:700;color:#fff;min-width:30px;text-align:center;';
+  t.after(flecha(-1, 'M15 18l-6-6 6-6'), cuenta, flecha(1, 'M9 18l6-6-6-6'));
+  const c = v.querySelector('#visor-c'); let ini = null;
+  c.addEventListener('touchstart', e => { ini = e.touches.length === 1 && _visorLista ? {x: e.touches[0].clientX, y: e.touches[0].clientY, sl: c.scrollLeft} : null; }, {passive: true});
+  c.addEventListener('touchend', e => { if(!ini || !_visorLista) return; const t2 = e.changedTouches[0], dx = t2.clientX - ini.x, dy = t2.clientY - ini.y; const borde = c.scrollWidth <= c.clientWidth + 2 || (dx < 0 ? c.scrollLeft + c.clientWidth >= c.scrollWidth - 2 : c.scrollLeft <= 2);
+    if(Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5 && borde && Math.abs(c.scrollLeft - ini.sl) < 4) visorPasar(dx < 0 ? 1 : -1); ini = null; }, {passive: true});
+  visorListaPintar();
   return v;
 }
 // acercar y alejar con dos dedos dentro del visor (la página entera no hace zoom, solo el documento)
@@ -15137,12 +15146,14 @@ function visorPellizco(c){
   c.addEventListener('touchend', e => { if(e.touches.length < 2) fin(); }); c.addEventListener('touchcancel', fin);
   ['gesturestart', 'gesturechange'].forEach(ev => c.addEventListener(ev, e => e.preventDefault(), {passive: false}));   // Safari: que no amplíe la página entera
 }
-function visorAbrir(url, titulo){
+function visorAbrir(url, titulo, deLista){
+  if(!deLista) _visorLista = null;
   const v = visorCrear(); _visorUrl = url; _visorVer = url; _visorZoom = 1; _visorPdf = null;
   const nombre = (titulo || decodeURIComponent(String(url).split('?')[0].split('/').pop() || 'Documento')).replace(/\s+/g, ' ').trim();
   _visorEsPdf = /\.pdf$/i.test(decodeURIComponent(String(url).split('?')[0].split('#')[0]));
   v.querySelector('#visor-t').textContent = nombre;
   v.classList.add('abierto'); document.documentElement.classList.add('visor-abierto');
+  visorListaPintar();
   visorPintar();
 }
 function visorCerrar(){ const v = document.getElementById('visor'); if(!v) return; v.classList.remove('abierto'); document.documentElement.classList.remove('visor-abierto'); const c = v.querySelector('#visor-c'); if(c) c.innerHTML = ''; _visorPdf = null; }
@@ -15476,8 +15487,16 @@ document.addEventListener('click', ev => {
   const a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null; if(!a || a.hasAttribute('download') || a.dataset.visor === 'no' || ev.defaultPrevented) return;
   if(!visorEsDoc(a.getAttribute('href'))) return;
   for(let n = ev.target; n && n !== a; n = n.parentNode){ if(n.hasAttribute && n.hasAttribute('onclick')) return; }   // un botón propio dentro del enlace (por ejemplo quitar un documento) sigue con lo suyo
-  ev.preventDefault(); ev.stopPropagation(); visorAbrir(a.href, (a.querySelector('.nm')?.textContent || a.textContent || a.title || '').trim());
+  ev.preventDefault(); ev.stopPropagation();
+  if(a.dataset.lista){ try{ const l = JSON.parse(a.dataset.lista); if(Array.isArray(l) && l.length > 1){ visorAbrirLista(l, Math.max(0, l.findIndex(x => x.u === a.getAttribute('href')))); return; } }catch(e){} }
+  visorAbrir(a.href, (a.querySelector('.nm')?.textContent || a.textContent || a.title || '').trim());
 }, true);
+// VARIOS ARCHIVOS EN EL VISOR (Daniel 02/10/2026): si los datos salieron de más de un archivo, se pasa de uno a otro deslizando o con las flechas
+let _visorLista = null, _visorIdx = 0;
+function visorAbrirLista(lista, i){ _visorLista = lista; _visorIdx = i || 0; const x = lista[_visorIdx]; visorAbrir(x.u, x.t, true); }
+function visorPasar(d){ if(!_visorLista) return; const n = _visorLista.length, i = (_visorIdx + d + n) % n; visorAbrirLista(_visorLista, i); }
+function visorListaPintar(){ const v = document.getElementById('visor'); if(!v) return; const hay = !!(_visorLista && _visorLista.length > 1);
+  v.querySelectorAll('.visor-nav').forEach(b => b.style.display = hay ? '' : 'none'); const c = v.querySelector('#visor-cuenta'); if(c){ c.style.display = hay ? '' : 'none'; c.textContent = hay ? (_visorIdx + 1) + '/' + _visorLista.length : ''; } }
 (function(){ const _abrir = window.open.bind(window); window.open = function(url, destino, opciones){ if(typeof url === 'string' && visorEsDoc(url)){ visorAbrir(url, ''); return null; } return _abrir(url, destino, opciones); }; })();
 document.addEventListener('keydown', ev => { if(ev.key === 'Escape' && document.getElementById('visor')?.classList.contains('abierto')) visorCerrar(); });
 const EM_ICONOS = {"doc": "<path d=\"M6 3h8l5 5v13H6z\"/><path d=\"M14 3v5h5\"/>", "clip": "<path d=\"M21 12.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8L13.5 4.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8\"/>", "trash": "<path d=\"M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3\"/>", "clip2": "<rect x=\"6\" y=\"4\" width=\"12\" height=\"17\" rx=\"2\"/><path d=\"M9 4V3h6v1M9 11h6M9 15h4\"/>", "search": "<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"M21 21l-5-5\"/>", "nota": "<path d=\"M4 4h16v12H8l-4 4z\"/><path d=\"M8 9h8M8 12h5\"/>", "pencil": "<path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z\"/>", "ban": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M5.6 5.6l12.8 12.8\"/>", "cam": "<path d=\"M4 8h3l2-3h6l2 3h3v11H4z\"/><circle cx=\"12\" cy=\"13\" r=\"3.5\"/>", "refresh": "<path d=\"M20 12a8 8 0 1 1-2.3-5.7\"/><path d=\"M20 4v5h-5\"/>", "docs": "<path d=\"M6 3h8l5 5v13H6z\"/><path d=\"M14 3v5h5M9 13h6M9 17h6\"/>", "mail": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"M3 7l9 6 9-6\"/>", "bell": "<path d=\"M6 17V11a6 6 0 0 1 12 0v6l2 2H4z\"/><path d=\"M10 21h4\"/>", "pin": "<path d=\"M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z\"/><circle cx=\"12\" cy=\"10\" r=\"2.2\"/>", "down": "<path d=\"M12 4v11M7 11l5 5 5-5M5 20h14\"/>", "print": "<path d=\"M7 9V3h10v6M7 17H4v-7h16v7h-3\"/><rect x=\"7\" y=\"14\" width=\"10\" height=\"7\"/>", "bulb": "<path d=\"M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z\"/>", "user": "<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21a8 8 0 0 1 16 0\"/>", "euro": "<path d=\"M17 6.5A6.5 6.5 0 1 0 17 17.5\"/><path d=\"M4 10.5h9M4 13.5h9\"/>", "spark": "<path d=\"M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z\"/>", "folder": "<path d=\"M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>", "bolt": "<path d=\"M13 2L4 14h7l-1 8 9-12h-7z\"/>", "mic": "<rect x=\"9\" y=\"3\" width=\"6\" height=\"11\" rx=\"3\"/><path d=\"M5 11a7 7 0 0 0 14 0M12 18v3\"/>", "okc": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 12.5l3 3 5-6\"/>", "chat": "<path d=\"M4 5h16v11H9l-5 4z\"/>", "recibo": "<path d=\"M6 3h12v18l-3-2-3 2-3-2-3 2z\"/><path d=\"M9 8h6M9 12h6\"/>", "truck": "<path d=\"M2 6h11v9H2z\"/><path d=\"M13 9h4l3 3v3h-7z\"/><circle cx=\"6\" cy=\"17\" r=\"1.8\"/><circle cx=\"16.5\" cy=\"17\" r=\"1.8\"/>", "chart": "<path d=\"M4 20V4M4 20h16M8 16v-5M12 16V7M16 16v-8\"/>", "wrench": "<path d=\"M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8 6.2 21l6.3-6.3a4 4 0 0 0 5.2-5.4l-3 3-2.4-.6-.6-2.4z\"/>", "xc": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M9 9l6 6M15 9l-6 6\"/>", "gear": "<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2\"/>", "box": "<path d=\"M3 8l9-5 9 5v9l-9 5-9-5z\"/><path d=\"M3 8l9 5 9-5M12 13v9\"/>", "cal": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 10h18M8 3v4M16 3v4\"/>", "eye": "<path d=\"M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>", "bank": "<path d=\"M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18\"/>", "bld": "<rect x=\"5\" y=\"3\" width=\"14\" height=\"18\" rx=\"1\"/><path d=\"M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2\"/>", "shield": "<path d=\"M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z\"/>", "bug": "<rect x=\"8\" y=\"8\" width=\"8\" height=\"11\" rx=\"4\"/><path d=\"M12 8V5M4 13h4M16 13h4M5 7l3 2M19 7l-3 2M5 19l3-2M19 19l-3-2\"/>", "map": "<path d=\"M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z\"/><path d=\"M9 4v14M15 6v14\"/>", "sat": "<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M4 4l5 5M15 15l5 5M4 20l5-5M15 9l5-5\"/>", "warn": "<path d=\"M12 3l10 18H2z\"/><path d=\"M12 10v5M12 18v.5\"/>", "dotr": "<circle cx=\"12\" cy=\"12\" r=\"6\" fill=\"#C4685A\" stroke=\"none\"/>", "doty": "<circle cx=\"12\" cy=\"12\" r=\"6\" fill=\"#D8AA3D\" stroke=\"none\"/>", "dotg": "<circle cx=\"12\" cy=\"12\" r=\"6\" fill=\"#4F8A5B\" stroke=\"none\"/>", "star": "<path d=\"M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z\"/>", "rep": "<path d=\"M3 11a8 8 0 0 1 14-5l3 3\"/><path d=\"M21 4v5h-5M21 13a8 8 0 0 1-14 5l-3-3\"/><path d=\"M3 20v-5h5\"/>"};
@@ -15518,7 +15537,9 @@ const FTE_SEL = '.factura-card-movil, .gasto-card, .gm-card, .cliente-card, .exp
 const fteUrl = d => d && (d.archivo_url || (d.archivo_path ? 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/' + d.archivo_path : null) || d.justificante_url || null);
 const fteDia = v => { try{ const x = new Date(v); return isNaN(x) ? '' : x.toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit'}); }catch(e){ return ''; } };
 const FTE_TP = {factura: 'factura', albaran: 'albarán', presupuesto: 'presupuesto', proforma: 'proforma', gasto: 'gasto'};
-function fteHtml(txt, url){ return '<div class="fte"><span class="fte-t">Fuente · ' + escHtml(txt) + '</span>' + (url ? '<a href="' + escHtml(url) + '" class="fte-lnk" onclick="event.stopPropagation()">Archivo</a>' : '') + '</div>'; }
+function fteHtml(txt, url, lista){   // lista: [{u, t}] cuando la ficha salió de varios archivos: el visor deja pasar de uno a otro deslizando
+  const varios = Array.isArray(lista) && lista.length > 1;
+  return '<div class="fte"><span class="fte-t">Fuente · ' + escHtml(txt) + '</span>' + (url ? '<a href="' + escHtml(url) + '" class="fte-lnk"' + (varios ? ' data-lista="' + escHtml(JSON.stringify(lista)) + '"' : '') + ' onclick="event.stopPropagation()">' + (varios ? 'Archivos ' + lista.length : 'Archivo') + '</a>' : '') + '</div>'; }
 function fteDeDocumento(d){ return d ? {txt: impOrigenGasto(d), url: fteUrl(d)} : null; }
 function fteDeCliente(id){
   const docs = Object.values(documentosRealesById).filter(d => d.entidad_id === id && d.created_at).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
@@ -15533,7 +15554,9 @@ function fteDeTrabajo(id){
 function fteDeFlota(id){
   const m = (typeof fleet !== 'undefined' ? fleet : []).concat(typeof flotaVendida !== 'undefined' ? flotaVendida : []).find(x => x.id === id); if(!m) return null;
   const docs = Array.isArray(m.documentos) ? m.documentos : [];
-  if(docs.length){ const d = docs.find(x => /permiso/i.test(x.nombre || '')) || docs.find(x => /ficha/i.test(x.nombre || '')) || docs[0]; return {txt: 'permiso y ficha técnica', url: d.url || null}; }
+  const conUrl = docs.filter(x => x && x.url), peso = x => /permiso/i.test(x.nombre || '') ? 0 : /ficha/i.test(x.nombre || '') ? 1 : 2;
+  if(conUrl.length){ const orden = conUrl.slice().sort((a, b) => peso(a) - peso(b)); return {txt: 'permiso y ficha técnica', url: orden[0].url, lista: orden.map(x => ({u: x.url, t: x.nombre || ''}))}; }
+  if(docs.length) return {txt: 'permiso y ficha técnica', url: null};
   return {txt: 'A mano', url: null};
 }
 function fteDeContrato(id){
@@ -15564,7 +15587,7 @@ function fteAplicar(el){
   if(r.url) el.querySelectorAll('.fc-ver-original').forEach(x => { if(x.closest('.gasto-adjuntos') || x.closest('.exp-adjuntos')) return; x.remove(); });
   el.querySelectorAll('.fc-extra').forEach(x => { if(!x.children.length) x.remove(); });
   el.querySelectorAll('.gasto-pie').forEach(x => { if(!x.children.length && !x.textContent.trim()) x.remove(); });
-  const tpl = document.createElement('template'); tpl.innerHTML = fteHtml(r.txt, r.url);
+  const tpl = document.createElement('template'); tpl.innerHTML = fteHtml(r.txt, r.url, r.lista);
   const dest = el.matches('.tb-card') ? (el.querySelector('.tb-cuerpo') || el) : el;   // la tarjeta de trabajo es una cuadrícula (cuerpo, ✕, ✓): la línea va dentro del cuerpo
   dest.appendChild(tpl.content.firstChild);
 }
@@ -15761,7 +15784,7 @@ function renderFichaMaquina(){
     h += flDocsHtml(m) + `<label class="btn primary" style="cursor:pointer;display:flex;justify-content:center;margin-top:4px;">📎 Adjuntar documento<input type="file" accept="image/*,application/pdf" style="display:none;" onchange="subirDocMaquina('${m.id}',this)"></label><div class="sub-t" id="mq-status-${m.id}" style="margin-top:6px;"></div>`;
   } else {
     h += `<div class="fl-sec"><h4>Editar</h4><div class="field" style="margin-bottom:10px;"><div class="l">Nombre de la máquina</div><input class="search-box" style="width:100%;" id="mq-nombre-${m.id}" value="${flE(m.name)}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Modelo (sale arriba en la tarjeta)</div><input class="search-box" style="width:100%;" id="mq-modelo-${m.id}" value="${flE(m.modelo || '')}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Lo que es (sale debajo: Mixta, Niveladora, Turismo…)</div><input class="search-box" style="width:100%;" id="mq-clase-${m.id}" value="${flE(m.clase || '')}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Matrícula</div><input class="search-box mono" style="width:100%;" id="mq-matricula-${m.id}" value="${flE(m.matricula)}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Ficha técnica (texto completo)</div><textarea class="search-box" style="width:100%;height:220px;font-family:'IBM Plex Mono',monospace;font-size:12px;" id="mq-ficha-${m.id}">${flE(m.fichaTecnica)}</textarea></div><button class="btn primary" style="width:100%;" onclick="guardarFichaMaquinaInline('${m.id}')">Guardar</button><div class="sub-t" id="mq-status-${m.id}" style="margin-top:6px;"></div></div>`;
-    h += `<div class="fl-sec"><h4>Texto original</h4><details><summary style="cursor:pointer;color:var(--ink-soft);font-size:12.5px;">Ver el texto completo tal como está guardado</summary><pre class="fl-pre">${flE(m.fichaTecnica || '(vacío)')}</pre></details><button type="button" class="btn sm" style="margin-top:10px;" onclick="copiarFichaMaquinaInline('${m.id}')">📋 Copiar la ficha completa</button></div>`;
+    h += `<div class="fl-sec"><h4>Texto original</h4><details><summary style="cursor:pointer;color:var(--ink-soft);font-size:12.5px;">Ver el texto completo tal como está guardado</summary><pre class="fl-pre">${flE(m.fichaTecnica || '(vacío)')}</pre></details><button type="button" class="btn sm" style="margin-top:10px;" onclick="copiarFichaMaquinaTodo('${m.id}')">Copiar la ficha completa</button></div>`;
   }
   ov.innerHTML = `<div class="fl-cab"><div class="fl-cab-top"><div class="fl-ico">${flIcono(m)}</div><div class="fl-cab-tit"><div class="fl-nombre">${flE(m.modelo || m.name)}</div><div class="fl-fila" style="margin-top:4px;">${m.matricula ? `<span class="fl-placa">${flE(m.matricula)}</span>` : ''}<span style="font-size:12px;color:var(--ink-soft);">${flE(m.clase || m.type || m.name)}</span></div></div><button type="button" class="fl-ib" title="Copiar ficha" aria-label="Copiar ficha" onclick="copiarFichaMaquinaInline('${m.id}')">📋</button><button type="button" class="fl-ib" title="Cerrar" aria-label="Cerrar" onclick="cerrarFichaMaquina()">✕</button></div><div class="fl-tabs">${tabs}</div></div><div class="fl-cuerpo">${h}</div>`;
 }
@@ -15825,7 +15848,31 @@ async function guardarFichaMaquinaInline(id){
   statusEl.textContent = 'Guardado ✓'; statusEl.style.color = 'var(--green)';
   mostrarToast('Ficha guardada ✓', 'ok'); renderFleetGrid();
 }
+// COPIAR (Daniel 02/10/2026): primero pregunta qué se quiere copiar, con pastillas, y copia solo eso
 function copiarFichaMaquinaInline(id){
+  const m = flBuscar(id); if(!m) return;
+  let R = null; try{ R = flParsear(m.fichaTecnica, m.name); }catch(e){}
+  const kv = a => (a || []).map(([k, v]) => k + ': ' + v).join('\n');
+  const mat = (m.matricula || '').trim(), bast = R ? ((R.ident || []).find(([k]) => /bastidor/i.test(k)) || [])[1] : '';
+  const titulo = (m.modelo || m.name || '') + (mat ? ' · ' + mat : '');
+  const op = [];
+  if(mat) op.push(['Matrícula', mat]);
+  if(bast) op.push(['Bastidor', bast]);
+  if(R){ const clave = (R.titulo ? [['Descripción', R.titulo]] : []).concat(flResumenPares(R)); if(clave.length) op.push(['Datos clave', titulo + '\n' + kv(clave)]);
+    const tec = (R.titulo ? [['Descripción', R.titulo]] : []).concat(R.ident || [], R.pesos || [], R.motor || [], R.otros || []); if(tec.length) op.push(['Datos técnicos', titulo + '\n' + kv(tec)]);
+    try{ const cia = flCompania(R); if(cia) op.push(['Seguro', titulo + '\nSeguro: ' + cia]); }catch(e){}
+    if(R.proxima) op.push(['ITV', titulo + '\nPróxima ITV: ' + String(R.proxima.f.getDate()).padStart(2, '0') + '/' + String(R.proxima.f.getMonth() + 1).padStart(2, '0') + '/' + R.proxima.f.getFullYear()]); }
+  if((m.fichaTecnica || '').trim()) op.push(['Ficha completa', titulo + '\n' + m.fichaTecnica.trim()]);
+  if(!op.length){ mostrarToast('Esta ficha no tiene datos que copiar.'); return; }
+  let caja = document.getElementById('fl-copiar'); if(caja) caja.remove();
+  caja = document.createElement('div'); caja.id = 'fl-copiar';
+  caja.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147482500;background:var(--paper);border-radius:20px 20px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.35);padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 16px);';
+  caja.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;"><b style="font-size:15px;">¿Qué copio?</b><button type="button" class="close-x" onclick="this.closest(\'#fl-copiar\').remove()">✕</button></div><div class="pillsel" style="display:flex;flex-wrap:wrap;gap:8px;">' + op.map((o, i) => '<button type="button" data-i="' + i + '" style="padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">' + escHtml(o[0]) + '</button>').join('') + '</div>';
+  caja.addEventListener('click', ev => { const b = ev.target.closest('button[data-i]'); if(!b) return; const o = op[Number(b.dataset.i)];
+    navigator.clipboard.writeText(o[1]).then(() => mostrarToast(o[0] + ' copiado ✓', 'ok')).catch(() => mostrarToast('No se pudo copiar — selecciona el texto a mano.')); caja.remove(); });
+  document.body.appendChild(caja);
+}
+function copiarFichaMaquinaTodo(id){
   const m = flBuscar(id);
   if(!m) return;
   const matricula = (document.getElementById('mq-matricula-'+id)?.value ?? m.matricula ?? '').trim();
