@@ -694,7 +694,7 @@ html.visor-abierto, html.visor-abierto body{overflow:hidden;}
 .visor-t{flex:1;min-width:0;font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .visor-bt{flex:0 0 44px;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .visor-bt svg{width:22px;height:22px;}
-.visor-c{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:8px;display:flex;flex-direction:column;align-items:center;gap:10px;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 80px);}
+.visor-c{flex:1;min-height:0;overflow:auto;touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch;padding:8px;display:flex;flex-direction:column;align-items:center;gap:10px;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 80px);}
 .visor-img{max-width:none;height:auto;background:#fff;border-radius:6px;flex:0 0 auto;}
 .visor-pag{background:#fff;border-radius:4px;box-shadow:0 4px 18px rgba(0,0,0,.4);flex:0 0 auto;}
 .visor-marco{width:100%;flex:1;min-height:70vh;border:0;background:#fff;border-radius:6px;}
@@ -3695,7 +3695,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.07</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.08</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3785,7 +3785,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.07</div>
+        <div class="sub" id="version-badge">V7.08</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -15084,7 +15084,23 @@ function visorCrear(){
   v.querySelector('#visor-mas').onclick = () => visorZoom(1.4);
   v.querySelector('#visor-menos').onclick = () => visorZoom(1 / 1.4);
   v.querySelector('#visor-desc').onclick = visorDescargar;
+  visorPellizco(v.querySelector('#visor-c'));
   return v;
+}
+// acercar y alejar con dos dedos dentro del visor (la página entera no hace zoom, solo el documento)
+function visorPellizco(c){
+  if(!c || c._pellizco) return; c._pellizco = true;
+  let p = null; const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY), mitad = t => ({x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2});
+  const piezas = () => [...c.children].filter(x => !x.classList.contains('visor-hojas') && !x.classList.contains('visor-msg'));
+  c.addEventListener('touchstart', e => { if(e.touches.length !== 2) return; const r = c.getBoundingClientRect(), m = mitad(e.touches); p = {d: dist(e.touches), z: _visorZoom, f: 1, fx: m.x - r.left, fy: m.y - r.top, sl: c.scrollLeft, st: c.scrollTop};
+    piezas().forEach(x => { const rx = x.getBoundingClientRect(); x.style.transformOrigin = (m.x - rx.left) + 'px ' + (m.y - rx.top) + 'px'; x.style.willChange = 'transform'; }); }, {passive: true});
+  c.addEventListener('touchmove', e => { if(!p || e.touches.length !== 2) return; e.preventDefault();
+    p.f = Math.min(5 / p.z, Math.max(0.4 / p.z, dist(e.touches) / p.d)); piezas().forEach(x => { x.style.transform = 'scale(' + p.f + ')'; }); }, {passive: false});
+  const fin = async () => { if(!p) return; const q = p; p = null; piezas().forEach(x => { x.style.transform = ''; x.style.transformOrigin = ''; x.style.willChange = ''; });
+    if(Math.abs(q.f - 1) < 0.02) return; _visorZoom = q.z * q.f; await visorPintar(true);
+    c.scrollLeft = (q.sl + q.fx) * q.f - q.fx; c.scrollTop = (q.st + q.fy) * q.f - q.fy; };
+  c.addEventListener('touchend', e => { if(e.touches.length < 2) fin(); }); c.addEventListener('touchcancel', fin);
+  ['gesturestart', 'gesturechange'].forEach(ev => c.addEventListener(ev, e => e.preventDefault(), {passive: false}));   // Safari: que no amplíe la página entera
 }
 function visorAbrir(url, titulo){
   const v = visorCrear(); _visorUrl = url; _visorVer = url; _visorZoom = 1; _visorPdf = null;
@@ -15266,8 +15282,10 @@ function vxHtmlHoja(h, est){
   for(let r = R.s.r; r <= R.e.r; r++) for(let c = R.s.c; c <= R.e.c; c++){ const k = vxRef(r, c), cel = h[k]; if((cel && cel.w != null && String(cel.w).trim() !== '') || tieneBorde(xf[k])){ if(r > maxR) maxR = r; if(c > maxC) maxC = c; } }
   imgs.forEach(i => { if(i.r1 > maxR) maxR = i.r1; if(i.c1 > maxC) maxC = i.c1; });
   const anchoDef = 64, altoDef = est && est.xls ? 17 : 20;
-  const W = [], H = []; for(let c = 0; c <= maxC; c++){ const x = cols[c]; W.push(x && x.hidden ? 0 : x && x.wpx != null ? Math.max(0, Math.round(x.wpx)) : anchoDef); }
-  for(let r = 0; r <= maxR; r++){ const x = rows[r]; H.push(x && x.hidden ? 0 : x && x.hpx ? Math.round(x.hpx) : altoDef); }
+  // ancho como Excel con Arial 10 (7 px por carácter), igual en xls y xlsx
+  const W = [], H = []; for(let c = 0; c <= maxC; c++){ const x = cols[c]; W.push(x && x.hidden ? 0 : x && x.width != null ? Math.max(0, Math.trunc((256 * x.width + 18) / 256 * 7)) : x && x.wpx != null ? Math.max(0, Math.round(x.wpx)) : anchoDef); }
+  // los altos vienen en puntos (hpt)
+  for(let r = 0; r <= maxR; r++){ const x = rows[r]; H.push(x && x.hidden ? 0 : x && x.hpt ? Math.round(x.hpt * 4 / 3) : x && x.hpx ? Math.round(x.hpx) : altoDef); }
   const X0 = [0], Y0 = [0]; W.forEach(w => X0.push(X0[X0.length - 1] + w)); H.forEach(hh => Y0.push(Y0[Y0.length - 1] + hh));
   const tapadas = new Set(), span = {}; (h['!merges'] || []).forEach(m => { if(m.s.r > maxR || m.s.c > maxC) return; span[vxRef(m.s.r, m.s.c)] = [Math.min(m.e.r, maxR) - m.s.r + 1, Math.min(m.e.c, maxC) - m.s.c + 1]; for(let r = m.s.r; r <= Math.min(m.e.r, maxR); r++) for(let c = m.s.c; c <= Math.min(m.e.c, maxC); c++) if(r !== m.s.r || c !== m.s.c) tapadas.add(vxRef(r, c)); });
   let html = '<div class="vx-hoja" style="position:relative;width:' + X0[X0.length - 1] + 'px"><table class="vx-t" style="width:' + X0[X0.length - 1] + 'px"><colgroup>' + W.map(w => '<col style="width:' + w + 'px">').join('') + '</colgroup>';
@@ -15277,14 +15295,15 @@ function vxHtmlHoja(h, est){
     for(let c = 0; c <= maxC; c++){
       const k = vxRef(r, c); if(tapadas.has(k)) continue;
       const cel = h[k], s = xf[k] || {}, sp = span[k], txt = cel && cel.w != null ? String(cel.w) : '';
+      const vecino = (() => { const sp2 = span[k], cn = c + (sp2 ? sp2[1] : 1), v = h[vxRef(r, cn)]; return v && v.w != null && String(v.w).trim() !== ''; })();   // como en Excel: el texto invade la celda de al lado solo si está vacía
       const ha = s.ha || (cel && (cel.t === 'n' || cel.t === 'd') ? 'right' : cel && cel.t === 'b' ? 'center' : 'left');
       let css = 'text-align:' + ha + ';vertical-align:' + (s.va || 'bottom') + ';';
       if(s.b) css += 'font-weight:700;'; if(s.i) css += 'font-style:italic;'; if(s.u) css += 'text-decoration:underline;';
       if(s.sz) css += 'font-size:' + (s.sz * 4 / 3).toFixed(1) + 'px;'; if(s.font) css += "font-family:'" + s.font.replace(/['"<>]/g, '') + "'," + (/impact/i.test(s.font) ? "'Arial Narrow'," : '') + 'Arial,sans-serif;' + (/impact/i.test(s.font) ? 'font-stretch:condensed;font-weight:900;' : '');
       if(s.color) css += 'color:' + s.color + ';'; if(s.fill) css += 'background:' + s.fill + ';';
       if(s.bl) css += 'border-left:' + s.bl + ';'; if(s.br) css += 'border-right:' + s.br + ';'; if(s.bt) css += 'border-top:' + s.bt + ';'; if(s.bb) css += 'border-bottom:' + s.bb + ';';
-      if(s.wrap) css += 'white-space:pre-wrap;';
-      html += '<td' + (sp ? (sp[0] > 1 ? ' rowspan="' + sp[0] + '"' : '') + (sp[1] > 1 ? ' colspan="' + sp[1] + '"' : '') : '') + ' style="' + css + '">' + visorEsc(txt.trim() ? txt : '') + '</td>';
+      if(s.wrap) css += 'white-space:pre-wrap;vertical-align:top;'; else if(vecino && txt) css += 'overflow:hidden;text-overflow:clip;';
+      html += '<td' + (sp ? (sp[0] > 1 ? ' rowspan="' + sp[0] + '"' : '') + (sp[1] > 1 ? ' colspan="' + sp[1] + '"' : '') : '') + ' style="' + css + '">' + (s.wrap && txt.trim() ? '<div style="height:' + (sp ? H.slice(r, r + sp[0]).reduce((x, y) => x + y, 0) : H[r]) + 'px;overflow:visible">' + visorEsc(txt) + '</div>' : visorEsc(txt.trim() ? txt : '')) + '</td>';   // el alto de la fila manda, como en Excel
     }
     html += '</tr>';
   }
@@ -15312,7 +15331,7 @@ async function vxImagenUrl(tipo, bytes){
 }
 async function visorLeerExcel(c, buf){
   await cargarLib('xlsx');
-  const wb = XLSX.read(buf, {type: 'array', cellDates: true, cellNF: true});
+  const wb = XLSX.read(buf, {type: 'array', cellDates: true, cellNF: true, cellStyles: true});   // cellStyles: sin esto no llegan los anchos y altos reales
   const es2 = (n, d) => n.toLocaleString('es-ES', {minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: Math.abs(n) >= 1000});
   for(const nh of wb.SheetNames){ const h = wb.Sheets[nh]; for(const k in h){ const cel = h[k]; if(k[0] === '!' || !cel) continue;   // fechas y números como en España (20/2/26, 1.822,50 €)
     if(cel.t === 'd' && cel.v instanceof Date){ const f = cel.v; cel.w = /yyyy/i.test(cel.z || '') ? f.toLocaleDateString('es-ES') : f.getDate() + '/' + (f.getMonth() + 1) + '/' + String(f.getFullYear()).slice(2); }
