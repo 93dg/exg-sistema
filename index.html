@@ -681,6 +681,10 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .fl-ico svg{width:26px;height:26px;}
 #facturas-kpi-strip, #presupuestos-kpi-strip, #proyectos-kpi-strip{display:none !important;}   /* los datos y totales están en Economía */
 #view-facturas .panel-head .count, #view-presupuestos .panel-head .count, #view-albaranes .panel-head .count{display:none !important;}
+.dd-filter-row .cli-icon-btn, .dd-filter-row-compacta .cli-icon-btn{width:46px !important;height:46px !important;}
+.dd-filter-row .cli-icon-btn svg, .dd-filter-row-compacta .cli-icon-btn svg{width:23px !important;height:23px !important;}
+.dd-filter-row .btn.sm, .dd-filter-row-compacta .btn.sm{height:46px;padding:0 18px;font-size:15px;font-weight:700;}
+@media(max-width:768px){ #nav > [data-en-barra]{display:none !important;} }   /* lo que ya está en la barra inferior no se repite en el menú lateral */
 .ico-em{width:1.15em;height:1.15em;vertical-align:-0.2em;margin-right:.35em;flex:0 0 auto;}
 .docs-selector-menu .ico-em{width:20px;height:20px;margin-right:10px;}
 .visor{position:fixed;inset:0;z-index:2147482000;background:#121416;display:none;flex-direction:column;}
@@ -2234,6 +2238,11 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .imp-pill.no{background:var(--red-soft);color:var(--red);}
 .imp-pill.b{background:var(--asphalt);color:#fff;}
 .imp-pill.pend{background:#FDEBDD;color:var(--orange);}
+.ct-exp{cursor:pointer;}
+.ct-exp .ct-det{display:none;}
+.ct-exp.abierta .ct-det{display:block;}
+.ct-caret{font-style:normal;margin-left:8px;color:var(--ink-soft);display:inline-block;transition:transform .15s;}
+.ct-exp.abierta .ct-caret{transform:rotate(180deg);}
 .imp-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
 .imp-acc .btn{font-size:12.5px;padding:7px 12px;}
 .imp-acc .btn.imp-arch{display:inline-flex;align-items:center;gap:6px;}
@@ -3654,7 +3663,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.99</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.100</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3744,7 +3753,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.99</div>
+        <div class="sub" id="version-badge">V6.100</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7159,8 +7168,19 @@ function navGruposConstruir(){
   }));
   navGruposRefrescar();
 }
+function navSincronizarInferior(){   // el menú lateral nunca repite lo que ya sale en la barra inferior: se lee de ella, así siempre van a la par
+  try{
+    document.querySelectorAll('#nav [data-en-barra]').forEach(e => e.removeAttribute('data-en-barra'));
+    document.querySelectorAll('#mobile-tabbar .mobile-tab-btn[data-view]').forEach(b => {
+      const v = b.dataset.view, g = NAV_DOCS_VISTAS.includes(v) ? 'documentos' : Object.keys(NAV_GRUPOS).find(k => NAV_GRUPOS[k].some(x => x[0] === v));
+      const dest = g === 'documentos' ? document.getElementById('nav-documentos-btn') : g ? document.querySelector('#nav > .nav-grupo[data-grupo="' + g + '"]') : document.querySelector('#nav > button[data-view="' + v + '"]');
+      if(dest) dest.setAttribute('data-en-barra', '1');
+    });
+  }catch(e){ console.warn(e); }
+}
 function navGruposRefrescar(){
   const act = (document.querySelector('.view.active')?.id || '').replace(/^view-/, '');
+  navSincronizarInferior();
   Object.entries(NAV_GRUPOS).forEach(([g, tabs]) => {
     const permit = tabs.map(t => t[0]).filter(navVistaPermitida), miembros = tabs.map(t => t[0]), sub = NAV_SUB[g];
     document.querySelectorAll(`.docs-tabs[data-grupo="${g}"]`).forEach(barra => {
@@ -9118,6 +9138,7 @@ function renderEconDocs(prefijo){
 let _diferirTarjetas = false;
 let _docsListos = false;
 const _historico = {pendientes: new Map(), procesar: null, finalizar: null, enCurso: false};
+let _ultimoToque = 0; ['touchstart', 'touchmove', 'pointerdown', 'wheel', 'scroll', 'keydown'].forEach(ev => window.addEventListener(ev, () => { _ultimoToque = performance.now(); }, {passive: true, capture: true}));   // última vez que la persona tocó la pantalla
 const HISTORICO_VISTAS = ['economia', 'ayuntamiento', 'archivos'];   // secciones que construyen solas los documentos antiguos; Facturas, Albaranes y Presupuestos los cargan solo con el botón, y Clientes no los necesita (sus totales salen de los datos en memoria)
 // Construye, en trozos pequeños, las filas de los documentos antiguos que faltan. Solo la primera vez que hace falta.
 const HIST_AVISOS = [['facturas', 'factura', 'Facturas'], ['albaranes', 'albaran', 'Albaranes'], ['presupuestos', 'presupuesto', 'Presupuestos']];
@@ -9159,12 +9180,13 @@ function asegurarHistorico(){
     if(H.pendientes.size) asegurarHistorico(); };
   const trozo = () => {
     try{
+      if(performance.now() - _ultimoToque < 600){ setTimeout(trozo, 250); return; }   // mientras tocas o bajas, el histórico espera: la pantalla manda
       const ini = performance.now();
-      while(i < lista.length && performance.now() - ini < 12) H.procesar(lista[i++], 'filas');
+      while(i < lista.length && performance.now() - ini < 6) H.procesar(lista[i++], 'filas');
       try{ const pc = Math.round(100 * i / lista.length) + ' %'; document.querySelectorAll('.hist-prog').forEach(e => { e.textContent = pc; }); }catch(e){}
       try{ const dur = performance.now() - ini; if(window.__exgMed && dur > 80) window.__exgMed.pasos.push({n: 'histórico · trozo largo (' + Math.round(i) + '/' + lista.length + ')', ms: Math.round(dur)}); }catch(e){}
-      if(i < lista.length){ setTimeout(trozo, 30); return; }
-      H.finalizar(true).catch(e => console.error('histórico', e)).then(terminar);
+      if(i < lista.length){ if(window.requestIdleCallback) requestIdleCallback(trozo, {timeout: 500}); else setTimeout(trozo, 40); return; }
+      const fin = () => { if(performance.now() - _ultimoToque < 600){ setTimeout(fin, 300); return; } H.finalizar(true).catch(e => console.error('histórico', e)).then(terminar); }; fin();
     }catch(e){ console.error('histórico', e); terminar(); }
   };
   setTimeout(trozo, 50);
@@ -9435,7 +9457,7 @@ function renderizarFilaYCardFactura(doc, entidad, trabajo, alPrincipio){
   row.dataset.total = totalNum;
   row.dataset.cobrado = cobradoNum;
   row.dataset.contabilidad = doc.contabilidad || 'oficial';
-  row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td class="col-texto" title="${(entidad?.name||'').replace(/"/g,'&quot;')}">${clienteHtml}</td><td class="mono col-texto" title="${(trabajo?.code||'').replace(/"/g,'&quot;')}">${trabajoHtml}</td><td class="num" data-num="${baseNum2}">${baseLabel}</td><td class="num" data-num="${ivaNum2}">${ivaLabel}</td><td class="num" data-num="${ivaPctDoc}">${ivaPctDoc}%</td><td class="num" data-num="${totalNum}">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" data-num="${cobradoNum}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-')}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
+  row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="fact-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count')"></td><td class="mono">${fechaCorta}</td><td class="mono">${doc.numero||'—'}</td><td class="col-texto" title="${(entidad?.name||'').replace(/"/g,'&quot;')}">${clienteHtml}</td><td class="mono col-texto" title="${(trabajo?.code||'').replace(/"/g,'&quot;')}">${trabajoHtml}</td><td class="num" data-num="${baseNum2}">${baseLabel}</td><td class="num" data-num="${ivaNum2}">${ivaLabel}</td><td class="num" data-num="${ivaPctDoc}">${ivaPctDoc}%</td><td class="num" data-num="${totalNum}">${amountLabel}</td><td class="num celda-cobrado-${doc.id}" data-num="${cobradoNum}" style="cursor:pointer;" title="Clic para poner lo cobrado" onclick="event.stopPropagation();editarCobrado('${doc.id}')">${cobradoLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('factura', doc.id, doc.estado_cobro, 'fact-')}</td><td class="celda-gestor-${doc.id}">${gestorPill}</td><td>${archivoHtml}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')"><svg class="ic ico-em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></td>`;
   const tbodyFact = document.getElementById('econ-facturas-tbody');
   if(tbodyFact) alPrincipio ? tbodyFact.prepend(row) : tbodyFact.appendChild(row);
 
@@ -10533,7 +10555,7 @@ function grFichaHtml(c){
   if(GR.fTab === 'resumen'){
     const m = grMejorAlt(c);
     let h = `<div class="fl-itv-hero ${d == null ? 'nd' : d < 0 ? 'mal' : d <= 60 ? 'aviso' : 'ok'}"><div><div class="pq">Coste al año</div><div class="gr-kpi" style="all:unset;"><b style="font-size:28px;font-weight:800;">${grAnual(c) ? grEur(grAnual(c)) : '—'}</b></div></div><div class="pq" style="margin-left:auto;text-align:right;font-size:13px;">${d == null ? 'sin fecha de renovación' : d < 0 ? 'renovó el ' + grFechaTxt(c.fecha_renovacion) : 'renueva ' + grFechaTxt(c.fecha_renovacion) + '<br>en ' + d + ' días'}</div></div>`;
-    h += `<div class="fl-sec"><h4>Datos</h4>${flKvHtml([['Proveedor', c.proveedor || '—'], ['Referencia', c.referencia || '—'], ['Afecta a', c.afecta_a || '—'], ['Importe', c.importe != null ? grEur(c.importe) + ' ' + (GR_PER_TXT[c.periodicidad] || '') : '—'], ['Desde', grFechaTxt(c.fecha_inicio)], ['Renovación', grFechaTxt(c.fecha_renovacion)], ['Se renueva sola', c.renovacion_automatica == null ? 'No consta' : c.renovacion_automatica ? 'Sí' : 'No'], ['Permanencia hasta', grFechaTxt(c.permanencia_hasta)], ['Preaviso', c.preaviso_dias ? c.preaviso_dias + ' días' : '—'], ['Estado', (GR_ESTADOS.find(x => x[0] === c.estado) || [])[1] || c.estado]])}</div>`;
+    h += `<div class="fl-nota" style="margin:0 0 8px;"><b>Fuente:</b> ${c.origen === 'manual' ? 'lo añadiste tú a mano' : c.origen ? 'detectado por el sistema (' + escHtml(String(c.origen).replace(/_/g, ' ')) + ')' : 'sin anotar'}${(c.documentos || []).length ? ' · ' + (c.documentos || []).length + ' documento(s) en la pestaña Docs' : ' · sin documento original'}.</div><div class="fl-sec"><h4>Datos</h4>${flKvHtml([['Proveedor', c.proveedor || '—'], ['Referencia', c.referencia || '—'], ['Afecta a', c.afecta_a || '—'], ['Importe', c.importe != null ? grEur(c.importe) + ' ' + (GR_PER_TXT[c.periodicidad] || '') : '—'], ['Desde', grFechaTxt(c.fecha_inicio)], ['Renovación', grFechaTxt(c.fecha_renovacion)], ['Se renueva sola', c.renovacion_automatica == null ? 'No consta' : c.renovacion_automatica ? 'Sí' : 'No'], ['Permanencia hasta', grFechaTxt(c.permanencia_hasta)], ['Preaviso', c.preaviso_dias ? c.preaviso_dias + ' días' : '—'], ['Estado', (GR_ESTADOS.find(x => x[0] === c.estado) || [])[1] || c.estado]])}</div>`;
     h += `<div class="fl-sec"><h4>¿Está en precio?</h4>`;
     h += v ? `<div style="font-size:14px;">El último importe pasó de <b>${grEur(v.desde)}</b> a <b>${grEur(v.hasta)}</b> (<span class="${v.pct > 0 ? 'gr-sube' : 'gr-baja'}">${grPct(v.pct)}</span>), ${v.anual > 0 ? 'unos ' + grEur0(v.anual) + ' más al año' : 'unos ' + grEur0(-v.anual) + ' menos al año'}.</div>` : `<div class="fl-vacio">${imps.length < 2 ? 'Todavía no hay dos importes para ver si ha subido.' : 'El importe no ha cambiado de forma apreciable.'}</div>`;
     h += m ? `<div class="gr-veredicto si"><b>Hay una alternativa más barata:</b> ${flE(m.a.proveedor)} cuesta ${grEur(m.s.coste)} al año: ahorras ${grEur(m.s.anual)} al año${m.s.cambio ? ' (' + grEur(m.s.primero) + ' el primer año, contando ' + grEur(m.s.cambio) + ' del cambio)' : ''}.</div>` : `<div class="gr-veredicto no">${alts.length ? 'Las alternativas anotadas no salen más baratas.' : 'Todavía no hay alternativas anotadas para comparar.'}</div>`;
@@ -15080,7 +15102,7 @@ function emRecorrer(raiz){
 (function(){   // regla de Daniel: nada de emojis en la interfaz; se cambian por iconos SVG (los que no tienen icono, se quitan)
   let cola = new Set(), prog = false;
   const lanzar = () => { prog = false; const l = Array.from(cola); cola = new Set(); l.forEach(n => { try{ if(n.isConnected !== false) emRecorrer(n); }catch(e){} }); };
-  const mo = new MutationObserver(ms => { ms.forEach(m => { if(m.type === 'characterData') cola.add(m.target); else m.addedNodes.forEach(n => cola.add(n)); }); if(!prog){ prog = true; requestAnimationFrame(lanzar); } });
+  const mo = new MutationObserver(ms => { ms.forEach(m => { if(m.type === 'characterData'){ cola.add(m.target); return; } m.addedNodes.forEach(n => { if(n.nodeType === 1 && (n.tagName === 'TR' || (n.id && /^(mcard|docrow|albrow|presrow)-/.test(n.id)))) return; cola.add(n); }); }); if(!prog){ prog = true; requestAnimationFrame(lanzar); } });
   const iniciar = () => { try{ emRecorrer(document.body); mo.observe(document.body, {childList: true, subtree: true, characterData: true}); }catch(e){ console.warn(e); } };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 })();
@@ -20700,7 +20722,7 @@ async function impCargarBanco(){
   if(!sb) return false;
   try{
     const anio = new Date().getFullYear(), desde = anio + '-01-01', hasta = anio + '-12-31';
-    const r1 = await sb.from('movimientos_banco').select('id,fecha,importe,estado,comercio,concepto,categoria,incluir_impuestos').gte('fecha', desde).lte('fecha', hasta).order('fecha', {ascending: true}).limit(5000);
+    const r1 = await sb.from('movimientos_banco').select('id,fecha,importe,estado,comercio,concepto,categoria,incluir_impuestos,origen').gte('fecha', desde).lte('fecha', hasta).order('fecha', {ascending: true}).limit(5000);
     const r2 = await sb.from('recibos_banco').select('id,fecha,importe,estado,contraparte,concepto,sentido').eq('estado', 'falta_factura').gte('fecha', desde).lte('fecha', hasta).order('fecha', {ascending: true}).limit(5000);
     if(r1.error || r2.error){ _impBanco.error = !_impBanco.cargado; return false; }
     _impBanco = {movs: r1.data || [], recibos: r2.data || [], cargado: true, error: false};
@@ -20717,7 +20739,7 @@ function impPendienteFactura(q, anio, D){
   const movsQ = (_impBanco.movs || []).filter(m => enQ(m.fecha));
   // si el trimestre tiene el extracto cargado se usa; si no, los recibos del banco que faltan factura
   const filas = movsQ.length
-    ? movsQ.filter(m => m.estado === 'falta_factura' && Number(m.importe) < 0).map(m => ({id: m.id, incl: m.incluir_impuestos === true, fecha: String(m.fecha).slice(0, 10), importe: -Number(m.importe), prov: m.categoria === 'combustible' ? 'Surtidores de Córdoba (gasoil)' : (m.comercio || m.concepto || 'Sin nombre'), det: m.categoria === 'combustible' ? '' : String(m.concepto || '')}))
+    ? movsQ.filter(m => m.estado === 'falta_factura' && Number(m.importe) < 0).map(m => ({id: m.id, origen: m.origen, incl: m.incluir_impuestos === true, fecha: String(m.fecha).slice(0, 10), importe: -Number(m.importe), prov: m.categoria === 'combustible' ? 'Surtidores de Córdoba (gasoil)' : (m.comercio || m.concepto || 'Sin nombre'), det: m.categoria === 'combustible' ? '' : String(m.concepto || '')}))
     : (_impBanco.recibos || []).filter(r => enQ(r.fecha) && r.sentido !== 'entrada').map(r => ({fecha: String(r.fecha).slice(0, 10), importe: Math.abs(Number(r.importe) || 0), prov: r.contraparte || r.concepto || 'Sin nombre', det: String(r.concepto || '')}));
   const grupos = lista => { const m = new Map(); lista.forEach(x => { const k = MAY(x.prov); if(!m.has(k)) m.set(k, {prov: k, items: [], total: 0}); const g = m.get(k); g.items.push(x); g.total += x.importe; }); return Array.from(m.values()).sort((a, b) => b.total - a.total); };
   const sinJust = ((D && D.gq) || []).filter(d => d.estado_justificante !== 'completo').map(d => ({fecha: String(d.dateRaw || '').slice(0, 10), importe: impTotalGasto(d), prov: d.client || 'Sin nombre', det: String(d.concepto || d.categoria || '')}));
@@ -20731,11 +20753,13 @@ let _impAbiertos = new Set();
 function impPill(t, k){ return `<span class="imp-pill ${k}">${escHtml(t)}</span>`; }
 function impFilaGasto(d, pills, acciones, extra){
   const mixto = impPct(d) < 1;
-  return `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}${pills || ''}</span><span class="mono">${impEur(impTotalGasto(d))}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratGasto(d))}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div>` +
+  return `<div class="ct-g ct-exp" onclick="impToggleFila(event, this)"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}${pills || ''}</span><span class="mono">${impEur(impTotalGasto(d))}<i class="ct-caret">▾</i></span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratGasto(d))}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div><div class="ct-det"><div class="ct-g2" style="margin-top:6px;"><b>Fuente:</b> ${escHtml(impFuenteTxt(d))}${impUrlArchivo(d) ? '' : ' Sin documento original.'}</div>` +
     (extra || `<div class="ct-g3">${mixto ? `Se deduce el <b>${impPctTxt(d)} %</b>: ` : ''}Gasto sin IVA <b>${impEur(impGastoDeducible(d))}</b> · IVA deducible <b>${impEur(impIvaDeducible(d))}</b></div>`) +
     (impCuentaEnOtro(d) ? `<div class="ct-g3" style="color:var(--orange);">Fecha del documento de otro trimestre: cuenta aquí. <a href="#" onclick="event.preventDefault();impAsignarPeriodo('${d.id}','${impPeriodoPropio(d).anio}-T${impPeriodoPropio(d).q}')">Devolverlo al ${impPeriodoPropio(d).q}T</a></div>` : '') +
-    `<div class="imp-acc">${impBtnArchivo(d)}${acciones || ''}</div>` + `</div>`;
+    `<div class="imp-acc">${impBtnArchivo(d)}${acciones || ''}</div>` + `</div></div>`;
 }
+function impToggleFila(ev, el){ if(ev && ev.target && ev.target.closest('button, a, .btn, input, select')) return; el.classList.toggle('abierta'); }
+function impFuenteTxt(d){ return impOrigenGasto(d) + (d.num || d.numero ? ' · Documento nº ' + (d.num || d.numero) + '.' : ''); }
 const impBtn = (t, js, k) => `<button type="button" class="btn ${k || ''}" onclick="${js}">${escHtml(t)}</button>`;
 function impUrlArchivo(d){ const r = d && (d.archivo_url || (d.archivo_path ? 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/' + d.archivo_path : null) || d.justificante_url); return r || null; }
 function impBtnArchivo(d){ return impUrlArchivo(d) ? `<button type="button" class="btn imp-arch" onclick="impVerArchivo('${d.id}')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8L13.5 4.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg>Archivo</button>` : `<span class="imp-pill no">Sin archivo</span>`; }
@@ -20758,7 +20782,8 @@ function impPintarApartados(q, anio, D){
   const suma = (arr, f) => arr.reduce((s, x) => s + f(x), 0), tot = arr => suma(arr, impTotalGasto);
   const fmt = f => f ? f.slice(8, 10) + '/' + f.slice(5, 7) : '';
   const filaB = (g, incluido) => { const ids = g.items.map(x => x.id).filter(Boolean), fechas = g.items.map(x => x.fecha).filter(Boolean).sort(), rango = fechas.length ? (fechas[0] === fechas[fechas.length - 1] ? fmt(fechas[0]) : fmt(fechas[0]) + ' a ' + fmt(fechas[fechas.length - 1])) : '';
-    return `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(g.prov)}${impPill(incluido ? 'Incluido, estimado' : 'No incluido: sin factura', incluido ? 'pend' : 'no')}</span><span class="mono n-warn">${impEur(g.total)}</span></div><div class="ct-g2">${g.items.length} ${g.items.length === 1 ? 'pago' : 'pagos'}${rango ? ' · ' + rango : ''}${incluido ? ' · IVA 21 % estimado' : ' · sin factura: no cuenta'}</div>${ids.length ? `<div class="imp-acc">${incluido ? impBtn('Quitar', `impPendDecision('${ids.join(',')}', false)`) : impBtn('Incluir', `impPendDecision('${ids.join(',')}', true)`, 'primary')}</div>` : ''}</div>`; };
+    const pagos = g.items.slice().sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).map(x => `<div class="ct-g3">${escHtml(fmt(x.fecha))} · <b>${impEur(x.importe)}</b>${x.det ? ' · ' + escHtml(MAY(x.det).slice(0, 56)) : ''}<br><span style="color:var(--ink-soft);">Fuente: ${x.origen === 'fintable' ? 'banco (Fintable)' : x.origen ? 'extracto del banco (Ruralvía)' : 'banco'}${x.id ? ' · movimiento ' + x.id : ''}. Sin documento: la factura aún no ha llegado.</span></div>`).join('');
+    return `<div class="ct-g ct-exp" onclick="impToggleFila(event, this)"><div class="ct-g1"><span class="ct-prov">${escHtml(g.prov)}${impPill(incluido ? 'Incluido, estimado' : 'No incluido: sin factura', incluido ? 'pend' : 'no')}</span><span class="mono n-warn">${impEur(g.total)}<i class="ct-caret">▾</i></span></div><div class="ct-g2">${g.items.length} ${g.items.length === 1 ? 'pago' : 'pagos'}${rango ? ' · ' + rango : ''}${incluido ? ' · IVA 21 % estimado' : ' · sin factura: no cuenta'}</div><div class="ct-det">${pagos}</div>${ids.length ? `<div class="imp-acc">${incluido ? impBtn('Quitar', `impPendDecision('${ids.join(',')}', false)`) : impBtn('Incluir', `impPendDecision('${ids.join(',')}', true)`, 'primary')}</div>` : ''}</div>`; };
   const filaJust = d => impFilaGasto(d, impPill('Incluido · falta justificante', 'pend'), '', null);
   const vacio = t => `<div class="empty" style="padding:12px;">${t}</div>`;
   const S = [
@@ -23850,6 +23875,8 @@ function openDocumentViewer(id){
   const urlOriginal = doc.archivo_url || (doc.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${doc.archivo_path}` : null);
   if(urlOriginal){ btnOriginal.dataset.url = urlOriginal; btnOriginal.style.display = ''; }
   else { btnOriginal.style.display = 'none'; }
+  { let fu = document.getElementById('ni-fuente'); if(!fu){ fu = document.createElement('div'); fu.id = 'ni-fuente'; fu.style.cssText = 'font-size:12px;color:var(--ink-soft);margin:4px 0 8px;line-height:1.4;'; btnOriginal.insertAdjacentElement('afterend', fu); }
+    try{ fu.textContent = 'Fuente: ' + impOrigenGasto(doc) + (urlOriginal ? '' : ' Sin documento original.'); }catch(e){ fu.textContent = ''; } }
   document.getElementById('ni-otras-acciones').innerHTML = accionesDocumento(doc).filter(x=>x.t!=='Editar' && x.t!=='Imprimir' && !x.t.startsWith('Pasar a') && !x.t.startsWith('← Volver a')).map(x=>`<button type="button" class="btn sm" onclick="${x.fn}">${x.t}</button>`).join('');
   // PASAR A… — desplegable único con la transición principal preseleccionada
   {
@@ -25015,7 +25042,7 @@ async function cargarDocumentosEconomicosReales(){
         row.dataset.contabilidad = doc.contabilidad || 'oficial'; row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum; row.dataset.tipo = doc.tipo;
         document.getElementById('econ-presupuestos-tbody')?.appendChild(row);
         const baseRowHtmlStandalone = baseRowHtml.replace(estadoPill, estadoPillStandalone);
-        const rowHtml = `<td onclick="event.stopPropagation();"><input type="checkbox" class="pres-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('pres-sel-chk','pres-borrar-sel-btn','pres-sel-count')"></td>` + baseRowHtmlStandalone + `<td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
+        const rowHtml = `<td onclick="event.stopPropagation();"><input type="checkbox" class="pres-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('pres-sel-chk','pres-borrar-sel-btn','pres-sel-count')"></td>` + baseRowHtmlStandalone + `<td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')"><svg class="ic ico-em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></td>`;
         const row2 = document.createElement('tr'); row2.id = 'presrow-'+doc.id; row2.onclick = () => toggleExpandirDocFila(doc.id, 11); row2.innerHTML = rowHtml;
         row2.dataset.contabilidad = doc.contabilidad || 'oficial'; row2.dataset.fechaIso = doc.fecha_devengo || ''; row2.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row2.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row2.dataset.total = totalNum; row2.dataset.tipo = doc.tipo;
         document.getElementById('presupuestos-tbody-standalone')?.appendChild(row2);
@@ -25041,7 +25068,7 @@ async function cargarDocumentosEconomicosReales(){
         row.id = 'albrow-'+doc.id;
         row.onclick = () => toggleExpandirDocFila(doc.id, 10);
         row.dataset.fechaIso = doc.fecha_devengo || ''; row.dataset.anio = doc.fecha_devengo ? doc.fecha_devengo.slice(0,4) : ''; row.dataset.trimestre = doc.fecha_devengo ? String(Math.floor((Number(doc.fecha_devengo.slice(5,7))-1)/3)+1) : ''; row.dataset.total = totalNum;
-        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="alb-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('alb-sel-chk','alb-borrar-sel-btn','alb-sel-count')"></td><td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}</td><td class="col-texto" title="${(entidad?.name||'').replace(/"/g,'&quot;')}">${clienteHtmlA}</td><td class="mono col-texto" title="${(trabajo?.code||'').replace(/"/g,'&quot;')}">${trabajoHtmlA}</td><td class="num" data-num="${totalNum}">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('albaran', doc.id, doc.estado_cobro, 'alb-')}</td><td>${archivoHtmlA}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')">🗑</span></td>`;
+        row.innerHTML = `<td onclick="event.stopPropagation();"><input type="checkbox" class="alb-sel-chk" data-id="${doc.id}" onchange="actualizarSeleccionDoc('alb-sel-chk','alb-borrar-sel-btn','alb-sel-count')"></td><td class="mono">${fechaCortaA}</td><td class="mono">${doc.numero||'—'}</td><td class="col-texto" title="${(entidad?.name||'').replace(/"/g,'&quot;')}">${clienteHtmlA}</td><td class="mono col-texto" title="${(trabajo?.code||'').replace(/"/g,'&quot;')}">${trabajoHtmlA}</td><td class="num" data-num="${totalNum}">${amountLabel}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect('albaran', doc.id, doc.estado_cobro, 'alb-')}</td><td>${archivoHtmlA}</td><td onclick="event.stopPropagation();">${calidadColumnaHtml(doc)}</td><td onclick="event.stopPropagation();" style="text-align:center;"><span style="cursor:pointer;color:var(--red);font-weight:800;" title="Borrar" onclick="borrarUnDocumento('${doc.id}')"><svg class="ic ico-em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></td>`;
         document.getElementById('albaranes-tbody-standalone')?.appendChild(row);
         // Tarjeta móvil — misma estructura que Facturas
         row._mkCard = () => { construirCardMovil(doc, 'albaran', 'alb-lista-movil', 'alb-sel-chk', amountLabel, fechaCortaA, entidad, trabajo, archivoUrlRealA, calidadCorta(doc)); return document.getElementById('mcard-'+doc.id); };
