@@ -3713,7 +3713,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.15</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.16</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3803,7 +3803,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.15</div>
+        <div class="sub" id="version-badge">V7.16</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18173,7 +18173,7 @@ async function borrarPendientesSeleccionados(grupo){
 // en revisarClientesAuto Y en cargarDatosReales para que persistan al recargar
 function actualizarPanelesSinActividad(){
   // antes usaba una variable `entidades` que no existe aquí (fallaba en cada carga); se parte de los clientes ya cargados
-  const entidades = (typeof clientes !== 'undefined' ? clientes : []).map(c=>({id:c.id, nombre:c.name, clase_nombre:c.clase_nombre||''}));
+  const entidades = (typeof clientes !== 'undefined' ? clientes : []).filter(c=>c.type!=='Proveedor').map(c=>({id:c.id, nombre:c.name, clase_nombre:c.clase_nombre||''}));   // sin proveedores
   if(!entidades.length || !documentosRealesById) return;
 
   // Falsos clientes (nombre parece dirección)
@@ -18189,11 +18189,20 @@ function actualizarPanelesSinActividad(){
         <div style="flex:1;min-width:0;">
           <div class="cli-pend-nombre">${svgEsc(e.nombre||'')}</div>
           <div class="cli-pend-problema">El nombre parece una dirección — revisar qué cliente real corresponde</div>
+          <div class="sosp-arch" data-ent="${e.id}"></div>
           <div class="cli-pend-sugerencias" style="margin-top:6px;">
             <button class="btn" onclick="openClientDrawer('${(e.nombre||'').replace(/'/g,"\'")}')">Ver ficha</button>
           </div>
         </div>
       </div>`).join('');
+    // el archivo del que salió cada nombre sospechoso (puede ser un documento antiguo que la web aún no tiene cargado): se pide a la base
+    bodyFalsos && bodyFalsos.querySelectorAll('.sosp-arch[data-ent]').forEach(async el => {
+      try{
+        const {data} = await sb.from('documentos_economicos').select('id,tipo,numero,archivo_path,archivo_url,justificante_url').eq('entidad_id', el.dataset.ent).is('deleted_at', null).limit(5);
+        const docs = (data || []).filter(d => fteUrl(d));
+        el.innerHTML = docs.length ? docs.map(d => fteHtml(decodeURIComponent(String(d.archivo_path || d.archivo_url || '').split('/').pop()) || 'Documento', fteUrl(d))).join('') : '<div class="fte"><span class="fte-t">Sin archivo de origen</span></div>';
+      }catch(err){ el.innerHTML = ''; }
+    });
   }
 
   // Sin actividad: sin documentos con importe/número/fecha
@@ -18350,6 +18359,7 @@ function cliExtraOk(c, f){
   return true;
 }
 function cliPasa(c, S, q, salvo){   // S = {tipo: Set, prio: Set, extra: Set}; "salvo" deja fuera un grupo (para contar sus pastillas)
+  if(c.type === 'Proveedor') return false;   // los proveedores no son clientes (Daniel 02/10/2026): no salen en Clientes
   if(q){ const campo = [c.name, c.nif, c.telefono, c.email, c.poblacion, c.direccion].join(' ').toLowerCase(); if(!campo.includes(q)) return false; }
   if(salvo !== 'tipo' && S.tipo.size && !S.tipo.has((c.type || '').toLowerCase())) return false;
   if(salvo !== 'prio' && S.prio.size && !S.prio.has(c.prio || 'media')) return false;
