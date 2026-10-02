@@ -2244,7 +2244,14 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .ct-caret{font-style:normal;margin-left:8px;color:var(--ink-soft);display:inline-block;transition:transform .15s;}
 .ct-exp.abierta .ct-caret{transform:rotate(180deg);}
 .imp-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
-.imp-acc .btn{font-size:12.5px;padding:7px 12px;}
+.imp-acc .btn, .imp-tard-b .btn{background:none !important;border:0 !important;box-shadow:none !important;padding:4px 2px !important;min-height:0 !important;height:auto !important;color:var(--orange) !important;font-weight:800 !important;font-size:14px !important;border-radius:0 !important;text-decoration:none;}
+.imp-acc .btn:active, .imp-tard-b .btn:active{opacity:.6;}
+.imp-acc{gap:18px;}
+.fte{font-size:12px;line-height:1.4;color:var(--ink-soft);margin-top:8px;text-align:left;font-weight:400;white-space:normal;}
+.fte b, .fte a, .fte-lnk{color:var(--orange);font-weight:800;text-decoration:none;}
+.fte b{margin-right:4px;}
+.fl-card .fte, .gr-card .fte, .machine-card .fte{grid-column:1 / -1;width:100%;flex-basis:100%;}
+.fl-card, .gr-card{flex-wrap:wrap;}
 .imp-acc .btn.imp-arch{display:inline-flex;align-items:center;gap:6px;}
 .imp-acc .btn.imp-arch svg{width:15px;height:15px;}
 .imp-tard-b .btn.imp-arch{display:inline-flex;align-items:center;gap:6px;}
@@ -3663,7 +3670,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.100</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.101</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3753,7 +3760,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.100</div>
+        <div class="sub" id="version-badge">V6.101</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8303,7 +8310,7 @@ function gastoCardHtml(d, modo){
   }else{
     pie += `<span class="gasto-gestor">${gestorPillHtml(d.id, !!d.enviado_gestor, d.enviado_gestor_fecha)}</span>`;
   }
-  return `<div class="gasto-card">
+  return `<div class="gasto-card" data-doc-id="${escHtml(d.id)}">
     <div class="gasto-cab">${cat}${d.confianza_extraccion === 'alta' ? '<span class="gasto-auto">leído por plantilla</span>' : ''}</div>
     <div class="gasto-prov">${escHtml(prov)}</div>
     <div class="gasto-concepto">${escHtml(d.concepto || '')}</div>
@@ -8534,7 +8541,7 @@ function renderGastosProCombustible(){
 function tarjetaSencillaGasto(d){
   const eur = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
   const prov = (clientes.find(c => c.id === d.entidad_id) || {}).name || d.client || '—';
-  return `<div class="gm-card"><div class="gm-cab"><b>${escHtml(d.concepto || '—')}</b><b>${escHtml(eur(d.importe || d.total))}</b></div>
+  return `<div class="gm-card" data-doc-id="${escHtml(d.id)}"><div class="gm-cab"><b>${escHtml(d.concepto || '—')}</b><b>${escHtml(eur(d.importe || d.total))}</b></div>
     <div class="gm-linea">${escHtml(prov)}</div>${d.recurrencia ? `<div class="gm-linea"><span class="pill mantenimiento">${escHtml(d.recurrencia)}</span></div>` : ''}</div>`;
 }
 // Tipos de gasto para el filtro de la lista (antes eran pestañas: Seguros, Préstamos, Efectivo, Banco, Recurrentes)
@@ -10116,7 +10123,7 @@ function renderProyectosTable(){
     </tr>`).join('') || '<tr><td colspan="6" class="empty">No hay proyectos en curso.</td></tr>';
   const lista = document.getElementById('proyectos-lista-movil');
   if(lista) lista.innerHTML = proyectosCache.map(p=>`
-    <div class="exp-card-movil">
+    <div class="exp-card-movil" data-fte="Proyecto creado a mano el ${formatFechaCorta(p.creado_at)}. Sin documento original.">
       <div>${estadoTag(p)}</div>
       <div class="exp-titulo">${clienteDe(p)}</div>
       <div class="exp-desc">${p.descripcion}</div>
@@ -10337,7 +10344,7 @@ function renderFlotaDocumentacion(){   // pestaña Documentación: un resumen po
   cont.innerHTML = fleet.map(m => {
     const docs = m.documentos || [], por = {}; docs.forEach(d => { const g = flDocGrupo(d.nombre); por[g] = (por[g] || 0) + 1; });
     const chips = FL_DOC_ORDEN.filter(g => por[g]).map(g => `<span class="fl-chip">${flE(g.replace('Identificación y fichas', 'Fichas').replace('Facturas y taller', 'Facturas'))} ${por[g]}</span>`).join('');
-    return `<button type="button" class="fl-card" style="margin-bottom:8px;" onclick="abrirFichaMaquina('${m.id}');flCambiarTab('docs')"><div class="fl-ico">${flIcono(m)}</div><div class="fl-card-cuerpo"><div style="display:flex;gap:8px;justify-content:space-between;align-items:flex-start;"><div style="min-width:0;"><div class="fl-nombre">${flE(m.modelo || m.name)}</div><div class="fl-modelo">${flE(m.clase || m.type || '')}</div>${m.matricula ? `<div style="margin-top:4px;"><span class="fl-placa">${flE(m.matricula)}</span></div>` : ''}</div><span class="fl-chip ${docs.length ? '' : 'nd'}" style="flex:0 0 auto;">📎 ${docs.length}</span></div><div class="fl-fila">${chips || '<span class="fl-vacio" style="padding:0;">Sin documentos adjuntos</span>'}</div></div></button>`;
+    return `<button type="button" class="fl-card" data-flota-id="${m.id}" style="margin-bottom:8px;" onclick="abrirFichaMaquina('${m.id}');flCambiarTab('docs')"><div class="fl-ico">${flIcono(m)}</div><div class="fl-card-cuerpo"><div style="display:flex;gap:8px;justify-content:space-between;align-items:flex-start;"><div style="min-width:0;"><div class="fl-nombre">${flE(m.modelo || m.name)}</div><div class="fl-modelo">${flE(m.clase || m.type || '')}</div>${m.matricula ? `<div style="margin-top:4px;"><span class="fl-placa">${flE(m.matricula)}</span></div>` : ''}</div><span class="fl-chip ${docs.length ? '' : 'nd'}" style="flex:0 0 auto;">📎 ${docs.length}</span></div><div class="fl-fila">${chips || '<span class="fl-vacio" style="padding:0;">Sin documentos adjuntos</span>'}</div></div></button>`;
   }).join('') || '<div class="fl-vacio">Todavía no hay máquinas.</div>';
 }
 function flIncFiltro(g, v){ _flIncF[g] = v; flIncRender(); }
@@ -15106,6 +15113,69 @@ function emRecorrer(raiz){
   const iniciar = () => { try{ emRecorrer(document.body); mo.observe(document.body, {childList: true, subtree: true, characterData: true}); }catch(e){ console.warn(e); } };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 })();
+
+// ===== FUENTE Y ARCHIVO EN TODAS LAS TARJETAS (regla de Daniel): cada tarjeta dice de dónde sale su información y enseña «Archivo» si hay documento original =====
+const FTE_SEL = '.factura-card-movil, .gasto-card, .gm-card, .cliente-card, .correo-row, .exp-card-movil, .fl-card, .machine-card, .gr-card, .inbox-row, .ai-sug-card, .notif-card, .rb-card, .tarifa-card, .tb-card, .emp-card, .inc-card';
+const fteUrl = d => d && (d.archivo_url || (d.archivo_path ? 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/' + d.archivo_path : null) || d.justificante_url || null);
+const fteFecha = v => { try{ const x = new Date(v); return isNaN(x) ? '' : x.toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric'}); }catch(e){ return ''; } };
+function fteDeDocumento(d){ return d ? {txt: impOrigenGasto(d), url: fteUrl(d)} : null; }
+function fteDeCliente(id){
+  const docs = Object.values(documentosRealesById).filter(d => d.entidad_id === id && d.created_at).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  const cli = (typeof clientes !== 'undefined' ? clientes : []).find(x => x.id === id);
+  if(docs.length){ const d = docs[0], tp = {factura: 'Factura', albaran: 'Albarán', presupuesto: 'Presupuesto', proforma: 'Proforma', gasto: 'Gasto'}[d.type] || 'Documento'; return {txt: `Datos de su primer documento: ${tp} nº ${d.num || d.numero || 's/n'} del ${fteFecha(d.dateRaw || d.created_at)} (${docs.length} en total).`, url: fteUrl(d)}; }
+  return {txt: `Ficha creada a mano${cli && cli.created_at ? ' el ' + fteFecha(cli.created_at) : ''}. Sin documento original.`, url: null};
+}
+function fteDeTrabajo(id){
+  const docs = Object.values(documentosRealesById).filter(d => d.trabajo_id === id && d.created_at).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  const j = (typeof _tbJobs !== 'undefined' ? _tbJobs : []).find(x => x.id === id) || (typeof jobs !== 'undefined' ? jobs : []).find(x => x.id === id);
+  if(docs.length){ const d = docs[0], tp = {factura: 'la factura', albaran: 'el albarán', presupuesto: 'el presupuesto', proforma: 'la proforma'}[d.type] || 'un documento'; return {txt: `Seguimiento desde ${tp} nº ${d.num || d.numero || 's/n'} del ${fteFecha(d.dateRaw || d.created_at)}.`, url: fteUrl(d)}; }
+  return {txt: `Trabajo creado a mano${j && j.created_at ? ' el ' + fteFecha(j.created_at) : ''}. Sin documento original.`, url: null};
+}
+function fteDeFlota(id){
+  const m = (typeof fleet !== 'undefined' ? fleet : []).concat(typeof flotaVendida !== 'undefined' ? flotaVendida : []).find(x => x.id === id); if(!m) return null;
+  const docs = Array.isArray(m.documentos) ? m.documentos : [];
+  if(docs.length){ const d = docs.find(x => /permiso|ficha/i.test(x.nombre || '')) || docs[0]; return {txt: `Ficha del vehículo: ${docs.length} documento(s) archivados (${String(d.nombre || 'documento').slice(0, 48)}…).`, url: d.url || null}; }
+  return {txt: 'Ficha escrita a mano. Sin documento original.', url: null};
+}
+function fteDeContrato(id){
+  const c = (typeof GR !== 'undefined' && GR.contratos ? GR.contratos : []).find(x => x.id === id); if(!c) return null;
+  const docs = Array.isArray(c.documentos) ? c.documentos : [];
+  return {txt: c.origen === 'manual' ? 'Contrato añadido a mano.' : c.origen ? 'Detectado por el sistema (' + String(c.origen).replace(/_/g, ' ') + ').' : 'Origen sin anotar.', url: docs.length ? (docs[docs.length - 1].url || null) : null};
+}
+function fteResolver(el){
+  const q = s => el.querySelector(s), oc = (el.getAttribute('onclick') || '') + ' ' + [...el.querySelectorAll('[onclick]')].slice(0, 6).map(x => x.getAttribute('onclick')).join(' ');
+  const uuid = (oc.match(/['"]([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})['"]/i) || [])[1];
+  if(el.matches('.factura-card-movil')) return fteDeDocumento(documentosRealesById[el.dataset.docId]);
+  if(el.matches('.gasto-card, .gm-card')) return fteDeDocumento(documentosRealesById[el.dataset.docId || (q('[data-id]') || {dataset: {}}).dataset.id]);
+  if(el.matches('.cliente-card')){ const id = (q('.cc-chk') || {dataset: {}}).dataset.id; return id ? fteDeCliente(id) : null; }
+  if(el.matches('.tb-card')) return fteDeTrabajo(el.dataset.id);
+  if(el.matches('.fl-card, .machine-card')) return fteDeFlota(el.dataset.flotaId || uuid);
+  if(el.matches('.gr-card')) return fteDeContrato(uuid);
+  if(el.matches('.correo-row')){ const r = (q('.correo-row-remitente') || {}).textContent || ''; return {txt: `Correo recibido en el Gmail de la empresa${r.trim() ? ' de ' + r.trim().slice(0, 50) : ''}.`, url: null}; }
+  if(el.matches('.inbox-row')){ const d = (typeof documentosCache !== 'undefined' ? documentosCache : []).find(x => String(x.id) === String((el.getAttribute('onclick') || '').match(/\((\d+)/)?.[1] || el.dataset.inboxId)); const s = (q('.inbox-src') || {}).textContent || ''; return {txt: `Entradas: ${s.replace(/\s+/g, ' ').trim() || 'documento'} recibido${d && d.created_at ? ' el ' + fteFecha(d.created_at) : ''}${d && d.sender ? ' de ' + d.sender : ''}.`, url: d ? (d.file_url || null) : null}; }
+  if(el.matches('.rb-card')) return {txt: 'Recibo del banco: aviso de Caja Rural recibido por correo.', url: null};
+  if(el.matches('.notif-card')) return {txt: el.dataset.fte || 'Aviso generado por el motor del sistema.', url: null};
+  if(el.matches('.exp-card-movil')) return el.dataset.fte ? {txt: el.dataset.fte, url: el.dataset.fteUrl || null} : {txt: 'Registro creado a mano en la web. Sin documento original.', url: (q('[data-url]') || {dataset: {}}).dataset.url || null};
+  if(el.matches('.tarifa-card')) return {txt: 'Tu lista de tarifas (precio fijado a mano). Sin documento original.', url: null};
+  if(el.matches('.ai-sug-card')) return {txt: 'Propuesta del sistema calculada con los datos de la propia web.', url: null};
+  return null;
+}
+function fteAplicar(el){
+  if(!el || el.dataset.fteOk) return; if(el.closest('tbody, table') && !el.matches('.tb-card')) return;
+  let r = null; try{ r = fteResolver(el); }catch(e){ return; } if(!r) return;
+  el.dataset.fteOk = '1';
+  const d = document.createElement('div'); d.className = 'fte';
+  d.innerHTML = '<b>Fuente</b> ' + escHtml(r.txt) + (r.url ? ' <a href="' + escHtml(r.url) + '" class="fte-lnk" onclick="event.stopPropagation()">Archivo</a>' : '');
+  el.appendChild(d);
+}
+function fteRecorrer(raiz){ if(!raiz || raiz.nodeType !== 1) return; if(raiz.matches && raiz.matches(FTE_SEL)) fteAplicar(raiz); raiz.querySelectorAll && raiz.querySelectorAll(FTE_SEL).forEach(fteAplicar); }
+(function(){
+  let cola = new Set(), prog = false;
+  const lanzar = () => { prog = false; const l = Array.from(cola); cola = new Set(); l.forEach(n => { try{ if(n.isConnected) fteRecorrer(n); }catch(e){} }); };
+  const mo = new MutationObserver(ms => { ms.forEach(m => m.addedNodes.forEach(n => { if(n.nodeType === 1 && n.tagName !== 'TR') cola.add(n); })); if(cola.size && !prog){ prog = true; requestAnimationFrame(lanzar); } });
+  const iniciar = () => { try{ fteRecorrer(document.body); mo.observe(document.body, {childList: true, subtree: true}); }catch(e){ console.warn(e); } };
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
+})();
 const FL_SVG = {
   camion: '<path d="M2 6h11v9H2z"/><path d="M13 9h4l3 3v3h-7z"/><circle cx="6" cy="17" r="1.8"/><circle cx="16.5" cy="17" r="1.8"/>',
   coche: '<path d="M4 15v-3l2-4h12l2 4v3z"/><path d="M4 15h16"/><circle cx="7.5" cy="16.5" r="1.7"/><circle cx="16.5" cy="16.5" r="1.7"/>',
@@ -15193,7 +15263,7 @@ function renderFleetGrid(){
     const cia = flCompania(R); if(cia) ch.push(`<span class="fl-chip">Seguro ${flE(cia)}</span>`);
     if(R.ivtm) ch.push(`<span class="fl-chip ${R.ivtm.pagado ? 'ok' : 'aviso'}">IVTM ${R.ivtm.anio}${R.ivtm.pagado ? ' ✓' : ''}</span>`);
     const nd = (m.documentos || []).length; if(nd) ch.push(`<span class="fl-chip">📎 ${nd}</span>`);
-    return `<button type="button" class="fl-card" onclick="abrirFichaMaquina('${m.id || ''}')">
+    return `<button type="button" class="fl-card" data-flota-id="${m.id || ''}" onclick="abrirFichaMaquina('${m.id || ''}')">
       <div class="fl-ico">${flIcono(m)}</div>
       <div class="fl-card-cuerpo">
         <div style="display:flex;gap:8px;justify-content:space-between;align-items:flex-start;"><div style="min-width:0;"><div class="fl-nombre">${flE(m.modelo || m.name)}</div><div class="fl-modelo">${flE(m.clase || m.type || m.name)}</div></div>${pill(m.state, true)}</div>
@@ -15458,7 +15528,7 @@ function renderNotificaciones(lista){
       const accion = svgEsc((n.accion_realizada||'Acción del motor').slice(0,70));
       const cliente = n.elemento_nombre ? svgEsc(n.elemento_nombre.slice(0,40)) : '';
       const etiquetaBtn = (n.elemento_tipo==='albaran' || (n.elemento_tipo==='documento_economico' && n.elemento_subtipo==='albaran')) ? '👁 Ver cambios' : n.elemento_tipo==='trabajo' ? '💼 Abrir' : 'Ver';
-      return `<div class="notif-card ${n.leida?'':'no-leida'}">
+      return `<div class="notif-card ${n.leida?'':'no-leida'}" data-fte="${svgEsc('Aviso generado por ' + (n.origen === 'banco' ? 'la sincronización del banco' : n.origen === 'correo' ? 'el importador del correo' : n.origen === 'motor_entradas' ? 'el motor de Entradas' : 'el sistema') + ' el ' + fechaHora + '.')}">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
           <div class="nc-accion" style="flex:1;font-size:13px;font-weight:${n.leida?'400':'600'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${accion}</div>
           <div class="nc-hora" style="flex-shrink:0;font-size:11px;color:var(--ink-soft);">${fechaHora}</div>
@@ -18308,7 +18378,7 @@ function renderExpedientesTabla(){
   `).join('') || '<tr><td colspan="8" class="empty">Sin expedientes todavía</td></tr>';
   const lista = document.getElementById('expedientes-lista-movil');
   if(lista) lista.innerHTML = rows.map(e=>`
-    <div class="exp-card-movil">
+    <div class="exp-card-movil" data-fte="Oferta o petición del Ayuntamiento de Fuente Obejuna${e.fecha ? ' del ' + escHtml(e.fecha) : ''}." data-fte-url="${escHtml(urlArchivo(e) || '')}">
       <div>${pill(e.estado)}</div>
       <div class="exp-titulo">${escHtml(e.titulo||'Sin título')}</div>
       <div class="exp-sub">Ayuntamiento de Fuente Obejuna${e.fecha ? ' · '+escHtml(e.fecha) : ''}</div>
@@ -20482,6 +20552,8 @@ function impOrigenGasto(d){   // de dónde sale un gasto: cómo entró, quién l
   const porCorreo = d.metodo_extraccion === 'pdf_correo' || /\/CORREO\//i.test(ruta) || /^correo\//i.test(ruta) || cli.origen === 'correo';
   const desdeWeb = !porCorreo && (/^sin-clasificar\//i.test(ruta) || d.metodo_extraccion === 'manual');
   const doc = ruta ? (/\.pdf$/i.test(ruta) ? 'PDF' : 'foto') : 'sin archivo';
+  if(/^EXCAVACIONES-GOMEZ\/ECONOMIA\/\d{4}\//i.test(ruta) && !porCorreo) return `Importado del archivo histórico (${decodeURIComponent(ruta.split('/').pop() || '')}), registrado el ${cuando}.`;
+  if(!ruta && !porCorreo) return `Creado a mano en la web el ${cuando}.`;
   if(porCorreo) return `Llegó por el correo (${doc}${cli.remitente ? ' de ' + cli.remitente : ''}) y lo registró Claude el ${cuando}.`;
   if(desdeWeb) return `Lo subiste tú desde la web (${doc}) el ${cuando}.`;
   return `Registrado el ${cuando} (${d.metodo_extraccion || 'origen sin anotar'}).`;
