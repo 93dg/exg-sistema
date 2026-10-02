@@ -1291,7 +1291,7 @@ html.visor-abierto, html.visor-abierto body{overflow:hidden;}
 .gasto-cab:empty{display:none;}
 .gasto-auto{font-size:11px;color:var(--green);}
 .gasto-prov{font-weight:700;font-size:15px;overflow-wrap:anywhere;}
-.gasto-concepto{font-size:13px;color:var(--ink-soft);overflow-wrap:anywhere;}
+.gasto-concepto{font-size:13px;color:var(--ink-soft);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .gasto-meta{font-size:12.5px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .gasto-motivo{font-size:12.5px;color:var(--orange);font-weight:600;}
 .gasto-tot{display:flex;gap:16px;justify-content:flex-end;align-items:flex-end;margin-top:4px;}
@@ -2251,7 +2251,8 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .fte-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .fte-lnk{flex:0 0 auto;color:var(--orange);font-weight:800;font-size:13px;text-decoration:none;}
 .fl-card .fte, .gr-card .fte{flex:1 0 100%;}
-.factura-card-movil > .fte{grid-column:2 / -1;grid-row:8;}   /* la tarjeta de documento es una cuadrícula con zonas fijas: la línea va debajo de todas */
+.factura-card-movil > .fte{grid-column:2 / -1;grid-row:8;}
+.cliente-card > .fte, .tarifa-card > .fte, .exp-card-movil > .fte{grid-column:1 / -1;flex:1 0 100%;}   /* la tarjeta de documento es una cuadrícula con zonas fijas: la línea va debajo de todas */
 .fl-card, .gr-card{flex-wrap:wrap;}
 .imp-acc .btn.imp-arch{display:inline-flex;align-items:center;gap:6px;}
 .imp-acc .btn.imp-arch svg{width:15px;height:15px;}
@@ -3671,7 +3672,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.102</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.103</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3761,7 +3762,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.102</div>
+        <div class="sub" id="version-badge">V6.103</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4774,7 +4775,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
 
       <div class="client-tabs" id="gpro-subtabs">
         <div class="client-tab active" data-sub="resumen">Resumen</div>
-        <div class="client-tab" data-sub="lista">Gastos</div>
+        <div class="client-tab" data-sub="lista">Lista</div>
         <div class="client-tab" data-sub="control">Control</div>
         <div class="client-tab" data-sub="combustible">Combustible</div>
         <div class="client-tab" data-sub="prestamos">Préstamos</div>
@@ -10124,7 +10125,7 @@ function renderProyectosTable(){
     </tr>`).join('') || '<tr><td colspan="6" class="empty">No hay proyectos en curso.</td></tr>';
   const lista = document.getElementById('proyectos-lista-movil');
   if(lista) lista.innerHTML = proyectosCache.map(p=>`
-    <div class="exp-card-movil" data-fte="Proyecto creado a mano el ${formatFechaCorta(p.creado_at)}. Sin documento original.">
+    <div class="exp-card-movil" data-fte="A mano">
       <div>${estadoTag(p)}</div>
       <div class="exp-titulo">${clienteDe(p)}</div>
       <div class="exp-desc">${p.descripcion}</div>
@@ -10406,6 +10407,8 @@ const GR_PER = {mensual: 12, bimestral: 6, trimestral: 4, semestral: 2, anual: 1
 const GR_PER_TXT = {mensual: 'al mes', bimestral: 'cada 2 meses', trimestral: 'al trimestre', semestral: 'al semestre', anual: 'al año', otra: 'cada vez'};
 const GR_ESTADOS = [['activo', 'Activo'], ['por_confirmar', 'Por confirmar'], ['en_revision', 'En revisión'], ['cancelado', 'Cancelado']];
 let GR = {cargado: false, contratos: [], importes: {}, alts: {}, banco: [], flota: [], tab: 'resumen', fCat: 'todas', fEst: 'vigentes', fichaId: null, fTab: 'resumen', nuevo: false, ignorados: []};
+try{ const _p = JSON.parse(localStorage.getItem('gr_posicion') || 'null'); if(_p){ GR.tab = ['resumen', 'contratos', 'detectados'].includes(_p.tab) ? _p.tab : GR.tab; GR.fCat = _p.fCat || GR.fCat; GR.fEst = _p.fEst || GR.fEst; } }catch(e){}
+function grGuardarPosicion(){ try{ localStorage.setItem('gr_posicion', JSON.stringify({tab: GR.tab, fCat: GR.fCat, fEst: GR.fEst})); }catch(e){} }
 try{ GR.ignorados = JSON.parse(localStorage.getItem('gr_ignorados') || '[]'); }catch(e){}
 const grSvg = i => `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${i}</svg>`;
 const grCat = k => GR_CATS.find(x => x[0] === k) || GR_CATS[GR_CATS.length - 1];
@@ -10453,6 +10456,8 @@ async function cargarGastosRec(){
 function grTab(t){ GR.tab = t; document.querySelectorAll('#gr-tabs .docs-tab').forEach(b => b.classList.toggle('active', b.dataset.gr === t)); grRender(); window.scrollTo(0, 0); }
 function grRender(){
   const cu = document.getElementById('gr-cuerpo'); if(!cu) return;
+  grGuardarPosicion();
+  document.querySelectorAll('#gr-tabs .docs-tab').forEach(b => b.classList.toggle('active', b.dataset.gr === GR.tab));
   if(!GR.cargado){ cu.innerHTML = '<div class="fl-vacio">Cargando…</div>'; return; }
   cu.innerHTML = GR.tab === 'resumen' ? grResumenHtml() : GR.tab === 'contratos' ? grContratosHtml() : grDetectadosHtml();
   if(GR.fichaId !== null || GR.nuevo) grRenderFicha();
@@ -15041,7 +15046,8 @@ async function visorPintar(soloZoom){
     c.innerHTML = '<div class="visor-msg">Abriendo…</div>';
     const im = new Image(); im.alt = ''; im.className = 'visor-img'; im.style.width = (_visorZoom * 100) + '%';
     im.onload = () => { c.innerHTML = ''; c.appendChild(im); };
-    im.onerror = () => { c.innerHTML = '<div class="visor-msg">No se puede enseñar este archivo aquí. Usa el botón de descargar.</div>'; };
+    im.onerror = () => { visorSinVista(c); };
+    if(/\.(xlsx?|docx?|pptx?|csv|odt|ods)$/i.test(decodeURIComponent(String(_visorUrl).split('?')[0]))){ c.innerHTML = ''; const f = document.createElement('iframe'); f.className = 'visor-marco'; f.src = 'https://view.officeapp.live.com/op/embed.aspx?src=' + encodeURIComponent(_visorUrl); c.appendChild(f); const d = document.createElement('div'); d.className = 'visor-msg'; d.innerHTML = 'Si no se ve, <a href="#" class="fte-lnk" onclick="event.preventDefault();visorDescargar()">Descargar</a>'; c.appendChild(d); return; }
     im.src = _visorUrl; return;
   }
   try{
@@ -15071,6 +15077,7 @@ function visorCargarPdfJs(){
   });
   return _visorPdfJs;
 }
+function visorSinVista(c){ c.innerHTML = '<div class="visor-msg">Este archivo no se puede ver aquí. <a href="#" class="fte-lnk" onclick="event.preventDefault();visorDescargar()">Descargar</a></div>'; }
 async function visorDescargar(){
   try{ const r = await fetch(_visorUrl), b = await r.blob(), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = decodeURIComponent(String(_visorUrl).split('?')[0].split('/').pop() || 'documento'); document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
   catch(e){ mostrarToast('No se pudo descargar', 'err'); }
@@ -15167,7 +15174,9 @@ function fteAplicar(el){
   if(r.url) el.querySelectorAll('.fc-ver-original').forEach(x => { if(x.closest('.gasto-adjuntos') || x.closest('.exp-adjuntos')) return; x.remove(); });
   el.querySelectorAll('.fc-extra').forEach(x => { if(!x.children.length) x.remove(); });
   el.querySelectorAll('.gasto-pie').forEach(x => { if(!x.children.length && !x.textContent.trim()) x.remove(); });
-  const tpl = document.createElement('template'); tpl.innerHTML = fteHtml(r.txt, r.url); el.appendChild(tpl.content.firstChild);
+  const tpl = document.createElement('template'); tpl.innerHTML = fteHtml(r.txt, r.url);
+  const dest = el.matches('.tb-card') ? (el.querySelector('.tb-cuerpo') || el) : el;   // la tarjeta de trabajo es una cuadrícula (cuerpo, ✕, ✓): la línea va dentro del cuerpo
+  dest.appendChild(tpl.content.firstChild);
 }
 function fteRecorrer(raiz){ if(!raiz || raiz.nodeType !== 1) return; if(raiz.matches && raiz.matches(FTE_SEL)) fteAplicar(raiz); raiz.querySelectorAll && raiz.querySelectorAll(FTE_SEL).forEach(fteAplicar); }
 (function(){
@@ -15529,7 +15538,7 @@ function renderNotificaciones(lista){
       const accion = svgEsc((n.accion_realizada||'Acción del motor').slice(0,70));
       const cliente = n.elemento_nombre ? svgEsc(n.elemento_nombre.slice(0,40)) : '';
       const etiquetaBtn = (n.elemento_tipo==='albaran' || (n.elemento_tipo==='documento_economico' && n.elemento_subtipo==='albaran')) ? '👁 Ver cambios' : n.elemento_tipo==='trabajo' ? '💼 Abrir' : 'Ver';
-      return `<div class="notif-card ${n.leida?'':'no-leida'}" data-fte="${svgEsc('Aviso generado por ' + (n.origen === 'banco' ? 'la sincronización del banco' : n.origen === 'correo' ? 'el importador del correo' : n.origen === 'motor_entradas' ? 'el motor de Entradas' : 'el sistema') + ' el ' + fechaHora + '.')}">
+      return `<div class="notif-card ${n.leida?'':'no-leida'}" data-fte="${svgEsc(n.origen === 'banco' ? 'Banco' : n.origen === 'correo' ? 'Correo' : n.origen === 'motor_entradas' ? 'Entradas' : 'Sistema')}">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
           <div class="nc-accion" style="flex:1;font-size:13px;font-weight:${n.leida?'400':'600'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${accion}</div>
           <div class="nc-hora" style="flex-shrink:0;font-size:11px;color:var(--ink-soft);">${fechaHora}</div>
@@ -18379,7 +18388,7 @@ function renderExpedientesTabla(){
   `).join('') || '<tr><td colspan="8" class="empty">Sin expedientes todavía</td></tr>';
   const lista = document.getElementById('expedientes-lista-movil');
   if(lista) lista.innerHTML = rows.map(e=>`
-    <div class="exp-card-movil" data-fte="Oferta o petición del Ayuntamiento de Fuente Obejuna${e.fecha ? ' del ' + escHtml(e.fecha) : ''}." data-fte-url="${escHtml(urlArchivo(e) || '')}">
+    <div class="exp-card-movil" data-fte="Ayuntamiento" data-fte-url="${escHtml(urlArchivo(e) || '')}">
       <div>${pill(e.estado)}</div>
       <div class="exp-titulo">${escHtml(e.titulo||'Sin título')}</div>
       <div class="exp-sub">Ayuntamiento de Fuente Obejuna${e.fecha ? ' · '+escHtml(e.fecha) : ''}</div>
@@ -20547,33 +20556,15 @@ function impGastosTardios(q, anio){
   return impGastosOficiales().filter(d => !d.periodo_fiscal && !impMotivoExclusion(d) && impFecha(d.dateRaw) && impFecha(d.dateRaw) < iniQ && impFecha(d.dateRaw).getFullYear() === anio && impFecha(d.created_at) && impFecha(d.created_at) >= iniQ)
     .sort((a, b) => String(a.dateRaw || '').localeCompare(String(b.dateRaw || '')));
 }
-function impOrigenGasto(d){   // de dónde sale un gasto, en corto: Correo · 01/10, Subido por ti · 29/09, Histórico, A mano · 02/10
-  const alta = d.created_at ? new Date(d.created_at) : null, dia = alta && !isNaN(alta) ? String(alta.getDate()).padStart(2, '0') + '/' + String(alta.getMonth() + 1).padStart(2, '0') : '';
+function impOrigenGasto(d){   // de dónde sale un gasto, en una o dos palabras
   const ruta = String(d.archivo_path || ''), cli = d.cliente_datos_doc || {};
   const porCorreo = d.metodo_extraccion === 'pdf_correo' || /\/CORREO\//i.test(ruta) || /^correo\//i.test(ruta) || cli.origen === 'correo';
   const desdeWeb = !porCorreo && (/^sin-clasificar\//i.test(ruta) || d.metodo_extraccion === 'manual' || d.metodo_extraccion === 'foto_entrada');
   if(/^EXCAVACIONES-GOMEZ\/ECONOMIA\/\d{4}\//i.test(ruta) && !porCorreo) return 'Histórico';
-  if(!ruta && !porCorreo) return 'A mano' + (dia ? ' · ' + dia : '');
-  if(porCorreo) return 'Correo' + (dia ? ' · ' + dia : '');
-  if(desdeWeb) return 'Subido por ti' + (dia ? ' · ' + dia : '');
-  return (d.metodo_extraccion || 'Sin anotar') + (dia ? ' · ' + dia : '');
-}
-async function impAsignarPeriodo(id, periodo){
-  const d = documentosRealesById[id]; if(!d || !sb) return;
-  try{
-    const {error} = await sb.from('documentos_economicos').update({periodo_fiscal: periodo}).eq('id', id);
-    if(error){ mostrarToast('No se pudo guardar: ' + errText(error), 'err'); return; }
-    d.periodo_fiscal = periodo; renderImpuestos();
-  }catch(e){ mostrarToast('No se pudo guardar: ' + errText(e), 'err'); }
-}
-async function impAsignarTodos(periodo){
-  const q = _impQ || (Math.floor(new Date().getMonth()/3)+1), lista = impGastosTardios(q, new Date().getFullYear());
-  if(!lista.length || !sb) return;
-  try{
-    const {error} = await sb.from('documentos_economicos').update({periodo_fiscal: periodo}).in('id', lista.map(d => d.id));
-    if(error){ mostrarToast('No se pudo guardar: ' + errText(error), 'err'); return; }
-    lista.forEach(d => { d.periodo_fiscal = periodo; }); mostrarToast(`${lista.length} gasto(s) contados en el ${q}T ✓`, 'ok'); renderImpuestos();
-  }catch(e){ mostrarToast('No se pudo guardar: ' + errText(e), 'err'); }
+  if(!ruta && !porCorreo) return 'A mano';
+  if(porCorreo) return 'Correo';
+  if(desdeWeb) return 'Subido web';
+  return d.metodo_extraccion || 'Sin anotar';
 }
 function impPendIncluidos(q, anio, acumulado){   // pagos del banco sin factura que se han incluido a mano en el cálculo (estimado, con IVA 21 %)
   const ini = acumulado ? anio + '-01-01' : anio + '-' + String((q-1)*3 + 1).padStart(2, '0') + '-01', fd = new Date(anio, q*3, 0), fin = anio + '-' + String(fd.getMonth() + 1).padStart(2, '0') + '-' + String(fd.getDate()).padStart(2, '0');
@@ -20824,14 +20815,14 @@ function impPendienteFactura(q, anio, D){
 let _impAbiertos = new Set();
 function impPill(t, k){ return `<span class="imp-pill ${k}">${escHtml(t)}</span>`; }
 function impFilaGasto(d, pills, acciones, extra){
-  const mixto = impPct(d) < 1;
-  return `<div class="ct-g ct-exp" onclick="impToggleFila(event, this)"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}${pills || ''}</span><span class="mono">${impEur(impTotalGasto(d))}<i class="ct-caret">▾</i></span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratGasto(d))}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div><div class="ct-det">${fteHtml(impFuenteTxt(d), impUrlArchivo(d))}` +
+  const mixto = impPct(d) < 1, txtPills = String(pills || '').replace(/<[^>]+>/g, ''), motivo = /no es|inversi|en b/i.test(txtPills);   // plegada solo se ve la pastilla que dice el motivo de no incluir
+  return `<div class="ct-g ct-exp" onclick="impToggleFila(event, this)"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}${motivo ? pills : ''}</span><span class="mono">${impEur(impTotalGasto(d))}<i class="ct-caret">▾</i></span></div><div class="ct-det">${!motivo && pills ? '<div style="margin-top:6px;">' + pills + '</div>' : ''}<div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratGasto(d))}${d.concepto ? ' · ' + escHtml(String(d.concepto).slice(0, 90)) : ''}</div>${fteHtml(impFuenteTxt(d), impUrlArchivo(d))}` +
     (extra || `<div class="ct-g3">${mixto ? `Se deduce el <b>${impPctTxt(d)} %</b>: ` : ''}Gasto sin IVA <b>${impEur(impGastoDeducible(d))}</b> · IVA deducible <b>${impEur(impIvaDeducible(d))}</b></div>`) +
     (impCuentaEnOtro(d) ? `<div class="ct-g3" style="color:var(--orange);">Fecha del documento de otro trimestre: cuenta aquí. <a href="#" onclick="event.preventDefault();impAsignarPeriodo('${d.id}','${impPeriodoPropio(d).anio}-T${impPeriodoPropio(d).q}')">Devolverlo al ${impPeriodoPropio(d).q}T</a></div>` : '') +
     (acciones ? `<div class="imp-acc">${acciones}</div>` : '') + `</div></div>`;
 }
 function impToggleFila(ev, el){ if(ev && ev.target && ev.target.closest('button, a, .btn, input, select')) return; el.classList.toggle('abierta'); }
-function impFuenteTxt(d){ return impOrigenGasto(d) + (d.num || d.numero ? ' · nº ' + (d.num || d.numero) : ''); }
+function impFuenteTxt(d){ return impOrigenGasto(d); }
 const impBtn = (t, js, k) => `<button type="button" class="btn ${k || ''}" onclick="${js}">${escHtml(t)}</button>`;
 function impUrlArchivo(d){ const r = d && (d.archivo_url || (d.archivo_path ? 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/' + d.archivo_path : null) || d.justificante_url); return r || null; }
 function impBtnArchivo(d){ return impUrlArchivo(d) ? `<button type="button" class="btn imp-arch" onclick="impVerArchivo('${d.id}')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8L13.5 4.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg>Archivo</button>` : `<span class="imp-pill no">Sin archivo</span>`; }
@@ -20860,7 +20851,7 @@ function impPintarApartados(q, anio, D){
   const vacio = t => `<div class="empty" style="padding:12px;">${t}</div>`;
   const S = [
     {id: 'ing', t: 'Ingresos', n: D.fq.length, nota: 'Facturas emitidas: IVA repercutido.', total: suma(D.fq, d => d.total),
-      html: D.fq.length ? D.fq.slice().sort((a, b) => String(b.dateRaw||'').localeCompare(String(a.dateRaw||''))).map(d => `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(d.num ? 'Nº ' + d.num : 'Sin número')} · ${escHtml(d.client || '—')}</span><span class="mono">${impEur(d.total)}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratFactura(d))}${d.estado_cobro === 'cobrado' ? ' · cobrada' : ' · sin cobrar'}</div><div class="ct-g3">Base <b>${impEur(impBaseFactura(d))}</b> · IVA <b>${impEur(impIvaFactura(d))}</b></div></div>`).join('') : vacio('Ninguna factura en este trimestre.')},
+      html: D.fq.length ? D.fq.slice().sort((a, b) => String(b.dateRaw||'').localeCompare(String(a.dateRaw||''))).map(d => `<div class="ct-g ct-exp" onclick="impToggleFila(event, this)"><div class="ct-g1"><span class="ct-prov">${escHtml(d.num ? 'Nº ' + d.num : 'Sin número')} · ${escHtml(d.client || '—')}</span><span class="mono">${impEur(d.total)}<i class="ct-caret">▾</i></span></div><div class="ct-det"><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratFactura(d))}${d.estado_cobro === 'cobrado' ? ' · cobrada' : ' · sin cobrar'}</div><div class="ct-g3">Base <b>${impEur(impBaseFactura(d))}</b> · IVA <b>${impEur(impIvaFactura(d))}</b></div><div class="fte"><span class="fte-t">Fuente · Emitida aquí</span><a href="#" class="fte-lnk" onclick="event.preventDefault();event.stopPropagation();${impUrlArchivo(d) ? 'visorAbrir(\'' + impUrlArchivo(d) + '\', \'Factura ' + escHtml(d.num || '') + '\')' : 'imprimirDocumento(\'' + d.id + '\')'}">Archivo</a></div></div></div>`).join('') : vacio('Ninguna factura en este trimestre.')},
     {id: 'inc', t: 'Gastos', n: incl.length, total: tot(incl), nota: 'Cuentan al 100 % y van al gestor.',
       html: incl.length ? ordena(incl).map(d => impFilaGasto(d, impPill('Incluido', 'ok'), impBtn('Uso mixto 50 %', `impPorcentaje('${d.id}', 50)`))).join('') : vacio('Ningún gasto en este apartado.')},
     {id: 'mix', t: 'Mixtos', n: mixtos.length, total: tot(mixtos), nota: 'Uso mixto (Audi): se deduce solo una parte del gasto y del IVA.',
