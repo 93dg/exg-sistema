@@ -3630,7 +3630,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.92</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.93</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3718,7 +3718,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.92</div>
+        <div class="sub" id="version-badge">V6.93</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -20387,8 +20387,18 @@ function impMotivoExclusion(d){
 }
 function impGastosTardios(q, anio){
   const iniQ = new Date(anio, (q-1)*3, 1);
-  return impGastosOficiales().filter(d => !d.periodo_fiscal && !impMotivoExclusion(d) && impFecha(d.dateRaw) && impFecha(d.dateRaw) < iniQ && impFecha(d.created_at) && impFecha(d.created_at) >= iniQ)
+  return impGastosOficiales().filter(d => !d.periodo_fiscal && !impMotivoExclusion(d) && impFecha(d.dateRaw) && impFecha(d.dateRaw) < iniQ && impFecha(d.dateRaw).getFullYear() === anio && impFecha(d.created_at) && impFecha(d.created_at) >= iniQ)
     .sort((a, b) => String(a.dateRaw || '').localeCompare(String(b.dateRaw || '')));
+}
+function impOrigenGasto(d){   // de dónde sale un gasto: cómo entró, quién lo registró y cuándo
+  const alta = d.created_at ? new Date(d.created_at) : null, cuando = alta && !isNaN(alta) ? alta.toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit'}) + ' a las ' + alta.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'}) : '';
+  const ruta = String(d.archivo_path || ''), cli = d.cliente_datos_doc || {};
+  const porCorreo = d.metodo_extraccion === 'pdf_correo' || /\/CORREO\//i.test(ruta) || /^correo\//i.test(ruta) || cli.origen === 'correo';
+  const desdeWeb = !porCorreo && (/^sin-clasificar\//i.test(ruta) || d.metodo_extraccion === 'manual');
+  const doc = ruta ? (/\.pdf$/i.test(ruta) ? 'PDF' : 'foto') : 'sin archivo';
+  if(porCorreo) return `Llegó por el correo (${doc}${cli.remitente ? ' de ' + cli.remitente : ''}) y lo registró Claude el ${cuando}.`;
+  if(desdeWeb) return `Lo subiste tú desde la web (${doc}) el ${cuando}.`;
+  return `Registrado el ${cuando} (${d.metodo_extraccion || 'origen sin anotar'}).`;
 }
 async function impAsignarPeriodo(id, periodo){
   const d = documentosRealesById[id]; if(!d || !sb) return;
@@ -20570,9 +20580,9 @@ function renderImpuestos(q){
   // antes de cerrar
   const inc = ini > hoy ? [] : impIncidencias(q, anio, D, c130);
   const tard = ini > hoy ? [] : impGastosTardios(q, anio), perTxt = `${anio}-T${q}`;
-  const tardHtml = tard.length ? `<details class="imp-tard" open><summary><span class="ic">!</span> ${tard.length} gasto(s) con fecha de un trimestre anterior, registrados ahora (${impEur(tard.reduce((s, d) => s + impTotalGasto(d), 0))}): ¿cuentan en el ${q}T?</summary>
+  const tardHtml = tard.length ? `<details class="imp-tard" open><summary><span class="ic">!</span> ${tard.length} gasto(s) de un trimestre anterior de ${anio}, registrados ahora (${impEur(tard.reduce((s, d) => s + impTotalGasto(d), 0))}): ¿cuentan en el ${q}T?</summary>
       <div style="margin:6px 0 4px;"><button type="button" class="btn primary" style="font-size:12.5px;padding:7px 12px;" onclick="impAsignarTodos('${perTxt}')">Contar todos en el ${q}T</button></div>` +
-      tard.map(d => { const o = impPeriodoPropio(d); return `<div class="ct-g" style="padding:8px 0;"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}</span><span class="mono">${impEur(impTotalGasto(d))}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(d.categoria || 'Sin categoría')}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div><div class="imp-tard-b"><button type="button" class="btn primary" onclick="impAsignarPeriodo('${d.id}','${perTxt}')">Contar en el ${q}T</button><button type="button" class="btn" onclick="impAsignarPeriodo('${d.id}','${o.anio}-T${o.q}')">Dejar en el ${o.q}T</button></div></div>`; }).join('') +
+      tard.map(d => { const o = impPeriodoPropio(d); return `<div class="ct-g" style="padding:8px 0;"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}</span><span class="mono">${impEur(impTotalGasto(d))}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(d.categoria || 'Sin categoría')}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div><div class="ct-g2" style="margin-top:3px;font-size:11.5px;"><b>Origen:</b> ${escHtml(impOrigenGasto(d))}</div><div class="imp-tard-b"><button type="button" class="btn primary" onclick="impAsignarPeriodo('${d.id}','${perTxt}')">Contar en el ${q}T</button><button type="button" class="btn" onclick="impAsignarPeriodo('${d.id}','${o.anio}-T${o.q}')">Dejar en el ${o.q}T</button></div></div>`; }).join('') +
       `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:6px;line-height:1.45;">El IVA de una factura se deduce en el trimestre en que se recibe y registra. Si el ${tard[0] ? impPeriodoPropio(tard[0]).q : ''}T ya se presentó sin ella, cuéntala aquí. El IRPF (130) es acumulado del año, así que no cambia.</div></details>` : '';
   $('imp-estado-tit').textContent = futuro ? 'Trimestre sin empezar' : (inc.length || tard.length) ? 'Antes de cerrar' : 'Trimestre preparado';
   $('imp-estado').innerHTML = ini > hoy ? '<div class="imp-inc ok"><span class="ic">·</span><span>Sin documentos todavía.</span></div>'
