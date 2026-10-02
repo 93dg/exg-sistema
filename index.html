@@ -446,6 +446,8 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .pill.porconfirmar, .pill.encurso, .pill.mantenimiento, .pill.revisar, .pill.pendiente_cobrar, .pill.en_proceso{background:var(--yellow-soft);color:#8A6100;}
 .pill.planificado, .pill.confirmado, .pill.presentado, .pill.enviado, .pill.trabajando, .pill.parcial, .pill.entregado{background:var(--blue-soft);color:var(--blue);}
 .pill.terminado, .pill.cobrado, .pill.disponible, .pill.validado, .pill.adjudicado{background:var(--green-soft);color:var(--green);}
+.pill.taller{background:var(--yellow-soft);color:#6F4E00;}
+.pill.vendida{background:var(--concrete);color:var(--ink-soft);}
 .pill.facturado{background:#E4DEF7;color:#5A3FA0;}
 .pill.rectificativa{background:#F7E4DE;color:#A0553F;}
 .pill.nula{background:var(--concrete-2);color:var(--ink-soft);text-decoration:line-through;}
@@ -676,6 +678,10 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .fl-card{display:flex;gap:12px;align-items:flex-start;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:12px;cursor:pointer;text-align:left;width:100%;font-family:inherit;color:inherit;}
 .fl-card:active{background:var(--concrete);}
 .fl-ico{flex:0 0 44px;height:44px;border-radius:14px;background:var(--concrete);display:flex;align-items:center;justify-content:center;font-size:24px;}
+.fl-ico svg{width:26px;height:26px;}
+.fl-estado{display:flex;gap:8px;flex-wrap:wrap;}
+.fl-estado button{padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;}
+.fl-estado button.act{background:var(--asphalt);border-color:var(--asphalt);color:#fff;}
 .fl-card-cuerpo{flex:1;min-width:0;}
 .fl-nombre{font-weight:700;font-size:14.5px;line-height:1.25;}
 .fl-modelo{font-size:12px;color:var(--ink-soft);margin-top:1px;}
@@ -3597,7 +3603,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.87</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.88</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3685,7 +3691,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.87</div>
+        <div class="sub" id="version-badge">V6.88</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5966,10 +5972,10 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
           </div>
           <div class="field" style="margin-bottom:12px;"><div class="l">Maquinaria necesaria</div>
             <div class="accessory-grid" id="nj-machine-grid">
-              <label class="accessory-chip"><input type="checkbox" value="Retroexcavadora (Rafa)"> Retroexcavadora (Rafa)</label>
-              <label class="accessory-chip"><input type="checkbox" value="Retroexcavadora (Manolo)"> Retroexcavadora (Manolo)</label>
+              <label class="accessory-chip"><input type="checkbox" value="Mixta (Rafa)"> Mixta (Rafa)</label>
+              <label class="accessory-chip"><input type="checkbox" value="Mixta (Manolo)"> Mixta (Manolo)</label>
               <label class="accessory-chip"><input type="checkbox" value="Excavadora giratoria"> Excavadora giratoria</label>
-              <label class="accessory-chip"><input type="checkbox" value="Motoniveladora"> Motoniveladora</label>
+              <label class="accessory-chip"><input type="checkbox" value="Niveladora"> Niveladora</label>
               <label class="accessory-chip"><input type="checkbox" value="Camión"> Camión</label>
             </div>
           </div>
@@ -10308,7 +10314,7 @@ async function cargarHistorialFlota(){
   try{
     const {data,error} = await sb.from('flota').select('*').eq('estado','vendida').order('created_at',{ascending:false});
     if(error||!data) return;
-    flotaVendida = data.map(m => ({id: m.id, name: m.nombre, type: m.tipo || '', state: 'vendida', matricula: m.matricula || '', fichaTecnica: m.ficha_tecnica || '', documentos: m.documentos || []}));
+    flotaVendida = data.map(m => ({id: m.id, name: m.nombre, type: m.tipo || '', modelo: m.modelo || '', clase: m.clase || '', state: 'vendida', matricula: m.matricula || '', fichaTecnica: m.ficha_tecnica || '', documentos: m.documentos || []}));
     const cont = document.getElementById('flota-historial-cards');
     if(!cont) return;
     cont.innerHTML = data.length ? data.map(m=>{
@@ -10318,7 +10324,7 @@ async function cargarHistorialFlota(){
       const resultHtml = result !== null ? `<b style="color:${result>=0?'var(--green)':'var(--red)'};">${result>=0?'+':''}${flEur(result)}</b>` : '<b>—</b>';
       const f = flotaVendida.find(x => x.id === m.id), nd = (m.documentos || []).length;
       return `<div class="fl-hist">
-        <div style="display:flex;gap:10px;align-items:flex-start;"><div class="fl-ico">${flIcono(f)}</div><div style="flex:1;min-width:0;"><div class="fl-nombre">${flE(m.nombre)}</div><div class="fl-modelo">${flE(m.tipo||'')}</div><div class="fl-fila">${m.matricula ? `<span class="fl-placa">${flE(m.matricula)}</span>` : ''}${nd ? `<span class="fl-chip">📎 ${nd}</span>` : ''}</div></div><span class="pill cancelado pill-sm">Vendida</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start;"><div class="fl-ico">${flIcono(f)}</div><div style="flex:1;min-width:0;"><div class="fl-nombre">${flE(m.modelo || m.nombre)}</div><div class="fl-modelo">${flE(m.clase || m.tipo || '')}</div><div class="fl-fila">${m.matricula ? `<span class="fl-placa">${flE(m.matricula)}</span>` : ''}${nd ? `<span class="fl-chip">📎 ${nd}</span>` : ''}</div></div><span class="pill cancelado pill-sm">Vendida</span></div>
         <div class="fl-hist-money"><div><span>Compra</span><b>${compra}</b></div><div><span>Venta</span><b>${venta}</b></div><div><span>Resultado</span>${resultHtml}</div></div>
         ${m.notas_historial ? `<div class="fl-hist-notas">${flE(m.notas_historial)}</div>` : ''}
         <div class="fl-hist-acc"><button type="button" class="btn sm" onclick="abrirFichaMaquina('${m.id}')">Ver ficha</button><button type="button" class="btn sm" onclick="editarHistorialFlota('${m.id}','coste_compra')">✏️ Coste compra</button><button type="button" class="btn sm" onclick="editarHistorialFlota('${m.id}','precio_venta')">✏️ Precio venta</button></div>
@@ -10780,7 +10786,7 @@ function openEntryDrawer(src, title){
 function closeEntryDrawer(){ document.getElementById('entry-overlay').classList.remove('active'); }
 
 let jobs = [];
-const stateLabels = {posible:'Posible trabajo', pendiente:'Pendiente de fecha', planificado:'Planificado', porconfirmar:'Por confirmar con el cliente', confirmado:'Confirmado', encurso:'En curso', terminado:'Terminado', facturado:'Facturado', cobrado:'Cobrado', cancelado:'Cancelado'};
+const stateLabels = {disponible:'Operativa', averiada:'Averiada', taller:'En taller', vendida:'Vendida', posible:'Posible trabajo', pendiente:'Pendiente de fecha', planificado:'Planificado', porconfirmar:'Por confirmar con el cliente', confirmado:'Confirmado', encurso:'En curso', terminado:'Terminado', facturado:'Facturado', cobrado:'Cobrado', cancelado:'Cancelado'};
 const jobStates = ['posible','pendiente','planificado','porconfirmar','confirmado','encurso','terminado','facturado','cobrado','cancelado'];
 
 function pill(state,sm){ return `<span class="pill ${state}${sm?' pill-sm':''}">${stateLabels[state]||state}</span>`; }
@@ -14883,9 +14889,18 @@ function flDias(f){ if(!f) return null; const h = new Date(); h.setHours(0, 0, 0
 const flEstadoDias = d => d == null ? 'nd' : d < 0 ? 'mal' : d <= 60 ? 'aviso' : 'ok';
 const flTextoDias = d => d == null ? '' : d < 0 ? 'vencida hace ' + (-d) + (-d === 1 ? ' día' : ' días') : d === 0 ? 'vence hoy' : 'en ' + d + (d === 1 ? ' día' : ' días');
 const flFechaCorta = f => f ? String(f.getDate()).padStart(2, '0') + '/' + String(f.getMonth() + 1).padStart(2, '0') + '/' + String(f.getFullYear()).slice(-2) : '';
+const FL_SVG = {
+  camion: '<path d="M2 6h11v9H2z"/><path d="M13 9h4l3 3v3h-7z"/><circle cx="6" cy="17" r="1.8"/><circle cx="16.5" cy="17" r="1.8"/>',
+  coche: '<path d="M4 15v-3l2-4h12l2 4v3z"/><path d="M4 15h16"/><circle cx="7.5" cy="16.5" r="1.7"/><circle cx="16.5" cy="16.5" r="1.7"/>',
+  mixta: '<circle cx="7" cy="17" r="2.6"/><circle cx="15" cy="17" r="1.8"/><path d="M4 14V8h6l2 3h4"/><path d="M15 11l5-5 2 2"/><path d="M20 6l-1 4"/>',
+  giratoria: '<rect x="3" y="15" width="11" height="4" rx="2"/><path d="M5 15v-4h6v4"/><path d="M10 11l5-6 4 2"/><path d="M19 7l-1 5h3z"/>',
+  niveladora: '<circle cx="5.5" cy="17" r="2"/><circle cx="11" cy="17" r="2"/><circle cx="19" cy="17" r="2"/><path d="M3 15V9h5v6"/><path d="M8 12h11"/><path d="M19 12v3"/>',
+  rulo: '<circle cx="6.5" cy="16" r="3.5"/><circle cx="17.5" cy="16" r="3.5"/><path d="M9 12V8h6v4"/><path d="M6.5 12H4"/>'
+};
 function flIcono(m){
-  const t = (m.name + ' ' + m.type).toLowerCase();
-  return /cami[oó]n|iveco/.test(t) ? '🚛' : /coche|audi|nissan|hyundai|galloper|turismo|x-trail/.test(t) ? '🚗' : /niveladora/.test(t) ? '🚧' : /rulo|compactador/.test(t) ? '🛞' : '🚜';
+  const t = ((m.clase || '') + ' ' + (m.modelo || '') + ' ' + (m.name || '') + ' ' + (m.type || '')).toLowerCase();
+  const k = /niveladora/.test(t) ? 'niveladora' : /rulo|compactador/.test(t) ? 'rulo' : /mixta|retro|case 580/.test(t) ? 'mixta' : /giratoria|excavadora|terex|liebherr/.test(t) ? 'giratoria' : /cami[oó]n|iveco/.test(t) ? 'camion' : /coche|audi|nissan|hyundai|galloper|turismo|todoterreno|x-trail/.test(t) ? 'coche' : 'mixta';
+  return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${FL_SVG[k]}</svg>`;
 }
 function flGrupo(k){
   if(/asientos|plazas|neum[aá]ticos|reforma|observaciones|kilometraje|modelo|compra|coste|pendiente|itv|ficha t[eé]cnica|vendido/i.test(k)) return 'otros';
@@ -14964,7 +14979,7 @@ function renderFleetGrid(){
     return `<button type="button" class="fl-card" onclick="abrirFichaMaquina('${m.id || ''}')">
       <div class="fl-ico">${flIcono(m)}</div>
       <div class="fl-card-cuerpo">
-        <div style="display:flex;gap:8px;justify-content:space-between;align-items:flex-start;"><div style="min-width:0;"><div class="fl-nombre">${flE(m.name)}</div><div class="fl-modelo">${flE(m.type)}</div></div>${pill(m.state, true)}</div>
+        <div style="display:flex;gap:8px;justify-content:space-between;align-items:flex-start;"><div style="min-width:0;"><div class="fl-nombre">${flE(m.modelo || m.name)}</div><div class="fl-modelo">${flE(m.clase || m.type || m.name)}</div></div>${pill(m.state, true)}</div>
         <div class="fl-fila">${m.matricula ? `<span class="fl-placa">${flE(m.matricula)}</span>` : ''}${ch.join('')}</div>
       </div></button>`;
   }).join('');
@@ -15011,6 +15026,7 @@ function renderFichaMaquina(){
   if(_flTab === 'resumen'){
     if(R.proxima) h += `<div class="fl-itv-hero ${R.proxima.estado}"><div><div class="pq">${flE(R.proxima.base)}</div><div class="gr">${flE(R.proxima.txt.length ? String(R.proxima.f.getDate()).padStart(2, '0') + '/' + String(R.proxima.f.getMonth() + 1).padStart(2, '0') + '/' + R.proxima.f.getFullYear() : '')}</div></div><div class="pq" style="margin-left:auto;text-align:right;font-size:13px;">${flTextoDias(R.proxima.d)}</div></div>`;
     else h += `<div class="fl-itv-hero nd"><div><div class="pq">ITV</div><div class="gr" style="font-size:18px;">Sin fecha de próxima ITV</div></div></div>`;
+    h += `<div class="fl-sec"><h4>Estado</h4><div class="fl-estado">${[['disponible', 'Operativa'], ['averiada', 'Averiada'], ['taller', 'En taller'], ['vendida', 'Vendida']].map(([k, l]) => `<button type="button" class="${(m.state === k || (k === 'disponible' && m.state === 'activo')) ? 'act' : ''}" onclick="flCambiarEstado('${m.id}', '${k}')">${l}</button>`).join('')}</div></div>`;
     const tiles = (R.titulo ? [['Descripción', R.titulo]] : []).concat(flResumenPares(R)); const cia = flCompania(R);
     if(cia) tiles.push(['Seguro', cia]);
     if(R.ivtm) tiles.push(['IVTM ' + R.ivtm.anio, R.ivtm.importe + ' €' + (R.ivtm.pagado ? ' · pagado ' + R.ivtm.pagado : ' · sin pagar')]);
@@ -15057,10 +15073,10 @@ function renderFichaMaquina(){
   } else if(_flTab === 'docs'){
     h += flDocsHtml(m) + `<label class="btn primary" style="cursor:pointer;display:flex;justify-content:center;margin-top:4px;">📎 Adjuntar documento<input type="file" accept="image/*,application/pdf" style="display:none;" onchange="subirDocMaquina('${m.id}',this)"></label><div class="sub-t" id="mq-status-${m.id}" style="margin-top:6px;"></div>`;
   } else {
-    h += `<div class="fl-sec"><h4>Editar</h4><div class="field" style="margin-bottom:10px;"><div class="l">Nombre de la máquina</div><input class="search-box" style="width:100%;" id="mq-nombre-${m.id}" value="${flE(m.name)}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Tipo o modelo</div><input class="search-box" style="width:100%;" id="mq-tipo-${m.id}" value="${flE(m.type)}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Matrícula</div><input class="search-box mono" style="width:100%;" id="mq-matricula-${m.id}" value="${flE(m.matricula)}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Ficha técnica (texto completo)</div><textarea class="search-box" style="width:100%;height:220px;font-family:'IBM Plex Mono',monospace;font-size:12px;" id="mq-ficha-${m.id}">${flE(m.fichaTecnica)}</textarea></div><button class="btn primary" style="width:100%;" onclick="guardarFichaMaquinaInline('${m.id}')">Guardar</button><div class="sub-t" id="mq-status-${m.id}" style="margin-top:6px;"></div></div>`;
+    h += `<div class="fl-sec"><h4>Editar</h4><div class="field" style="margin-bottom:10px;"><div class="l">Nombre de la máquina</div><input class="search-box" style="width:100%;" id="mq-nombre-${m.id}" value="${flE(m.name)}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Modelo (sale arriba en la tarjeta)</div><input class="search-box" style="width:100%;" id="mq-modelo-${m.id}" value="${flE(m.modelo || '')}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Lo que es (sale debajo: Mixta, Niveladora, Turismo…)</div><input class="search-box" style="width:100%;" id="mq-clase-${m.id}" value="${flE(m.clase || '')}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Matrícula</div><input class="search-box mono" style="width:100%;" id="mq-matricula-${m.id}" value="${flE(m.matricula)}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Ficha técnica (texto completo)</div><textarea class="search-box" style="width:100%;height:220px;font-family:'IBM Plex Mono',monospace;font-size:12px;" id="mq-ficha-${m.id}">${flE(m.fichaTecnica)}</textarea></div><button class="btn primary" style="width:100%;" onclick="guardarFichaMaquinaInline('${m.id}')">Guardar</button><div class="sub-t" id="mq-status-${m.id}" style="margin-top:6px;"></div></div>`;
     h += `<div class="fl-sec"><h4>Texto original</h4><details><summary style="cursor:pointer;color:var(--ink-soft);font-size:12.5px;">Ver el texto completo tal como está guardado</summary><pre class="fl-pre">${flE(m.fichaTecnica || '(vacío)')}</pre></details><button type="button" class="btn sm" style="margin-top:10px;" onclick="copiarFichaMaquinaInline('${m.id}')">📋 Copiar la ficha completa</button></div>`;
   }
-  ov.innerHTML = `<div class="fl-cab"><div class="fl-cab-top"><div class="fl-ico">${flIcono(m)}</div><div class="fl-cab-tit"><div class="fl-nombre">${flE(m.name)}</div><div class="fl-fila" style="margin-top:4px;">${m.matricula ? `<span class="fl-placa">${flE(m.matricula)}</span>` : ''}<span style="font-size:12px;color:var(--ink-soft);">${flE(m.type)}</span></div></div><button type="button" class="fl-ib" title="Copiar ficha" aria-label="Copiar ficha" onclick="copiarFichaMaquinaInline('${m.id}')">📋</button><button type="button" class="fl-ib" title="Cerrar" aria-label="Cerrar" onclick="cerrarFichaMaquina()">✕</button></div><div class="fl-tabs">${tabs}</div></div><div class="fl-cuerpo">${h}</div>`;
+  ov.innerHTML = `<div class="fl-cab"><div class="fl-cab-top"><div class="fl-ico">${flIcono(m)}</div><div class="fl-cab-tit"><div class="fl-nombre">${flE(m.modelo || m.name)}</div><div class="fl-fila" style="margin-top:4px;">${m.matricula ? `<span class="fl-placa">${flE(m.matricula)}</span>` : ''}<span style="font-size:12px;color:var(--ink-soft);">${flE(m.clase || m.type || m.name)}</span></div></div><button type="button" class="fl-ib" title="Copiar ficha" aria-label="Copiar ficha" onclick="copiarFichaMaquinaInline('${m.id}')">📋</button><button type="button" class="fl-ib" title="Cerrar" aria-label="Cerrar" onclick="cerrarFichaMaquina()">✕</button></div><div class="fl-tabs">${tabs}</div></div><div class="fl-cuerpo">${h}</div>`;
 }
 async function subirDocMaquina(id, input){
   if(!exigirNivel('flota','editar')) return;
@@ -15095,17 +15111,30 @@ async function borrarDocMaquina(id, path){
   renderFleetGrid();
 }
 function toggleMaquinaExpandida(id){ abrirFichaMaquina(id); }   // compatibilidad: la ficha ya no se despliega en la tarjeta, se abre aparte
+async function flCambiarEstado(id, estado){   // operativa, averiada, en taller o vendida: se cambia con un toque y se guarda
+  if(!exigirNivel('flota', 'editar')) return;
+  const m = flBuscar(id); if(!m || !sb) return;
+  if((m.state === estado) || (estado === 'disponible' && m.state === 'activo')) return;
+  if(estado === 'vendida' && !(await confirmarAccion('¿Marcar «' + (m.name || 'esta máquina') + '» como vendida? Pasa al historial de maquinaria vendida.'))) return;
+  const cambio = {estado: estado === 'disponible' ? 'activo' : estado}; if(estado === 'vendida') cambio.fecha_venta = new Date().toISOString().slice(0, 10);
+  const {error} = await sb.from('flota').update(cambio).eq('id', id);
+  if(error){ mostrarToast('No se pudo cambiar el estado: ' + errText(error), 'err'); return; }
+  m.state = estado;
+  if(estado === 'vendida'){ const k = fleet.indexOf(m); if(k >= 0) fleet.splice(k, 1); cerrarFichaMaquina(); try{ await cargarHistorialFlota(); }catch(e){} }
+  mostrarToast('Estado: ' + ({disponible: 'operativa', averiada: 'averiada', taller: 'en taller', vendida: 'vendida'})[estado] + ' ✓', 'ok');
+  renderFleetGrid();
+}
 async function guardarFichaMaquinaInline(id){
   const m = flBuscar(id);
   const statusEl = document.getElementById('mq-status-'+id);
   if(!m || !sb){ statusEl.textContent = 'Supabase no está conectado.'; statusEl.style.color = 'var(--red)'; return; }
   const matricula = document.getElementById('mq-matricula-'+id).value.trim();
   const ficha = document.getElementById('mq-ficha-'+id).value.trim();
-  const nombre = (document.getElementById('mq-nombre-'+id)?.value ?? m.name).trim(), tipo = (document.getElementById('mq-tipo-'+id)?.value ?? m.type).trim();
+  const nombre = (document.getElementById('mq-nombre-'+id)?.value ?? m.name).trim(), tipo = m.type || '', modelo = (document.getElementById('mq-modelo-'+id)?.value ?? m.modelo ?? '').trim(), clase = (document.getElementById('mq-clase-'+id)?.value ?? m.clase ?? '').trim();
   if(!nombre){ statusEl.textContent = 'El nombre no puede quedar vacío.'; statusEl.style.color = 'var(--red)'; return; }
-  const {error} = await sb.from('flota').update({nombre, tipo, matricula, ficha_tecnica: ficha}).eq('id', id);
+  const {error} = await sb.from('flota').update({nombre, modelo: modelo || null, clase: clase || null, matricula, ficha_tecnica: ficha}).eq('id', id);
   if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
-  m.name = nombre; m.type = tipo; m.matricula = matricula; m.fichaTecnica = ficha;
+  m.name = nombre; m.modelo = modelo; m.clase = clase; m.matricula = matricula; m.fichaTecnica = ficha;
   statusEl.textContent = 'Guardado ✓'; statusEl.style.color = 'var(--green)';
   mostrarToast('Ficha guardada ✓', 'ok'); renderFleetGrid();
 }
@@ -15606,13 +15635,13 @@ async function cargarDatosReales(){
         if(existente){
           // ya había una entrada con este nombre (de la lista de siempre) — se actualiza con el dato real, no se salta
           existente.id = m.id;
-          existente.type = m.tipo || existente.type;
+          existente.type = m.tipo || existente.type; existente.modelo = m.modelo || ''; existente.clase = m.clase || '';
           existente.state = m.estado==='activo' ? 'disponible' : (m.estado || existente.state);
           existente.matricula = m.matricula || '';
           existente.fichaTecnica = m.ficha_tecnica || '';
           existente.documentos = m.documentos || [];
         } else {
-          fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', state: m.estado==='activo' ? 'disponible' : m.estado, matricula: m.matricula||'', fichaTecnica: m.ficha_tecnica||'', documentos: m.documentos||[]});
+          fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', modelo: m.modelo || '', clase: m.clase || '', state: m.estado==='activo' ? 'disponible' : m.estado, matricula: m.matricula||'', fichaTecnica: m.ficha_tecnica||'', documentos: m.documentos||[]});
         }
       });
       renderFleetGrid();
