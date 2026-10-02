@@ -2230,6 +2230,10 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .imp-pill.pend{background:#FDEBDD;color:var(--orange);}
 .imp-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
 .imp-acc .btn{font-size:12.5px;padding:7px 12px;}
+.imp-acc .btn.imp-arch{display:inline-flex;align-items:center;gap:6px;}
+.imp-acc .btn.imp-arch svg{width:15px;height:15px;}
+.imp-tard-b .btn.imp-arch{display:inline-flex;align-items:center;gap:6px;}
+.imp-tard-b .btn.imp-arch svg{width:15px;height:15px;}
 .imp-pend-nota{font-size:12px;color:var(--ink-soft);margin:8px 0 4px;line-height:1.45;}
 .imp-pend-tit{font-size:12px;font-weight:700;margin:12px 0 2px;text-transform:uppercase;letter-spacing:.03em;}
 .imp-sub{border-bottom:1px solid var(--line);}
@@ -3639,7 +3643,7 @@ window.quitarSplash = function(){ var s = document.getElementById('arranque-spla
 setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m = document.getElementById('arranque-msg'); if(b){ b.style.display = 'block'; } if(m){ m.textContent = 'Está tardando más de lo normal…'; } }, 7000);
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.94</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V6.95</div>
 <!-- Escritorio: botones individuales -->
 <button id="actualizar-fijo-btn" onclick="actualizarSeccionActual()" title="Actualizar">↻</button>
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3727,7 +3731,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V6.94</div>
+        <div class="sub" id="version-badge">V6.95</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5185,10 +5189,10 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
 
         <button type="button" class="btn primary imp-gestor-btn" id="imp-gestor-btn" onclick="impAbrirGestor()">Preparar para el gestor</button>
 
-        <details class="imp-det" id="imp-det-303"><summary>Ver cálculo del modelo 303</summary><div class="imp-det-body" id="imp-303-calc"></div></details>
-        <details class="imp-det" id="imp-det-130"><summary>Ver cálculo del modelo 130</summary><div class="imp-det-body" id="imp-130-calc"></div></details>
+        <details class="imp-det" id="imp-det-303"><summary>Cálculo 303</summary><div class="imp-det-body" id="imp-303-calc"></div></details>
+        <details class="imp-det" id="imp-det-130"><summary>Cálculo 130</summary><div class="imp-det-body" id="imp-130-calc"></div></details>
         <div id="imp-apartados"></div>
-        <details class="imp-det" id="imp-det-fis" style="display:none;"><summary>Ver detalles fiscales</summary><div class="imp-det-body" id="imp-fis-lista"></div></details>
+        <details class="imp-det" id="imp-det-fis" style="display:none;"><summary>Detalles fiscales</summary><div class="imp-det-body" id="imp-fis-lista"></div></details>
         <div class="two-col-note">Estimación de control interno con las facturas y gastos oficiales registrados; no es una declaración. El gestor revisa y determina el tratamiento fiscal definitivo.</div>
       </div>
 
@@ -5230,7 +5234,7 @@ setTimeout(function(){ var b = document.getElementById('arranque-recargar'), m =
         <div class="panel"><div class="panel-head"><h3>Pagado a cuenta durante el año</h3></div><div class="panel-body" id="imp-a-pagado"></div></div>
         <div class="panel"><div class="panel-head"><h3>Estimación</h3></div><div class="panel-body" id="imp-a-est"></div></div>
         <div class="panel"><div class="panel-head"><h3>Resultado definitivo de la Renta</h3></div><div class="panel-body" id="imp-a-def"></div></div>
-        <details class="imp-det"><summary>Ver evolución por trimestres</summary><div class="imp-det-body" id="imp-a-evol"></div></details>
+        <details class="imp-det"><summary>Evolución por trimestres</summary><div class="imp-det-body" id="imp-a-evol"></div></details>
         <div class="two-col-note">Control y estimación con los datos de la actividad. La declaración de la Renta (modelo 100) la determina el gestor con tus datos personales y fiscales.</div>
       </div>
     </div>
@@ -9364,6 +9368,11 @@ function pintarOrdenActivo(chipsId, resumenId, clave, dir, campos){
 }
 // Aplica el orden ya guardado por el usuario tras (re)cargar las filas — se llama una vez
 // que la tabla tiene datos; si no hay nada guardado, no hace nada (queda el orden natural).
+function ordenarPorDefectoFecha(tbodyId, columna){   // sin orden elegido: lo más reciente primero y lo que no tiene fecha, al final
+  try{ if(localStorage.getItem('orden_' + tbodyId)) return; }catch(e){}
+  const tb = document.getElementById(tbodyId); if(!tb) return;
+  tb.dataset.ordCol = columna; tb.dataset.ordDir = 'asc'; ordenarTabla(tbodyId, columna, 'fecha');   // el cambio interno de sentido la deja en descendente
+}
 function aplicarOrdenGuardadoSiExiste(tbodyId, chipsId){
   const guardado = JSON.parse(localStorage.getItem('orden_'+tbodyId) || 'null');
   const cont = document.getElementById(chipsId);
@@ -20598,7 +20607,7 @@ function renderImpuestos(q){
   const tard = ini > hoy ? [] : impGastosTardios(q, anio), perTxt = `${anio}-T${q}`;
   const tardHtml = tard.length ? `<details class="imp-tard" open><summary><span class="ic">!</span> ${tard.length} gasto(s) de un trimestre anterior de ${anio}, registrados ahora (${impEur(tard.reduce((s, d) => s + impTotalGasto(d), 0))}): ¿cuentan en el ${q}T?</summary>
       <div style="margin:6px 0 4px;"><button type="button" class="btn primary" style="font-size:12.5px;padding:7px 12px;" onclick="impAsignarTodos('${perTxt}')">Contar todos en el ${q}T</button></div>` +
-      tard.map(d => { const o = impPeriodoPropio(d); return `<div class="ct-g" style="padding:8px 0;"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}</span><span class="mono">${impEur(impTotalGasto(d))}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(d.categoria || 'Sin categoría')}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div><div class="ct-g2" style="margin-top:3px;font-size:11.5px;"><b>Origen:</b> ${escHtml(impOrigenGasto(d))}</div><div class="imp-tard-b"><button type="button" class="btn primary" onclick="impAsignarPeriodo('${d.id}','${perTxt}')">Contar en el ${q}T</button><button type="button" class="btn" onclick="impAsignarPeriodo('${d.id}','${o.anio}-T${o.q}')">Dejar en el ${o.q}T</button></div></div>`; }).join('') +
+      tard.map(d => { const o = impPeriodoPropio(d); return `<div class="ct-g" style="padding:8px 0;"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}</span><span class="mono">${impEur(impTotalGasto(d))}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(d.categoria || 'Sin categoría')}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div><div class="ct-g2" style="margin-top:3px;font-size:11.5px;"><b>Origen:</b> ${escHtml(impOrigenGasto(d))}</div><div class="imp-tard-b">${impBtnArchivo(d)}<button type="button" class="btn primary" onclick="impAsignarPeriodo('${d.id}','${perTxt}')">Contar en el ${q}T</button><button type="button" class="btn" onclick="impAsignarPeriodo('${d.id}','${o.anio}-T${o.q}')">Dejar en el ${o.q}T</button></div></div>`; }).join('') +
       `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:6px;line-height:1.45;">El IVA de una factura se deduce en el trimestre en que se recibe y registra. Si el ${tard[0] ? impPeriodoPropio(tard[0]).q : ''}T ya se presentó sin ella, cuéntala aquí. El IRPF (130) es acumulado del año, así que no cambia.</div></details>` : '';
   $('imp-estado-tit').textContent = futuro ? 'Trimestre sin empezar' : (inc.length || tard.length) ? 'Antes de cerrar' : 'Trimestre preparado';
   $('imp-estado').innerHTML = ini > hoy ? '<div class="imp-inc ok"><span class="ic">·</span><span>Sin documentos todavía.</span></div>'
@@ -20680,9 +20689,12 @@ function impFilaGasto(d, pills, acciones, extra){
   return `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(d.client || '—')}${pills || ''}</span><span class="mono">${impEur(impTotalGasto(d))}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratGasto(d))}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</div>` +
     (extra || `<div class="ct-g3">${mixto ? `Se deduce el <b>${impPctTxt(d)} %</b>: ` : ''}Gasto sin IVA <b>${impEur(impGastoDeducible(d))}</b> · IVA deducible <b>${impEur(impIvaDeducible(d))}</b></div>`) +
     (impCuentaEnOtro(d) ? `<div class="ct-g3" style="color:var(--orange);">Fecha del documento de otro trimestre: cuenta aquí. <a href="#" onclick="event.preventDefault();impAsignarPeriodo('${d.id}','${impPeriodoPropio(d).anio}-T${impPeriodoPropio(d).q}')">Devolverlo al ${impPeriodoPropio(d).q}T</a></div>` : '') +
-    (acciones ? `<div class="imp-acc">${acciones}</div>` : '') + `</div>`;
+    `<div class="imp-acc">${impBtnArchivo(d)}${acciones || ''}</div>` + `</div>`;
 }
 const impBtn = (t, js, k) => `<button type="button" class="btn ${k || ''}" onclick="${js}">${escHtml(t)}</button>`;
+function impUrlArchivo(d){ const r = d && (d.archivo_url || (d.archivo_path ? 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/' + d.archivo_path : null) || d.justificante_url); return r || null; }
+function impBtnArchivo(d){ return impUrlArchivo(d) ? `<button type="button" class="btn imp-arch" onclick="impVerArchivo('${d.id}')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8L13.5 4.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg>Archivo</button>` : `<span class="imp-pill no">Sin archivo</span>`; }
+function impVerArchivo(id){ const d = documentosRealesById[id], u = d && impUrlArchivo(d); if(!u){ mostrarToast('Este gasto no tiene archivo.', 'err'); return; } visorAbrir(u, (d.client || 'Gasto') + (d.num ? ' · ' + d.num : '')); }
 function impPintarApartados(q, anio, D){
   const cont = document.getElementById('imp-apartados'); if(!cont) return;
   const enQ = d => { const p = impPeriodo(d); return p.anio === anio && p.q === q; };
@@ -20701,25 +20713,25 @@ function impPintarApartados(q, anio, D){
   const suma = (arr, f) => arr.reduce((s, x) => s + f(x), 0), tot = arr => suma(arr, impTotalGasto);
   const fmt = f => f ? f.slice(8, 10) + '/' + f.slice(5, 7) : '';
   const filaB = (g, incluido) => { const ids = g.items.map(x => x.id).filter(Boolean), fechas = g.items.map(x => x.fecha).filter(Boolean).sort(), rango = fechas.length ? (fechas[0] === fechas[fechas.length - 1] ? fmt(fechas[0]) : fmt(fechas[0]) + ' a ' + fmt(fechas[fechas.length - 1])) : '';
-    return `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(g.prov)}${impPill(incluido ? 'Incluido, estimado' : 'No incluido: sin factura', incluido ? 'pend' : 'no')}</span><span class="mono n-warn">${impEur(g.total)}</span></div><div class="ct-g2">${g.items.length} ${g.items.length === 1 ? 'pago' : 'pagos'}${rango ? ' · ' + rango : ''}${incluido ? ' · se cuenta con IVA 21 % hasta que llegue la factura' : ' · no cuenta en el 303 ni en el 130 hasta que llegue la factura'}</div>${ids.length ? `<div class="imp-acc">${incluido ? impBtn('Quitar del cálculo', `impPendDecision('${ids.join(',')}', false)`) : impBtn('Incluir en el cálculo', `impPendDecision('${ids.join(',')}', true)`, 'primary')}</div>` : ''}</div>`; };
+    return `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(g.prov)}${impPill(incluido ? 'Incluido, estimado' : 'No incluido: sin factura', incluido ? 'pend' : 'no')}</span><span class="mono n-warn">${impEur(g.total)}</span></div><div class="ct-g2">${g.items.length} ${g.items.length === 1 ? 'pago' : 'pagos'}${rango ? ' · ' + rango : ''}${incluido ? ' · IVA 21 % estimado' : ' · sin factura: no cuenta'}</div>${ids.length ? `<div class="imp-acc">${incluido ? impBtn('Quitar', `impPendDecision('${ids.join(',')}', false)`) : impBtn('Incluir', `impPendDecision('${ids.join(',')}', true)`, 'primary')}</div>` : ''}</div>`; };
   const filaJust = d => impFilaGasto(d, impPill('Incluido · falta justificante', 'pend'), '', null);
   const vacio = t => `<div class="empty" style="padding:12px;">${t}</div>`;
   const S = [
-    {id: 'ing', t: 'Ingresos incluidos', n: D.fq.length, nota: 'Las facturas emitidas de este trimestre: de aquí sale el IVA repercutido.', total: suma(D.fq, d => d.total),
+    {id: 'ing', t: 'Ingresos incluidos', n: D.fq.length, nota: 'Facturas emitidas: IVA repercutido.', total: suma(D.fq, d => d.total),
       html: D.fq.length ? D.fq.slice().sort((a, b) => String(b.dateRaw||'').localeCompare(String(a.dateRaw||''))).map(d => `<div class="ct-g"><div class="ct-g1"><span class="ct-prov">${escHtml(d.num ? 'Nº ' + d.num : 'Sin número')} · ${escHtml(d.client || '—')}</span><span class="mono">${impEur(d.total)}</span></div><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratFactura(d))}${d.estado_cobro === 'cobrado' ? ' · cobrada' : ' · sin cobrar'}</div><div class="ct-g3">Base <b>${impEur(impBaseFactura(d))}</b> · IVA <b>${impEur(impIvaFactura(d))}</b></div></div>`).join('') : vacio('Ninguna factura en este trimestre.')},
-    {id: 'inc', t: 'Gastos incluidos', n: incl.length, total: tot(incl), nota: 'Cuentan al 100 % en el 303 y en el 130, y se mandan al gestor.',
-      html: incl.length ? ordena(incl).map(d => impFilaGasto(d, impPill('Incluido', 'ok'), impBtn('Uso mixto: deducir la mitad', `impPorcentaje('${d.id}', 50)`))).join('') : vacio('Ningún gasto en este apartado.')},
-    {id: 'mix', t: 'Gastos incluidos mixtos', n: mixtos.length, total: tot(mixtos), nota: 'Vehículos de uso mixto (los Audi): solo se deduce una parte del gasto y de su IVA.',
-      html: mixtos.length ? ordena(mixtos).map(d => impFilaGasto(d, impPill('Uso mixto ' + impPctTxt(d) + ' %', 'mixto'), impBtn('Quitar el uso mixto (100 %)', `impPorcentaje('${d.id}', 100)`) + impBtn('Mitad (50 %)', `impPorcentaje('${d.id}', 50)`))).join('') : vacio('Ningún gasto de uso mixto.')},
-    {id: 'dsi', t: 'Gastos incluidos dudosos', n: dudSi.length, total: tot(dudSi), nota: 'Cuentan por ahora, pero falta confirmar que son de la empresa.',
-      html: dudSi.length ? ordena(dudSi).map(d => impFilaGasto(d, impPill('Dudoso · cuenta por ahora', 'dudoso'), impBtn('Es de la empresa', `impDudoso('${d.id}','empresa')`, 'primary') + impBtn('Sacar del cálculo', `impDudoso('${d.id}','sacar')`))).join('') : vacio('Ningún dudoso incluido.')},
-    {id: 'dno', t: 'Gastos no incluidos dudosos', n: dudNo.length, total: tot(dudNo), nota: 'No cuentan hasta que se decida. Se pueden incluir mientras tanto.',
-      html: dudNo.length ? ordena(dudNo).map(d => impFilaGasto(d, impPill('Dudoso · no cuenta', 'dudoso'), impBtn('Incluir mientras se decide', `impDudoso('${d.id}','incluir')`) + impBtn('Es de la empresa', `impDudoso('${d.id}','empresa')`, 'primary') + impBtn('No es de la empresa', `impDudoso('${d.id}','noempresa')`), `<div class="ct-g3">Si cuenta: gasto sin IVA <b>${impEur(impGastoDeducible(d))}</b> · IVA deducible <b>${impEur(impIvaDeducible(d))}</b>${impPct(d) < 1 ? ' · uso mixto ' + impPctTxt(d) + ' %' : ''}</div>`)).join('') : vacio('Ningún dudoso sin incluir.')},
-    {id: 'noinc', t: 'Gastos no incluidos', n: noInc.length + enB.length, total: tot(noInc) + tot(enB), nota: 'Esto NO se manda al gestor. Cada gasto dice por qué no se incluye.',
+    {id: 'inc', t: 'Gastos incluidos', n: incl.length, total: tot(incl), nota: 'Cuentan al 100 % y van al gestor.',
+      html: incl.length ? ordena(incl).map(d => impFilaGasto(d, impPill('Incluido', 'ok'), impBtn('Uso mixto 50 %', `impPorcentaje('${d.id}', 50)`))).join('') : vacio('Ningún gasto en este apartado.')},
+    {id: 'mix', t: 'Gastos incluidos mixtos', n: mixtos.length, total: tot(mixtos), nota: 'Uso mixto (Audi): se deduce solo una parte del gasto y del IVA.',
+      html: mixtos.length ? ordena(mixtos).map(d => impFilaGasto(d, impPill('Uso mixto ' + impPctTxt(d) + ' %', 'mixto'), impBtn('100 %', `impPorcentaje('${d.id}', 100)`) + impBtn('50 %', `impPorcentaje('${d.id}', 50)`))).join('') : vacio('Ningún gasto de uso mixto.')},
+    {id: 'dsi', t: 'Gastos incluidos dudosos', n: dudSi.length, total: tot(dudSi), nota: 'Cuentan por ahora; falta confirmarlos.',
+      html: dudSi.length ? ordena(dudSi).map(d => impFilaGasto(d, impPill('Dudoso · cuenta por ahora', 'dudoso'), impBtn('Es de la empresa', `impDudoso('${d.id}','empresa')`, 'primary') + impBtn('Quitar', `impDudoso('${d.id}','sacar')`))).join('') : vacio('Ningún dudoso incluido.')},
+    {id: 'dno', t: 'Gastos no incluidos dudosos', n: dudNo.length, total: tot(dudNo), nota: 'No cuentan hasta decidir. Puedes incluirlos ya.',
+      html: dudNo.length ? ordena(dudNo).map(d => impFilaGasto(d, impPill('Dudoso · no cuenta', 'dudoso'), impBtn('Incluir ya', `impDudoso('${d.id}','incluir')`) + impBtn('Es de la empresa', `impDudoso('${d.id}','empresa')`, 'primary') + impBtn('No es de la empresa', `impDudoso('${d.id}','noempresa')`), `<div class="ct-g3">Si cuenta: gasto sin IVA <b>${impEur(impGastoDeducible(d))}</b> · IVA deducible <b>${impEur(impIvaDeducible(d))}</b>${impPct(d) < 1 ? ' · uso mixto ' + impPctTxt(d) + ' %' : ''}</div>`)).join('') : vacio('Ningún dudoso sin incluir.')},
+    {id: 'noinc', t: 'Gastos no incluidos', n: noInc.length + enB.length, total: tot(noInc) + tot(enB), nota: 'No van al gestor. Cada uno dice el motivo.',
       html: (noInc.length || enB.length) ? ordena(noInc).map(d => impFilaGasto(d, d.categoria === 'Compra de vehículos' ? impPill('Inversión: compra de vehículo', 'no') : impPill('No es de la empresa', 'no'), d.categoria === 'Compra de vehículos' ? '' : impBtn('Sí es de la empresa', `impDudoso('${d.id}','empresa')`), `<div class="ct-g3">${d.categoria === 'Compra de vehículos' ? 'Es una inversión, no un gasto del trimestre.' : 'Marcado como no relacionado con la actividad.'}</div>`)).join('') + ordena(enB).map(d => impFilaGasto(d, impPill('En B: no se declara', 'b'), '', `<div class="ct-g3">Contabilidad en B: cuenta como control, no entra en los impuestos ni va al gestor.</div>`)).join('') : vacio('Ningún gasto sin incluir.')},
-    {id: 'pinc', t: 'Gastos incluidos pendientes de factura', n: pendJust.length + incB.reduce((s, g) => s + g.items.length, 0), total: tot(pendJust) + suma(incB, g => g.total), nota: 'Cuentan en el cálculo, pero les falta la factura o el justificante completo: se piden todos juntos al cerrar el trimestre.',
+    {id: 'pinc', t: 'Gastos incluidos pendientes de factura', n: pendJust.length + incB.reduce((s, g) => s + g.items.length, 0), total: tot(pendJust) + suma(incB, g => g.total), nota: 'Cuentan, pero falta la factura o el justificante: se piden al cerrar el trimestre.',
       html: (pendJust.length || incB.length) ? ordena(pendJust).map(filaJust).join('') + incB.map(g => filaB(g, true)).join('') : vacio(banco ? 'Nada pendiente de factura entre lo que cuenta.' : 'Cargando el banco…')},
-    {id: 'pno', t: 'Gastos no incluidos pendientes de factura', n: noB.reduce((s, g) => s + g.items.length, 0), total: suma(noB, g => g.total), nota: 'Pagos del banco sin factura: no cuentan hasta que llegue la factura. Si sabes que va a llegar, puedes incluirlos ya (se cuentan con IVA 21 %, estimado).',
+    {id: 'pno', t: 'Gastos no incluidos pendientes de factura', n: noB.reduce((s, g) => s + g.items.length, 0), total: suma(noB, g => g.total), nota: 'Pagos del banco sin factura: no cuentan hasta que llegue. Puedes incluirlos ya (IVA 21 %, estimado).',
       html: noB.length ? noB.map(g => filaB(g, false)).join('') : vacio(banco ? (P.conExtracto ? 'Ningún pago del banco sin factura en este trimestre.' : 'No hay pagos del banco cargados en este trimestre.') : 'Cargando el banco…')}
   ];
   cont.innerHTML = S.map(s => `<details class="imp-det" data-ap="${s.id}" ${_impAbiertos.has(s.id) ? 'open' : ''}><summary>${escHtml(s.t)} (${s.n}${s.n ? ' · ' + impEur(s.total) : ''})</summary><div class="imp-det-body"><div class="imp-pend-nota">${escHtml(s.nota)}</div>${s.html}</div></details>`).join('');
@@ -24315,7 +24327,7 @@ function renderControlDocs(){
    Facturas, Albaranes, Presupuestos y Proformas usan EXACTAMENTE el mismo
    desplegable, colores y nombres. Si se cambia un nombre o color aquí, se
    propaga solo a las cuatro secciones — no hay definiciones paralelas. */
-const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['pendiente_enviar','Listo para enviar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Cobro parcial'],['cobrado','Cobrado'],['rectificativa','Rectificativa'],['nula','Nula']];
+const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['pendiente_enviar','Listo para enviar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Cobro parcial'],['cobrado','Cobrado'],['rectificativa','Rectificativa'],['revisar','Revisar'],['nula','Nula']];
 function estadoDocumentoSelect(tipo, id, actual, contexto){
   const act = actual || 'pendiente_enviar';
   const label = ESTADOS_DOCUMENTO.find(o=>o[0]===act)?.[1] || act;
@@ -25013,7 +25025,7 @@ async function cargarDocumentosEconomicosReales(){
       sincronizarListaMovilFacturas(); _p('tarjetas de facturas');
       await ceder();
       filtrarPorAnioTrim('albaranes-tbody-standalone','alb'); _p('filtrar albaranes');
-      aplicarOrdenGuardadoSiExiste('albaranes-tbody-standalone','alb-orden-chips'); _p('ordenar albaranes');
+      aplicarOrdenGuardadoSiExiste('albaranes-tbody-standalone','alb-orden-chips'); ordenarPorDefectoFecha('albaranes-tbody-standalone', 1); _p('ordenar albaranes');
       filtrarPorAnioTrim('presupuestos-tbody-standalone','pres'); _p('filtrar presupuestos');
       aplicarOrdenGuardadoSiExiste('presupuestos-tbody-standalone','pres-orden-chips'); _p('ordenar presupuestos');
       if(!esFinal){ await ceder(); calcularTotalesClientes(); renderGastosPro(); _p('totales de clientes y gastos'); }
