@@ -1077,6 +1077,8 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+#rec-filtro-plazo-chips{display:none;}   /* V7.31: sus pastillas solo se ven dentro del filtro plegable, nunca sueltas mientras carga la web */
+.pleg #rec-filtro-plazo-chips{display:flex;}
 /* V7.29 (Daniel: Correo «muy mal optimizado»): búsqueda, orden y botones en una fila; filtros en una sola fila que se desliza; sin Buscar (Enter) */
 #view-correo .panel-head{flex-wrap:nowrap !important;gap:6px !important;padding:8px 10px !important;}
 #view-correo .panel-head > div:first-child{min-width:0 !important;flex:1 1 auto !important;}
@@ -3388,7 +3390,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.30</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.31</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3478,7 +3480,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.30</div>
+        <div class="sub" id="version-badge">V7.31</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -10763,17 +10765,19 @@ async function cargarAlertasYRecordatorios(){
     .in('tipo',['recordatorio','alerta_cobro_pendiente','alerta_itv','alerta_documento_personal'])
     .eq('data->>estado','pendiente')
     .order('created_at',{ascending:false});
-  _recItems = data || [];
+  _recItems = data || []; _recCargado = true;
   _recItv = null;
   try{
     const {data: fl} = await sb.from('flota').select('id,nombre,matricula,itv_vence,estado').not('itv_vence','is',null);
     _recItv = avisosItvFlota(fl, new Date()).map(htmlAvisoItv).join('');
   }catch(e){}
   recRender();
-  try{ if(!PLEG2.rec) pleg2Crear({id: 'rec', despuesDe: '#rec-filtro-ancla', grupos: [['plazo', 'Plazo', 'rec-filtro-plazo-chips', 'unico']]}); }catch(e){ setTimeout(() => { try{ if(!PLEG2.rec) pleg2Crear({id: 'rec', despuesDe: '#rec-filtro-ancla', grupos: [['plazo', 'Plazo', 'rec-filtro-plazo-chips', 'unico']]}); }catch(e2){} }, 1500); }
+  recMontarFiltro();
 }
 // RECORDATORIOS POR PLAZO (Daniel 02/10/2026): solo se ven los que tocan en la semana, el mes o el año elegido; los vencidos y los que no tienen fecha salen siempre
-let _recItems = [], _recItv = null;
+let _recItems = [], _recItv = null, _recCargado = false;
+function recMontarFiltro(){ try{ if(!PLEG2.rec) pleg2Crear({id: 'rec', despuesDe: '#rec-filtro-ancla', plegados: ['plazo'], grupos: [['plazo', 'Plazo', 'rec-filtro-plazo-chips', 'unico']]}); }catch(e){} }
+document.addEventListener('DOMContentLoaded', () => setTimeout(recMontarFiltro, 0));
 function recVence(d){ const v = d.vence || d.fecha_limite || null; if(v) return String(v).slice(0, 10); const f = d.fecha ? String(d.fecha).slice(0, 10) : null; return f && f > new Date().toISOString().slice(0, 10) ? f : null; }
 function recPlazo(){ const a = document.querySelector('#rec-filtro-plazo-chips .chip-filter.active'); return a ? Number(a.dataset.plazo) : 30; }
 function recVisible(d, plazo){ const v = recVence(d); if(!v || !plazo) return true; const lim = new Date(Date.now() + plazo * 864e5).toISOString().slice(0, 10); return v <= lim; }
@@ -10811,7 +10815,7 @@ document.addEventListener('click', ev => { const ch = ev.target.closest('#rec-fi
 function actualizarVacioAlertas(){
   const bd = document.getElementById('alertas-list-bd');
   const at = document.getElementById('alertas-list-atencion');
-  const vacio = (!bd || !bd.children.length) && (!at || !at.children.length);
+  const vacio = _recCargado && (!bd || !bd.children.length) && (!at || !at.children.length);   // V7.31: «Sin alertas» solo cuando ya se sabe que no hay, nunca mientras carga
   const emptyEl = document.getElementById('alertas-empty');
   if(emptyEl) emptyEl.style.display = vacio ? 'block' : 'none';
 }
@@ -17358,7 +17362,8 @@ function pleg2Crear(cfg){
   const caja = document.createElement('div'); caja.className = 'pleg'; caja.id = 'pleg-' + cfg.id;
   caja.innerHTML = '<div class="pleg-cols"></div><div class="pleg-filas"></div><div class="pleg-guardados"></div>';
   ref.insertAdjacentElement('afterend', caja);
-  PLEG2[cfg.id] = {cfg, plegados: (cfg.plegados || []).slice(), caja};
+  let pl0 = (cfg.plegados || []).slice(); try{ const l = JSON.parse(localStorage.getItem('pleg-' + cfg.id) || 'null'); if(Array.isArray(l)) pl0 = l; }catch(e){}   // V7.31: el último estado guardado en este móvil, al instante
+  PLEG2[cfg.id] = {cfg, plegados: pl0, caja};
   cfg.grupos.forEach(g => { const f = document.getElementById(g[2]); if(f) caja.querySelector('.pleg-guardados').appendChild(f); });
   (cfg.quitar || []).forEach(i => document.getElementById(i)?.remove());
   caja.addEventListener('click', ev => {
@@ -17373,10 +17378,12 @@ async function pleg2Cargar(id, intentos){
   if(typeof sb === 'undefined' || !sb){ if(intentos < 40) setTimeout(() => pleg2Cargar(id, intentos + 1), 500); return; }
   try{
     const {data} = await sb.from('filtros_persistentes').select('container_id,valor').eq('container_id', 'pleg-' + id);
-    (data || []).forEach(f => { try{ const l = JSON.parse(f.valor); if(Array.isArray(l)){ PLEG2[id].plegados = l.filter(k => PLEG2[id].cfg.grupos.some(g => g[0] === k)); pleg2Render(id); } }catch(e){} });
+    (data || []).forEach(f => { try{ const l = JSON.parse(f.valor); if(Array.isArray(l)){ const n = l.filter(k => PLEG2[id].cfg.grupos.some(g => g[0] === k)); try{ localStorage.setItem('pleg-' + id, JSON.stringify(n)); }catch(e){}
+      if(JSON.stringify(n) !== JSON.stringify(PLEG2[id].plegados)){ PLEG2[id].plegados = n; pleg2Render(id); } } }catch(e){} });   // solo se repinta si de verdad cambia
   }catch(e){ console.warn('No se pudo leer qué filtros estaban plegados', e); }
 }
 async function pleg2Guardar(id){
+  try{ localStorage.setItem('pleg-' + id, JSON.stringify(PLEG2[id].plegados)); }catch(e){}
   if(typeof sb === 'undefined' || !sb) return;
   const {error} = await sb.from('filtros_persistentes').upsert({container_id: 'pleg-' + id, valor: JSON.stringify(PLEG2[id].plegados), actualizado_at: new Date().toISOString()});
   if(error) console.error('No se pudo guardar qué filtros están plegados', error);
