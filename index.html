@@ -1081,6 +1081,17 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+#sel-flotante{display:none;}
+@media(max-width:768px){
+  #sel-flotante.on{display:block;position:fixed;left:10px;right:10px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:9000;background:var(--asphalt);color:#fff;border-radius:18px;padding:10px 10px 8px;box-shadow:0 10px 30px rgba(0,0,0,.35);}
+  #sel-flotante .self-n{font-size:12.5px;margin:0 4px 8px;opacity:.85;}
+  #sel-flotante .self-acc{display:flex;gap:4px;justify-content:space-between;}
+  #sel-flotante .self-b{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;background:transparent;border:none;color:#fff;font-family:inherit;font-size:10.5px;font-weight:600;padding:4px 0;border-radius:10px;}
+  #sel-flotante .self-b:active{background:rgba(255,255,255,.12);}
+  #sel-flotante .self-b svg{width:21px;height:21px;}
+  #sel-flotante .self-rojo{color:#FF8A80;}
+  #fact-barra-seleccion, #alb-borrar-sel-btn, #alb-mover-sel-btn, #alb-enviarcliente-sel-btn, #alb-imprimir-sel-btn, #pres-borrar-sel-btn, #pres-mover-sel-btn, #pres-enviarcliente-sel-btn, #pres-imprimir-sel-btn{display:none !important;}
+}
 /* ===== EDITOR DE DOCUMENTOS — REDISEÑO COMPLETO PARA MÓVIL (V7.32, Daniel lo había reportado 5 veces) =====
    Una sola capa al final que manda sobre los parches anteriores:
    arriba solo estado, PDF y pasar a, en filas finas; el documento sin marco ni rayas; Guardar y PDF abajo, fijos, al alcance del pulgar */
@@ -3466,7 +3477,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.42</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.43</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3556,7 +3567,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.42</div>
+        <div class="sub" id="version-badge">V7.43</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -10971,16 +10982,22 @@ function recVer(id, i){
   const r = _recItems.find(x => x.id === id); let v = r && r.data && r.data.ver; if(Array.isArray(v)) v = v[i || 0]; if(!v) return;
   const pre = v.vista === 'albaranes' ? 'alb' : 'pres';
   document.querySelector('.nav button[data-view=' + v.vista + ']')?.click();
-  setTimeout(() => {
-    if(v.modo && typeof setModoPresProf === 'function') setModoPresProf(v.modo);
-    setTimeout(() => {
-      try{ _anioTocado[pre] = true; }catch(e){}   // que no vuelva a ponerse solo el año actual
-      document.querySelector('#' + pre + '-filtro-anio-chips [data-anio=""]')?.click();
-      document.querySelectorAll('#' + pre + '-filtro-estado-chips .chip-filter').forEach(c => { if(c.classList.contains('active') !== (c.dataset.estado === v.estado)) c.click(); });
-      const b = document.getElementById(pre + '-search'); if(b && v.buscar){ b.value = v.buscar; b.dispatchEvent(new Event('input')); }
-      window.scrollTo(0, 0);
-    }, 300);
-  }, 400);
+  // V7.43 (Daniel: «le doy a Proformas y me lleva a Presupuestos»): no se fía de un tiempo fijo; repite hasta que la sección,
+  // el tipo (proforma/presupuesto), el año, el estado y la búsqueda están puestos de verdad
+  let intentos = 0;
+  const aplicar = () => {
+    intentos++;
+    const vistaOk = document.getElementById('view-' + v.vista)?.classList.contains('active');
+    if(v.modo && typeof presModo !== 'undefined' && presModo !== v.modo && typeof setModoPresProf === 'function') setModoPresProf(v.modo);
+    try{ _anioTocado[pre] = true; }catch(e){}
+    const todos = document.querySelector('#' + pre + '-filtro-anio-chips [data-anio=""]'); if(todos && !todos.classList.contains('active')) todos.click();
+    document.querySelectorAll('#' + pre + '-filtro-estado-chips .chip-filter').forEach(c => { if(c.classList.contains('active') !== (c.dataset.estado === v.estado)) c.click(); });
+    const b = document.getElementById(pre + '-search'); if(b && v.buscar && b.value !== v.buscar){ b.value = v.buscar; b.dispatchEvent(new Event('input')); }
+    if(intentos === 1){ try{ asegurarHistorico(); }catch(e){} }   // los documentos antiguos solo se cargan cuando se piden: aquí se piden todos los años
+    const listo = vistaOk && (!v.modo || presModo === v.modo) && todos && todos.classList.contains('active');
+    if(!listo && intentos < 20) setTimeout(aplicar, 250); else window.scrollTo(0, 0);
+  };
+  setTimeout(aplicar, 200);
 }
 function recPosponer(id){
   const r = _recItems.find(x => x.id === id); if(!r) return; const d = r.data || {};
@@ -16994,8 +17011,41 @@ function sincCheckMovilFactura(id, checked){
   if(canonica){ canonica.checked = checked; }
   actualizarSeleccionDoc('fact-sel-chk','fact-borrar-sel-btn','fact-sel-count');
 }
+// BARRA FLOTANTE DE SELECCIÓN (Daniel 03/10/2026: «tengo seleccionadas varias y no encuentro las acciones»): en el móvil, en cuanto hay
+// algo marcado sale abajo, encima del menú, una barra fija con cuántos hay y las acciones; desaparece al quitar la selección
+const SELF_ICO = {
+  cliente: '<path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/>',
+  gestor: '<path d="M12 3v12M7.5 7.5L12 3l4.5 4.5"/><path d="M5 14v5h14v-5"/>',
+  imprimir: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
+  mover: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  borrar: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  cerrar: '<path d="M6 6l12 12M18 6L6 18"/>'
+};
+function selFlotante(claseChk, n){
+  let b = document.getElementById('sel-flotante');
+  if(!b){ b = document.createElement('div'); b.id = 'sel-flotante'; document.body.appendChild(b); }
+  if(!n){ b.classList.remove('on'); return; }
+  const ic = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SELF_ICO[k]}</svg>`;
+  const bt = (k, txt, fn, extra) => `<button type="button" class="self-b${extra || ''}" onclick="${fn}">${ic(k)}<span>${txt}</span></button>`;
+  b.innerHTML = `<div class="self-n"><b>${n}</b> ${n === 1 ? 'seleccionado' : 'seleccionados'}</div><div class="self-acc">`
+    + bt('cliente', 'Cliente', `enviarSeleccionadasAlCliente('${claseChk}')`)
+    + (claseChk === 'fact-sel-chk' ? bt('gestor', 'Gestor', `enviarSeleccionadasAlGestor('${claseChk}')`) : '')
+    + bt('imprimir', 'Imprimir', `imprimirSeleccionadas('${claseChk}')`)
+    + `<button type="button" class="self-b" data-chk="${claseChk}" onclick="abrirMoverSeleccionados(this)">${ic('mover')}<span>Mover</span></button>`
+    + bt('borrar', 'Borrar', `borrarDocumentosSeleccionados('${claseChk}')`, ' self-rojo')
+    + bt('cerrar', 'Quitar', `selQuitar('${claseChk}')`)
+    + '</div>';
+  b.classList.add('on');
+}
+document.addEventListener('click', e => { if(e.target.closest && e.target.closest('.nav button, .mobile-nav button, .bottom-nav button, .tab-bar button')){ const b = document.getElementById('sel-flotante'); if(b) b.classList.remove('on'); } }, true);   // al cambiar de sección la barra se va
+function selQuitar(claseChk){
+  document.querySelectorAll('.' + claseChk + ':checked').forEach(c => { c.checked = false; });
+  document.querySelectorAll('.factura-card-movil input[type=checkbox]:checked, .doc-card-movil input[type=checkbox]:checked').forEach(c => { c.checked = false; });
+  actualizarSeleccionDoc(claseChk, claseChk.replace('-chk', '-borrar-sel-btn'), claseChk.replace('-chk', '-sel-count'));
+}
 function actualizarSeleccionDoc(claseChk, btnId, countId){
   const marcados = document.querySelectorAll('.'+claseChk+':checked');
+  try{ selFlotante(claseChk, marcados.length); }catch(e){}
   const countEl = document.getElementById(countId);
   if(countEl) countEl.textContent = marcados.length;
   // la barra de acciones sobre lo seleccionado es un bloque único: existe o no existe,
@@ -25349,7 +25399,7 @@ function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta
   card.innerHTML = `
     <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${doc.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
     <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
-    <input type="checkbox" class="fc-check ${cbClass}" data-id="${doc.id}" onclick="event.stopPropagation();">
+    <input type="checkbox" class="fc-check ${cbClass}" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="actualizarSeleccionDoc('${cbClass}', '${cbClass}'.replace('-chk','-borrar-sel-btn'), '${cbClass}'.replace('-chk','-sel-count'))">
     <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}</div>
     <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
     ${obraHtml}
