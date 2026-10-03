@@ -3331,7 +3331,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.25</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.26</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3421,7 +3421,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.25</div>
+        <div class="sub" id="version-badge">V7.26</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -15244,6 +15244,7 @@ const fteDia = v => { try{ const x = new Date(v); return isNaN(x) ? '' : x.toLoc
 const FTE_TP = {factura: 'factura', albaran: 'albarán', presupuesto: 'presupuesto', proforma: 'proforma', gasto: 'gasto'};
 function fteHtml(txt, url, lista){   // lista: [{u, t}] cuando la ficha salió de varios archivos: el visor deja pasar de uno a otro deslizando
   const varios = Array.isArray(lista) && lista.length > 1;
+  if(!url && /^\s*a mano\s*$/i.test(String(txt || ''))) return '';   // Daniel 03/10/2026: si la fuente es «a mano» y no hay archivo que ver, no se pone
   return '<div class="fte"><span class="fte-t">Fuente · ' + escHtml(txt) + '</span>' + (url ? '<a href="' + escHtml(url) + '" class="fte-lnk"' + (varios ? ' data-lista="' + escHtml(JSON.stringify(lista)) + '"' : '') + ' onclick="event.stopPropagation()">' + (varios ? 'Archivos ' + lista.length : 'Archivo') + '</a>' : '') + '</div>'; }
 function fteDeDocumento(d){ return d ? {txt: impOrigenGasto(d), url: fteUrl(d)} : null; }
 // VELOCIDAD (V7.20): antes cada tarjeta recorría todos los documentos para buscar el primero de su cliente o trabajo; ahora se hace un índice una vez
@@ -15303,7 +15304,7 @@ function fteAplicar(el){
   el.querySelectorAll('.gasto-pie').forEach(x => { if(!x.children.length && !x.textContent.trim()) x.remove(); });
   const tpl = document.createElement('template'); tpl.innerHTML = fteHtml(r.txt, r.url, r.lista);
   const dest = el.matches('.tb-card') ? (el.querySelector('.tb-cuerpo') || el) : el;   // la tarjeta de trabajo es una cuadrícula (cuerpo, ✕, ✓): la línea va dentro del cuerpo
-  dest.appendChild(tpl.content.firstChild);
+  if(tpl.content.firstChild) dest.appendChild(tpl.content.firstChild);
 }
 function fteRecorrer(raiz){ if(!raiz || raiz.nodeType !== 1) return; if(raiz.matches && raiz.matches(FTE_SEL)) fteAplicar(raiz); raiz.querySelectorAll && raiz.querySelectorAll(FTE_SEL).forEach(fteAplicar); }
 (function(){
