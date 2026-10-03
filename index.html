@@ -1538,7 +1538,6 @@ body.rb-oculta-fab #mob-menu-btn, body.rb-oculta-fab #asistente-ia-fab{transform
       "check obra obra"
       "check meta meta"
       "check total total"
-      "check gestor gestor"
       "check extra extra";
     row-gap:6px;column-gap:10px;align-items:center;
     padding:14px 34px 14px 14px;
@@ -3314,7 +3313,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.20</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.21</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3404,7 +3403,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.20</div>
+        <div class="sub" id="version-badge">V7.21</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7939,14 +7938,13 @@ function gastoCardHtml(d, modo){
   }
   if(modo === 'normal'){   // mismo diseño que las tarjetas de Facturas y Albaranes
     const enB = (d.contabilidad || 'oficial') === 'en_b', sinJust = (d.estado_justificante || 'pendiente') !== 'completo';
-    const gestor = sinJust && !d.enviado_gestor ? '<span class="pill noadjudicado" title="Falta el justificante: no se puede enviar todavía">Falta justificante</span>' : gestorMovilHtml(d.id, !!d.enviado_gestor, d.enviado_gestor_fecha);
-    const extra = [motivo ? `<div class="gasto-motivo">${escHtml(motivo)}</div>` : '', consumoGastoHtml(d), adjuntosGastoHtml(d)].join('');
+    const gestor = sinJust && !d.enviado_gestor ? '<span class="pill noadjudicado" title="Falta el justificante">Falta justificante</span>' : '';   // V7.21: sin envío al gestor en la tarjeta
+    const extra = [gestor, motivo ? `<div class="gasto-motivo">${escHtml(motivo)}</div>` : '', consumoGastoHtml(d), adjuntosGastoHtml(d)].join('');
     return `<div class="factura-card-movil fc-gasto" data-doc-id="${escHtml(d.id)}">
       <div class="fc-estado-wrap"><span class="pill borrador">${escHtml(d.categoria || 'Gasto')}</span>${enB ? '<span class="pill mantenimiento" style="margin-left:6px;">En B</span>' : ''}</div>
       <div class="fc-cliente">${escHtml(prov)}</div>
       <div class="fc-obra">${escHtml(d.concepto || '')}</div>
       <div class="fc-meta"><span class="fc-meta-ico">${ICO_DOC} Nº ${escHtml(d.numero || '—')}</span><span class="fc-meta-sep">|</span><span class="fc-meta-ico">${ICO_CAL} ${escHtml(fecha)}</span></div>
-      <div class="fc-gestor-wrap">${gestor}</div>
       ${extra.trim() ? `<div class="fc-extra" style="flex-direction:column;align-items:flex-start;">${extra}</div>` : ''}
       <div class="fc-total-block">${totalBlockHtml(d)}</div>
     </div>`;
@@ -9175,9 +9173,8 @@ function renderizarFilaYCardFactura(doc, entidad, trabajo, alPrincipio){
       <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
       ${obraHtml}
       <div class="fc-meta">${metaHtml}</div>
-      <div class="fc-gestor-wrap celda-gestor-movil-${doc.id}" onclick="event.stopPropagation();">${gestorMovilHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha)}</div>
-      ${extraHtml}
-      <div class="fc-total-block">${totalBlockHtml(doc)}</div>`;
+      <div class="fc-total-block">${totalBlockHtml(doc)}</div>
+      ${extraHtml}`;   // V7.21: el envío al gestor va en el menú de los 3 puntos
     alPrincipio ? listaMovil.prepend(card) : listaMovil.appendChild(card);
   }
   return document.getElementById('mcard-'+doc.id);
@@ -9291,7 +9288,10 @@ function abrirMenuAccionesMovil(docId, event){
   event?.stopPropagation();
   const doc = documentosRealesById[docId];
   if(!doc) return;
-  const botones = accionesDocumento(doc).filter(x=>x.t!=='Editar')
+  const gestor = doc.enviado_gestor
+    ? [{t: 'Gestor: enviada' + (doc.enviado_gestor_fecha ? ' el ' + String(doc.enviado_gestor_fecha).slice(0, 10).split('-').reverse().join('/') : '') + ' · marcar pendiente', fn: `cambiarGestorDesdeMenu('${doc.id}', false, '')`}]
+    : [{t: 'Enviar al gestor', fn: `enviarAlGestorDoc('${doc.id}')`}, {t: 'Gestor: marcar como enviada', fn: `cambiarGestorDesdeMenu('${doc.id}', true, '')`}];
+  const botones = gestor.concat(accionesDocumento(doc).filter(x=>x.t!=='Editar'))
     .map(x=>`<button class="btn" style="width:100%;text-align:left;margin-bottom:6px;" onclick="cerrarModalGenerico();${x.fn}">${x.t}</button>`).join('');
   mostrarModalGenerico(tipoDocEtiqueta(doc.type)+' '+(doc.num||'')+' — '+doc.client, `<div style="display:flex;flex-direction:column;">${botones}</div>`);
 }
@@ -22763,8 +22763,9 @@ function abrirCalidadDetalle(docId){
     });
   }
   const bloques = c.conflicto ? '<div id="calidad-conflicto-detalle">Cargando…</div>' : c.codigos.length ? c.codigos.map(cod=>{
-    const d = CALIDAD_DETALLE[cod] || {titulo:cod, explicacion:'', corregible:false};
-    return `<div class="ai-card-block"><div class="ai-card-label">${d.titulo}</div><div class="ai-card-text">${d.explicacion}</div></div>`;
+    const k = calidadConcreto(doc, cod);   // Daniel 02/10/2026: el fallo concreto de ESTE documento, con su solución y la opción de descartarlo
+    return `<div class="ai-card-block" data-cod="${cod}"><div class="ai-card-label">${escHtml(k.titulo)}</div><div class="ai-card-text">${k.detalle}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">${k.propuesta ? `<button class="btn primary sm" onclick="calidadAplicar('${docId}','${cod}')">${escHtml(k.propuesta.texto)}</button>` : ''}<button class="btn sm" onclick="calidadDescartar('${docId}','${cod}')">Descartar</button></div></div>`;
   }).join('') : `<div class="ai-card-block"><div class="ai-card-label">Sin problemas</div><div class="ai-card-text">Este documento está validado.</div></div>`;
   const puedeReprocesar = doc.archivo_path && c.codigos.some(cod=>CALIDAD_DETALLE[cod]?.corregible);
   // Trazabilidad real: si este documento nace de otro (proforma→factura, albarán→proforma…),
@@ -22789,6 +22790,56 @@ function abrirCalidadDetalle(docId){
       <button class="ai-btn" onclick="cerrarModalGenerico();openDocumentViewer('${docId}')">Ver documento completo</button>
     </div>
   `);
+}
+// FALLOS CONCRETOS (Daniel 02/10/2026): cada fallo dice qué pasa exactamente en ESE documento, con sus cifras, y propone el arreglo cuando lo hay
+function calidadConcreto(doc, cod){
+  const eur = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  const lineas = Array.isArray(doc.conceptos) ? doc.conceptos : [];
+  const suma = lineas.reduce((a, l) => a + (Number(l.importe) || (Number(l.cantidad) || 0) * (Number(l.precio_unitario) || 0)), 0);
+  const conIva = !(DOC_TYPES[doc.type] && DOC_TYPES[doc.type].hasIva === false) && (doc.tratamiento_iva || 'normal') !== 'isp' && doc.type !== 'albaran';
+  const pct = Number(doc.iva_pct != null ? doc.iva_pct : 21), esperado = Math.round((conIva ? suma * (1 + pct / 100) : suma) * 100) / 100, total = Number(doc.importe || 0);
+  const archivo = doc.archivo_path ? decodeURIComponent(String(doc.archivo_path).split('/').pop()) : '';
+  const delOriginal = archivo ? ` Archivo original: ${escHtml(archivo)}.` : '';
+  const nomDoc = (doc.cliente_datos_doc && (doc.cliente_datos_doc.nombre || doc.cliente_datos_doc.razon_social)) || '';
+  switch(cod){
+    case 'total':
+      if(!total) return {titulo: 'Sin total', detalle: `No tiene total guardado. ${lineas.length === 1 ? 'Su línea suma' : 'Sus ' + lineas.length + ' líneas suman'} <b>${eur(suma)}</b>${conIva ? ` (con IVA ${pct} %: <b>${eur(esperado)}</b>)` : ''}.`, propuesta: suma > 0 ? {texto: 'Poner el total en ' + eur(esperado), campos: {importe: esperado}} : null};
+      return {titulo: 'El total no cuadra con las líneas', detalle: `${lineas.length === 1 ? 'La línea suma' : 'Las ' + lineas.length + ' líneas suman'} <b>${eur(suma)}</b>${conIva ? `, con IVA ${pct} % serían <b>${eur(esperado)}</b>,` : ''} y el total guardado es <b>${eur(total)}</b> (diferencia ${eur(Math.abs(esperado - total))}).${conIva && Math.abs(suma - total) < 1 ? (lineas.length === 1 ? ' Puede que la línea ya lleve el IVA dentro' : ' Puede que las líneas ya lleven el IVA dentro') + ': en ese caso, descártalo.' : ''}${delOriginal}`, propuesta: suma > 0 ? {texto: 'Poner el total en ' + eur(esperado), campos: {importe: esperado}} : null};
+    case 'fecha': return {titulo: 'Sin fecha', detalle: `No tiene fecha guardada.${delOriginal}`, propuesta: {texto: 'Abrir para ponerla', abrir: true}};
+    case 'cliente': return {titulo: 'Sin cliente', detalle: `No está unido a ningún cliente.${nomDoc ? ` En el documento pone <b>${escHtml(nomDoc)}</b>.` : ''}${delOriginal}`, propuesta: {texto: 'Abrir para elegirlo', abrir: true}};
+    case 'cliente_es_etiqueta': return {titulo: 'El cliente no es un nombre', detalle: `El cliente guardado, <b>${escHtml(doc.client || '')}</b>, parece una dirección o una etiqueta, no un cliente.${delOriginal}`, propuesta: {texto: 'Abrir para cambiarlo', abrir: true}};
+    case 'lineas': return {titulo: 'Sin líneas', detalle: `No tiene ninguna línea de concepto${total ? `, aunque su total es ${eur(total)}` : ''}.${delOriginal}`, propuesta: archivo ? {texto: 'Volver a leer el original', reprocesar: true} : {texto: 'Abrir para añadirlas', abrir: true}};
+    case 'numero': return {titulo: 'Factura sin número', detalle: `Esta factura del ${doc.dateLabel || 'año ' + (doc.anio || '')} no tiene número.${delOriginal}`, propuesta: {texto: 'Abrir para ponerlo', abrir: true}};
+    case 'envio_sin_evidencia': return {titulo: 'Enviada al gestor sin fecha', detalle: 'Está marcada como enviada al gestor, pero no consta cuándo se envió.', propuesta: {texto: 'Volver a pendiente de enviar', campos: {enviado_gestor: false}}};
+    case 'cobro': return {titulo: 'Cobrado, pero falta dinero', detalle: `Está como cobrada, pero solo constan cobrados <b>${eur(doc.cobrado_importe)}</b> de <b>${eur(total)}</b>.`, propuesta: {texto: 'Cobrado completo (' + eur(total) + ')', campos: {cobrado_importe: total}}};
+    case 'precio': { const sin = lineas.map((l, i) => (l.cantidad == null && l.precio_unitario == null && l.horas == null) ? i + 1 : 0).filter(Boolean); return {titulo: 'Líneas sin horas ni precio', detalle: `Las líneas ${sin.slice(0, 8).join(', ')}${sin.length > 8 ? '…' : ''} no tienen horas/cantidad ni precio, y las demás sí.${delOriginal}`, propuesta: archivo ? {texto: 'Volver a leer el original', reprocesar: true} : {texto: 'Abrir para completarlas', abrir: true}}; }
+    case 'precio_sin_confirmar': return {titulo: 'Sin horas ni precios', detalle: `Ninguna línea trae horas o precio: solo importes.${delOriginal}`, propuesta: null};
+    case 'conflicto_iva_total': return {titulo: 'IVA y total no casan', detalle: `El IVA y el total que pone el original no cuadran entre sí (total guardado ${eur(total)}).${delOriginal}`, propuesta: null};
+    case 'archivo': return {titulo: 'Sin archivo original', detalle: 'Se digitalizó de un archivo, pero el archivo no está enlazado.', propuesta: null};
+    default: { const d = CALIDAD_DETALLE[cod] || {titulo: cod, explicacion: ''}; return {titulo: d.titulo, detalle: d.explicacion, propuesta: null}; }
+  }
+}
+async function calidadRefrescar(docId){
+  const {data} = await sb.from('documentos_economicos').select('estado_calidad,info_faltante,calidad_descartados,importe,enviado_gestor,cobrado_importe').eq('id', docId).maybeSingle();
+  const d = documentosRealesById[docId]; if(d && data) Object.assign(d, data, {total: Number(data.importe || 0)});
+  const c = d ? calidadCorta(d) : {texto: 'OK', codigos: []};
+  document.querySelectorAll('#mcard-' + docId + ' .fc-fallos').forEach(el => { if(c.texto === 'OK') el.remove(); else el.innerHTML = ICO_WARN + ' ' + (c.codigos.length || 1) + ' FALLO' + ((c.codigos.length || 1) === 1 ? '' : 'S'); });
+  if(c.texto === 'OK'){ cerrarModalGenerico(); mostrarToast('Sin fallos ✓', 'ok'); } else abrirCalidadDetalle(docId);
+}
+async function calidadDescartar(docId, cod){
+  const {error} = await sb.rpc('descartar_fallo_calidad', {p_id: docId, p_codigo: cod});
+  if(error){ mostrarToast('No se pudo descartar: ' + errText(error), 'err'); return; }
+  mostrarToast('Descartado: ya no se volverá a marcar en este documento.', 'ok'); calidadRefrescar(docId);
+}
+async function calidadAplicar(docId, cod){
+  const doc = documentosRealesById[docId]; if(!doc) return; const k = calidadConcreto(doc, cod), p = k.propuesta; if(!p) return;
+  if(p.abrir){ cerrarModalGenerico(); openDocumentViewer(docId); return; }
+  if(p.reprocesar){ reprocesarUnDocumento(docId); return; }
+  if(!exigirNivelDoc(docId, 'editar')) return;
+  const {error} = await sb.from('documentos_economicos').update(p.campos).eq('id', docId);
+  if(error){ mostrarToast('No se pudo cambiar: ' + errText(error), 'err'); return; }
+  await sb.rpc('verificar_calidad', {p_anio: null, p_id: docId});
+  mostrarToast('Hecho ✓', 'ok'); calidadRefrescar(docId);
 }
 async function reprocesarUnDocumento(docId){
   cerrarModalGenerico();
@@ -24854,8 +24905,9 @@ function totalBlockHtml(doc){
   // Solo los tipos de documento que llevan IVA (factura, proforma, presupuesto) lo enseñan aquí.
   // Un albarán nunca lleva IVA (DOC_TYPES.albaran.hasIva=false, y su propio editor nunca lo muestra):
   // si el dato quedó guardado por error, esta tarjeta no debe inventárselo.
-  const pct = (DOC_TYPES[doc.type] && DOC_TYPES[doc.type].hasIva===false) ? null : doc.iva_pct;
-  const esIsp = (DOC_TYPES[doc.type] && DOC_TYPES[doc.type].hasIva===false) ? false : (doc.tratamiento_iva||'normal')==='isp';
+  const sinIva = (DOC_TYPES[doc.type] && DOC_TYPES[doc.type].hasIva===false) || (doc.type || doc.tipo) === 'albaran';   // un albarán nunca enseña IVA
+  const pct = sinIva ? null : doc.iva_pct;
+  const esIsp = sinIva ? false : (doc.tratamiento_iva||'normal')==='isp';
   let ivaHtml = '';
   let subtotalHtml = '';
   if(esIsp){
@@ -24912,9 +24964,8 @@ function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta
     <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
     ${obraHtml}
     <div class="fc-meta">${metaHtml}</div>
-    <div class="fc-gestor-wrap celda-gestor-movil-${doc.id}" onclick="event.stopPropagation();">${gestorMovilHtml(doc.id, doc.enviado_gestor, doc.enviado_gestor_fecha)}</div>
-    ${extraHtml}
-    <div class="fc-total-block">${totalBlockHtml(doc)}</div>`;
+    <div class="fc-total-block">${totalBlockHtml(doc)}</div>
+    ${extraHtml}`;   // V7.21: el envío al gestor va en el menú de los 3 puntos; el total, justo debajo de los datos, y los avisos al final
   lista.appendChild(card);
 }
 const ICO_DOC = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
