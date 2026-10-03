@@ -1104,9 +1104,6 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
   .correo-row-acciones-movil{position:absolute;top:4px;right:6px;width:30px;height:30px;}
 }
 
-/* V7.49: el texto se ve en mayúsculas mientras se escribe sin tocar el valor (para no romper el autocompletado del iPhone) */
-input:not([type=password]):not([type=email]):not([type=url]):not([type=number]):not([data-no-mayus]), textarea:not([data-no-mayus]){text-transform:uppercase;}
-input::placeholder, textarea::placeholder{text-transform:none;}
 
 /* V7.49 Tarifas compactas y expedientes */
 .tarifa-card.tc2{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;}
@@ -3533,7 +3530,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.49</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.50</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3623,7 +3620,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.49</div>
+        <div class="sub" id="version-badge">V7.50</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11263,6 +11260,17 @@ function mayusCampo(el){
   el.value = nuevo;
   if(inicio != null && fin != null && typeof el.setSelectionRange === 'function' && document.activeElement === el){ try{ el.setSelectionRange(inicio, fin); }catch(_){} }
 }
+// V7.50: el teclado del iPhone escribe ya en mayúsculas (autocapitalize="characters"), así sus sugerencias salen en mayúsculas y al
+// tocarlas se escriben bien; no se toca el texto mientras se escribe. Se aplica a todos los campos, también a los que se crean después.
+function mayusTeclado(raiz){
+  (raiz.querySelectorAll ? raiz.querySelectorAll('input, textarea') : []).forEach(el => {
+    const tipo = (el.type || 'text').toLowerCase();
+    if(el.hasAttribute('data-no-mayus') || ['password','email','url','number','date','time','file','hidden','checkbox','radio','range','color','datetime-local','month','week'].includes(tipo)) return;
+    if(el.getAttribute('autocapitalize') !== 'characters') el.setAttribute('autocapitalize', 'characters');
+  });
+}
+mayusTeclado(document);
+new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if(n.nodeType === 1){ if(/^(INPUT|TEXTAREA)$/.test(n.tagName)) mayusTeclado(n.parentNode || document); else mayusTeclado(n); } }))).observe(document.documentElement, {childList: true, subtree: true});
 document.addEventListener('blur', e => mayusCampo(e.target), true);
 document.addEventListener('change', e => mayusCampo(e.target), true);
 document.addEventListener('keydown', e => { if(e.key === 'Enter') mayusCampo(e.target); }, true);
@@ -12485,12 +12493,15 @@ function rbTeclado(){   // con el teclado abierto, solo la fila de escribir sube
   const t = document.getElementById('rb-texto'), vv = window.visualViewport; if(!t) return;
   if(!vv || !document.getElementById('rb-marcar').classList.contains('abierto')){ t.style.transform = ''; return; }
   const m = document.getElementById('rb-marcar');
-  if(vv.offsetTop > 0 || window.scrollY > 0){ try{ window.scrollTo(0, 0); }catch(e){} }   // V7.23: que el móvil no desplace la pantalla al escribir
+  if((vv.offsetTop > 0 || window.scrollY > 0) && document.activeElement?.id !== 'rb-txt'){ try{ window.scrollTo(0, 0); }catch(e){} }   // V7.23: que el móvil no desplace la pantalla al escribir (nunca mientras se escribe)
   m.style.transform = vv.offsetTop > 0 ? `translateY(${vv.offsetTop}px)` : '';
   const hueco = Math.round(window.innerHeight - vv.height);
   t.style.transform = hueco > 80 ? `translateY(${-hueco}px)` : '';
 }
-if(window.visualViewport){ window.visualViewport.addEventListener('resize', rbTeclado); window.visualViewport.addEventListener('scroll', rbTeclado); }
+// V7.50: solo cuando cambia el alto (se abre o se cierra el teclado). Antes también en cada desplazamiento, y al tocar una sugerencia
+// del teclado del iPhone la pantalla se recolocaba en medio de la escritura y la palabra no llegaba a escribirse.
+let _rbHueco = -1;
+if(window.visualViewport){ window.visualViewport.addEventListener('resize', () => { const h = Math.round(window.innerHeight - window.visualViewport.height); if(Math.abs(h - _rbHueco) > 40){ _rbHueco = h; rbTeclado(); } }); }
 function rbCancelar(){ const mm = document.getElementById('rb-marcar'); mm.style.transform = ''; mm.classList.remove('rb-grande'); _rb.imgs = null; document.getElementById('rb-minis') && (document.getElementById('rb-minis').innerHTML = ''); document.getElementById('rb-marcar').classList.remove('abierto', 'ayuda'); document.documentElement.classList.remove('rb-marcando'); const t = document.getElementById('rb-texto'); if(t) t.style.transform = ''; _rb.cap = null; _rb.marcas = []; }
 function rbMarcasResumen(){   // dónde se marcó, en fracciones de la pantalla (0 a 1); lo que se borró con la goma ya no cuenta
   const lz = document.getElementById('rb-lienzo'), W = lz.width, H = lz.height, cm = _rb.capa ? _rb.capa.getContext('2d') : null;
