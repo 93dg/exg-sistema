@@ -1077,6 +1077,7 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.rec-fte{font-size:12px;font-weight:400;color:var(--ink-soft);margin-top:3px;}   /* como la «Fuente» de las tarjetas de Documentos */
 .rec-b{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;}
 .rec-b-pri{background:var(--orange);border-color:var(--orange);color:#fff;}
 /* Cabecera del editor compacta (Daniel 02/10/2026: «mucho espacio desaprovechado y mal colocados»): la X no ocupa una fila propia,
@@ -3330,7 +3331,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.23</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.24</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3420,7 +3421,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.23</div>
+        <div class="sub" id="version-badge">V7.24</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -10614,7 +10615,7 @@ function renderAtencion(){
   if(cont){
     cont.innerHTML = atencion.map((a,i)=>`<div class="alert-row" style="align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;" onclick="atencionFns[${i}]()">
       <div class="alert-dot ${a.sev==='red'?'red':a.sev==='yellow'?'orange':'blue'}" style="margin-top:4px;flex-shrink:0;"></div>
-      <div style="flex:1;"><div class="t">${a.t}</div><div class="s" style="margin-top:2px;">${a.s}</div></div>
+      <div style="flex:1;"><div class="t">${a.t}</div><div class="s" style="margin-top:2px;">${a.s}</div><div class="rec-fte">Fuente · ${a.fte || (a.action ? 'ficha del trabajo' : 'aviso automático')}</div></div>
     </div>`).join('');
   }
   window.atencionFns = atencion.map(a=>a.action);
@@ -10668,6 +10669,7 @@ function htmlAvisoItv(a){
       <div class="alert-dot ${color}" style="margin-top:4px;flex-shrink:0;"></div>
       <div style="flex:1;">
         <div class="t"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px;"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><circle cx="8" cy="17" r="1.6"/><circle cx="16" cy="17" r="1.6"/></svg>ITV ${v.nombre}${v.matricula?' ('+v.matricula+')':''} — ${cuando}</div>
+        <div class="rec-fte">Fuente · ficha del vehículo (Flota)</div>
         <div class="s" style="margin-top:2px;">Válida hasta ${dd}/${m}/${y}. Aviso automático: desaparece al actualizar la fecha de ITV en la ficha del vehículo.</div>
       </div>
     </div>`;
@@ -10708,7 +10710,7 @@ function recRender(){
     return `<details class="alert-det">
       <summary class="alert-sum">
         <div class="alert-dot ${color}"></div>
-        <div class="t">${icono} ${escHtml(corto)}</div>
+        <div class="t">${icono} ${escHtml(corto)}<div class="rec-fte">Fuente · ${escHtml(d.fuente || (r.tipo === 'alerta_cobro_pendiente' ? 'documentos pendientes de cobro' : r.tipo === 'alerta_itv' ? 'ficha del vehículo' : d.origen === 'recordatorio' ? 'recordatorio' : 'chat con Claude'))}${d.archivo_url ? ' <a href="' + escHtml(d.archivo_url) + '" class="fte-lnk" onclick="event.stopPropagation()">Archivo</a>' : ''}</div></div>
         <div class="s alert-fecha"${v && v < hoy ? ' style="color:var(--red);font-weight:700;"' : ''}>${v ? (v < hoy ? 'venció ' : 'vence ') : ''}${txtFecha}</div>
       </summary>
       <div class="alert-det-b">
