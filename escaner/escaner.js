@@ -94,6 +94,7 @@
       cv.morphologyEx(papel, papel, cv.MORPH_OPEN, cierrePapel);
       cv.morphologyEx(papel, papel, cv.MORPH_CLOSE, M(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(19, 19))));
 
+      const bordes = M(new cv.Mat());   // se rellena más abajo, antes de puntuar candidatos
       // Cuánto de un candidato cae dentro de esa máscara de papel (0 a 1): descarta bordes del propio fondo (madera, mantel...).
       function cobertura(quad) {
         const relleno = M(cv.Mat.zeros(h, w, cv.CV_8U));
@@ -116,14 +117,38 @@
         if (!quad) { const r = cv.minAreaRect(hull); quad = cv.RotatedRect.points(r).map((p) => ({ x: p.x, y: p.y })); }
         return { quad, areaHull, exacto };
       }
+      // V7.40 — APOYO EN BORDES: qué parte del contorno del candidato cae sobre un borde real de la foto (0 a 1).
+      // Un documento de verdad tiene borde en sus cuatro lados; un cuadrilátero inventado (líneas que cruzan la foto) no.
+      // Así funciona también con tarjetas de colores (DNI, permiso) sobre fondos con textura, donde «parece papel» falla.
+      function apoyo(quad) {
+        let si = 0, tot = 0;
+        for (let k = 0; k < 4; k++) {
+          const a = quad[k], b = quad[(k + 1) % 4];
+          for (let t = 0.08; t <= 0.92; t += 0.02) {
+            const x = Math.round(a.x + (b.x - a.x) * t), y = Math.round(a.y + (b.y - a.y) * t); tot++;
+            if (x >= 0 && y >= 0 && x < w && y < h && bordes.ucharPtr(y, x)[0] > 0) si++;
+          }
+        }
+        return tot ? si / tot : 0;
+      }
+      function rectitud(quad) {   // 1 si los cuatro ángulos son rectos; baja con lo torcido que esté
+        let peor = 0;
+        for (let k = 0; k < 4; k++) {
+          const p = quad[(k + 3) % 4], q = quad[k], r = quad[(k + 1) % 4];
+          const v1 = { x: p.x - q.x, y: p.y - q.y }, v2 = { x: r.x - q.x, y: r.y - q.y };
+          const c = Math.abs((v1.x * v2.x + v1.y * v2.y) / ((Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y)) || 1));
+          peor = Math.max(peor, c);
+        }
+        return Math.max(0, 1 - peor * 1.4);
+      }
       function puntuar(quad, areaHull, exacto) {
         const qa = areaPoligono(quad), relleno = Math.min(areaHull, qa) / Math.max(areaHull, qa);
         const fracImg = qa / area, penaliza = fracImg > 0.97 ? 0.5 : 1;
-        const cob = cobertura(quad);
+        const cob = cobertura(quad), ap = apoyo(ordenar(quad)), rc = rectitud(ordenar(quad));
         // Solo se exige coincidir con "esto es papel" a los candidatos grandes (fracImg > 0.75): son los que pueden ser en
         // realidad el fondo colándose. Un candidato normal, con margen visible, se puntúa igual que antes.
-        const factorCobertura = fracImg > 0.75 ? Math.pow(cob, 2.5) : 1;
-        return { quad, cobertura: cob, score: fracImg * relleno * relleno * (exacto ? 1 : 0.85) * penaliza * factorCobertura };
+        const factorCobertura = fracImg > 0.75 ? Math.pow(Math.max(cob, ap), 2.5) : 1;
+        return { quad, cobertura: cob, apoyo: ap, score: Math.sqrt(fracImg) * relleno * relleno * (exacto ? 1 : 0.85) * penaliza * factorCobertura * Math.pow(0.15 + ap, 2) * (0.4 + 0.6 * rc) };
       }
       function probarMayor(bin) {
         const contornos = new cv.MatVector(), jer = new cv.Mat();
@@ -132,6 +157,17 @@
         for (let i = 0; i < contornos.size(); i++) {
           const c = contornos.get(i), a = cv.contourArea(c);
           if (a > area * 0.04 && a < area * 0.995) { const { quad, areaHull, exacto } = aQuad(c); const cand = puntuar(quad, areaHull, exacto); if (!mejor || cand.score > mejor.score) mejor = cand; }
+        }
+        contornos.delete(); jer.delete();
+        return mejor;
+      }
+      function probarLista(bin) {   // también los contornos de dentro (la tarjeta dentro de la cartera, el papel sobre la carpeta…)
+        const contornos = new cv.MatVector(), jer = new cv.Mat();
+        cv.findContours(bin, contornos, jer, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+        let mejor = null;
+        for (let i = 0; i < contornos.size(); i++) {
+          const c = contornos.get(i), a = cv.contourArea(c);
+          if (a > area * 0.05 && a < area * 0.995) { const { quad, areaHull, exacto } = aQuad(c); const cand = puntuar(quad, areaHull, exacto); if (!mejor || cand.score > mejor.score) mejor = cand; }
         }
         contornos.delete(); jer.delete();
         return mejor;
@@ -153,11 +189,13 @@
       const cierre = M(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(7, 7)));
       const bin = M(new cv.Mat()); cv.threshold(suave, bin, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU); cv.morphologyEx(bin, bin, cv.MORPH_CLOSE, cierre);
       const ed = M(new cv.Mat()); cv.Canny(suave, ed, 35, 110); cv.dilate(ed, ed, cierre); cv.morphologyEx(ed, ed, cv.MORPH_CLOSE, cierre);
-      const candidatos = [probarMayor(bin), probarMayor(ed), probarMayor(papel), probarUnion(papel)].filter(Boolean);
+      const bordesFinos = M(new cv.Mat()); cv.Canny(suave, bordesFinos, 30, 90);
+      cv.dilate(bordesFinos, bordes, M(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5))));
+      const candidatos = [probarMayor(bin), probarMayor(ed), probarLista(ed), probarMayor(papel), probarUnion(papel)].filter(Boolean);
       if (!candidatos.length) return null;
       const g = candidatos.sort((a, b) => b.score - a.score)[0];
       const k = 1 / esc;
-      return { quad: g.quad.map((p) => ({ x: p.x * k, y: p.y * k })), cobertura: g.cobertura };
+      return { quad: g.quad.map((p) => ({ x: p.x * k, y: p.y * k })), cobertura: Math.max(g.cobertura, g.apoyo || 0) };
     } finally { borrar.forEach((m) => { try { m.delete(); } catch (e) {} }); }
   }
 
@@ -290,21 +328,45 @@
       ctx.fillStyle = "rgba(0,0,0,.42)"; ctx.fill("evenodd");            // se oscurece lo que quedará fuera
       ctx.beginPath(); p.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.closePath();
       ctx.lineWidth = 3 * st.dpr; ctx.strokeStyle = "#FF7A2E"; ctx.stroke();
-      p.forEach((q) => { ctx.beginPath(); ctx.arc(q.x, q.y, 12 * st.dpr, 0, Math.PI * 2); ctx.fillStyle = "#D8560F"; ctx.fill(); ctx.lineWidth = 3 * st.dpr; ctx.strokeStyle = "#fff"; ctx.stroke(); });
+      p.forEach((q, i) => { if (i === st.arrastrando) return; ctx.beginPath(); ctx.arc(q.x, q.y, 12 * st.dpr, 0, Math.PI * 2); ctx.fillStyle = "#D8560F"; ctx.fill(); ctx.lineWidth = 3 * st.dpr; ctx.strokeStyle = "#fff"; ctx.stroke(); });
+      if (st.arrastrando >= 0) lupa(p, k);
     }
+    // LUPA (Daniel 03/10/2026: «cuando muevo una esquina me tapo con mi propio dedo»): mientras se arrastra una esquina, en la esquina
+    // contraria de la foto sale un círculo con esa zona ampliada 3 veces y una cruz justo donde cae el punto
+    function lupa(p, k) {
+      // la lupa va FUERA de la foto (en el hueco oscuro de arriba o de abajo), para no tapar ninguna esquina
+      let lc = document.getElementById("esc-lupa");
+      if (!lc) { lc = document.createElement("canvas"); lc.id = "esc-lupa"; lc.style.cssText = "position:fixed;z-index:10;width:132px;height:132px;border-radius:50%;border:3px solid #fff;box-shadow:0 6px 22px rgba(0,0,0,.55);pointer-events:none;display:none;background:#141618;"; el.appendChild(lc); }
+      const D = Math.round(132 * st.dpr); if (lc.width !== D){ lc.width = D; lc.height = D; }
+      const r = lienzo.getBoundingClientRect(), q = p[st.arrastrando], qyPant = r.top + q.y / st.dpr;
+      const arriba = qyPant > window.innerHeight / 2;   // el dedo abajo: lupa arriba; el dedo arriba: lupa abajo
+      lc.style.left = Math.round(window.innerWidth / 2 - 66) + "px";
+      lc.style.top = (arriba ? Math.max(70, r.top - 150) : Math.min(window.innerHeight - 220, r.bottom + 18)) + "px";
+      lc.style.display = "block";
+      const c2 = lc.getContext("2d"), R = D / 2, Z = 3, f = st.esquinas[st.arrastrando], lado = D / (k * Z);
+      c2.setTransform(1, 0, 0, 1, 0, 0); c2.clearRect(0, 0, D, D); c2.fillStyle = "#141618"; c2.fillRect(0, 0, D, D);
+      c2.drawImage(st.foto, f.x - lado / 2, f.y - lado / 2, lado, lado, 0, 0, D, D);
+      c2.lineWidth = 2 * st.dpr; c2.strokeStyle = "#FF7A2E";
+      [(st.arrastrando + 1) % 4, (st.arrastrando + 3) % 4].forEach((j) => { const o = st.esquinas[j]; c2.beginPath(); c2.moveTo(R, R); c2.lineTo(R + (o.x - f.x) * k * Z, R + (o.y - f.y) * k * Z); c2.stroke(); });
+      c2.lineWidth = 1.5 * st.dpr; c2.strokeStyle = "#fff";
+      c2.beginPath(); c2.moveTo(R - 14 * st.dpr, R); c2.lineTo(R + 14 * st.dpr, R); c2.moveTo(R, R - 14 * st.dpr); c2.lineTo(R, R + 14 * st.dpr); c2.stroke();
+      // el punto que se arrastra se dibuja hueco, para ver lo que hay debajo
+      ctx.beginPath(); ctx.arc(q.x, q.y, 14 * st.dpr, 0, Math.PI * 2); ctx.lineWidth = 2.5 * st.dpr; ctx.strokeStyle = "#FF7A2E"; ctx.stroke();
+    }
+    function lupaFuera(){ const lc = document.getElementById("esc-lupa"); if (lc) lc.style.display = "none"; }
     function punto(ev) { const r = lienzo.getBoundingClientRect(); return { x: (ev.clientX - r.left) / st.escala, y: (ev.clientY - r.top) / st.escala }; }
     lienzo.onpointerdown = (ev) => {
       if (st.paso !== "ajustar" || !st.esquinas) return;
       const p = punto(ev); let mejor = -1, md = 48 / st.escala;   // hasta 48 px del dedo
       st.esquinas.forEach((q, i) => { const d = dist(q, p); if (d < md) { md = d; mejor = i; } });
-      if (mejor >= 0) { st.arrastrando = mejor; try { lienzo.setPointerCapture(ev.pointerId); } catch (e) {} ev.preventDefault(); }
+      if (mejor >= 0) { st.arrastrando = mejor; try { lienzo.setPointerCapture(ev.pointerId); } catch (e) {} ev.preventDefault(); dibujar(); }
     };
     lienzo.onpointermove = (ev) => {
       if (st.arrastrando < 0) return;
       const p = punto(ev); st.esquinas[st.arrastrando] = { x: Math.max(0, Math.min(st.foto.width, p.x)), y: Math.max(0, Math.min(st.foto.height, p.y)) };
       dibujar(); ev.preventDefault();
     };
-    lienzo.onpointerup = lienzo.onpointercancel = () => { st.arrastrando = -1; };
+    lienzo.onpointerup = lienzo.onpointercancel = () => { st.arrastrando = -1; lupaFuera(); dibujar(); };
 
     async function detectarAhora() {
       cargando("Detectando el documento…"); await new Promise((r) => setTimeout(r, 30));
