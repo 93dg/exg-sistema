@@ -3477,7 +3477,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.46</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.47</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3567,7 +3567,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.46</div>
+        <div class="sub" id="version-badge">V7.47</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18283,13 +18283,15 @@ function actualizarPanelesSinActividad(){
     });
   }
 
-  // Sin actividad: sin documentos con importe/número/fecha
-  const conDocReal = new Set(
-    Object.values(documentosRealesById||{})
-      .filter(d=>(parseFloat(d.importe)||0)>0 || d.num || d.numero || d.dateRaw)
-      .map(d=>d.entidad_id)
-  );
-  const sinAct = entidades.filter(e=>!conDocReal.has(e.id) && (e.clase_nombre||'')!=='direccion');
+  // Sin actividad (V7.47, Daniel: «¿qué son los 242?»): antes se contaba solo con los documentos ya cargados en la web, y como los antiguos
+  // se cargan más tarde, salían casi todos los clientes. Ahora lo dice la base: fichas sin ningún documento en todo el histórico.
+  if(!window._entSinDocs){
+    if(!window._entSinDocsPidiendo && sb){ window._entSinDocsPidiendo = true;
+      sb.rpc('entidades_sin_documentos').then(({data}) => { window._entSinDocs = new Set((data || []).map(x => typeof x === 'string' ? x : (x.entidades_sin_documentos || x.id))); window._entSinDocsPidiendo = false; actualizarPanelesSinActividad(); }); }
+    const p = document.getElementById('panel-sin-actividad'); if(p) p.style.display = 'none';
+    return;
+  }
+  const sinAct = entidades.filter(e=>window._entSinDocs.has(e.id) && (e.clase_nombre||'')!=='direccion');
   const panelSin = document.getElementById('panel-sin-actividad');
   const bodySin  = document.getElementById('sin-actividad-body');
   const countSin = document.getElementById('sin-actividad-count');
