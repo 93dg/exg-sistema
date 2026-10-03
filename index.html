@@ -3477,7 +3477,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.43</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.44</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3567,7 +3567,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.43</div>
+        <div class="sub" id="version-badge">V7.44</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -24982,14 +24982,18 @@ function renderControlDocs(){
         const fecha = formatFechaCorta(d.dateRaw);
         const cal = calidadCorta(d);
         const fallosHtml = cal.texto==='OK' ? '' : `<span class="fc-fallos" onclick="event.stopPropagation();abrirCalidadDetalle('${d.id}')">${ICO_WARN} ${cal.texto.slice(0,14)}</span>`;
-        const archivoBtn = d.archivo_url ? `<span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${d.archivo_url}')">${ICO_CLIP} Ver</span>` : '';
+        const urlArch = d.archivo_url || (typeof fteUrl === 'function' ? fteUrl(d) : '');   // V7.44: el archivo sale igual que en Documentos
+        const archivoBtn = urlArch ? `<span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${urlArch}')">${ICO_CLIP} Archivo</span>` : '';
         const extraHtml = (archivoBtn || fallosHtml) ? `<div class="fc-extra">${archivoBtn}${fallosHtml}</div>` : '';
         const estadoHtml = controlDocsEstadoPill(d,'m');
-        const tipoNum = `${tipoDocEtiqueta(d.type||'')} · ${d.numero||'—'}`;
+        const tipoNum = `${String(tipoDocEtiqueta(d.type||'')).replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/, '')} · ${d.numero||'—'}`;   // sin el emoji del tipo
+        const cliente = d.client && d.client !== '—' ? d.client : 'Sin cliente';
         return `<div class="factura-card-movil" onclick="openDocumentViewer('${d.id}')">
-          <input type="checkbox" class="fc-check" onclick="event.stopPropagation();">
+          <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${d.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
+          <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${d.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
+          <input type="checkbox" class="fc-check ctrl-sel-chk" data-id="${d.id}" onclick="event.stopPropagation();" onchange="actualizarSeleccionDoc('ctrl-sel-chk','ctrl-borrar-sel-btn','ctrl-sel-count')">
           <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}</div>
-          <div class="fc-cliente">${svgEsc(d.client||'Sin cliente')}</div>
+          <div class="fc-cliente">${svgEsc(cliente)}</div>
           <div class="fc-meta">
             <span class="fc-meta-ico">${ICO_DOC} ${svgEsc(tipoNum)}</span>
             <span class="fc-meta-sep">|</span>
