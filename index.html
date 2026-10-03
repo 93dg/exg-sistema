@@ -2457,7 +2457,14 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 /* V7.29 (Daniel: ordenar y mejorar al desplegar): el desplegable es una tarjeta clara; el texto largo se corta a 4 líneas con «Ver más» */
 #alertas-list-bd .alert-det-b, #alertas-list-atencion .alert-det-b{margin:0 0 12px 20px;padding:12px 14px;background:var(--concrete);border-radius:12px;}
 #alertas-list-bd .alert-det-b .s, #alertas-list-atencion .alert-det-b .s{font-size:13px;line-height:1.45;}
-.rec-largo{font-weight:600;color:var(--ink);margin-bottom:6px;font-size:13.5px;text-transform:none;}
+.rec-largo{font-weight:600;color:var(--ink);margin-bottom:8px;font-size:13.5px;text-transform:none;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.rec-lista{margin:8px 0 2px;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px;}
+.rec-lista li{position:relative;padding-left:14px;font-size:13px;line-height:1.4;color:var(--ink);}
+.rec-lista li::before{content:'';position:absolute;left:2px;top:7px;width:5px;height:5px;border-radius:50%;background:var(--orange);}
+.rec-lista li b{font-weight:700;}
+.rec-lista .rec-oculto{display:none;}
+.rec-lista.ver .rec-oculto{display:list-item;}
+#alertas-list-bd .alert-det-b .rec-fte{margin-bottom:4px;}
 .rec-desc{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}
 .rec-desc.ver{-webkit-line-clamp:unset;display:block;}
 .alert-det-b .rec-b{padding:7px 12px;font-size:13px;}
@@ -3455,7 +3462,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.36</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.37</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3545,7 +3552,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.36</div>
+        <div class="sub" id="version-badge">V7.37</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -10880,9 +10887,9 @@ function recRender(){
         ${v ? `<div class="s alert-fecha"${v < hoy ? ' style="color:var(--red);font-weight:700;"' : ''}>${txtFecha}</div>` : ''}
       </summary>
       <div class="alert-det-b">
-        ${largo ? `<div class="rec-largo">${escHtml(largo)}</div>` : ''}
+        ${largo ? `<div class="rec-largo">${escHtml(recSinGritos(largo))}</div>` : ''}
         <div class="rec-fte">Fuente · ${escHtml(d.fuente || (r.tipo === 'alerta_cobro_pendiente' ? 'documentos pendientes de cobro' : r.tipo === 'alerta_itv' ? 'ficha del vehículo' : d.origen === 'recordatorio' ? 'recordatorio' : 'chat con Claude'))}${d.archivo_url ? ' <a href="' + escHtml(d.archivo_url) + '" class="fte-lnk" onclick="event.stopPropagation()">Archivo</a>' : ''}</div>
-        ${desc?`<div class="s rec-desc">${escHtml(desc)}</div>${desc.length > 220 ? '<span class="rec-mas" onclick="const d=this.previousElementSibling;d.classList.toggle(\'ver\');this.textContent=d.classList.contains(\'ver\')?\'Ver menos\':\'Ver más\'">Ver más</span>' : ''}`:''}
+        ${desc ? recDetalleHtml(desc) : ''}
         ${d.en_bandeja ? '<div class="s" style="margin-top:6px;color:var(--orange);font-weight:700;">En la bandeja' + (d.orden_bandeja ? ': ' + escHtml(d.orden_bandeja) : '') + '</div>' : ''}
         <div class="rec-acc">${d.ver ? (Array.isArray(d.ver) ? d.ver : [d.ver]).map((v, i) => `<button type="button" class="rec-b rec-b-pri" onclick="recVer('${r.id}', ${i})">${escHtml(v.etiqueta || 'Ver')}</button>`).join('') : ''}<button type="button" class="rec-b ${d.ver ? '' : 'rec-b-pri'}" onclick="recABandeja('${r.id}')">A la bandeja</button><button type="button" class="rec-b" onclick="recPosponer('${r.id}')">Posponer</button><button type="button" class="rec-b" onclick="marcarRecordatorioResuelto('${r.id}')">Hecho</button></div>
       </div>
@@ -10920,6 +10927,18 @@ function recABandeja(id){
   };
 }
 // «Ver» en un recordatorio: abre la lista exacta de la que habla (vista, tipo, todos los años, estado y búsqueda)
+// DESPLEGADO ORDENADO (Daniel: «es un pelotón de texto todo seguido»): el texto se parte en frases, cada una en su línea con un punto,
+// los importes y las fechas en negrita; se ven las 4 primeras y el resto con «Ver más»
+function recSinGritos(t){   // «PEDIR A COVAP LAS FACTURAS…» → «Pedir a COVAP las facturas…»: solo la parte en mayúsculas del principio; siglas y matrículas se quedan
+  const SIG = /^(COVAP|IVTM|AEAT|ITV|FNMT|DGT|PDF|IVA|SMS|API|CIF|NIF|IBAN|PER|SL|SA|3T|4T|EXG|B)$/;
+  return String(t).replace(/^[^a-záéíóúñ]+(?=[\s:]|$)/, m => m.split(/(\s+)/).map((w, i) => /\s/.test(w) || SIG.test(w.replace(/[^\w]/g, '')) || /\d/.test(w) ? w : (i === 0 ? w.charAt(0) + w.slice(1).toLowerCase() : w.toLowerCase())).join(''));
+}
+function recDetalleHtml(desc){
+  const partes = String(desc).replace(/\s+/g, ' ').split(/(?<=[.;:])\s+(?=[A-ZÁÉÍÓÚÑ0-9«(¿])/).map(x => x.trim().replace(/[.;]$/, '')).filter(x => x.length > 2);
+  const resaltar = t => escHtml(t).replace(/(\d{1,3}(?:\.\d{3})*,\d{2}\s?€|\d+(?:,\d+)?\s?€|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b)/g, '<b>$1</b>');
+  const li = (t, oculto) => `<li${oculto ? ' class="rec-oculto"' : ''}>${resaltar(t)}</li>`;
+  return `<ul class="rec-lista">${partes.map((p, i) => li(p, i >= 4)).join('')}</ul>` + (partes.length > 4 ? `<span class="rec-mas" onclick="const u=this.previousElementSibling;u.classList.toggle('ver');this.textContent=u.classList.contains('ver')?'Ver menos':'Ver ${partes.length - 4} más'">Ver ${partes.length - 4} más</span>` : '');
+}
 function recVer(id, i){
   const r = _recItems.find(x => x.id === id); let v = r && r.data && r.data.ver; if(Array.isArray(v)) v = v[i || 0]; if(!v) return;
   const pre = v.vista === 'albaranes' ? 'alb' : 'pres';
@@ -15013,6 +15032,8 @@ function visorCrear(){
   v.querySelector('#visor-mas').onclick = () => visorZoom(1.4);
   v.querySelector('#visor-menos').onclick = () => visorZoom(1 / 1.4);
   v.querySelector('#visor-desc').onclick = visorDescargar;
+  { const d = v.querySelector('#visor-desc'), p = document.createElement('button'); p.type = 'button'; p.className = 'visor-bt'; p.id = 'visor-imp'; p.title = 'Imprimir'; p.setAttribute('aria-label', 'Imprimir');
+    p.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>'; p.onclick = visorImprimir; d.after(p); }
   visorPellizco(v.querySelector('#visor-c'));
   const top = v.querySelector('.visor-top'), t = v.querySelector('#visor-t');
   const flecha = (d, p) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'visor-bt visor-nav'; b.title = d < 0 ? 'Anterior' : 'Siguiente'; b.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="' + p + '"/></svg>'; b.onclick = () => visorPasar(d); return b; };
@@ -15044,9 +15065,11 @@ function visorAbrir(url, titulo, deLista){
   if(!deLista) _visorLista = null;
   const v = visorCrear(); _visorUrl = url; _visorVer = url; _visorZoom = 1; _visorPdf = null;
   const nombre = (titulo || decodeURIComponent(String(url).split('?')[0].split('/').pop() || 'Documento')).replace(/\s+/g, ' ').trim();
-  _visorEsPdf = /\.pdf$/i.test(decodeURIComponent(String(url).split('?')[0].split('#')[0]));
+  _visorEsPdf = /\.pdf$/i.test(decodeURIComponent(String(url).split('?')[0].split('#')[0])) || /\.pdf$/i.test(nombre);   // un PDF hecho en la web (blob:) se reconoce por su nombre
+  _visorNombre = nombre;
   v.querySelector('#visor-t').textContent = nombre;
   v.classList.add('abierto'); document.documentElement.classList.add('visor-abierto');
+  const imp = v.querySelector('#visor-imp'); if(imp) imp.style.display = _visorEsPdf ? '' : 'none';
   visorListaPintar();
   visorPintar();
 }
@@ -15373,6 +15396,18 @@ async function visorPintarDoc(c, soloZoom){
   }catch(e){ console.warn('visor: no se pudo leer', e); if(tok === visorPintar._n) visorSinVista(c); }
 }
 function visorSinVista(c){ c.innerHTML = '<div class="visor-msg">Este archivo no se puede ver aquí. <a href="#" class="fte-lnk" onclick="event.preventDefault();visorDescargar()">Descargar</a></div>'; }
+let _visorNombre = '';
+// IMPRIMIR DENTRO DE LA WEB (Daniel: «cuando le doy a imprimir me sale con el visor externo»): el PDF se abre en nuestro visor;
+// su botón de imprimir usa el menú de compartir del móvil (que trae «Imprimir») y, en el ordenador, imprime desde un marco oculto
+async function visorImprimir(){
+  try{
+    const r = await fetch(_visorUrl), b = await r.blob(), nom = /\.pdf$/i.test(_visorNombre) ? _visorNombre : 'documento.pdf';
+    const f = new File([b], nom, {type: 'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files: [f]}) && /iPhone|iPad|Android/i.test(navigator.userAgent)){ await navigator.share({files: [f], title: nom}); return; }
+    const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0;'; fr.src = URL.createObjectURL(b); document.body.appendChild(fr);
+    fr.onload = () => { try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ mostrarToast('No se pudo imprimir desde aquí: descárgalo e imprímelo.', 'err'); } setTimeout(() => fr.remove(), 60000); };
+  }catch(e){ if(e && e.name !== 'AbortError') mostrarToast('No se pudo imprimir', 'err'); }
+}
 async function visorDescargar(){
   try{ const r = await fetch(_visorUrl), b = await r.blob(), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = decodeURIComponent(String(_visorUrl).split('?')[0].split('/').pop() || 'documento'); document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
   catch(e){ mostrarToast('No se pudo descargar', 'err'); }
@@ -20059,10 +20094,8 @@ function generarPDFDocumento(accion, modoForzado){
     // el mismo PDF real que se descarga, pero enviado directamente a imprimir — abre el PDF
     // en una pestaña nueva y dispara el diálogo de impresión del propio lector de PDF,
     // en vez de una vista HTML aparte que podía verse distinta al documento real
-    doc.autoPrint();
-    const url = doc.output('bloburl');
-    const ventana = window.open(url, '_blank');
-    if(!ventana){ mostrarToast('El navegador ha bloqueado la ventana — permite ventanas emergentes para imprimir.'); }
+    const url = doc.output('bloburl');   // V7.37: dentro de la web, en el visor propio (con su botón de imprimir); nunca en otra pestaña
+    visorAbrir(url, `${num || 'documento'}.pdf`);
   } else if(accion==='blob'){
     return doc.output('blob');
   } else {
