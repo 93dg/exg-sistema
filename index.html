@@ -3477,7 +3477,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.44</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.45</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3567,7 +3567,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.44</div>
+        <div class="sub" id="version-badge">V7.45</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3664,11 +3664,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
       <div class="panel" id="panel-notificaciones" style="margin-bottom:12px;">
         <div class="panel-head" onclick="toggleNotifPanel()" style="cursor:pointer;justify-content:space-between;align-items:center;">
           <div style="display:flex;align-items:center;gap:8px;">
-            <h3 style="margin:0;">🔔 Notificaciones</h3>
+            <h3 style="margin:0;">Pendiente de verificación</h3>
             <span class="count" id="notif-count" style="display:none;"></span>
           </div>
           <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
-            <button class="btn sm" onclick="marcarTodasLeidasNotif()">✓ Leer todo</button>
+
             
             <span id="notif-chevron" style="color:var(--ink-soft);font-size:16px;">▾</span>
           </div>
@@ -3689,8 +3689,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
             </table>
           </div>
           <div class="lista-movil-solo" id="notif-lista-movil" style="padding:8px 0;"></div>
-          <div style="padding:12px 14px;text-align:center;display:none;" id="notif-empty">
-            <span style="color:var(--ink-soft);font-size:13px;">Sin notificaciones</span>
+          <div style="padding:12px 14px;text-align:center;display:none;" id="notif-empty"><span style="color:var(--ink-soft);font-size:13px;">Nada que verificar</span>
           </div>
         </div>
       </div>
@@ -15892,6 +15891,7 @@ async function cargarNotificaciones(){
     .from('sistema_notificaciones')
     .select('*')
     .eq('verificado', false)
+    .not('origen', 'in', '(correo,banco)')   // V7.45 (Daniel): aquí solo lo que él tiene que comprobar; los avisos de correo y banco son trabajo de la bandeja
     .order('created_at', {ascending:false})
     .limit(50);
   if(error || !data) return;
@@ -15944,7 +15944,7 @@ function renderNotificaciones(lista){
         <td style="text-align:center;">
           <button class="btn sm" onclick="abrirDetalleNotif('${n.id}')">Ver</button>
           ${n.elemento_id&&n.seccion?`<button class="btn sm" onclick="irAElementoNotif('${n.id}')" title="Ir al elemento">↗</button>`:''}
-          <button class="btn sm notif-x" onclick="borrarNotif('${n.id}')" title="Borrar" aria-label="Borrar notificación">✕</button>
+          <button class="btn sm primary" onclick="verificarNotif('${n.id}')">Está bien</button>
         </td>
       </tr>`;
     }).join('');
@@ -15967,21 +15967,31 @@ function renderNotificaciones(lista){
         </div>
         ${cliente?`<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${cliente}</div>`:''}
         <div class="nc-links" style="margin-top:8px;">
-          ${n.elemento_id?`<button class="btn sm primary" onclick="irAElementoNotif('${n.id}')">${etiquetaBtn}</button>`:''}
+          ${n.elemento_id?`<button class="btn sm" onclick="irAElementoNotif('${n.id}')">${etiquetaBtn.replace(/^[^A-Za-zÁÉÍÓÚáéíóú]+/, '')}</button>`:''}
           <button class="btn sm" onclick="abrirDetalleNotif('${n.id}')">Detalle</button>
+          <button class="btn sm primary" onclick="verificarNotif('${n.id}')">Está bien</button>
         </div>
       </div>`;
     }).join('');
   }
 }
 
+// «Está bien»: Daniel da por comprobado el cambio y sale de Pendiente de verificación
+async function verificarNotif(id){
+  if(!sb) return;
+  const {error} = await sb.from('sistema_notificaciones').update({verificado: true, verificado_at: new Date().toISOString(), leida: true}).eq('id', id);
+  if(error){ mostrarToast('No se pudo: ' + errText(error), 'err'); return; }
+  _notificacionesCache = _notificacionesCache.filter(x => x.id !== id);
+  renderNotificaciones(_notificacionesCache);
+  mostrarToast('Verificado ✓', 'ok');
+}
 function abrirDetalleNotif(id){
   const n = _notificacionesCache.find(x=>x.id===id);
   if(!n) return;
   // Marcar como leída
   if(!n.leida && sb){ sb.from('sistema_notificaciones').update({leida:true}).eq('id',id).then(()=>{ n.leida=true; renderNotificaciones(_notificacionesCache); }); }
   const cambio = n.datos_cambio ? JSON.stringify(n.datos_cambio, null, 2) : '—';
-  mostrarModalGenerico('🔔 Detalle de cambio',
+  mostrarModalGenerico('Detalle del cambio',
     `<div style="font-size:13px;line-height:1.7;display:flex;flex-direction:column;gap:8px;">
       <div><b>📥 Recibido:</b><br>${svgEsc(n.mensaje_original||'—')}</div>
       <div><b>🧠 Decisión:</b><br>${svgEsc(n.decision_sistema||'—')}</div>
