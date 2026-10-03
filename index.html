@@ -448,6 +448,10 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .pill.terminado, .pill.cobrado, .pill.disponible, .pill.validado, .pill.adjudicado{background:var(--green-soft);color:var(--green);}
 .pill.taller{background:var(--yellow-soft);color:#6F4E00;}
 .pill.vendida{background:var(--concrete);color:var(--ink-soft);}
+.fl-part{border-left:4px solid #6B5BD2;}
+.fl-part-notas{margin:10px 0 4px;}
+.fl-part-notas .rec-mas{display:inline-block;margin:6px 0 0 14px;color:var(--orange);font-weight:700;font-size:13px;cursor:pointer;}
+.fl-part-pill{background:#ECE9FB;color:#4A3DB0;font-size:10.5px;font-weight:700;white-space:nowrap;}
 .pill.facturado{background:#E4DEF7;color:#5A3FA0;}
 .pill.rectificativa{background:#F7E4DE;color:#A0553F;}
 .pill.nula{background:var(--concrete-2);color:var(--ink-soft);text-decoration:line-through;}
@@ -3462,7 +3466,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.41</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.42</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3552,7 +3556,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.41</div>
+        <div class="sub" id="version-badge">V7.42</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4032,6 +4036,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
         <div class="client-tab" data-sub="averias">Averías</div>
         <div class="client-tab" data-sub="repuestos">Repuestos</div>
         <div class="client-tab" data-sub="historial">Historial</div>
+        <div class="client-tab" data-sub="particulares">Particulares</div>
       </div>
 
       <div class="sub-view" id="flota-maquinaria">
@@ -4064,6 +4069,10 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
       <div class="sub-view" id="flota-historial" style="display:none;">
         <div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">Maquinaria y vehículos que ya no forman parte de la flota.</div>
         <div id="flota-historial-cards"></div>
+      </div>
+      <div class="sub-view" id="flota-particulares" style="display:none;">
+        <div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">Vehículos que no son de la empresa pero tienen algún gasto que se paga desde su cuenta (seguro, impuesto…). No cuentan en la flota, ni en sus avisos, ni como gasto de la empresa.</div>
+        <div id="flota-particulares-cards"></div>
       </div>
     </div>
 
@@ -7079,7 +7088,7 @@ function setupSubtabs(navId, prefix, mapping, opts){
     });
   });
 }
-setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimiento:'flota-mantenimiento',averias:'flota-averias',repuestos:'flota-repuestos',historial:'flota-historial'});
+setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',mantenimiento:'flota-mantenimiento',averias:'flota-averias',repuestos:'flota-repuestos',historial:'flota-historial',particulares:'flota-particulares'});
 setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad'});
 setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',control:'gpro-control',combustible:'gpro-comb',prestamos:'gpro-prestamos',revisar:'gpro-revisar'},{onSwitch:{revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible(), control:()=>renderGastosProControl(), prestamos:()=>iniciarPrestamos()}});
 document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filters .chip-filter').forEach(chip=>{
@@ -10233,6 +10242,25 @@ async function cargarHistorialFlota(){
       </div>`;
     }).join('') : '<div class="fl-sec"><div class="fl-vacio">Sin maquinaria vendida.</div></div>';
   }catch(e){}
+  cargarParticularesFlota();
+}
+// PARTICULARES (Daniel 03/10/2026): vehículos de la familia que no son de la empresa, con la distinción bien visible
+async function cargarParticularesFlota(){
+  if(!sb) return;
+  try{
+    const {data} = await sb.from('flota').select('*').eq('estado', 'particular').order('created_at', {ascending: false});
+    (data || []).forEach(m => { m.documentos = (m.documentos || []).filter(d => !d.oculto); });
+    flotaParticular = (data || []).map(m => ({id: m.id, name: m.nombre, type: m.tipo || '', modelo: m.modelo || '', clase: m.clase || '', state: 'particular', matricula: m.matricula || '', fichaTecnica: m.ficha_tecnica || '', documentos: m.documentos || [], itv_vence: m.itv_vence}));
+    const cont = document.getElementById('flota-particulares-cards'); if(!cont) return;
+    cont.innerHTML = (data || []).length ? data.map(m => {
+      const f = flotaParticular.find(x => x.id === m.id), nd = (m.documentos || []).length;
+      return `<div class="fl-hist fl-part">
+        <div style="display:flex;gap:10px;align-items:flex-start;"><div class="fl-ico">${flIcono(f)}</div><div style="flex:1;min-width:0;"><div class="fl-nombre">${flE(m.modelo || m.nombre)}</div><div class="fl-modelo">${flE(m.matricula || '')}${m.clase ? ' · ' + flE(m.clase) : ''}</div></div><span class="pill fl-part-pill">No es de la empresa</span></div>
+        ${m.notas_historial ? `<div class="fl-part-notas">${recDetalleHtml(m.notas_historial.replace(/^NO ES DE LA EMPRESA\.\s*/, ''))}</div>` : ''}
+        <div class="fl-hist-acc"><button type="button" class="btn sm" onclick="abrirFichaMaquina('${m.id}')">Ver ficha${nd ? ' · ' + nd + ' doc.' : ''}</button></div>
+      </div>`;
+    }).join('') : '<div class="fl-sec"><div class="fl-vacio">No hay vehículos particulares.</div></div>';
+  }catch(e){}
 }
 
 
@@ -10828,7 +10856,7 @@ const DIAS_AVISO_ITV = 15;
 function avisosItvFlota(filasFlota, hoy){
   const h = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
   return (filasFlota||[])
-    .filter(v => v.itv_vence && v.estado !== 'vendida')
+    .filter(v => v.itv_vence && v.estado !== 'vendida' && v.estado !== 'particular')
     .map(v => { const f = new Date(v.itv_vence+'T00:00:00'); return {v, dias: Math.round((f-h)/86400000)}; })
     .filter(a => a.dias <= DIAS_AVISO_ITV)
     .sort((a,b) => a.dias - b.dias);
@@ -10934,8 +10962,8 @@ function recSinGritos(t){   // «PEDIR A COVAP LAS FACTURAS…» → «Pedir a C
   return String(t).replace(/^[^a-záéíóúñ]+(?=[\s:]|$)/, m => m.split(/(\s+)/).map((w, i) => /\s/.test(w) || SIG.test(w.replace(/[^\w]/g, '')) || /\d/.test(w) ? w : (i === 0 ? w.charAt(0) + w.slice(1).toLowerCase() : w.toLowerCase())).join(''));
 }
 function recDetalleHtml(desc){
-  const partes = String(desc).replace(/\s+/g, ' ').split(/(?<=[.;:])\s+(?=[A-ZÁÉÍÓÚÑ0-9«(¿])/).map(x => x.trim().replace(/[.;]$/, '')).filter(x => x.length > 2);
-  const resaltar = t => escHtml(t).replace(/(\d{1,3}(?:\.\d{3})*,\d{2}\s?€|\d+(?:,\d+)?\s?€|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b)/g, '<b>$1</b>');
+  const partes = String(desc).replace(/\s+/g, ' ').split(/(?<=[a-záéíóúñ)\d€][.;])\s+(?=[A-ZÁÉÍÓÚÑ«(¿])/).map(x => x.trim().replace(/[.;]$/, '')).filter(x => x.length > 2);
+  const resaltar = t => escHtml(t).replace(/((?<![\d.,])\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?\s?€|(?<![\d.,])\d+(?:,\d{1,2})?\s?€|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b)/g, '<b>$1</b>');
   const li = (t, oculto) => `<li${oculto ? ' class="rec-oculto"' : ''}>${resaltar(t)}</li>`;
   return `<ul class="rec-lista">${partes.map((p, i) => li(p, i >= 4)).join('')}</ul>` + (partes.length > 4 ? `<span class="rec-mas" onclick="const u=this.previousElementSibling;u.classList.toggle('ver');this.textContent=u.classList.contains('ver')?'Ver menos':'Ver ${partes.length - 4} más'">Ver ${partes.length - 4} más</span>` : '');
 }
@@ -15491,7 +15519,7 @@ function fteDeTrabajo(id){
   return {txt: 'A mano', url: null};
 }
 function fteDeFlota(id){
-  const m = (typeof fleet !== 'undefined' ? fleet : []).concat(typeof flotaVendida !== 'undefined' ? flotaVendida : []).find(x => x.id === id); if(!m) return null;
+  const m = (typeof fleet !== 'undefined' ? fleet : []).concat(typeof flotaVendida !== 'undefined' ? flotaVendida : [], typeof flotaParticular !== 'undefined' ? flotaParticular : []).find(x => x.id === id); if(!m) return null;
   const docs = Array.isArray(m.documentos) ? m.documentos : [];
   const conUrl = docs.filter(x => x && x.url), peso = x => /permiso/i.test(x.nombre || '') ? 0 : /ficha/i.test(x.nombre || '') ? 1 : 2;
   if(conUrl.length){ const orden = conUrl.slice().sort((a, b) => peso(a) - peso(b)); return {txt: 'permiso y ficha técnica', url: orden[0].url, lista: orden.map(x => ({u: x.url, t: x.nombre || ''}))}; }
@@ -15615,8 +15643,8 @@ function flResumenPares(R){
   const t = [['Bastidor', buscar(/bastidor|^vin|identificaci/i)], ['Motor', buscar(/^motor/i)], ['Potencia', buscar(/potencia/i)], ['Combustible', buscar(/combustible/i)], ['Tara', buscar(/^tara/i)], ['MMA', buscar(/mtma|^mma/i)], ['Matriculación', buscar(/^matriculaci|primera matr/i)], ['Titular', buscar(/titular|propietario/i)]];
   return t.filter(x => x[1]);
 }
-let _flInc = [], _flIncF = {estado: 'pendientes', tipo: 'todos'}, flotaVendida = [];
-const flBuscar = id => fleet.find(f => f.id === id) || flotaVendida.find(f => f.id === id);
+let _flInc = [], _flIncF = {estado: 'pendientes', tipo: 'todos'}, flotaVendida = [], flotaParticular = [];
+const flBuscar = id => fleet.find(f => f.id === id) || flotaVendida.find(f => f.id === id) || flotaParticular.find(f => f.id === id);
 function renderFleetGrid(){
   const cont = document.getElementById('fleet-grid'); if(!cont) return;
   cont.innerHTML = fleet.map(m => {
@@ -16301,7 +16329,7 @@ async function cargarDatosReales(){
       renderJobFilters();
       renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
     }
-    const {data: flotaReal} = await sb.from('flota').select('*').neq('estado','vendida').order('created_at',{ascending:false});
+    const {data: flotaReal} = await sb.from('flota').select('*').not('estado', 'in', '(vendida,particular)').order('created_at',{ascending:false});   // V7.42: los vehículos particulares tienen su propia pestaña
     if(flotaReal && flotaReal.length){
       flotaReal.forEach(m => { m.documentos = (m.documentos || []).filter(d => !d.oculto); });   // V7.25: las copias antiguas de un mismo documento (sustituidas por una más reciente) no se enseñan
       flotaReal.forEach(m=>{
