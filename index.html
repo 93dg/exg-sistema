@@ -1998,7 +1998,21 @@ html.rb-marcando #report-bug-btn{transform:translateY(170px) !important;opacity:
 #rb-ayuda{display:none;margin:0 12px 6px;padding:10px 12px;border-radius:12px;background:#26262b;color:#ddd;font-size:12.5px;line-height:1.5;max-height:34vh;overflow-y:auto;}
 #rb-marcar.ayuda #rb-ayuda{display:block;}
 #rb-ayuda b{color:#fff;}
-#rb-herr{display:flex;justify-content:center;gap:8px;padding:8px 12px 4px;}
+#rb-herr{display:flex;justify-content:center;gap:6px;padding:6px 8px 2px;flex-wrap:nowrap;}
+/* V7.23 (Daniel): todo abajo y con iconos; arriba solo la captura */
+#rb-marcar #rb-sup{display:none;}
+#rb-marcar #rb-caja{padding-top:calc(env(safe-area-inset-top,0px) + 8px);}
+#rb-herr .rb-b, #rb-herr .rb-t{width:42px;height:42px;flex:0 0 42px;padding:0;display:flex;align-items:center;justify-content:center;}
+#rb-herr .rb-sep{width:1px;background:#3a3a40;margin:6px 2px;flex:none;}
+#rb-minis{display:flex;gap:8px;padding:6px 12px 2px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+#rb-minis:empty{display:none;}
+.rb-mini{position:relative;flex:0 0 auto;width:52px;height:68px;border-radius:8px;overflow:hidden;border:2px solid transparent;background:#2a2a2e;padding:0;}
+.rb-mini.act{border-color:var(--orange);}
+.rb-mini img{width:100%;height:100%;object-fit:cover;display:block;}
+.rb-mini .rb-mini-x{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:12px;line-height:18px;text-align:center;}
+#rb-marcar.rb-grande #rb-chips, #rb-marcar.rb-grande #rb-texto{display:none;}
+#rb-chips{flex-wrap:nowrap !important;overflow-x:auto;justify-content:flex-start !important;-webkit-overflow-scrolling:touch;}
+#rb-chips .rb-c{flex:0 0 auto;}
 .rb-t{border:1px solid #3a3a40;background:#1d1d21;color:#ddd;border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
 .rb-t.act{background:#fff;color:#111;border-color:#fff;}
 #rb-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;padding:4px 12px;}
@@ -3316,7 +3330,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.22</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.23</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3406,7 +3420,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.22</div>
+        <div class="sub" id="version-badge">V7.23</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12081,6 +12095,7 @@ async function openReportBug(){
   if(!cap){ cap = rbSinCaptura(); _rb.sinCaptura = true; try{ aiRegistrarEvento('captura_fallida', (seccionActualNombre() + ': ' + res.error).slice(0, 120)); }catch(e){} }
   _rb.cap = cap; _rb.marcas = []; _rb.actual = null; _rb.blob = null; _rb.meta = null;
   const lz = document.getElementById('rb-lienzo'); lz.width = cap.width; lz.height = cap.height;
+  rbImgsIniciar(cap, _rb.sinCaptura); document.getElementById('rb-marcar').classList.remove('rb-grande');
   rbHerramienta('trazo'); rbPintar();
   document.querySelectorAll('#rb-chips .rb-c').forEach(b => b.classList.remove('act')); document.getElementById('rb-txt').value = '';
   document.getElementById('rb-marcar').classList.add('abierto'); document.documentElement.classList.add('rb-marcando');
@@ -12118,15 +12133,65 @@ function rbPunto(ev){ const lz = document.getElementById('rb-lienzo'), r = lz.ge
   const fin = ev => { if(!_rb.actual) return; const m = _rb.actual; _rb.actual = null; const util = m.t === 'rect' ? (Math.abs(m.x1 - m.x0) > 6 && Math.abs(m.y1 - m.y0) > 6) : true; if(util) _rb.marcas.push(m); rbPintar(); };
   lz.addEventListener('pointerup', fin); lz.addEventListener('pointercancel', fin);
 })();
-function rbDeshacer(){ _rb.marcas.pop(); rbPintar(); }
+function rbDeshacer(){ _rb.marcas.pop(); rbPintar(); rbMinis(); }
+// VARIAS IMÁGENES EN UN REPORTE (Daniel 02/10/2026): la captura + fotos de referencia con «+»; abajo sus miniaturas para elegir, ampliar o quitar, y cada una con sus marcas
+function rbImgsIniciar(cap, sin){ _rb.imgs = [{cap, marcas: [], sin: !!sin}]; _rb.sel = 0; _rb.marcas = _rb.imgs[0].marcas; rbMinis(); }
+function rbSel(i){
+  if(!_rb.imgs || !_rb.imgs[i]) return;
+  if(i === _rb.sel){ document.getElementById('rb-marcar').classList.toggle('rb-grande'); return; }   // tocar la que ya está elegida: verla en grande
+  _rb.sel = i; const im = _rb.imgs[i]; _rb.cap = im.cap; _rb.marcas = im.marcas; _rb.sinCaptura = !!im.sin; _rb.actual = null;
+  const lz = document.getElementById('rb-lienzo'); lz.width = im.cap.width; lz.height = im.cap.height; rbPintar(); rbMinis();
+}
+function rbQuitar(i){
+  if(!_rb.imgs) return; _rb.imgs.splice(i, 1);
+  if(!_rb.imgs.length){ const cv = rbSinCaptura(); _rb.imgs = [{cap: cv, marcas: [], sin: true}]; }
+  _rb.sel = -1; rbSel(Math.min(i, _rb.imgs.length - 1));
+}
+function rbMinis(){
+  const caja = document.getElementById('rb-minis'); if(!caja || !_rb.imgs) return;
+  if(_rb.imgs.length < 2){ caja.innerHTML = ''; return; }
+  caja.innerHTML = _rb.imgs.map((im, i) => { let url = ''; try{ const t = document.createElement('canvas'), k = 120 / Math.max(im.cap.width, im.cap.height); t.width = Math.round(im.cap.width * k); t.height = Math.round(im.cap.height * k); const c = t.getContext('2d'); c.drawImage(i === _rb.sel ? document.getElementById('rb-lienzo') : im.cap, 0, 0, t.width, t.height); url = t.toDataURL('image/jpeg', 0.6); }catch(e){}
+    return '<button type="button" class="rb-mini' + (i === _rb.sel ? ' act' : '') + '" onclick="rbSel(' + i + ')"><img alt="" src="' + url + '"><span class="rb-mini-x" onclick="event.stopPropagation();rbQuitar(' + i + ')">✕</span></button>'; }).join('');
+}
+function rbAnadirFotos(){
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+  inp.onchange = async () => { for(const f of Array.from(inp.files || [])){ try{
+      const bmp = await new Promise((ok, mal) => { const img = new Image(); img.onload = () => ok(img); img.onerror = mal; img.src = URL.createObjectURL(f); });
+      const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height)), cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k); cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+      if(!_rb.imgs) rbImgsIniciar(_rb.cap, _rb.sinCaptura); _rb.imgs.push({cap: cv, marcas: []});
+    }catch(e){ mostrarToast('No se pudo abrir una de las fotos.', 'err'); } }
+    if(_rb.imgs) rbSel(_rb.imgs.length - 1); };
+  inp.click();
+}
+async function rbAplanar(i){   // la imagen i con sus marcas, en JPEG
+  const im = _rb.imgs[i], cv = document.createElement('canvas'); cv.width = im.cap.width; cv.height = im.cap.height; const c = cv.getContext('2d'); c.drawImage(im.cap, 0, 0);
+  const capa = document.createElement('canvas'); capa.width = cv.width; capa.height = cv.height; const cm = capa.getContext('2d'); cm.lineJoin = 'round'; cm.lineCap = 'round'; const g = Math.max(4, cv.width / 90);
+  im.marcas.forEach(m => { if(m.t === 'goma'){ cm.globalCompositeOperation = 'destination-out'; cm.lineWidth = Math.max(20, cv.width / 18); cm.strokeStyle = '#000'; } else { cm.globalCompositeOperation = 'source-over'; cm.lineWidth = g; cm.strokeStyle = '#ff2d2d'; cm.fillStyle = 'rgba(255,45,45,0.14)'; }
+    if(m.t === 'rect'){ const x = Math.min(m.x0, m.x1), y = Math.min(m.y0, m.y1), w = Math.abs(m.x1 - m.x0), h = Math.abs(m.y1 - m.y0); cm.fillRect(x, y, w, h); cm.strokeRect(x, y, w, h); } else if(m.pts.length){ cm.beginPath(); cm.moveTo(m.pts[0][0], m.pts[0][1]); m.pts.slice(1).forEach(q => cm.lineTo(q[0], q[1])); cm.stroke(); } });
+  c.drawImage(capa, 0, 0); return new Promise(res => cv.toBlob(res, 'image/jpeg', 0.82));
+}
+(function rbReordenar(){   // botones de arriba (Cerrar, Deshacer, Ayuda) a la fila de abajo; «+» para fotos; etiquetas más cortas; miniaturas encima de las herramientas
+  const herr = document.getElementById('rb-herr'), sup = document.getElementById('rb-sup'); if(!herr || !sup) return;
+  const b = sup.querySelectorAll('button'); const cerrar = b[0], resto = Array.from(b).slice(1);
+  const sep = () => { const x = document.createElement('span'); x.className = 'rb-sep'; return x; };
+  if(cerrar) herr.prepend(cerrar, sep());
+  const mas = document.createElement('button'); mas.type = 'button'; mas.className = 'rb-b'; mas.title = 'Añadir fotos'; mas.setAttribute('aria-label', 'Añadir fotos'); mas.onclick = rbAnadirFotos;
+  mas.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+  herr.append(sep(), mas, ...resto);
+  const minis = document.createElement('div'); minis.id = 'rb-minis'; herr.before(minis);
+  const corto = {colores: 'Color', posicion: 'Sitio'}; document.querySelectorAll('#rb-chips .rb-c').forEach(c => { if(corto[c.dataset.c]) c.textContent = corto[c.dataset.c]; });
+})();
 function rbTeclado(){   // con el teclado abierto, solo la fila de escribir sube por encima de él; la captura no se mueve ni cambia de tamaño
   const t = document.getElementById('rb-texto'), vv = window.visualViewport; if(!t) return;
   if(!vv || !document.getElementById('rb-marcar').classList.contains('abierto')){ t.style.transform = ''; return; }
-  const hueco = Math.round(window.innerHeight - vv.offsetTop - vv.height);
+  const m = document.getElementById('rb-marcar');
+  if(vv.offsetTop > 0 || window.scrollY > 0){ try{ window.scrollTo(0, 0); }catch(e){} }   // V7.23: que el móvil no desplace la pantalla al escribir
+  m.style.transform = vv.offsetTop > 0 ? `translateY(${vv.offsetTop}px)` : '';
+  const hueco = Math.round(window.innerHeight - vv.height);
   t.style.transform = hueco > 80 ? `translateY(${-hueco}px)` : '';
 }
 if(window.visualViewport){ window.visualViewport.addEventListener('resize', rbTeclado); window.visualViewport.addEventListener('scroll', rbTeclado); }
-function rbCancelar(){ document.getElementById('rb-marcar').classList.remove('abierto', 'ayuda'); document.documentElement.classList.remove('rb-marcando'); const t = document.getElementById('rb-texto'); if(t) t.style.transform = ''; _rb.cap = null; _rb.marcas = []; }
+function rbCancelar(){ const mm = document.getElementById('rb-marcar'); mm.style.transform = ''; mm.classList.remove('rb-grande'); _rb.imgs = null; document.getElementById('rb-minis') && (document.getElementById('rb-minis').innerHTML = ''); document.getElementById('rb-marcar').classList.remove('abierto', 'ayuda'); document.documentElement.classList.remove('rb-marcando'); const t = document.getElementById('rb-texto'); if(t) t.style.transform = ''; _rb.cap = null; _rb.marcas = []; }
 function rbMarcasResumen(){   // dónde se marcó, en fracciones de la pantalla (0 a 1); lo que se borró con la goma ya no cuenta
   const lz = document.getElementById('rb-lienzo'), W = lz.width, H = lz.height, cm = _rb.capa ? _rb.capa.getContext('2d') : null;
   const vivo = m => {
@@ -12145,9 +12210,12 @@ async function rbEnviar(otro){   // un solo toque: la captura con lo marcado + l
   try{
     if(dictadoActivo) toggleDictado('rb-txt', 'rb-mic');
     document.getElementById('rb-txt').blur();
+    if(_rb.imgs && _rb.sel !== 0){ const s0 = _rb.sel; _rb.sel = -1; rbSel(0); }   // las marcas que se resumen son las de la primera imagen
     rbPintar();
     const lz = document.getElementById('rb-lienzo');
     const blob = _rb.sinCaptura ? null : await new Promise(res => lz.toBlob(res, 'image/jpeg', 0.82));
+    const referencias = [];
+    for(let i = 1; _rb.imgs && i < _rb.imgs.length; i++){ try{ const b2 = await rbAplanar(i), p2 = `sin-clasificar/reportes/${Date.now()}-${i}.jpg`; const {error: e2} = await sb.storage.from(DOC_BUCKET).upload(p2, b2, {contentType: 'image/jpeg'}); if(!e2) referencias.push(sb.storage.from(DOC_BUCKET).getPublicUrl(p2).data.publicUrl); }catch(e){} }
     const marcas = _rb.sinCaptura ? [] : rbMarcasResumen(), etiquetas = Array.from(document.querySelectorAll('#rb-chips .rb-c.act')).map(b => b.dataset.c), texto = document.getElementById('rb-txt').value.trim();
     let capturaUrl = null;
     if(blob){
@@ -12160,12 +12228,12 @@ async function rbEnviar(otro){   // un solo toque: la captura con lo marcado + l
     const categoria = etiquetas.includes('fallo') ? 'fallo' : etiquetas.length ? 'mejorar_diseno' : texto ? 'fallo' : 'marcado';
     const {error} = await sb.from('sistema').insert({tipo: 'mejora', data: {
       texto: `[${seccion}] ${cuerpo || (marcas.length ? 'Revisar lo marcado en la captura' : 'Revisar esta pantalla')}`,
-      captura_url: capturaUrl, sin_captura: _rb.sinCaptura || null, estado: 'pendiente', protocolo_exg: PROTOCOLO_EXG_REPORTE, seccion, categoria, etiquetas: etiquetas.length ? etiquetas : null, marcas: marcas.length ? marcas : null,
+      captura_url: capturaUrl, referencias: referencias.length ? referencias : null, sin_captura: _rb.sinCaptura || null, estado: 'pendiente', protocolo_exg: PROTOCOLO_EXG_REPORTE, seccion, categoria, etiquetas: etiquetas.length ? etiquetas : null, marcas: marcas.length ? marcas : null,
       created_context: {url: window.location.href, timestamp: new Date().toISOString(), pantalla: {ancho: window.innerWidth, alto: window.innerHeight}}}});
     if(error){ mostrarToast('No se pudo enviar: ' + errText(error), 'err'); return; }
     mostrarToast('Reporte enviado ✓', 'ok');
     if(otro){   // se queda la misma captura para marcar otra cosa: se limpian marcas, etiquetas y texto
-      _rb.marcas = []; _rb.actual = null; rbPintar(); document.querySelectorAll('#rb-chips .rb-c').forEach(b => b.classList.remove('act')); document.getElementById('rb-txt').value = '';
+      _rb.marcas = []; _rb.actual = null; if(_rb.imgs){ _rb.imgs = [_rb.imgs[0]]; _rb.imgs[0].marcas = _rb.marcas; rbMinis(); } rbPintar(); document.querySelectorAll('#rb-chips .rb-c').forEach(b => b.classList.remove('act')); document.getElementById('rb-txt').value = '';
     } else rbCancelar();
   }catch(e){ mostrarToast('No se pudo enviar: ' + errText(e), 'err'); }
   finally{ _rb.enviando = false; botones.forEach(b => { b.disabled = false; }); }
