@@ -3314,7 +3314,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.19</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.20</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3404,7 +3404,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.19</div>
+        <div class="sub" id="version-badge">V7.20</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -10650,7 +10650,7 @@ function htmlAvisoItv(a){
   return `<div class="alert-row" style="align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);">
       <div class="alert-dot ${color}" style="margin-top:4px;flex-shrink:0;"></div>
       <div style="flex:1;">
-        <div class="t">🚗 ITV ${v.nombre}${v.matricula?' ('+v.matricula+')':''} — ${cuando}</div>
+        <div class="t"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px;"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><circle cx="8" cy="17" r="1.6"/><circle cx="16" cy="17" r="1.6"/></svg>ITV ${v.nombre}${v.matricula?' ('+v.matricula+')':''} — ${cuando}</div>
         <div class="s" style="margin-top:2px;">Válida hasta ${dd}/${m}/${y}. Aviso automático: desaparece al actualizar la fecha de ITV en la ficha del vehículo.</div>
       </div>
     </div>`;
@@ -12009,7 +12009,8 @@ async function rbCapturar(){
   if(typeof html2canvas !== 'function') return {cap: null, error: 'html2canvas no cargó'};
   const ocultar = ['report-bug-btn', 'asistente-ia-fab', 'mob-menu-btn', 'global-add-fab', 'mob-menu-panel'].map(i => document.getElementById(i)).filter(Boolean);
   ocultar.forEach(e => { e.dataset.vis = e.style.visibility; e.style.visibility = 'hidden'; });
-  const fuera = el => { try{ if(!el.matches || !el.matches('tr, [id^="mcard-"], .machine-card, .fl-card, .gm-card, .tb-card, .fl-doc, li')) return false; const r = el.getBoundingClientRect(); return r.bottom < -150 || r.top > window.innerHeight + 150; }catch(e){ return false; } };
+  const fuera = el => { try{ if(el.nodeType === 1 && ((el.classList.contains('view') && !el.classList.contains('active')) || (el.style && el.style.display === 'none') || el.tagName === 'SCRIPT' || el.tagName === 'TEMPLATE')) return true;   // VELOCIDAD (V7.20): lo que no se ve no se copia para la captura (antes se copiaba la web entera: más de un minuto en el móvil)
+    if(!el.matches || !el.matches('tr, [id^="mcard-"], .machine-card, .fl-card, .gm-card, .tb-card, .fl-doc, li, .panel, details, section, .card, .kpi, .sub-view, .alert-row, .notif-card, .cliente-card, .factura-card-movil')) return false; const r = el.getBoundingClientRect(); return r.bottom < -150 || r.top > window.innerHeight + 150; }catch(e){ return false; } };
   const conTiempo = (pr, ms) => Promise.race([pr, new Promise((_, ko) => setTimeout(() => ko(new Error('la captura tardó más de ' + ms / 1000 + ' s')), ms))]);
   const opciones = (extra) => ({x: window.scrollX, y: window.scrollY, width: window.innerWidth, height: window.innerHeight, scale: Math.max(0.6, Math.min(2, 800 / window.innerWidth)), logging: false, useCORS: true, ignoreElements: fuera, ...extra});
   let ultimoError = '';
@@ -15143,14 +15144,23 @@ function fteHtml(txt, url, lista){   // lista: [{u, t}] cuando la ficha salió d
   const varios = Array.isArray(lista) && lista.length > 1;
   return '<div class="fte"><span class="fte-t">Fuente · ' + escHtml(txt) + '</span>' + (url ? '<a href="' + escHtml(url) + '" class="fte-lnk"' + (varios ? ' data-lista="' + escHtml(JSON.stringify(lista)) + '"' : '') + ' onclick="event.stopPropagation()">' + (varios ? 'Archivos ' + lista.length : 'Archivo') + '</a>' : '') + '</div>'; }
 function fteDeDocumento(d){ return d ? {txt: impOrigenGasto(d), url: fteUrl(d)} : null; }
+// VELOCIDAD (V7.20): antes cada tarjeta recorría todos los documentos para buscar el primero de su cliente o trabajo; ahora se hace un índice una vez
+let _fteIdx = {n: -1, t: 0, ent: null, trab: null};
+function fteIndice(){
+  const ahora = Date.now(), lista = Object.values(documentosRealesById || {});
+  if(_fteIdx.ent && _fteIdx.n === lista.length && ahora - _fteIdx.t < 5000) return _fteIdx;
+  const ent = new Map(), trab = new Map(), mejor = (m, k, d) => { if(!k) return; const p = m.get(k); if(!p || String(d.created_at).localeCompare(String(p.created_at)) < 0) m.set(k, d); };
+  lista.forEach(d => { if(!d || !d.created_at) return; mejor(ent, d.entidad_id, d); mejor(trab, d.trabajo_id, d); });
+  _fteIdx = {n: lista.length, t: ahora, ent, trab}; return _fteIdx;
+}
 function fteDeCliente(id){
-  const docs = Object.values(documentosRealesById).filter(d => d.entidad_id === id && d.created_at).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
-  if(docs.length){ const d = docs[0]; return {txt: (FTE_TP[d.type] || 'documento') + ' nº ' + (d.num || d.numero || 's/n'), url: fteUrl(d)}; }
+  const d = fteIndice().ent.get(id);
+  if(d) return {txt: (FTE_TP[d.type] || 'documento') + ' nº ' + (d.num || d.numero || 's/n'), url: fteUrl(d)};
   return {txt: 'A mano', url: null};
 }
 function fteDeTrabajo(id){
-  const docs = Object.values(documentosRealesById).filter(d => d.trabajo_id === id && d.created_at).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
-  if(docs.length){ const d = docs[0]; return {txt: (FTE_TP[d.type] || 'documento') + ' nº ' + (d.num || d.numero || 's/n'), url: fteUrl(d)}; }
+  const d = fteIndice().trab.get(id);
+  if(d) return {txt: (FTE_TP[d.type] || 'documento') + ' nº ' + (d.num || d.numero || 's/n'), url: fteUrl(d)};
   return {txt: 'A mano', url: null};
 }
 function fteDeFlota(id){
