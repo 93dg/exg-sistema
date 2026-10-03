@@ -1085,6 +1085,12 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-barra-abajo .ie-pdf-movil{flex:0 0 auto;}
 .ie-actions-top:empty{display:none !important;}
 .pillsel .ps-chip{white-space:nowrap;}
+#ps-menu{position:fixed;z-index:2147483100;display:flex;flex-direction:column;gap:6px;padding:10px;background:var(--paper);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 34px rgba(0,0,0,.28);max-width:calc(100vw - 16px);animation:psMenuEntra .14s ease-out;}
+@keyframes psMenuEntra{from{opacity:0;transform:translateY(6px) scale(.98);}to{opacity:1;transform:none;}}
+.ps-menu-op{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;text-align:left;}
+.ps-menu-op.act{border:2px solid var(--ink);}
+.ps-menu-op:not(.pill).act{background:var(--asphalt);border-color:var(--asphalt);color:#fff;}
+
 /* V7.33 — editor: arriba solo estado y X en una fila, «Pasar a» y «Más acciones» en otra; abajo Guardar (icono), modo del PDF y PDF (icono) */
 .ie-barra-abajo{align-items:center;}
 .ie-barra-abajo .btn.ie-ico{flex:0 0 52px !important;width:52px;padding:0 !important;height:48px;display:flex;align-items:center;justify-content:center;}
@@ -3445,7 +3451,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.33</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.34</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3535,7 +3541,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.33</div>
+        <div class="sub" id="version-badge">V7.34</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -24945,11 +24951,29 @@ function pillsSelIniciar(id, opciones, alElegir, conColor){
   el.classList.add('ps-plegado');   // sale plegado enseñando solo la opción marcada
   el.addEventListener('click', ev => {
     const b = ev.target.closest('.ps-chip'); if(!b) return;
+    if(el.dataset.menu && el.classList.contains('ps-plegado')){ psMenuAbrir(el, opciones, conColor, v => { if(v !== valor){ el.value = v; if(alElegir) alElegir(v); } }); return; }   // V7.34: donde no hay sitio, las opciones salen en un menú flotante
     if(el.classList.contains('ps-plegado')){ el.classList.remove('ps-plegado'); return; }   // tocar la marcada despliega las demás
     if(b.dataset.v !== valor){ el.value = b.dataset.v; if(alElegir) alElegir(b.dataset.v); }
     el.classList.add('ps-plegado');   // al elegir, vuelve a plegarse
   });
 }
+// MENÚ DESPLEGABLE BONITO (Daniel 03/10/2026): donde no hay sitio para que las pastillas se abran en línea (barra de abajo, estado arriba),
+// las opciones salen en una tarjeta flotante con pastillas redondas y sus colores, encima o debajo según haya hueco; se cierra al elegir o al tocar fuera
+function psMenuCerrar(){ const m = document.getElementById('ps-menu'); if(m) m.remove(); document.removeEventListener('pointerdown', psMenuFuera, true); }
+function psMenuFuera(ev){ const m = document.getElementById('ps-menu'); if(m && !m.contains(ev.target)) psMenuCerrar(); }
+function psMenuAbrir(el, opciones, conColor, alElegir){
+  psMenuCerrar();
+  const r = el.getBoundingClientRect(), actual = el.value, m = document.createElement('div'); m.id = 'ps-menu';
+  m.innerHTML = opciones.map(([v, l]) => `<button type="button" class="ps-menu-op ${conColor ? 'pill ' + v : ''}${v === actual ? ' act' : ''}" data-v="${v}">${l}${v === actual ? ' <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:14px;height:14px;"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : ''}</button>`).join('');
+  document.body.appendChild(m);
+  const mw = m.offsetWidth, mh = m.offsetHeight, arriba = r.top > window.innerHeight / 2;
+  m.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, r.left + r.width / 2 - mw / 2)) + 'px';
+  m.style.top = (arriba ? Math.max(8, r.top - mh - 8) : Math.min(window.innerHeight - mh - 8, r.bottom + 8)) + 'px';
+  m.addEventListener('click', ev => { const b = ev.target.closest('.ps-menu-op'); if(!b) return; psMenuCerrar(); alElegir(b.dataset.v); });
+  setTimeout(() => document.addEventListener('pointerdown', psMenuFuera, true), 0);
+}
+document.getElementById('ni-modo-pdf') && (document.getElementById('ni-modo-pdf').dataset.menu = '1');
+document.getElementById('ni-estado-cobro') && (document.getElementById('ni-estado-cobro').dataset.menu = '1');
 pillsSelIniciar('ni-modo-pdf', [['completo', 'Completo'], ['sin_fechas', 'Sin fechas en conceptos'], ['simplificado', 'Simplificado (1 línea)']], v => cambiarModoPdfDesdeEditor(v));
 pillsSelIniciar('ni-estado-cobro', ESTADOS_DOCUMENTO, v => cambiarEstadoDesdeEditor(v), true);
 document.getElementById('ni-modo-pdf').value = 'completo';
