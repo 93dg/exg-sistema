@@ -1077,6 +1077,10 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.gr-dg-res{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 10px;}
+.gr-dg{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;}
+.gr-dg span{display:block;font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
+.gr-dg b{font-size:13.5px;font-weight:600;}
 .rec-fte{font-size:12px;font-weight:400;color:var(--ink-soft);margin-top:3px;}   /* como la «Fuente» de las tarjetas de Documentos */
 .rec-b{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;}
 .rec-b-pri{background:var(--orange);border-color:var(--orange);color:#fff;}
@@ -3334,7 +3338,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.27</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.28</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3424,7 +3428,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.27</div>
+        <div class="sub" id="version-badge">V7.28</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4709,6 +4713,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
         <button class="docs-tab active" data-gr="resumen" onclick="grTab('resumen')">Resumen</button>
         <button class="docs-tab" data-gr="contratos" onclick="grTab('contratos')">Contratos</button>
         <button class="docs-tab" data-gr="detectados" onclick="grTab('detectados')">Detectados</button>
+        <button class="docs-tab" data-gr="digital" onclick="grTab('digital')">Digitalización</button>
       </div>
       <div id="gr-cuerpo"><div class="fl-vacio">Cargando…</div></div>
     </div>
@@ -10153,6 +10158,7 @@ async function cargarGastosRec(){
     GR.alts = {}; (a.data || []).forEach(x => { (GR.alts[x.contrato_id] = GR.alts[x.contrato_id] || []).push(x); });
     GR.banco = b.data || []; GR.flota = f.data || []; GR.cargado = true;
   }catch(e){ console.warn('gastos recurrentes', e); }
+  try{ const {data: dg} = await sb.rpc('panel_digitalizacion'); GR.digital = dg || []; }catch(e){ GR.digital = []; }
   grRender();
 }
 function grTab(t){ GR.tab = t; document.querySelectorAll('#gr-tabs .docs-tab').forEach(b => b.classList.toggle('active', b.dataset.gr === t)); grRender(); window.scrollTo(0, 0); }
@@ -10161,8 +10167,41 @@ function grRender(){
   grGuardarPosicion();
   document.querySelectorAll('#gr-tabs .docs-tab').forEach(b => b.classList.toggle('active', b.dataset.gr === GR.tab));
   if(!GR.cargado){ cu.innerHTML = '<div class="fl-vacio">Cargando…</div>'; return; }
-  cu.innerHTML = GR.tab === 'resumen' ? grResumenHtml() : GR.tab === 'contratos' ? grContratosHtml() : grDetectadosHtml();
+  cu.innerHTML = GR.tab === 'resumen' ? grResumenHtml() : GR.tab === 'contratos' ? grContratosHtml() : GR.tab === 'digital' ? grDigitalHtml() : grDetectadosHtml();
   if(GR.fichaId !== null || GR.nuevo) grRenderFicha();
+}
+// DIGITALIZACIÓN DE PROVEEDORES (Daniel 03/10/2026): cómo llega la factura de cada proveedor y qué falta para que llegue sola. Primero el correo; API solo si el correo no la trae
+const GR_DG_EST = {automatizado: ['Automático', 'ok'], parcial: ['Parcial', 'aviso'], manual: ['A mano', 'mal']};
+const GR_DG_MET = {correo: 'Correo', api: 'API', banco: 'Banco', portal: 'Portal', ninguno: '—'};
+function grDigitalHtml(){
+  const l = GR.digital || []; if(!l.length) return '<div class="fl-vacio">Sin proveedores todavía.</div>';
+  const n = k => l.filter(p => p.estado === k).length, fecha = f => f ? f.split('-').reverse().join('/').replace(/^(\d\d\/\d\d\/)\d\d(\d\d)$/, '$1$2') : '—';
+  let h = `<div class="gr-dg-res"><span class="fl-chip ok">${n('automatizado')} automáticos</span><span class="fl-chip aviso">${n('parcial')} parciales</span><span class="fl-chip mal">${n('manual')} a mano</span></div>`;
+  h += '<div class="fl-sec"><h4>Proveedores</h4>' + l.map(p => { const e = GR_DG_EST[p.estado] || [p.estado, 'nd'];
+    return `<details class="alert-det"><summary class="alert-sum"><div class="t">${flE(p.proveedor)}</div><span class="fl-chip ${e[1]}" style="flex:none;">${e[0]}</span></summary>
+      <div class="alert-det-b"><div class="gr-dg">
+        <div><span>Gasto</span><b>${flE(p.tipo_gasto || '—')}</b></div>
+        <div><span>Hoy llega</span><b>${flE(p.via_actual || '—')}</b></div>
+        <div><span>Método automático</span><b>${GR_DG_MET[p.metodo_auto] || flE(p.metodo_auto || '—')}</b></div>
+        <div><span>Última factura</span><b>${fecha(p.ultima_factura)}${p.ultima_con_archivo && p.ultima_con_archivo !== p.ultima_factura ? ' (con archivo: ' + fecha(p.ultima_con_archivo) + ')' : ''}</b></div>
+        <div><span>Último año</span><b>${p.facturas_12m || 0} factura${p.facturas_12m === 1 ? '' : 's'}${p.sin_archivo_12m ? ' · ' + p.sin_archivo_12m + ' sin archivo' : ''}</b></div>
+        ${p.ultimo_correo ? `<div><span>Último correo</span><b>${fecha(p.ultimo_correo)}</b></div>` : ''}
+      </div>
+      ${p.incidencias ? `<div class="fl-aviso-lin" style="margin-top:8px;">${flE(p.incidencias)}</div>` : ''}
+      <div class="rec-acc">${p.estado !== 'automatizado' ? `<button type="button" class="rec-b rec-b-pri" onclick="grDgBandeja('${p.id}')">A la bandeja</button>` : ''}<button type="button" class="rec-b" onclick="grDgEstado('${p.id}')">Cambiar estado</button></div></div></details>`; }).join('') + '</div>';
+  return h;
+}
+async function grDgBandeja(id){
+  const p = (GR.digital || []).find(x => x.id === id); if(!p) return;
+  const orden = p.metodo_auto === 'correo' ? 'Prepárame el correo para pedirle que mande las facturas por email' + (p.correo_pedir ? ' (' + p.correo_pedir + ')' : '') : 'Prepara la vía automática (' + (GR_DG_MET[p.metodo_auto] || p.metodo_auto) + ') y dime qué tengo que hacer';
+  const {error} = await sb.from('sistema').insert({tipo: 'mejora', data: {texto: '[Digitalización] ' + p.proveedor + ' — ORDEN: ' + orden + (p.incidencias ? ' — ' + p.incidencias : ''), estado: 'pendiente', origen: 'digitalizacion', proveedor_id: id, orden, seccion: 'Gastos recurrentes', fecha: new Date().toISOString()}});
+  mostrarToast(error ? 'No se pudo: ' + errText(error) : 'En la bandeja: Claude te lo prepara cuando sigas con la bandeja.', error ? 'err' : 'ok');
+}
+function grDgEstado(id){
+  const p = (GR.digital || []).find(x => x.id === id); if(!p) return;
+  const c = recHoja('Estado de ' + p.proveedor, '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + Object.entries(GR_DG_EST).map(([k, v]) => '<button type="button" class="rec-b' + (k === p.estado ? ' rec-b-pri' : '') + '" data-e="' + k + '">' + v[0] + '</button>').join('') + '</div>');
+  c.querySelectorAll('[data-e]').forEach(b => b.onclick = async () => { const {error} = await sb.from('proveedores_digitalizacion').update({estado: b.dataset.e, updated_at: new Date().toISOString()}).eq('id', id);
+    if(error){ mostrarToast('No se pudo: ' + errText(error), 'err'); return; } p.estado = b.dataset.e; c.remove(); grRender(); });
 }
 function grCardIco(cat){ return `<div class="fl-ico">${grSvg(grCat(cat)[2])}</div>`; }
 function grFilaContrato(c){

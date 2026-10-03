@@ -24,6 +24,15 @@ async def main():
             if '/auth/v1/' in u:
                 if 'user' in u: return await route.fulfill(status=200,content_type='application/json',body=json.dumps(user))
                 return await route.fulfill(status=200,content_type='application/json',body=json.dumps(ses))
+            if req.method=='POST' and '/rest/v1/rpc/' in u and (req.post_data or '{}').strip() in ('{}',''):
+                u2=u; h=req.headers;cuerpo=json.dumps({"ruta":u2[len(U):],"range":h.get('range'),"prefer":None,"accept":h.get('accept')}).encode()
+                def llamar2():
+                    try:
+                        r=urllib.request.urlopen(urllib.request.Request(U+"/functions/v1/exg-prueba-lectura",data=cuerpo,headers={"x-exg-clave":CL,"Content-Type":"application/json"}),timeout=60)
+                        return r.status,r.read(),r.headers.get('content-type')
+                    except urllib.error.HTTPError as e: return e.code,e.read(),'application/json'
+                st,bd,ct=await asyncio.get_event_loop().run_in_executor(None,llamar2)
+                return await route.fulfill(status=st,headers={'content-type':ct or 'application/json'},body=bd)
             if req.method!='GET':
                 bloqueadas.append(req.method+' '+u.split('/rest/v1/')[-1][:60] if '/rest/v1/' in u else req.method+' '+u[:80])
                 return await route.fulfill(status=200,content_type='application/json',body='[]')
