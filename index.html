@@ -1081,6 +1081,15 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+/* V7.54 estados de presupuesto */
+.pill.enviado{background:#E3ECF7;color:#2B5C8F;}
+.pill.aceptado{background:#E2F1E6;color:#2E7D46;}
+.pill.rechazado{background:#F5E1E1;color:#A33A3A;}
+#view-presupuestos[data-modo="proforma"] #pres-filtro-estado-chips .solo-presupuesto{display:none;}
+#view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="pendiente_cobrar"],
+#view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="parcial"],
+#view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="cobrado"]{display:none;}
+
 /* V7.49 Correo compacto en el móvil (Daniel: «muy grande todo») */
 @media(max-width:768px){
   #view-correo .panel-head{padding:10px 12px !important;gap:8px !important;flex-wrap:nowrap !important;}
@@ -3534,7 +3543,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.53</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.54</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3624,7 +3633,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.53</div>
+        <div class="sub" id="version-badge">V7.54</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4567,6 +4576,9 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
                 </div>
                 <p class="dd-section-label">Estado</p>
                 <div class="filters" id="pres-filtro-estado-chips" style="margin:0;">
+                  <div class="chip-filter solo-presupuesto" data-estado="enviado">Enviado</div>
+                  <div class="chip-filter solo-presupuesto" data-estado="aceptado">Aceptado</div>
+                  <div class="chip-filter solo-presupuesto" data-estado="rechazado">Rechazado</div>
                   <div class="chip-filter" data-estado="borrador">Borrador</div>
                   <div class="chip-filter" data-estado="revisar">Revisar</div>
                   <div class="chip-filter" data-estado="pendiente_enviar">Listo para enviar</div>
@@ -8935,6 +8947,7 @@ document.addEventListener('click', (ev)=>{
 });
 function setModoPresProf(modo){
   presModo = modo==='proforma' ? 'proforma' : 'presupuesto';
+  document.getElementById('view-presupuestos')?.setAttribute('data-modo', presModo);   // los chips de estado cambian con el tipo
   const esPf = presModo==='proforma';
   const t = document.getElementById('presprof-titulo'); if(t) t.textContent = esPf ? 'Proformas' : 'Presupuestos';
   const d = document.getElementById('presprof-desc'); if(d) d.textContent = esPf ? 'Todas las proformas — conectado con Economía' : 'Todos los presupuestos — conectado con Economía';
@@ -10827,7 +10840,7 @@ function openEntryDrawer(src, title){
 function closeEntryDrawer(){ document.getElementById('entry-overlay').classList.remove('active'); }
 
 let jobs = [];
-const stateLabels = {disponible:'Operativa', averiada:'Averiada', taller:'En taller', vendida:'Vendida', posible:'Posible trabajo', pendiente:'Pendiente de fecha', planificado:'Planificado', porconfirmar:'Por confirmar con el cliente', confirmado:'Confirmado', encurso:'En curso', terminado:'Terminado', facturado:'Facturado', cobrado:'Cobrado', cancelado:'Cancelado'};
+const stateLabels = {enviado:'Enviado', aceptado:'Aceptado', rechazado:'Rechazado', disponible:'Operativa', averiada:'Averiada', taller:'En taller', vendida:'Vendida', posible:'Posible trabajo', pendiente:'Pendiente de fecha', planificado:'Planificado', porconfirmar:'Por confirmar con el cliente', confirmado:'Confirmado', encurso:'En curso', terminado:'Terminado', facturado:'Facturado', cobrado:'Cobrado', cancelado:'Cancelado'};
 const jobStates = ['posible','pendiente','planificado','porconfirmar','confirmado','encurso','terminado','facturado','cobrado','cancelado'];
 
 function pill(state,sm){ return `<span class="pill ${state}${sm?' pill-sm':''}">${stateLabels[state]||state}</span>`; }
@@ -25128,10 +25141,13 @@ function renderControlDocs(){
    Facturas, Albaranes, Presupuestos y Proformas usan EXACTAMENTE el mismo
    desplegable, colores y nombres. Si se cambia un nombre o color aquí, se
    propaga solo a las cuatro secciones — no hay definiciones paralelas. */
+// V7.54 (Daniel: «los presupuestos no pueden tener esos estados»): un presupuesto no se cobra; tiene sus propios estados
+const ESTADOS_PRESUPUESTO = [['borrador','Borrador'],['pendiente_enviar','Listo para enviar'],['enviado','Enviado'],['aceptado','Aceptado'],['rechazado','Rechazado'],['revisar','Revisar']];
+const estadosDeTipo = tipo => tipo === 'presupuesto' ? ESTADOS_PRESUPUESTO : ESTADOS_DOCUMENTO;
 const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['pendiente_enviar','Listo para enviar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Cobro parcial'],['cobrado','Cobrado'],['rectificativa','Rectificativa'],['revisar','Revisar'],['nula','Nula']];
 function estadoDocumentoSelect(tipo, id, actual, contexto){
   const act = actual || 'pendiente_enviar';
-  const label = ESTADOS_DOCUMENTO.find(o=>o[0]===act)?.[1] || act;
+  const label = estadosDeTipo(tipo).concat(ESTADOS_DOCUMENTO).find(o=>o[0]===act)?.[1] || stateLabels[act] || act;
   // ddId único por tabla/contexto donde se renderiza (el mismo documento puede aparecer
   // a la vez en varias tablas — Centro de control, Facturas, la fila "standalone" de
   // Presupuestos... — un id de DOM repetido hacía que solo la primera copia funcionara
@@ -25140,7 +25156,7 @@ function estadoDocumentoSelect(tipo, id, actual, contexto){
   return `<div class="estado-cobro-dd" id="${ddId}" data-doc-id="${id}">
     <span class="pill ${act}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${ddId}')">${label}</span>
     <div class="estado-cobro-menu">
-      ${ESTADOS_DOCUMENTO.map(([v,l])=>`<span class="pill ${v}" onclick="event.stopPropagation();cambiarEstadoDocumento('${tipo}','${id}','${v}','${ddId}')">${l}</span>`).join('')}
+      ${estadosDeTipo(tipo).map(([v,l])=>`<span class="pill ${v}" onclick="event.stopPropagation();cambiarEstadoDocumento('${tipo}','${id}','${v}','${ddId}')">${l}</span>`).join('')}
     </div>
   </div>`;
 }
@@ -25219,7 +25235,7 @@ function pillsSelIniciar(id, opciones, alElegir, conColor){
   el.classList.add('ps-plegado');   // sale plegado enseñando solo la opción marcada
   el.addEventListener('click', ev => {
     const b = ev.target.closest('.ps-chip'); if(!b) return;
-    if(el.dataset.menu && el.classList.contains('ps-plegado')){ psMenuAbrir(el, opciones, conColor, v => { if(v !== valor){ el.value = v; if(alElegir) alElegir(v); } }); return; }   // V7.34: donde no hay sitio, las opciones salen en un menú flotante
+    if(el.dataset.menu && el.classList.contains('ps-plegado')){ psMenuAbrir(el, el.dataset.permitidos ? el.dataset.permitidos.split(',').map(k => opciones.find(o => o[0] === k)).filter(Boolean) : opciones, conColor, v => { if(v !== valor){ el.value = v; if(alElegir) alElegir(v); } }); return; }   // V7.34: donde no hay sitio, las opciones salen en un menú flotante
     if(el.classList.contains('ps-plegado')){ el.classList.remove('ps-plegado'); return; }   // tocar la marcada despliega las demás
     if(b.dataset.v !== valor){ el.value = b.dataset.v; if(alElegir) alElegir(b.dataset.v); }
     el.classList.add('ps-plegado');   // al elegir, vuelve a plegarse
@@ -25249,13 +25265,14 @@ pillsSelIniciar('explorer-sort', [['tipo', 'Por tipo'], ['nombre', 'Por nombre']
 document.getElementById('explorer-sort') && (document.getElementById('explorer-sort').value = 'tipo');
 document.getElementById('explorer-type-filter') && (document.getElementById('explorer-type-filter').value = '');
 pillsSelIniciar('ni-modo-pdf', [['completo', 'Completo'], ['sin_fechas', 'Sin fechas en conceptos'], ['simplificado', 'Simplificado (1 línea)']], v => cambiarModoPdfDesdeEditor(v));
-pillsSelIniciar('ni-estado-cobro', ESTADOS_DOCUMENTO, v => cambiarEstadoDesdeEditor(v), true);
+pillsSelIniciar('ni-estado-cobro', ESTADOS_DOCUMENTO.concat([['enviado','Enviado'],['aceptado','Aceptado'],['rechazado','Rechazado']]), v => cambiarEstadoDesdeEditor(v), true);
 document.getElementById('ni-modo-pdf').value = 'completo';
 // ===== Editor: estado y cómo mostrar el PDF =====
 function actualizarControlesEditor(doc){
   const wrap = document.getElementById('ni-estado-modo-wrap');
   if(!wrap) return;
   const sel = document.getElementById('ni-estado-cobro');
+  sel.dataset.permitidos = estadosDeTipo(doc.tipo || doc.type).map(o => o[0]).join(',');   // el menú solo enseña los estados de su tipo
   sel.value = doc.estado_cobro || 'pendiente_enviar';
   document.getElementById('ni-modo-pdf').value = doc.modo_pdf || 'completo';
   wrap.style.display = 'flex';
