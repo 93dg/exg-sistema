@@ -1076,6 +1076,9 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a{display:flex;gap:8px;align-items:flex-start;margin:0 20px 16px 20px;padding:0;background:none;}
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
+.rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.rec-b{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;}
+.rec-b-pri{background:var(--orange);border-color:var(--orange);color:#fff;}
 /* Cabecera del editor compacta (Daniel 02/10/2026: «mucho espacio desaprovechado y mal colocados»): la X no ocupa una fila propia,
    Estado y PDF van en la misma línea y Pasar a justo debajo, sin márgenes grandes */
 .ie-topbar:has(> #ni-doctype[style*="display:none"]), .ie-topbar:has(> #ni-doctype[style*="display: none"]){height:0;padding:0;border:0;overflow:visible;justify-content:flex-end;}
@@ -3313,7 +3316,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.21</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.22</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3403,7 +3406,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.21</div>
+        <div class="sub" id="version-badge">V7.22</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -10684,18 +10687,21 @@ function recRender(){
   const html = items.map(r=>{
     const d = r.data||{};
     const color = r.tipo==='alerta_itv'?'orange':r.tipo==='alerta_cobro_pendiente'?'red':'blue';
-    const icono = r.tipo==='alerta_itv'?'🚗':r.tipo==='alerta_cobro_pendiente'?'💰':'🔔';
+    const icono = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:15px;height:15px;vertical-align:-2px;margin-right:2px;">' + (r.tipo==='alerta_itv' ? '<path d="M5 17h14v-5l-2-5H7l-2 5z"/><circle cx="8" cy="17" r="1.6"/><circle cx="16" cy="17" r="1.6"/>' : r.tipo==='alerta_cobro_pendiente' ? '<circle cx="12" cy="12" r="9"/><path d="M15 9.5a3 3 0 1 0 0 5M8 11h5M8 13.5h5"/>' : '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>') + '</svg>';
     const desc = d.descripcion || d.instruccion || d.accion || '';
+    const corto = d.titulo_corto || d.titulo || r.tipo, largo = d.titulo_corto && d.titulo && d.titulo !== d.titulo_corto ? d.titulo : '';
     const v = recVence(d), hoy = new Date().toISOString().slice(0, 10), fFecha = v ? new Date(v + 'T12:00:00') : new Date(r.created_at), txtFecha = fFecha.toLocaleDateString('es-ES',{day:'2-digit',month:'short'});
     return `<details class="alert-det">
       <summary class="alert-sum">
         <div class="alert-dot ${color}"></div>
-        <div class="t">${icono} ${escHtml(d.titulo||r.tipo)}</div>
+        <div class="t">${icono} ${escHtml(corto)}</div>
         <div class="s alert-fecha"${v && v < hoy ? ' style="color:var(--red);font-weight:700;"' : ''}>${v ? (v < hoy ? 'venció ' : 'vence ') : ''}${txtFecha}</div>
       </summary>
       <div class="alert-det-b">
+        ${largo ? `<div class="s" style="font-weight:600;color:var(--ink);margin-bottom:4px;">${escHtml(largo)}</div>` : ''}
         ${desc?`<div class="s">${escHtml(desc)}</div>`:''}
-        <button onclick="marcarRecordatorioResuelto('${r.id}')" style="font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer;">✓ Resuelto</button>
+        ${d.en_bandeja ? '<div class="s" style="margin-top:6px;color:var(--orange);font-weight:700;">En la bandeja' + (d.orden_bandeja ? ': ' + escHtml(d.orden_bandeja) : '') + '</div>' : ''}
+        <div class="rec-acc"><button type="button" class="rec-b rec-b-pri" onclick="recABandeja('${r.id}')">A la bandeja</button><button type="button" class="rec-b" onclick="recPosponer('${r.id}')">Posponer</button><button type="button" class="rec-b" onclick="marcarRecordatorioResuelto('${r.id}')">Hecho</button></div>
       </div>
     </details>`;
   }).join('');
@@ -10712,6 +10718,31 @@ function actualizarVacioAlertas(){
   if(emptyEl) emptyEl.style.display = vacio ? 'block' : 'none';
 }
 
+// RECORDATORIOS CON BOTONES (Daniel 02/10/2026): «A la bandeja» lo deja preparado, con la orden que elijas, para que Claude lo aborde al seguir con la bandeja
+function recHoja(titulo, cuerpo){ let c = document.getElementById('rec-hoja'); if(c) c.remove(); c = document.createElement('div'); c.id = 'rec-hoja';
+  c.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147482500;background:var(--paper);border-radius:20px 20px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.35);padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 16px);';
+  c.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;"><b style="font-size:15px;">' + escHtml(titulo) + '</b><button type="button" class="close-x" onclick="document.getElementById(\'rec-hoja\').remove()">✕</button></div>' + cuerpo; document.body.appendChild(c); return c; }
+function recABandeja(id){
+  const r = _recItems.find(x => x.id === id); if(!r) return; const d = r.data || {};
+  const ops = ['Resuélvelo tú', 'Prepáralo y lo decido yo', 'Pregúntame lo que necesites', 'Recuérdamelo y ya'];
+  const c = recHoja('¿Qué hago con esto?', '<div class="s" style="margin-bottom:10px;">' + escHtml(d.titulo_corto || d.titulo || '') + '</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">' + ops.map((o, i) => '<button type="button" class="rec-b' + (i === 0 ? ' rec-b-pri' : '') + '" data-o="' + i + '">' + o + '</button>').join('') + '</div><textarea id="rec-orden" rows="2" placeholder="Algo más que deba saber (si quieres)" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:12px;padding:10px;font-family:inherit;font-size:15px;"></textarea><button type="button" id="rec-mandar" class="btn primary" style="width:100%;margin-top:10px;">Mandar a la bandeja</button>');
+  let elegida = 0; c.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { elegida = Number(b.dataset.o); c.querySelectorAll('[data-o]').forEach(x => x.classList.toggle('rec-b-pri', x === b)); });
+  c.querySelector('#rec-mandar').onclick = async () => {
+    const extra = (c.querySelector('#rec-orden').value || '').trim(), orden = ops[elegida] + (extra ? '. ' + extra : '');
+    const texto = '[Recordatorio] ' + (d.titulo_corto || d.titulo || '') + ' — ORDEN: ' + orden + (d.titulo && d.titulo !== d.titulo_corto ? ' — Detalle: ' + d.titulo : '');
+    const {error} = await sb.from('sistema').insert({tipo: 'mejora', data: {texto, estado: 'pendiente', origen: 'recordatorio', recordatorio_id: id, orden, seccion: 'Centro de control', fecha: new Date().toISOString()}});
+    if(error){ mostrarToast('No se pudo mandar: ' + errText(error), 'err'); return; }
+    await sb.from('sistema').update({data: {...d, en_bandeja: true, orden_bandeja: orden}}).eq('id', id); r.data = {...d, en_bandeja: true, orden_bandeja: orden};
+    c.remove(); recRender(); mostrarToast('En la bandeja: Claude lo verá cuando sigas con la bandeja.', 'ok');
+  };
+}
+function recPosponer(id){
+  const r = _recItems.find(x => x.id === id); if(!r) return; const d = r.data || {};
+  const c = recHoja('¿Hasta cuándo?', '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + [['1 semana', 7], ['2 semanas', 14], ['1 mes', 30], ['3 meses', 90]].map(([t, n]) => '<button type="button" class="rec-b" data-n="' + n + '">' + t + '</button>').join('') + '</div>');
+  c.querySelectorAll('[data-n]').forEach(b => b.onclick = async () => { const v = new Date(Date.now() + Number(b.dataset.n) * 864e5).toISOString().slice(0, 10);
+    const {error} = await sb.from('sistema').update({data: {...d, vence: v}}).eq('id', id); if(error){ mostrarToast('No se pudo: ' + errText(error), 'err'); return; }
+    r.data = {...d, vence: v}; c.remove(); recRender(); mostrarToast('Pospuesto hasta el ' + v.split('-').reverse().join('/') + '.', 'ok'); });
+}
 async function marcarRecordatorioResuelto(id){
   if(!sb) return;
   await sb.from('sistema').update({'data': sb.rpc ? undefined : null}).eq('id',id);
