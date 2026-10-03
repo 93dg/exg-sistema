@@ -3331,7 +3331,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.24</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.25</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3421,7 +3421,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.24</div>
+        <div class="sub" id="version-badge">V7.25</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -10075,6 +10075,7 @@ async function cargarHistorialFlota(){
   if(!sb) return;
   try{
     const {data,error} = await sb.from('flota').select('*').eq('estado','vendida').order('created_at',{ascending:false});
+    (data || []).forEach(m => { m.documentos = (m.documentos || []).filter(d => !d.oculto); });
     if(error||!data) return;
     flotaVendida = data.map(m => ({id: m.id, name: m.nombre, type: m.tipo || '', modelo: m.modelo || '', clase: m.clase || '', state: 'vendida', matricula: m.matricula || '', fichaTecnica: m.ficha_tecnica || '', documentos: m.documentos || []}));
     const cont = document.getElementById('flota-historial-cards');
@@ -16077,6 +16078,7 @@ async function cargarDatosReales(){
     }
     const {data: flotaReal} = await sb.from('flota').select('*').neq('estado','vendida').order('created_at',{ascending:false});
     if(flotaReal && flotaReal.length){
+      flotaReal.forEach(m => { m.documentos = (m.documentos || []).filter(d => !d.oculto); });   // V7.25: las copias antiguas de un mismo documento (sustituidas por una más reciente) no se enseñan
       flotaReal.forEach(m=>{
         const existente = fleet.find(f=>f.name===m.nombre);
         if(existente){
