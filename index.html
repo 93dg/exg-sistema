@@ -1093,6 +1093,10 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 
 /* V7.33 — editor: arriba solo estado y X en una fila, «Pasar a» y «Más acciones» en otra; abajo Guardar (icono), modo del PDF y PDF (icono) */
 .ie-barra-abajo{align-items:center;}
+.ie-historial{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 14px 6px 14px;}
+.ie-hist-t{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);margin-right:2px;}
+.ie-hist-p{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--concrete);color:var(--ink);text-decoration:none;}
+a.ie-hist-p{color:var(--orange);border-color:var(--orange-soft,#f3d6c5);}
 .ie-barra-abajo .btn.ie-ico{flex:0 0 52px !important;width:52px;padding:0 !important;height:48px;display:flex;align-items:center;justify-content:center;}
 .ie-barra-abajo .ie-pdf-movil{flex:0 0 52px !important;width:52px;height:48px;padding:0 !important;display:flex;align-items:center;justify-content:center;}
 .ie-barra-abajo #ni-emitir:not(.ie-ico){flex:1 1 auto !important;}
@@ -3451,7 +3455,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.34</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.35</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3541,7 +3545,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.34</div>
+        <div class="sub" id="version-badge">V7.35</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6364,6 +6368,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
       <span class="tb-ftit" style="cursor:default;">Pasar a</span><div class="pillsel" id="ni-pasar-a-pastillas"></div>
     </div>
 
+    <div class="ie-historial ie-edit-only" id="ni-historial" style="display:none;"></div>
     <!-- Acciones principales: guardar es lo primero que se ve y ocupa todo el ancho en móvil.
          GUARDAR nunca toca la numeración (documento sigue en borrador). EMITIR es la única
          acción que consolida el número en firme — desaparece en cuanto el documento ya está
@@ -9543,6 +9548,19 @@ async function crearAlbaranDesdeDocumento(id){
   mostrarToast(`Albarán creado — ${original.tipo==='proforma'?'la proforma queda como Aceptada':'el presupuesto queda como Aceptado'}.`);
   await cargarDocumentosEconomicosReales();
   openDocumentViewer(doc.id);
+}
+// HISTORIAL EN EL EDITOR (Daniel 03/10/2026): todo lo enlazado converge en el último documento (la factura); desde él se ve de dónde viene
+// y se puede abrir el archivo de cada paso anterior. Los pasos anteriores no salen en las listas ni cuentan en ningún total: solo cuenta la factura.
+async function ieHistorial(doc){
+  const cont = document.getElementById('ni-historial'); if(!cont) return; cont.style.display = 'none'; cont.innerHTML = '';
+  if(!doc || !doc.expediente_id || !sb) return;
+  const {data} = await sb.from('documentos_economicos').select('id,tipo,numero,fecha_devengo,fase_estado,archivo_path,archivo_url,importe').eq('expediente_id', doc.expediente_id).is('deleted_at', null).order('fecha_devengo', {ascending: true});
+  if(!data || data.length < 2 || editingDocId !== doc.id) return;
+  const f = x => x ? x.split('-').reverse().join('/').replace(/^(\d\d\/\d\d\/)\d\d(\d\d)$/, '$1$2') : '—';
+  const et = t => String(tipoDocEtiqueta(t) || t).replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/, '');   // sin el emoji del tipo
+  cont.innerHTML = '<span class="ie-hist-t">Viene de</span>' + data.filter(h => h.id !== doc.id).map(h => { const u = fteUrl(h);
+    return u ? `<a href="${escHtml(u)}" class="ie-hist-p" onclick="event.stopPropagation()">${et(h.tipo)}${h.numero ? ' ' + escHtml(h.numero) : ''} · ${f(h.fecha_devengo)}</a>` : `<span class="ie-hist-p">${et(h.tipo)}${h.numero ? ' ' + escHtml(h.numero) : ''} · ${f(h.fecha_devengo)}</span>`; }).join('');
+  cont.style.display = '';
 }
 async function cargarHistorialExpediente(expedienteId, filaId, docActualId){
   if(!sb) return;
@@ -24338,6 +24356,7 @@ function openDocumentViewer(id){
   else { btnOriginal.style.display = 'none'; }
   { let fu = document.getElementById('ni-fuente'); if(!fu){ fu = document.createElement('div'); fu.id = 'ni-fuente'; fu.style.cssText = 'font-size:12px;color:var(--ink-soft);margin:4px 0 8px;line-height:1.4;'; btnOriginal.insertAdjacentElement('afterend', fu); }
     try{ const o = impOrigenGasto(doc); fu.textContent = o === 'A mano' ? '' : 'Fuente · ' + o; fu.style.display = o === 'A mano' ? 'none' : ''; }catch(e){ fu.textContent = ''; } }   // «A mano» sin archivo no se pone (regla de Daniel)
+  ieHistorial(doc);
   document.getElementById('ni-otras-acciones').innerHTML = accionesDocumento(doc).filter(x=>x.t!=='Editar' && x.t!=='Imprimir' && !x.t.startsWith('Pasar a') && !x.t.startsWith('← Volver a')).map(x=>`<button type="button" class="btn sm" onclick="${x.fn}">${x.t}</button>`).join('');
   // PASAR A… — desplegable único con la transición principal preseleccionada
   {
