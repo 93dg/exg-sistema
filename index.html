@@ -3388,7 +3388,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.29</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.30</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3478,7 +3478,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.29</div>
+        <div class="sub" id="version-badge">V7.30</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -10841,13 +10841,18 @@ function recPosponer(id){
     const {error} = await sb.from('sistema').update({data: {...d, vence: v}}).eq('id', id); if(error){ mostrarToast('No se pudo: ' + errText(error), 'err'); return; }
     r.data = {...d, vence: v}; c.remove(); recRender(); mostrarToast('Pospuesto hasta el ' + v.split('-').reverse().join('/') + '.', 'ok'); });
 }
+// HECHO (Daniel 03/10/2026): no basta con quitarlo de la lista. Queda «hecho por Daniel, pendiente de comprobar» y va a la bandeja para que Claude
+// compruebe que de verdad está hecho y cierre todo lo pendiente relacionado en cualquier sitio (otros recordatorios, contratos, gastos, casos…)
 async function marcarRecordatorioResuelto(id){
   if(!sb) return;
-  await sb.from('sistema').update({'data': sb.rpc ? undefined : null}).eq('id',id);
-  // Actualizar el campo estado dentro del jsonb
-  const {data:row} = await sb.from('sistema').select('data').eq('id',id).single();
-  if(row) await sb.from('sistema').update({data:{...row.data, estado:'resuelto'}}).eq('id',id);
-  mostrarToast('Marcado como resuelto ✓','ok');
+  const {data: row, error: e1} = await sb.from('sistema').select('data,tipo').eq('id', id).single();
+  if(e1 || !row){ mostrarToast('No se pudo: ' + errText(e1), 'err'); return; }
+  const d = row.data || {}, ahora = new Date().toISOString();
+  const {error} = await sb.from('sistema').update({data: {...d, estado: 'resuelto', hecho_por_daniel: ahora, pendiente_comprobar: true}}).eq('id', id);
+  if(error){ mostrarToast('No se pudo: ' + errText(error), 'err'); return; }
+  await sb.from('sistema').insert({tipo: 'mejora', data: {texto: '[Hecho] ' + (d.titulo_corto || d.titulo || '') + ' — ORDEN: Daniel lo ha marcado como hecho. Comprueba que de verdad está hecho y cierra todo lo pendiente relacionado en cualquier sitio (otros recordatorios, contratos, gastos, casos, Digitalización); si no está hecho del todo, díselo.' + (d.titulo && d.titulo !== d.titulo_corto ? ' — Detalle: ' + d.titulo : ''),
+    estado: 'pendiente', origen: 'hecho', recordatorio_id: id, seccion: 'Centro de control', fecha: ahora}});
+  mostrarToast('Hecho ✓ — Claude lo comprueba y cierra lo relacionado', 'ok');
   cargarAlertasYRecordatorios();
 }
 
