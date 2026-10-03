@@ -1115,6 +1115,8 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .tc2-x{width:34px;height:34px;flex:0 0 34px;border-radius:50%;border:none;background:var(--concrete);color:var(--red);display:flex;align-items:center;justify-content:center;padding:0;}
 .exp-top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:34px;}
 .exp-bts{display:flex;gap:6px;}
+.exp-docs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0 4px;}
+button.ie-hist-p{font-family:inherit;cursor:pointer;}
 .exp-card-movil{position:relative;}
 .exp-bts .fc-mas-btn{position:static !important;}
 
@@ -3532,7 +3534,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.52</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.53</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3622,7 +3624,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.52</div>
+        <div class="sub" id="version-badge">V7.53</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18953,6 +18955,8 @@ function renderExpedientesTabla(){
       <div class="exp-sub">${escHtml(fin && fin.client ? fin.client : 'Ayuntamiento de Fuente Obejuna')}${fecha ? ' · ' + fecha : ''}</div>
       ${e.descripcion ? `<div class="exp-desc">${escHtml(e.descripcion)}</div>` : ''}
       ${e.adjuntos && e.adjuntos.length ? `<div class="fc-extra">${adjuntosHtml(e)}</div>` : ''}
+      ${(() => { const fs = typeof documentosRealesById !== 'undefined' ? Object.values(documentosRealesById).filter(d => d.expediente_id === e.id && d.id !== e.fase_activa_id).sort((a, b) => String(a.dateRaw||'').localeCompare(String(b.dateRaw||''))) : [];
+        return fs.length ? `<div class="exp-docs"><span class="ie-hist-t">Documentos</span>${fs.map(d => `<button type="button" class="ie-hist-p" onclick="event.stopPropagation();openDocumentViewer('${d.id}')">${escHtml(String(tipoDocEtiqueta(d.type||'')).replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/, ''))} ${escHtml(d.numero || d.num || '')} · ${escHtml(formatFechaCorta(d.dateRaw))}</button>`).join('')}</div>` : ''; })()}
       ${e.estado==='adjudicado' ? `<div>${botonTrabajo(e)}</div>` : ''}
     </div>`;
   }).join('') || '<div class="empty" style="padding:16px;">Sin expedientes todavía</div>';
@@ -18962,7 +18966,9 @@ function renderExpedientesTabla(){
 async function cargarExpedientesReales(){
   if(!sb) return;
   try{
-    const {data, error} = await sb.from('expedientes').select('*').order('created_at',{ascending:false});
+    // V7.53 (Daniel: «hay facturas en expedientes»): aquí solo los expedientes de verdad; los «historiales» que agrupan una factura con
+    // su proforma o presupuesto se ven desde la propia factura («Viene de»), no aquí
+    const {data, error} = await sb.from('expedientes').select('*').or('clase.is.null,clase.neq.historial').order('created_at',{ascending:false});
     if(error || !data) return;
     data.forEach(e=>{ expedientesById[e.id] = e; });
     renderExpedientesTabla();
