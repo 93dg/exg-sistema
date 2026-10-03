@@ -3543,7 +3543,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.54</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.55</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3633,7 +3633,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.54</div>
+        <div class="sub" id="version-badge">V7.55</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -25143,11 +25143,15 @@ function renderControlDocs(){
    propaga solo a las cuatro secciones — no hay definiciones paralelas. */
 // V7.54 (Daniel: «los presupuestos no pueden tener esos estados»): un presupuesto no se cobra; tiene sus propios estados
 const ESTADOS_PRESUPUESTO = [['borrador','Borrador'],['pendiente_enviar','Listo para enviar'],['enviado','Enviado'],['aceptado','Aceptado'],['rechazado','Rechazado'],['revisar','Revisar']];
-const estadosDeTipo = tipo => tipo === 'presupuesto' ? ESTADOS_PRESUPUESTO : ESTADOS_DOCUMENTO;
+// A la administración (ayuntamientos, Diputación…) no se le cobra con proforma ni albarán; a los particulares sí (Daniel 03/10/2026)
+const esAdministracion = nombre => /(AYUNTAMIENTO|AYTO\.|DIPUTACI|JUNTA DE ANDALUC|CONSEJER|MINISTERIO|MANCOMUNIDAD|CONFEDERACI)/i.test(String(nombre || ''));
+const estadosDeTipo = (tipo, doc) => tipo === 'presupuesto' ? ESTADOS_PRESUPUESTO
+  : ((tipo === 'proforma' || tipo === 'albaran') && doc && esAdministracion(doc.client || doc.cliente)) ? ESTADOS_DOCUMENTO.filter(o => !['pendiente_cobrar','parcial','cobrado'].includes(o[0]))
+  : ESTADOS_DOCUMENTO;
 const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['pendiente_enviar','Listo para enviar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Cobro parcial'],['cobrado','Cobrado'],['rectificativa','Rectificativa'],['revisar','Revisar'],['nula','Nula']];
 function estadoDocumentoSelect(tipo, id, actual, contexto){
   const act = actual || 'pendiente_enviar';
-  const label = estadosDeTipo(tipo).concat(ESTADOS_DOCUMENTO).find(o=>o[0]===act)?.[1] || stateLabels[act] || act;
+  const label = estadosDeTipo(tipo, documentosRealesById?.[id]).concat(ESTADOS_DOCUMENTO).find(o=>o[0]===act)?.[1] || stateLabels[act] || act;
   // ddId único por tabla/contexto donde se renderiza (el mismo documento puede aparecer
   // a la vez en varias tablas — Centro de control, Facturas, la fila "standalone" de
   // Presupuestos... — un id de DOM repetido hacía que solo la primera copia funcionara
@@ -25156,7 +25160,7 @@ function estadoDocumentoSelect(tipo, id, actual, contexto){
   return `<div class="estado-cobro-dd" id="${ddId}" data-doc-id="${id}">
     <span class="pill ${act}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${ddId}')">${label}</span>
     <div class="estado-cobro-menu">
-      ${estadosDeTipo(tipo).map(([v,l])=>`<span class="pill ${v}" onclick="event.stopPropagation();cambiarEstadoDocumento('${tipo}','${id}','${v}','${ddId}')">${l}</span>`).join('')}
+      ${estadosDeTipo(tipo, documentosRealesById?.[id]).map(([v,l])=>`<span class="pill ${v}" onclick="event.stopPropagation();cambiarEstadoDocumento('${tipo}','${id}','${v}','${ddId}')">${l}</span>`).join('')}
     </div>
   </div>`;
 }
@@ -25272,7 +25276,7 @@ function actualizarControlesEditor(doc){
   const wrap = document.getElementById('ni-estado-modo-wrap');
   if(!wrap) return;
   const sel = document.getElementById('ni-estado-cobro');
-  sel.dataset.permitidos = estadosDeTipo(doc.tipo || doc.type).map(o => o[0]).join(',');   // el menú solo enseña los estados de su tipo
+  sel.dataset.permitidos = estadosDeTipo(doc.tipo || doc.type, doc).map(o => o[0]).join(',');   // el menú solo enseña los estados de su tipo
   sel.value = doc.estado_cobro || 'pendiente_enviar';
   document.getElementById('ni-modo-pdf').value = doc.modo_pdf || 'completo';
   wrap.style.display = 'flex';
