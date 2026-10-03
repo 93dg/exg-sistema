@@ -3455,7 +3455,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.35</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.36</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3545,7 +3545,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.35</div>
+        <div class="sub" id="version-badge">V7.36</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4401,6 +4401,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
                 <p class="dd-section-label">Estado</p>
                 <div class="filters" id="alb-filtro-estado-chips" style="margin:0;">
                   <div class="chip-filter" data-estado="borrador">Borrador</div>
+                  <div class="chip-filter" data-estado="revisar">Revisar</div>
                   <div class="chip-filter" data-estado="pendiente_enviar">Listo para enviar</div>
                   <div class="chip-filter" data-estado="pendiente_cobrar">Pendiente de cobrar</div>
                   <div class="chip-filter" data-estado="parcial">Cobro parcial</div>
@@ -4494,6 +4495,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
                 <p class="dd-section-label">Estado</p>
                 <div class="filters" id="pres-filtro-estado-chips" style="margin:0;">
                   <div class="chip-filter" data-estado="borrador">Borrador</div>
+                  <div class="chip-filter" data-estado="revisar">Revisar</div>
                   <div class="chip-filter" data-estado="pendiente_enviar">Listo para enviar</div>
                   <div class="chip-filter" data-estado="pendiente_cobrar">Pendiente de cobrar</div>
                   <div class="chip-filter" data-estado="parcial">Cobro parcial</div>
@@ -10882,7 +10884,7 @@ function recRender(){
         <div class="rec-fte">Fuente · ${escHtml(d.fuente || (r.tipo === 'alerta_cobro_pendiente' ? 'documentos pendientes de cobro' : r.tipo === 'alerta_itv' ? 'ficha del vehículo' : d.origen === 'recordatorio' ? 'recordatorio' : 'chat con Claude'))}${d.archivo_url ? ' <a href="' + escHtml(d.archivo_url) + '" class="fte-lnk" onclick="event.stopPropagation()">Archivo</a>' : ''}</div>
         ${desc?`<div class="s rec-desc">${escHtml(desc)}</div>${desc.length > 220 ? '<span class="rec-mas" onclick="const d=this.previousElementSibling;d.classList.toggle(\'ver\');this.textContent=d.classList.contains(\'ver\')?\'Ver menos\':\'Ver más\'">Ver más</span>' : ''}`:''}
         ${d.en_bandeja ? '<div class="s" style="margin-top:6px;color:var(--orange);font-weight:700;">En la bandeja' + (d.orden_bandeja ? ': ' + escHtml(d.orden_bandeja) : '') + '</div>' : ''}
-        <div class="rec-acc"><button type="button" class="rec-b rec-b-pri" onclick="recABandeja('${r.id}')">A la bandeja</button><button type="button" class="rec-b" onclick="recPosponer('${r.id}')">Posponer</button><button type="button" class="rec-b" onclick="marcarRecordatorioResuelto('${r.id}')">Hecho</button></div>
+        <div class="rec-acc">${d.ver ? (Array.isArray(d.ver) ? d.ver : [d.ver]).map((v, i) => `<button type="button" class="rec-b rec-b-pri" onclick="recVer('${r.id}', ${i})">${escHtml(v.etiqueta || 'Ver')}</button>`).join('') : ''}<button type="button" class="rec-b ${d.ver ? '' : 'rec-b-pri'}" onclick="recABandeja('${r.id}')">A la bandeja</button><button type="button" class="rec-b" onclick="recPosponer('${r.id}')">Posponer</button><button type="button" class="rec-b" onclick="marcarRecordatorioResuelto('${r.id}')">Hecho</button></div>
       </div>
     </details>`;
   }).join('');
@@ -10916,6 +10918,22 @@ function recABandeja(id){
     await sb.from('sistema').update({data: {...d, en_bandeja: true, orden_bandeja: orden}}).eq('id', id); r.data = {...d, en_bandeja: true, orden_bandeja: orden};
     c.remove(); recRender(); mostrarToast('En la bandeja: Claude lo verá cuando sigas con la bandeja.', 'ok');
   };
+}
+// «Ver» en un recordatorio: abre la lista exacta de la que habla (vista, tipo, todos los años, estado y búsqueda)
+function recVer(id, i){
+  const r = _recItems.find(x => x.id === id); let v = r && r.data && r.data.ver; if(Array.isArray(v)) v = v[i || 0]; if(!v) return;
+  const pre = v.vista === 'albaranes' ? 'alb' : 'pres';
+  document.querySelector('.nav button[data-view=' + v.vista + ']')?.click();
+  setTimeout(() => {
+    if(v.modo && typeof setModoPresProf === 'function') setModoPresProf(v.modo);
+    setTimeout(() => {
+      try{ _anioTocado[pre] = true; }catch(e){}   // que no vuelva a ponerse solo el año actual
+      document.querySelector('#' + pre + '-filtro-anio-chips [data-anio=""]')?.click();
+      document.querySelectorAll('#' + pre + '-filtro-estado-chips .chip-filter').forEach(c => { if(c.classList.contains('active') !== (c.dataset.estado === v.estado)) c.click(); });
+      const b = document.getElementById(pre + '-search'); if(b && v.buscar){ b.value = v.buscar; b.dispatchEvent(new Event('input')); }
+      window.scrollTo(0, 0);
+    }, 300);
+  }, 400);
 }
 function recPosponer(id){
   const r = _recItems.find(x => x.id === id); if(!r) return; const d = r.data || {};
