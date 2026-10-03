@@ -162,7 +162,7 @@
   }
 
   // ---------- Enderezar y limpiar ----------
-  // modo: "color" | "bn". Devuelve un canvas nuevo con solo el documento.
+  // modo: "original" | "color" | "bn". Devuelve un canvas nuevo con solo el documento.
   function enderezar(cv, canvas, esquinas, modo, maxLado) {
     maxLado = maxLado || 2000;
     const borrar = [], M = (m) => { borrar.push(m); return m; };
@@ -186,7 +186,9 @@
       const fondo = M(new cv.Mat()); cv.resize(peq, fondo, new cv.Size(W, H), 0, 0, cv.INTER_LINEAR);
       const limpio = M(new cv.Mat()); cv.divide(rgb, fondo, limpio, 255, -1);
       let salida = limpio;
-      if (modo === "bn") {
+      if (modo === "original") {   // Daniel 03/10/2026: solo recortar y enderezar, sin tocar colores (a veces el original ya se ve perfecto)
+        salida = plano;
+      } else if (modo === "bn") {
         const g = M(new cv.Mat()); cv.cvtColor(limpio, g, cv.COLOR_RGB2GRAY);
         const bin = M(new cv.Mat()); cv.adaptiveThreshold(g, bin, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 41, 12);
         salida = M(new cv.Mat()); cv.cvtColor(bin, salida, cv.COLOR_GRAY2RGBA);
@@ -253,7 +255,7 @@
 <div id="esc-caja"><canvas id="esc-lienzo"></canvas><div id="esc-cargando" hidden>Preparando el escáner…</div></div>
 <div id="esc-ayuda"></div>
 <div class="esc-pie" id="esc-pie-ajuste"><button type="button" id="esc-repetir">Repetir foto</button><button type="button" id="esc-auto">Detectar de nuevo</button></div>
-<div class="esc-pie" id="esc-pie-resultado" hidden><button type="button" id="esc-volver">Ajustar</button><div class="esc-modos"><button type="button" data-modo="color" class="on">Color</button><button type="button" data-modo="bn">Blanco y negro</button></div></div>`;
+<div class="esc-pie" id="esc-pie-resultado" hidden><button type="button" id="esc-volver">Ajustar</button><div class="esc-modos"><button type="button" data-modo="original">Original</button><button type="button" data-modo="color" class="on">Color</button><button type="button" data-modo="bn">Blanco y negro</button></div></div>`;
     document.body.appendChild(el);
     return el;
   }
