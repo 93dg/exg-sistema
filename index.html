@@ -1081,6 +1081,23 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+@media(max-width:768px){#view-calcempleado .topbar .desc{display:none;} #view-calcempleado .topbar h1{font-size:20px;margin:0;}}
+.ce-real{padding:12px;}
+.ce-real-t{font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:8px;}
+.ce-real-n{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
+.ce-real-n > div{display:flex;flex-direction:column;gap:1px;background:var(--concrete);border-radius:12px;padding:9px;min-width:0;}
+.ce-real-n span{font-size:10.5px;font-weight:600;color:var(--ink-soft);line-height:1.2;}
+.ce-real-n b{font-size:17px;white-space:nowrap;}
+.ce-real-n i{font-style:normal;font-size:11px;color:var(--ink-soft);}
+.ce-real-n .ce-real-dif{background:var(--orange);color:#fff;}
+.ce-real-n .ce-real-dif span, .ce-real-n .ce-real-dif i{color:rgba(255,255,255,.85);}
+details.ce-pleg > summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;margin:0;}
+details.ce-pleg > summary::-webkit-details-marker{display:none;}
+details.ce-pleg > summary::after{content:'▸';color:var(--ink-soft);}
+details.ce-pleg[open] > summary::after{content:'▾';}
+details.ce-pleg[open] > summary{margin-bottom:10px;}
+.ce-min{padding:8px 10px;font-size:12px;gap:2px;}
+
 .ce-min{display:flex;flex-direction:column;gap:3px;margin-top:10px;padding:10px 12px;border-radius:12px;background:#E2F1E6;color:#1F5E33;font-size:12.5px;}
 .ce-min.bajo{background:#F8E1DE;color:#9B2C22;}
 .ce-min.pend{background:#FBF0D9;color:#7A5410;}
@@ -3650,7 +3667,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.70</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.71</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3740,7 +3757,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.70</div>
+        <div class="sub" id="version-badge">V7.71</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7173,6 +7190,7 @@ function ceIrpfDueno(beneficio){ const b = Math.max(0, beneficio - CE_RENTA.redu
 const ceEur = v => (Math.round(v) || 0).toLocaleString('es-ES') + ' €';
 async function ceCargar(){
   if(!CE.resumen && sb){ try{ const {data} = await sb.rpc('resumen_anual_economia'); CE.resumen = data || []; }catch(e){ CE.resumen = []; } }
+  if(sb && !CE._plegLeido){ CE._plegLeido = true; try{ const {data} = await sb.from('filtros_persistentes').select('container_id,valor').like('container_id', 'ce-pleg-%'); (data || []).forEach(f => { try{ localStorage.setItem(f.container_id, f.valor); }catch(e){} }); }catch(e){} }
   ceRender();
 }
 function ceEscenarios(){
@@ -7207,19 +7225,35 @@ function ceRender(){
       </div>
     </div>`; }).join('');
   const hist = (CE.resumen || []).filter(x => x.anio >= new Date().getFullYear() - 5).map(x => `<span class="ce-chip">${x.anio}: ${ceEur(x.ingresos)}</span>`).join('');
+  // V7.71 (Daniel: «lo que me interesa ver siempre es ir cambiando la nómina y combinaciones y ver la diferencia en el escenario real, arriba, sin scroll»):
+  // arriba nómina, pagas, contrato y jornada; justo debajo el resultado real (renta 2025); el resto en plegables que se recuerdan
+  const realE = esc.find(e => e.nombre.startsWith('Renta')) || esc[1] || esc[0];
+  const realAh = realE ? ceIrpfDueno(realE.beneficio) - ceIrpfDueno(realE.beneficio - costeEmp) : 0, realC = costeEmp - realAh;
+  const pleg = (id, titulo, cuerpo) => `<details class="panel ce-panel ce-pleg" data-pleg="${id}"${cePlegAbierto(id) ? ' open' : ''}><summary class="ce-h">${titulo}</summary>${cuerpo}</details>`;
   app.innerHTML = `
   <div class="panel ce-panel">
     <div class="ce-campos">
       <label class="ce-c"><span>Nómina neta al mes</span><div class="pillsel" id="ce-neto" data-menu="1"></div></label>
+      <label class="ce-c"><span>Pagas al año</span><div class="pillsel" id="ce-pagas" data-menu="1"></div></label>
+      <label class="ce-c"><span>Contrato</span><div class="pillsel" id="ce-contrato" data-menu="1"></div></label>
+      <label class="ce-c"><span>Jornada</span><div class="pillsel" id="ce-jornada" data-menu="1"></div></label>
       <div class="ce-min ce-ancho ${bajoSMI ? 'bajo' : convConocido ? '' : 'pend'}">
         <b>${bajoSMI ? 'Por debajo del mínimo legal estimado' : convConocido ? 'Por encima del mínimo legal estimado' : 'Mínimo pendiente de confirmar por convenio'}</b>
         <span>Mínimo bruto: <b>${ceEur(smi / CE.pagas)}</b>/mes (${CE.pagas} pagas) o <b>${ceEur(smi)}</b>/año</span>
         <span>Neto aproximado equivalente: <b>${ceEur(minNetoMes)}</b>/mes</span>
         <span>${convConocido ? 'Según el SMI 2026.' : 'Referencia: SMI 2026 (1.221 € × 14). ' + (CE.convenio === 'nose' ? 'El convenio aplicable podría exigir más.' : 'Las tablas del convenio para «' + (CE_PUESTOS[CE.puesto] || [''])[0] + '» pueden exigir más.')}</span>
       </div>
-      <label class="ce-c"><span>Pagas al año</span><div class="pillsel" id="ce-pagas"></div></label>
-      <label class="ce-c"><span>Contrato</span><div class="pillsel" id="ce-contrato" data-menu="1"></div></label>
-      <label class="ce-c"><span>Jornada</span><div class="pillsel" id="ce-jornada" data-menu="1"></div></label>
+    </div>
+  </div>
+  <div class="panel ce-panel ce-real">
+    <div class="ce-real-t">Escenario real${realE ? ' · ' + realE.nombre : ''}</div>
+    <div class="ce-real-n">
+      <div><span>En B</span><b>${ceEur(enB)}</b><i>${ceEur(enB / 12)}/mes</i></div>
+      <div><span>Con alta (tras ahorro IRPF)</span><b>${ceEur(realC)}</b><i>${ceEur(realC / 12)}/mes</i></div>
+      <div class="ce-real-dif"><span>Diferencia</span><b>${ceEur(realC - enB)}</b><i>${ceEur((realC - enB) / 12)}/mes</i></div>
+    </div>
+  </div>
+  ${pleg('ajustes', 'Más ajustes', `<div class="ce-campos">
       <label class="ce-c"><span>Puesto</span><div class="pillsel" id="ce-puesto" data-menu="1"></div></label>
       <label class="ce-c"><span>Convenio</span><div class="pillsel" id="ce-convenio" data-menu="1"></div></label>
       <label class="ce-c"><span>Bonificación</span><div class="pillsel" id="ce-bonif" data-menu="1"></div></label>
@@ -7230,10 +7264,8 @@ function ceRender(){
       <label class="ce-c ce-ancho"><span>Retención IRPF del trabajador (%) · vacío = estimada</span><input type="number" inputmode="decimal" id="ce-ret" value="${CE.retencion}" placeholder="${(ceDesdeNeto(CE.neto * CE.pagas, ceSS(CE.contrato, CE.at)).irpf / ceDesdeNeto(CE.neto * CE.pagas, ceSS(CE.contrato, CE.at)).bruto * 100).toFixed(1)} (estimada)" step="0.5"></label>
       <label class="ce-c ce-ancho"><span>Margen de beneficio (%) · 39 % en la renta de 2025</span><input type="number" inputmode="decimal" id="ce-margen" value="${CE.margen}" step="1"></label>
       <label class="ce-c ce-ancho"><span>Otro beneficio para probar (opcional)</span><input type="number" inputmode="decimal" id="ce-benef" value="${CE.beneficioReal || ''}" placeholder="opcional" step="500"></label>
-    </div>
-  </div>
-  <div class="panel ce-panel">
-    <h3 class="ce-h">Con alta</h3>
+    </div>`)}
+  ${pleg('detalle', 'Detalle del coste con alta · ' + ceEur(costeEmp) + '/año', `
     <div class="ce-kpis">
       <div><span>Bruto al año</span><b>${ceEur(r.bruto)}</b><i>${ceEur(r.bruto / CE.pagas)} × ${CE.pagas} pagas</i></div>
       <div><span>Seg. Social de la empresa</span><b>${ceEur(r.ssE)}</b><i>${(ss.emp * 100).toFixed(2)} % del bruto</i></div>
@@ -7245,19 +7277,15 @@ function ceRender(){
     </div>
     ${r.base > r.bruto + 1 ? `<div class="ce-nota">Cotiza por la base mínima (${ceEur(r.base)} al año), no por el bruto.</div>` : ''}
     <div class="ce-nota">Todo el coste es gasto deducible de la actividad. La nómina no lleva IVA. Revisa con el gestor las tablas del convenio.</div>
-  </div>
-  <div class="panel ce-panel">
-    <h3 class="ce-h">En B</h3>
-    <div class="ce-kpis"><div class="ce-total"><span>Lo que se paga</span><b>${ceEur(enB)}</b><i>${ceEur(enB / 12)} al mes (el neto, sin más)</i></div></div>
-  </div>
-  <div class="panel ce-panel">
-    <h3 class="ce-h">Diferencia según cómo vaya el año</h3>
+`)}
+  ${pleg('escenarios', 'Otros escenarios', `
     ${esc.length ? `<div class="ce-escs">${filasEsc}</div>` : '<div class="ce-nota">Cargando el historial de facturas…</div>'}
     <div class="ce-hist">${hist}</div>
     <div class="ce-nota">Ahorro de IRPF estimado con vuestra renta de 2025 (conjunta). Beneficio = facturado sin IVA × margen (el margen ya descuenta la cuota de autónomo y el resto de gastos). Orientativo.</div>
     <div class="ce-nota ce-riesgo">En B no hay alta en la Seguridad Social: si hay una inspección, además de la multa por cada trabajador sin alta se reclaman todas las cuotas atrasadas con recargo, y si tiene un accidente trabajando la empresa responde de todo.</div>
-  </div>`;
+`)}`;
   pillsSelIniciar('ce-pagas', [['12', '12 pagas'], ['14', '14 pagas']], v => { CE.pagas = Number(v); ceGuardar(); ceRender(); });
+  app.querySelectorAll('details.ce-pleg').forEach(d => d.addEventListener('toggle', () => cePlegGuardar(d.dataset.pleg, d.open)));
   document.getElementById('ce-pagas').value = String(CE.pagas);
   const ceSel = (id, ops, k, despues) => { if(!document.getElementById(id)) return; pillsSelIniciar(id, ops, v => { CE[k] = v; if(despues) despues(v); ceGuardar(); ceRender(); }); document.getElementById(id).value = CE[k]; };
   { const ops = []; for(let n = 600; n <= 3000; n += 100) ops.push([String(n), n.toLocaleString('es-ES') + ' €' + (n < minNetoMes - 0.5 ? ' · bajo el mínimo' : '')]);
@@ -7273,7 +7301,12 @@ function ceRender(){
   ceSel('ce-hijos', [['0', 'Sin hijos'], ['1', '1'], ['2', '2'], ['3', '3 o más']], 'hijos');
   [['ce-at', 'at'], ['ce-margen', 'margen'], ['ce-benef', 'beneficioReal'], ['ce-ret', 'retencion']].forEach(([id, k]) => { const el = document.getElementById(id); el.onchange = () => { CE[k] = k === 'retencion' ? (el.value === '' ? '' : Number(el.value)) : (Number(el.value) || 0); if(k === 'at') CE.atManual = true; ceGuardar(); ceRender(); }; });
 }
-function ceGuardar(){ try{ const {resumen, ...d} = CE; localStorage.setItem('ce-datos', JSON.stringify(d)); }catch(e){} }
+function cePlegAbierto(id){ try{ const v = localStorage.getItem('ce-pleg-' + id); return v === null ? false : v === '1'; }catch(e){ return false; } }
+function cePlegGuardar(id, abierto){
+  try{ localStorage.setItem('ce-pleg-' + id, abierto ? '1' : '0'); }catch(e){}
+  try{ if(sb) sb.from('filtros_persistentes').upsert({container_id: 'ce-pleg-' + id, valor: abierto ? '1' : '0'}, {onConflict: 'container_id'}).then(()=>{}); }catch(e){}
+}
+function ceGuardar(){ try{ const {resumen, _plegLeido, ...d} = CE; localStorage.setItem('ce-datos', JSON.stringify(d)); }catch(e){} }
 document.addEventListener('click', e => { if(e.target.closest && e.target.closest('[data-view="calcempleado"]')) setTimeout(ceCargar, 50); }, true);
 
 function navGruposConstruir(){
