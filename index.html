@@ -1117,6 +1117,22 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .eq-seg i.on.n1{background:#f0997b;} .eq-seg i.on.n2{background:#ef9f27;} .eq-seg i.on.n3{background:#639922;} .eq-seg i.on.n4{background:#3B6D11;}
 .eq-seg.vacio{height:5px;}
 .eq-res em{font-style:normal;font-size:14px;color:var(--ink-soft);flex:0 0 auto;}
+.eq-ico{width:20px;height:20px;vertical-align:-4px;color:var(--ink);}
+.eq-ico.mini{width:14px;height:14px;vertical-align:-2px;color:var(--ink-soft);}
+.eq-rm span .eq-ico{width:24px;height:24px;}
+.eq-res em .eq-ico{width:16px;height:16px;color:var(--ink-soft);}
+.eq-nomina{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--concrete);border-radius:12px;padding:8px 10px;margin-top:8px;}
+.eq-nomina span{display:block;font-size:10.5px;font-weight:700;color:var(--ink-soft);}
+.eq-nomina b{font-size:20px;font-weight:800;letter-spacing:-.3px;}
+.eq-nomina b i{font-style:normal;font-size:11px;font-weight:600;color:var(--ink-soft);}
+.eq-nd{text-align:right;font-size:10.5px;color:var(--ink-soft);line-height:1.35;}
+.eq-plus{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:10px;font-size:11px;color:rgba(255,255,255,.8);}
+.eq-plus button{all:unset;cursor:pointer;padding:3px 9px;border-radius:99px;border:1px solid rgba(255,255,255,.3);font-weight:700;font-size:11px;}
+.eq-plus button.act{background:var(--orange);border-color:var(--orange);color:#fff;}
+.eq-cb .eq-ico{width:17px;height:17px;}
+.dir-t-ico .eq-ico{width:22px;height:22px;}
+.dir-dec-ico .eq-ico{width:34px;height:34px;color:#fff;}
+.dir-ta-txt .eq-ico.mini{width:15px;height:15px;color:var(--ink);}
 /* V7.84 Equipo: nivel de cada persona con cada máquina (0–4), su valor y lo que falta cubrir */
 .eq-hero{background:var(--asphalt);color:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;}
 .eq-hero h1{font-size:22px;margin:0;font-weight:800;}
@@ -3846,7 +3862,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.84</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.85</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3936,7 +3952,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.84</div>
+        <div class="sub" id="version-badge">V7.85</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7607,6 +7623,49 @@ document.addEventListener('click', e => { if(e.target.closest && e.target.closes
 // el valor que tiene: más sabe, más vale y más debería cobrar; también para contratar»). Datos en Sistema (tipo=equipo). Se toca un punto para
 // poner el nivel (0–4). Valor = media ponderada por lo difícil de cada máquina. Mínimo de convenio = salario anual de su categoría / horas del convenio
 let _eq = null, _eqId = null, _eqAbierta = null;   // persona desplegada para editar (las demás, en resumen)
+// V7.85 (Daniel: «eso son emojis… pon svg»): iconos de línea propios para cada máquina, experiencia y mecánica
+const EQ_SVG = {
+  giratoria: '<rect x="2" y="16" width="12" height="4" rx="2"/><path d="M4 16v-4h5.5l1.5 4"/><path d="M9.5 12l4.5-6.5 5 3"/><path d="M19 8.5l2 4.5-3.5 .5"/>',
+  niveladora: '<circle cx="5" cy="17" r="2"/><circle cx="18" cy="17" r="2"/><path d="M2.5 13h15l3 2.5"/><path d="M13 13V8h4.5v5"/><path d="M8 13.5l-1 3.5M5.5 17.5h4"/>',
+  mixta: '<circle cx="7" cy="17" r="2.3"/><circle cx="15" cy="17" r="2.3"/><path d="M5 14.5V9h6v5.5"/><path d="M5 12.5H2.2L1.5 16h3"/><path d="M11 11l5-4.5 4.5 3.5-1.5 3.5"/>',
+  camion: '<rect x="2" y="7.5" width="11" height="8.5" rx="1"/><path d="M13 10.5h4l3.5 3.5V16H13"/><circle cx="6" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
+  martillo: '<path d="M9 3h6v4H9z"/><path d="M10 7h4v6l-2 8-2-8z"/>',
+  experiencia: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 3.5v6.3M4.3 15.5l5.6-2.4M19.7 15.5l-5.6-2.4"/>',
+  mecanica: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5l3 3 5.8-5.8a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
+  editar: '<path d="M4 20h4L19.5 8.5l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'
+};
+const eqIco = (k, cls) => `<svg class="eq-ico ${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${EQ_SVG[k] || '<circle cx="12" cy="12" r="8"/>'}</svg>`;
+// V7.85 (Daniel: «no pueden cobrar lo mismo; nómina neta justa de cada uno a jornada completa»): el bruto va del convenio de peón (valor 0) al de
+// maquinista + el plus máximo (valor 100), en proporción al valor, y nunca por debajo del convenio de su categoría. Neto = bruto − Seguridad Social del
+// trabajador − retención estimada (soltero sin hijos, la de la calculadora de Empleado), en 14 pagas
+function eqNomina(p, v, cat){
+  const T = (typeof CE_CONVENIO_TABLAS !== 'undefined' && CE_CONVENIO_TABLAS.construccion) || {}, plus = Number(_eq.plus_valor_max != null ? _eq.plus_valor_max : 40) / 100;
+  const base = T.peon || 0, tope = (T.maquinista || 0) * (1 + plus), minCat = T[cat] || base;
+  const bruto = Math.max(minCat, base + (tope - base) * v / 100);
+  let ssT = 0, ret = 0;
+  try{ ssT = bruto * ceSS('indefinido').trab; ret = ceIrpfTrabajador(bruto, ssT); }catch(e){ ssT = bruto * 0.065; ret = bruto * 0.12; }
+  const neto = bruto - ssT - ret;
+  return {bruto, neto, netoMes: neto / 14, minCat};
+}
+// V7.85: también en Dirección, iconos SVG en vez de emojis (los emojis guardados en los datos se traducen aquí)
+Object.assign(EQ_SVG, {
+  banco: '<path d="M3 9.5L12 4l9 5.5"/><path d="M5 10v7M9.5 10v7M14.5 10v7M19 10v7"/><path d="M3 20h18"/>',
+  cobrar: '<path d="M4 13h4l1.5 2.5h5L16 13h4"/><path d="M5.5 6h13L21 13v5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18v-5z"/><path d="M12 3v7M9.5 7.5L12 10l2.5-2.5"/>',
+  factura: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+  mano: '<path d="M8 12l3-3 2 1 3-3 4 4-6 6-2-1-2 2-6-6z"/><path d="M3 9l3-3"/>',
+  euro: '<path d="M17.5 6.5A6.5 6.5 0 1 0 17.5 17.5"/><path d="M4 10.5h9M4 13.5h8"/>',
+  edificio: '<path d="M3 21h18M5 21V8l7-4 7 4v13"/><path d="M9 21v-5h6v5M9 11h.01M15 11h.01"/>',
+  telefono: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>',
+  nave: '<path d="M3 20V10l9-6 9 6v10"/><path d="M8 20v-6h8v6"/><path d="M2 20h20"/>',
+  persona: '<circle cx="12" cy="7.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+  diana: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  relevo: '<path d="M4 12a8 8 0 0 1 13.7-5.6L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15"/><path d="M4 20v-5h5"/>',
+  futuro: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  reciclar: '<path d="M7 19H4.5a1.5 1.5 0 0 1-1.3-2.2L6 12"/><path d="M11 19h7.5a1.5 1.5 0 0 0 1.3-2.2l-1.4-2.6"/><path d="M9 6.5l1.7-2.8a1.5 1.5 0 0 1 2.6 0L16 8"/><path d="M8 16l3 3-3 3M13.5 9.5L16 8l1.5 2.5M4.5 13.5L6 12l2.5 1.2"/>',
+  pensar: '<circle cx="12" cy="12" r="8.5"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 16.5h.01"/>'
+});
+const DIR_EMOJI = {'🏦': 'banco', '📥': 'cobrar', '🧾': 'factura', '🚜': 'mixta', '🤝': 'mano', '💶': 'euro', '🏛': 'edificio', '📞': 'telefono', '🏚': 'nave', '🧑‍🔧': 'mecanica', '👷': 'persona', '💰': 'euro', '🎯': 'diana', '🔁': 'relevo', '🔭': 'futuro', '♻️': 'reciclar'};
+const dirIco = (e, cls) => eqIco(DIR_EMOJI[e] || e || 'pensar', cls);
 const EQ_COLOR = ['#b8b6ae', '#f0997b', '#ef9f27', '#639922', '#3B6D11'];
 function eqCategoria(n){
   const max = ids => Math.max(0, ...ids.map(i => n[i] || 0));
@@ -7631,36 +7690,39 @@ function eqPintar(){
   const puntos = (p, clave, n) => `<div class="eq-dots">${[1, 2, 3, 4].map(k => `<button type="button" class="eq-dot${k <= n ? ' on n' + n : ''}" data-eq-p="${p.id}" data-eq-h="${clave}" data-eq-n="${k}" aria-label="Nivel ${k}"></button>`).join('')}</div>`;
   const tabla = (typeof CE_CONVENIO_TABLAS !== 'undefined' && CE_CONVENIO_TABLAS.construccion) || {}, nomCat = c => (typeof CE_PUESTOS !== 'undefined' && CE_PUESTOS[c]) ? CE_PUESTOS[c][0] : c;
   const sinNada = P.every(p => !Object.values(p.niveles || {}).some(Boolean));
-  const per = P.map(p => { p.niveles = p.niveles || {}; const v = eqValor(p), cat = eqCategoria(p.niveles), eh = tabla[cat] ? tabla[cat] / horas : null, domina = H.filter(h => (p.niveles[h.id] || 0) >= 3).length, arregla = H.filter(h => h.mec && (p.niveles[h.id + '_mec'] || 0) >= 3).length;
+  const per = P.map(p => { p.niveles = p.niveles || {}; const v = eqValor(p), cat = eqCategoria(p.niveles), eh = tabla[cat] ? tabla[cat] / horas : null, domina = H.filter(h => (p.niveles[h.id] || 0) >= 3).length, arregla = H.filter(h => h.mec && (p.niveles[h.id + '_mec'] || 0) >= 3).length, nom = eqNomina(p, v, cat);
     return `<div class="eq-per">
       <div class="eq-cab" data-eq-abrir="${p.id}"><div class="eq-av">${escHtml(p.nombre.slice(0, 1))}</div><div class="eq-nom"><b>${escHtml(p.nombre)}</b><span>${escHtml(p.rol || '')}</span></div>
         <div class="eq-valor"><b>${v}</b><span>valor / 100</span></div></div>
       <div class="eq-barra"><i style="width:${v}%"></i></div>
       ${_eqAbierta !== p.id ? `<div class="eq-res" data-eq-abrir="${p.id}">${H.map(h => { const n = p.niveles[h.id] || 0, m = p.niveles[h.id + '_mec'] || 0, seg = (k, c) => `<i class="${k <= c ? 'on n' + c : ''}"></i>`;
-        return `<div class="eq-rm"><span>${h.ico}</span><div class="eq-seg">${[1, 2, 3, 4].map(k => seg(k, n)).join('')}</div>${h.mec ? `<div class="eq-seg mec">${[1, 2, 3, 4].map(k => seg(k, m)).join('')}</div>` : '<div class="eq-seg vacio"></div>'}</div>`; }).join('')}<em>✎</em></div>` :
-      H.map(h => { const n = p.niveles[h.id] || 0, m = p.niveles[h.id + '_mec'] || 0; return `<div class="eq-maq"><div class="eq-mt">${h.ico} ${escHtml(h.nombre)}</div>
-        <div class="eq-hab"><div class="eq-hn">Llevar<small>${escHtml(NN[n] || '')}</small></div>${puntos(p, h.id, n)}</div>
-        ${h.mec ? `<div class="eq-hab"><div class="eq-hn">Arreglar<small>${escHtml(NM[m] || '')}</small></div>${puntos(p, h.id + '_mec', m)}</div>` : ''}</div>`; }).join('')}
-      <div class="eq-pie"><span>Lleva <b>${domina}</b> · arregla <b>${arregla}</b></span><span>${escHtml(nomCat(cat))} · convenio <b>${eh ? tbN(eh) + ' €/h' : '—'}</b></span></div>
+        return `<div class="eq-rm"><span>${eqIco(h.id)}</span><div class="eq-seg">${[1, 2, 3, 4].map(k => seg(k, n)).join('')}</div>${h.mec ? `<div class="eq-seg mec">${[1, 2, 3, 4].map(k => seg(k, m)).join('')}</div>` : '<div class="eq-seg vacio"></div>'}</div>`; }).join('')}<em>${eqIco('editar')}</em></div>` :
+      H.map(h => { const n = p.niveles[h.id] || 0, m = p.niveles[h.id + '_mec'] || 0; return `<div class="eq-maq"><div class="eq-mt">${eqIco(h.id)} ${escHtml(h.nombre)}</div>
+        <div class="eq-hab"><div class="eq-hn">${eqIco('experiencia', 'mini')} Experiencia<small>${escHtml(NN[n] || '')}</small></div>${puntos(p, h.id, n)}</div>
+        ${h.mec ? `<div class="eq-hab"><div class="eq-hn">${eqIco('mecanica', 'mini')} Mecánica<small>${escHtml(NM[m] || '')}</small></div>${puntos(p, h.id + '_mec', m)}</div>` : ''}</div>`; }).join('')}
+      <div class="eq-nomina"><div><span>Nómina neta justa</span><b>${tbN(nom.netoMes, 0)} €<i>/mes</i></b></div><div class="eq-nd">${tbN(nom.bruto, 0)} € brutos/año<br>${escHtml(nomCat(cat))} · mín. convenio ${tbN(nom.minCat, 0)} €</div></div>
+      <div class="eq-pie"><span>${eqIco('experiencia', 'mini')} Experiencia <b>${domina}</b></span><span>${eqIco('mecanica', 'mini')} Mecánica <b>${arregla}</b></span></div>
     </div>`; }).join('');
   const est = n => sinNada ? 'gris' : n === 0 ? 'rojo' : n === 1 ? 'amar' : 'verde', peor = (a, b) => ['rojo', 'amar', 'verde', 'gris'].find(x => x === a || x === b);
   const cob = H.map(h => { const q = P.filter(p => (p.niveles[h.id] || 0) >= 3), r = h.mec ? P.filter(p => (p.niveles[h.id + '_mec'] || 0) >= 3) : null;
     return {h, q, r, sq: est(q.length), sr: r ? est(r.length) : 'verde', s: peor(est(q.length), r ? est(r.length) : 'verde')}; });
-  const falta = [].concat(...cob.map(c => [c.sq === 'rojo' || c.sq === 'amar' ? 'llevar ' + c.h.nombre.toLowerCase() : null, c.r && (c.sr === 'rojo' || c.sr === 'amar') ? 'arreglar ' + c.h.nombre.toLowerCase() : null])).filter(Boolean);
-  app.innerHTML = `<div class="eq-hero"><h1>Equipo</h1><p>Qué máquina lleva y cuál sabe arreglar cada uno. Toca a una persona para poner sus niveles</p>
-      <div class="eq-ley"><span>Arriba llevar · abajo arreglar</span>${NN.slice(1).map((t, i) => `<span><i style="background:${EQ_COLOR[i + 1]}"></i>${i + 1} ${escHtml(t.split(':')[0])}</span>`).join('')}</div></div>
+  const falta = [].concat(...cob.map(c => [c.sq === 'rojo' || c.sq === 'amar' ? 'experiencia en ' + c.h.nombre.toLowerCase() : null, c.r && (c.sr === 'rojo' || c.sr === 'amar') ? 'mecánica de ' + c.h.nombre.toLowerCase() : null])).filter(Boolean);
+  app.innerHTML = `<div class="eq-hero"><h1>Equipo</h1><p>Experiencia y mecánica de cada uno por máquina, y su nómina justa. Toca a una persona para poner sus niveles</p>
+      <div class="eq-plus"><span>Tope (valor 100): maquinista +</span>${[20, 30, 40, 50].map(x => `<button type="button" data-eq-plus="${x}" class="${Number(_eq.plus_valor_max != null ? _eq.plus_valor_max : 40) === x ? 'act' : ''}">${x} %</button>`).join('')}</div>
+      <div class="eq-ley"><span>Arriba experiencia · abajo mecánica</span>${NN.slice(1).map((t, i) => `<span><i style="background:${EQ_COLOR[i + 1]}"></i>${i + 1} ${escHtml(t.split(':')[0])}</span>`).join('')}</div></div>
     ${per}
     <button type="button" class="eq-add" data-eq-add>+ Añadir persona o candidato</button>
-    <div class="eq-tit">Quién lleva y quién arregla cada máquina</div>
+    <div class="eq-tit">Experiencia y mecánica por máquina</div>
     <div class="eq-cob">${cob.map(c => { const nom = l => sinNada ? '—' : l.length ? escHtml(l.map(p => p.nombre).join(', ')) : 'nadie';
-      return `<div class="eq-cb s-${c.s}"><b>${c.h.ico} ${escHtml(c.h.nombre)}</b><span class="t-${c.sq}">🕹 ${nom(c.q)}</span>${c.r ? `<span class="t-${c.sr}">🔧 ${nom(c.r)}</span>` : ''}</div>`; }).join('')}</div>
-    ${!sinNada && falta.length ? `<div class="eq-buscar">Si contratáis, buscad a alguien que sepa <b>${falta.join(', ')}</b>. Ahí dependéis de una persona o de nadie.</div>` : ''}`;
+      return `<div class="eq-cb s-${c.s}"><b>${eqIco(c.h.id)} ${escHtml(c.h.nombre)}</b><span>${eqIco('experiencia', 'mini')} ${nom(c.q)}</span>${c.r ? `<span>${eqIco('mecanica', 'mini')} ${nom(c.r)}</span>` : ''}</div>`; }).join('')}</div>
+    ${!sinNada && falta.length ? `<div class="eq-buscar">Si contratáis, buscad a alguien con <b>${falta.join(', ')}</b>. Ahí dependéis de una persona o de nadie.</div>` : ''}`;
 }
 document.addEventListener('click', e => {
   const t = e.target.closest ? e.target : null; if(!t) return;
   if(!t.closest('#eq-app') || !_eq) return;
   const d = t.closest('[data-eq-n]');
   if(d){ const p = _eq.personas.find(x => x.id === d.dataset.eqP); if(!p) return; const k = Number(d.dataset.eqN), act = p.niveles[d.dataset.eqH] || 0; p.niveles[d.dataset.eqH] = act === k ? k - 1 : k; eqPintar(); eqGuardar(); return; }
+  const pl = t.closest('[data-eq-plus]'); if(pl){ _eq.plus_valor_max = Number(pl.dataset.eqPlus); eqPintar(); eqGuardar(); return; }
   const ab = t.closest('[data-eq-abrir]'); if(ab){ _eqAbierta = _eqAbierta === ab.dataset.eqAbrir ? null : ab.dataset.eqAbrir; eqPintar(); return; }
   if(t.closest('[data-eq-add]')){ const n = (prompt('Nombre de la persona o candidato') || '').trim(); if(!n) return; const rol = (prompt('Papel (por ejemplo: candidato, operario)') || '').trim(); _eq.personas.push({id: 'p' + Date.now(), nombre: n, rol, niveles: {}}); eqPintar(); eqGuardar(); }
 }, true);
@@ -7741,31 +7803,31 @@ function dirPintar(){
   // semáforo: verde bien, amarillo ojo, rojo mal
   const semaf = (val, rojo, amar, inverso) => val == null ? 'gris' : (inverso ? (val < rojo ? 'rojo' : val < amar ? 'amar' : 'verde') : (val > rojo ? 'rojo' : val > amar ? 'amar' : 'verde'));
   const tiles = [
-    {ico: '🏦', t: 'En el banco', v: v ? (v.saldo == null ? '—' : dirEur(v.saldo)) : '…', s: v ? semaf(v.saldo, 10000, 20000, true) : 'gris', p: 'mínimo sano: 10.000 €', ir: 'economia'},
-    {ico: '📥', t: 'Por cobrar', v: v ? dirEur(v.cobrar) : '…', s: v ? semaf(v.cobrar, 30000, 10000) : 'gris', p: v ? v.nCobrar + ' documentos' : '', ir: 'facturas'},
-    {ico: '🧾', t: 'Sin facturar (Admón.)', v: v ? dirEur(v.facturar) : '…', s: v ? (v.facturar <= 0 ? 'verde' : v.facturarDias > 60 ? 'rojo' : 'amar') : 'gris', p: v && v.facturar > 0 ? 'el más antiguo: ' + v.facturarDias + ' días' : 'al día', ir: 'albaranes'},
-    {ico: '🚜', t: 'Trabajo en cola', v: v ? (v.meses == null ? '—' : tbN(v.meses) + (v.meses >= 1.05 ? ' meses' : ' mes')) : '…', s: v ? semaf(v.meses, 4, 2) : 'gris', p: v ? v.nTrab + ' trabajos' : '', ir: 'trabestad'},
+    {ico: 'banco', t: 'En el banco', v: v ? (v.saldo == null ? '—' : dirEur(v.saldo)) : '…', s: v ? semaf(v.saldo, 10000, 20000, true) : 'gris', p: 'mínimo sano: 10.000 €', ir: 'economia'},
+    {ico: 'cobrar', t: 'Por cobrar', v: v ? dirEur(v.cobrar) : '…', s: v ? semaf(v.cobrar, 30000, 10000) : 'gris', p: v ? v.nCobrar + ' documentos' : '', ir: 'facturas'},
+    {ico: 'factura', t: 'Sin facturar (Admón.)', v: v ? dirEur(v.facturar) : '…', s: v ? (v.facturar <= 0 ? 'verde' : v.facturarDias > 60 ? 'rojo' : 'amar') : 'gris', p: v && v.facturar > 0 ? 'el más antiguo: ' + v.facturarDias + ' días' : 'al día', ir: 'albaranes'},
+    {ico: 'mixta', t: 'Trabajo en cola', v: v ? (v.meses == null ? '—' : tbN(v.meses) + (v.meses >= 1.05 ? ' meses' : ' mes')) : '…', s: v ? semaf(v.meses, 4, 2) : 'gris', p: v ? v.nTrab + ' trabajos' : '', ir: 'trabestad'},
   ];
   const R = 26, C = 2 * Math.PI * R;
   app.innerHTML = `
   <div class="dir-hero">
-    <div><div class="dir-hola">Dirección</div><div class="dir-sub">${hechas === tareas.length && tareas.length ? '¡Todo hecho! 💪' : `${tareas.length - hechas} cosas por hacer · ${pend.length} decisiones`}</div></div>
+    <div><div class="dir-hola">Dirección</div><div class="dir-sub">${hechas === tareas.length && tareas.length ? 'Todo hecho' : `${tareas.length - hechas} cosas por hacer · ${pend.length} decisiones`}</div></div>
     <svg viewBox="0 0 64 64" class="dir-anillo"><circle cx="32" cy="32" r="${R}" class="dir-an-f"/><circle cx="32" cy="32" r="${R}" class="dir-an-v" stroke-dasharray="${(C * pct).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 32 32)"/><text x="32" y="37" text-anchor="middle">${hechas}/${tareas.length}</text></svg>
   </div>
-  <div class="dir-tiles">${tiles.map(x => `<button type="button" class="dir-tile s-${x.s}" data-dir-ir="${x.ir}"><span class="dir-t-ico">${x.ico}</span><span class="dir-t-t">${x.t}</span><b>${x.v}</b><i>${escHtml(x.p)}</i></button>`).join('')}</div>
+  <div class="dir-tiles">${tiles.map(x => `<button type="button" class="dir-tile s-${x.s}" data-dir-ir="${x.ir}"><span class="dir-t-ico">${dirIco(x.ico)}</span><span class="dir-t-t">${x.t}</span><b>${x.v}</b><i>${escHtml(x.p)}</i></button>`).join('')}</div>
   <div class="dir-tit">Qué hacer ahora</div>
   <div class="dir-tareas">${tareas.map(t => `<div class="dir-tarea${t.hecha ? ' hecha' : ''}">
       <button type="button" class="dir-check" data-dir-tarea="${t.id}" aria-label="Marcar">${t.hecha ? '✓' : ''}</button>
-      <div class="dir-ta-txt"><b>${t.ico || ''} ${escHtml(t.titulo)}</b><span>${escHtml(t.detalle || '')}</span></div>
+      <div class="dir-ta-txt"><b>${dirIco(t.ico, 'mini')} ${escHtml(t.titulo)}</b><span>${escHtml(t.detalle || '')}</span></div>
       ${t.importe ? `<span class="dir-ta-eur">${dirEur(t.importe)}</span>` : ''}
       ${t.ir && !t.hecha ? `<button type="button" class="dir-ir" data-dir-ir="${t.ir}" aria-label="Ir">→</button>` : ''}
     </div>`).join('')}</div>
   <div class="dir-tit">Decisión pendiente <span>${decs.length - pend.length}/${decs.length} tomadas</span></div>
-  ${dec ? `<div class="dir-dec"><div class="dir-dec-ico">${dec.ico || '🤔'}</div><div class="dir-dec-q">${escHtml(dec.pregunta)}</div>
+  ${dec ? `<div class="dir-dec"><div class="dir-dec-ico">${dirIco(dec.ico)}</div><div class="dir-dec-q">${escHtml(dec.pregunta)}</div>
       <div class="dir-dec-ops">${dec.opciones.map(o => `<button type="button" data-dir-dec="${dec.id}" data-op="${escHtml(o)}">${escHtml(o)}</button>`).join('')}</div>
       <button type="button" class="dir-luego" data-dir-luego="${dec.id}">Decidir más tarde ›</button></div>`
-    : '<div class="dir-dec dir-dec-fin">🎉 Todas las decisiones tomadas</div>'}
-  ${tomadas.length ? `<div class="dir-tomadas">${tomadas.map(x => `<button type="button" data-dir-deshacer="${x.id}" title="Tocar para volver a decidir">${x.ico || ''} ${escHtml(x.elegida)}</button>`).join('')}</div>` : ''}
+    : '<div class="dir-dec dir-dec-fin">Todas las decisiones tomadas</div>'}
+  ${tomadas.length ? `<div class="dir-tomadas">${tomadas.map(x => `<button type="button" data-dir-deshacer="${x.id}" title="Tocar para volver a decidir">${escHtml(x.elegida)}</button>`).join('')}</div>` : ''}
   <button type="button" class="dir-vermas" data-dir-diag>${_dirVerDiag ? 'Ocultar diagnóstico ▴' : 'Ver diagnóstico completo ▾'}</button>
   ${_dirVerDiag ? (d.secciones || []).map((x, i) => `<div class="dir-sec"><button type="button" data-dir-sec="${i}">${escHtml(x.titulo)}<i>▾</i></button><div class="dir-cuerpo">${dirMd(x.md)}</div></div>`).join('') : ''}`;
 }
