@@ -1083,6 +1083,8 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
 .ce-min{display:flex;flex-direction:column;gap:3px;margin-top:10px;padding:10px 12px;border-radius:12px;background:#E2F1E6;color:#1F5E33;font-size:12.5px;}
 .ce-min.bajo{background:#F8E1DE;color:#9B2C22;}
+.ce-min.pend{background:#FBF0D9;color:#7A5410;}
+.ce-campos .ce-min{margin-top:0;}
 .ce-min > b{font-size:13.5px;}
 
 /* V7.63 calculadora de empleado */
@@ -3648,7 +3650,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.69</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.70</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3738,7 +3740,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.69</div>
+        <div class="sub" id="version-badge">V7.70</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7131,6 +7133,8 @@ const CE = {neto: 1200, pagas: 14, contrato: 'indefinido', at: 6.70, atManual: f
   jornada: '100', puesto: 'maquinista', convenio: 'construccion', edad: '30-44', bonif: 'ninguna', familia: 'soltero', hijos: '0'};
 // V7.68 (Daniel: «datos que falten como desplegables, solo los que cambian el cálculo»). Valores de referencia (revisar cada enero):
 const CE_REF = {smiAnual: 17094, baseMinMes: 1424.50, flc: 0.35, indemTemporal: 7, smiTxt: 'SMI 2026 (RD 126/2026): 1.221 € × 14'};   // SMI 2026, base mínima = SMI prorrateado, Fundación Laboral de la Construcción, indemnización fin de obra
+// Tablas salariales anuales por puesto (bruto mínimo de convenio, jornada completa). Vacías: no hay tabla publicada cargada; se rellenan cuando se tengan.
+const CE_CONVENIO_TABLAS = {construccion: {}, nose: {}};
 const CE_PUESTOS = {maquinista: ['Maquinista', 6.70], conductor: ['Conductor de camión', 6.70], peon: ['Peón', 6.70], oficial: ['Oficial de obra', 6.70], administrativo: ['Administrativo', 1.50]};
 // Bonificaciones de cuota empresarial (RDL 1/2023), solo con contrato indefinido, € al año
 const CE_BONIF = {ninguna: ['Ninguna', 0], larga: ['Desempleado de larga duración', 1320], joven: ['Joven con Garantía Juvenil (<30)', 3300], discapacidad: ['Discapacidad (≥33 %)', 4500], exclusion: ['Riesgo de exclusión social', 1320], violencia: ['Víctima de violencia de género', 1536]};
@@ -7185,7 +7189,9 @@ function ceRender(){
   const app = document.getElementById('ce-app'); if(!app) return;
   const ss = ceSS(CE.contrato, CE.at), netoAnual = CE.neto * CE.pagas, r = ceDesdeNeto(netoAnual, ss);
   const costeEmp = r.bruto + r.ssE + r.conv, enB = netoAnual;
-  const smi = CE_REF.smiAnual * (Number(CE.jornada) || 100) / 100, bajoSMI = r.bruto < smi - 1;
+  // Mínimo legal: el mayor entre el SMI (× jornada) y la tabla del convenio para el puesto, si la tenemos. Sin tabla, no se inventa: queda pendiente.
+  const tablaConv = (CE_CONVENIO_TABLAS[CE.convenio] || {})[CE.puesto] || 0, convConocido = CE.convenio === 'ninguno' || tablaConv > 0;
+  const smi = Math.max(CE_REF.smiAnual, tablaConv) * (Number(CE.jornada) || 100) / 100, bajoSMI = r.bruto < smi - 1;
   // neto mensual que corresponde al bruto mínimo legal con esta configuración (lo que cobraría con el mínimo)
   const minNetoMes = (() => { const b = ceBase(smi); return (smi - b * ss.trab - ceRet(smi, b * ss.trab)) / CE.pagas; })();
   const esc = ceEscenarios();
@@ -7205,6 +7211,12 @@ function ceRender(){
   <div class="panel ce-panel">
     <div class="ce-campos">
       <label class="ce-c"><span>Nómina neta al mes</span><div class="pillsel" id="ce-neto" data-menu="1"></div></label>
+      <div class="ce-min ce-ancho ${bajoSMI ? 'bajo' : convConocido ? '' : 'pend'}">
+        <b>${bajoSMI ? 'Por debajo del mínimo legal estimado' : convConocido ? 'Por encima del mínimo legal estimado' : 'Mínimo pendiente de confirmar por convenio'}</b>
+        <span>Mínimo bruto: <b>${ceEur(smi / CE.pagas)}</b>/mes (${CE.pagas} pagas) o <b>${ceEur(smi)}</b>/año</span>
+        <span>Neto aproximado equivalente: <b>${ceEur(minNetoMes)}</b>/mes</span>
+        <span>${convConocido ? 'Según el SMI 2026.' : 'Referencia: SMI 2026 (1.221 € × 14). ' + (CE.convenio === 'nose' ? 'El convenio aplicable podría exigir más.' : 'Las tablas del convenio para «' + (CE_PUESTOS[CE.puesto] || [''])[0] + '» pueden exigir más.')}</span>
+      </div>
       <label class="ce-c"><span>Pagas al año</span><div class="pillsel" id="ce-pagas"></div></label>
       <label class="ce-c"><span>Contrato</span><div class="pillsel" id="ce-contrato" data-menu="1"></div></label>
       <label class="ce-c"><span>Jornada</span><div class="pillsel" id="ce-jornada" data-menu="1"></div></label>
@@ -7226,15 +7238,10 @@ function ceRender(){
       <div><span>Bruto al año</span><b>${ceEur(r.bruto)}</b><i>${ceEur(r.bruto / CE.pagas)} × ${CE.pagas} pagas</i></div>
       <div><span>Seg. Social de la empresa</span><b>${ceEur(r.ssE)}</b><i>${(ss.emp * 100).toFixed(2)} % del bruto</i></div>
       <div><span>Seg. Social del trabajador</span><b>${ceEur(r.ssT)}</b><i>${(ss.trab * 100).toFixed(2)} %, se le quita de la nómina</i></div>
-      <div><span>Retención de IRPF (orientativa)</span><b>${ceEur(r.irpf)}</b><i>${(r.irpf / r.bruto * 100).toFixed(1)} %${CE.retencion === '' ? ', depende del trabajador' : ''}</i></div>
+      <div><span>Retención de IRPF (orientativa)</span>${bajoSMI && CE.retencion === '' ? '<b>—</b><i>nómina por debajo del mínimo</i>' : `<b>${ceEur(r.irpf)}</b><i>${(r.irpf / r.bruto * 100).toFixed(1)} %${CE.retencion === '' ? ', depende del trabajador' : ''}</i>`}</div>
       ${r.bonif ? `<div><span>Bonificación</span><b>−${ceEur(r.bonif)}</b><i>ya restada de la Seg. Social</i></div>` : ''}
       ${r.conv ? `<div><span>Convenio de construcción</span><b>${ceEur(r.conv)}</b><i>Fundación Laboral${CE.contrato === 'indefinido' ? '' : ' + 7 % fin de obra'}</i></div>` : ''}
       <div class="ce-total"><span>Coste total para la empresa</span><b>${ceEur(costeEmp)}</b><i>${ceEur(costeEmp / 12)} al mes</i></div>
-    </div>
-    <div class="ce-min${bajoSMI ? ' bajo' : ''}">
-      ${bajoSMI ? '<b>Por debajo del mínimo estimado para esta configuración</b>' : '<b>Por encima del mínimo</b>'}
-      <span>Mínimo bruto legal: <b>${ceEur(smi)}</b>/año (${ceEur(smi / CE.pagas)} × ${CE.pagas}) · neto aprox. <b>${ceEur(minNetoMes)}</b>/mes</span>
-      <span>${CE.convenio === 'nose' ? 'Referencia: ' + CE_REF.smiTxt + '. El convenio podría exigir un salario superior.' : 'Referencia: ' + CE_REF.smiTxt + '. Las tablas del convenio pueden exigir más según la categoría.'}</span>
     </div>
     ${r.base > r.bruto + 1 ? `<div class="ce-nota">Cotiza por la base mínima (${ceEur(r.base)} al año), no por el bruto.</div>` : ''}
     <div class="ce-nota">Todo el coste es gasto deducible de la actividad. La nómina no lleva IVA. Revisa con el gestor las tablas del convenio.</div>
