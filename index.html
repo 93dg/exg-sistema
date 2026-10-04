@@ -1277,6 +1277,15 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .as-tit.falta{background:#fbf2df;}
 .as-tit.falta span{color:#854F0B;}
 .as-tit button{all:unset;cursor:pointer;background:#fff;border:1px solid var(--line);border-radius:99px;padding:3px 10px;font-size:11.5px;font-weight:800;}
+.as-tels{display:flex;gap:5px;margin-top:2px;}
+.as-b{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;border-radius:10px;padding:7px 4px;text-decoration:none;background:#eef6e6;color:#27500A !important;border:1.5px solid #97c459;}
+.as-b.p{flex-direction:row;gap:6px;background:#3B6D11;color:#fff !important;border-color:#3B6D11;}
+.as-b.w{background:#e9f7ef;border-color:#5dcaa5;color:#085041 !important;}
+.as-b svg{width:16px;height:16px;flex:0 0 auto;}
+.as-b b{font-size:15px;font-weight:800;white-space:nowrap;}
+.as-tels.n3 .as-b b{font-size:13px;}
+.as-b small{font-size:9.5px;font-weight:700;line-height:1;opacity:.85;}
+.as-b:active{transform:scale(.97);}
 /* V8.01 Flota › Asistencia; V8.03 compacta en 2 columnas para que quepan todos en una captura */
 .as-top{font-size:12px;font-weight:700;color:var(--ink-soft);margin:0 2px 8px;}
 .as-lista{display:flex;flex-direction:column;gap:6px;}   /* V8.04: un vehículo por línea */
@@ -4121,7 +4130,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.04</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.05</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4211,7 +4220,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.04</div>
+        <div class="sub" id="version-badge">V8.05</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8432,19 +8441,22 @@ function asisPintar(){
     const cab = `<div class="as-cab"><b>${escHtml(f.nombre)}</b><span>${escHtml(f.matricula || '')}${f.estado === 'particular' ? ' · particular' : f.estado === 'averiada' ? ' · averiada' : ''}</span></div>`;
     if(!a) return `<div class="as-card sin">${cab}<div class="as-sin">Sin seguro registrado</div></div>`;
     const pzDb = (_asisPol || []).find(p => p.flota_id === f.id && p.activa !== false), pol = (act && act.poliza) || (pzDb && (pzDb.numero_completo || pzDb.numero_poliza)) || '';
-    const sec = [a.tel2 ? `<a href="${asisTel(a.tel2)}">${escHtml(a.tel2_txt || 'Otro')}: ${asisFmt(a.tel2)}</a>` : '', a.whatsapp ? `<a href="https://wa.me/${a.whatsapp}" target="_blank" rel="noopener">WhatsApp: ${asisFmt(a.whatsapp)}</a>` : ''].filter(Boolean).join('');
+    // V8.05 (reporte de Daniel): todos los teléfonos en una fila de botones que se reparten el ancho; sin textos obvios
+    const ico = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>';
+    const tels = [`<a class="as-b p" href="${asisTel(a.tel)}">${ico}<b>${asisFmt(a.tel)}</b></a>`,
+      a.tel2 ? `<a class="as-b" href="${asisTel(a.tel2)}">${a.tel2_txt ? `<small>${escHtml(a.tel2_txt)}</small>` : ''}<b>${asisFmt(a.tel2)}</b></a>` : '',
+      a.whatsapp ? `<a class="as-b w" href="https://wa.me/${a.whatsapp}" target="_blank" rel="noopener"><small>WhatsApp</small><b>${asisFmt(a.whatsapp)}</b></a>` : ''].filter(Boolean);
     return `<div class="as-card">${cab}
       <div class="as-aseg">${escHtml(a.nombre)}${act.hasta ? ` · hasta ${act.hasta.split('-').reverse().slice(0, 2).join('/')}` : ''}</div>
       <button type="button" class="as-pol${pol ? '' : ' falta'}" data-as-pol="${f.id}">Póliza: <b>${pol ? escHtml(pol) : 'falta, toca para ponerla'}</b></button>
       ${(() => { const P = _asis.personas || {}, t = act.titular && P[act.titular];   // V8.04: titular, DNI y nacimiento, que es lo que piden al llamar
         return t ? `<div class="as-tit"><span>Titular</span><b>${escHtml(t.nombre)}</b><i>DNI ${escHtml(t.dni)} · nac. ${escHtml(t.nacimiento)}</i></div>`
           : `<div class="as-tit falta"><span>Titular: falta, ¿de quién es?</span>${Object.entries(P).map(([k, x]) => `<button type="button" data-as-tit="${f.id}" data-p="${k}">${escHtml(x.nombre.split(' ')[0])}</button>`).join('')}</div>`; })()}
-      <a class="as-llamar" href="${asisTel(a.tel)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg><b>${asisFmt(a.tel)}</b></a>
-      ${sec ? `<div class="as-sec">${sec}</div>` : ''}
+      <div class="as-tels n${tels.length}">${tels.join('')}</div>
       ${sig && A[sig.aseg] ? `<div class="as-sig">Desde ${sig.desde.split('-').reverse().slice(0, 2).join('/')}: <b>${escHtml(A[sig.aseg].nombre)}</b> <a href="${asisTel(A[sig.aseg].tel)}">${asisFmt(A[sig.aseg].tel)}</a></div>` : ''}
-      ${v.nota ? `<div class="as-nota">${escHtml(v.nota)}</div>` : ''}${v.aviso ? `<div class="as-aviso">${escHtml(v.aviso)}</div>` : ''}</div>`; };
+      ${v.aviso ? `<div class="as-aviso">${escHtml(v.aviso)}</div>` : ''}</div>`; };
   const V = _asis.vehiculos || [], con = V.filter(v => (v.seguros || []).length), sin = V.filter(v => !(v.seguros || []).length);
-  box.innerHTML = `<div class="as-top">Asistencia en carretera 24 h · toca el número verde para llamar</div>
+  box.innerHTML = `
     <div class="as-lista">${con.map(fila).join('')}</div>
     ${sin.length ? `<div class="as-sintit">Sin seguro registrado (${sin.length})</div><div class="as-lista">${sin.map(fila).join('')}</div>` : ''}
     <div class="as-fuente">${escHtml(_asis.fuente || '')}</div>`;
