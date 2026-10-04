@@ -3706,7 +3706,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.73</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.74</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3796,7 +3796,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.73</div>
+        <div class="sub" id="version-badge">V7.74</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7193,11 +7193,22 @@ const CE = {neto: 1200, pagas: 14, contrato: 'indefinido', at: 6.70, atManual: f
 // V7.68 (Daniel: «datos que falten como desplegables, solo los que cambian el cálculo»). Valores de referencia (revisar cada enero):
 const CE_REF = {smiAnual: 17094, baseMinMes: 1424.50, flc: 0.35, indemTemporal: 7, smiTxt: 'SMI 2026 (RD 126/2026): 1.221 € × 14'};   // SMI 2026, base mínima = SMI prorrateado, Fundación Laboral de la Construcción, indemnización fin de obra
 // Tablas salariales anuales por puesto (bruto mínimo de convenio, jornada completa). Vacías: no hay tabla publicada cargada; se rellenan cuando se tengan.
-const CE_CONVENIO_TABLAS = {construccion: {}, nose: {}};
-const CE_PUESTOS = {maquinista: ['Maquinista', 6.70], conductor: ['Conductor de camión', 6.70], peon: ['Peón', 6.70], oficial: ['Oficial de obra', 6.70], administrativo: ['Administrativo', 1.50]};
+// V7.74: tablas 2026 del Convenio Provincial de Construcción y Obras Públicas de Córdoba (acta de 29/12/2025, BOP 06/02/2026; vía convenioscolectivos.org).
+// Bruto mínimo anual a jornada completa = salario base diario × 365 (o mensual × 12) + paga de junio + paga de Navidad + vacaciones + plus de actividad × 217 días de trabajo.
+// Sin pluses extrasalariales (ropa, herramienta), que no cuentan para el mínimo.
+const CE_CONV_TXT = 'Convenio de Construcción de Córdoba 2026';
+const CE_CONVENIO_TABLAS = {construccion: {
+  maquinista: 28053, conductor1: 28053, oficial1: 28053,   // nivel VIII: 42,87 €/día + 3 × 2.205,28 + 26,68 × 217
+  conductor2: 27018, oficial2: 27018,                      // nivel IX: 40,81 €/día + 3 × 2.110,83
+  peonesp: 26385,                                          // nivel XI: 39,55 €/día + 3 × 2.053,07
+  peon: 26153,                                             // nivel XII: 39,10 €/día + 3 × 2.030,76
+  administrativo: 26815                                    // nivel IX (aux. administrativo): 1.224,39 €/mes × 12 + 3 × 2.110,83
+}, nose: {}};
+const CE_NIVEL = {maquinista: 'nivel VIII', conductor1: 'nivel VIII', oficial1: 'nivel VIII', conductor2: 'nivel IX', oficial2: 'nivel IX', peonesp: 'nivel XI', peon: 'nivel XII', administrativo: 'nivel IX'};
+const CE_PUESTOS = {maquinista: ['Maquinista', 6.70], conductor1: ['Conductor 1.º', 6.70], conductor2: ['Conductor 2.º', 6.70], oficial1: ['Oficial 1.ª', 6.70], oficial2: ['Oficial 2.ª', 6.70], peonesp: ['Peón especialista', 6.70], peon: ['Peón', 6.70], administrativo: ['Auxiliar administrativo', 1.50]};
 // Bonificaciones de cuota empresarial (RDL 1/2023), solo con contrato indefinido, € al año
 const CE_BONIF = {ninguna: ['Ninguna', 0], larga: ['Desempleado de larga duración', 1320], joven: ['Joven con Garantía Juvenil (<30)', 3300], discapacidad: ['Discapacidad (≥33 %)', 4500], exclusion: ['Riesgo de exclusión social', 1320], violencia: ['Víctima de violencia de género', 1536]};
-try{ const g = JSON.parse(localStorage.getItem('ce-datos') || '{}'); if(g.v === 2) Object.assign(CE, g); if(!CE.jornada) CE.jornada = '100'; }catch(e){}
+try{ const g = JSON.parse(localStorage.getItem('ce-datos') || '{}'); if(g.v === 2) Object.assign(CE, g); if(!CE.jornada) CE.jornada = '100'; CE.puesto = ({conductor: 'conductor1', oficial: 'oficial1'})[CE.puesto] || CE.puesto; }catch(e){}
 function ceEscala(base, tramos){ let c = 0, prev = 0; for(const [hasta, t] of tramos){ if(base <= prev) break; const tope = Math.min(base, hasta); c += (tope - prev) * t / 100; prev = hasta; } return c; }
 const CE_EST = [[12450, 9.5], [20200, 12], [35200, 15], [60000, 18.5], [300000, 22.5], [1e12, 24.5]];
 const CE_AND = [[13000, 9.5], [21100, 12], [35200, 15], [60000, 18.5], [1e12, 22.5]];
@@ -7283,7 +7294,7 @@ function ceRender(){
         <b>${bajoSMI ? 'Por debajo del mínimo legal estimado' : convConocido ? 'Por encima del mínimo legal estimado' : 'Mínimo pendiente de confirmar por convenio'}</b>
         <span>Mínimo bruto: <b>${ceEur(smi / CE.pagas)}</b>/mes (${CE.pagas} pagas) o <b>${ceEur(smi)}</b>/año</span>
         <span>Neto aproximado equivalente: <b>${ceEur(minNetoMes)}</b>/mes</span>
-        <span>${convConocido ? 'Según el SMI 2026.' : 'Referencia: SMI 2026 (1.221 € × 14). ' + (CE.convenio === 'nose' ? 'El convenio aplicable podría exigir más.' : 'Las tablas del convenio para «' + (CE_PUESTOS[CE.puesto] || [''])[0] + '» pueden exigir más.')}</span>
+        <span>${tablaConv ? CE_CONV_TXT + ', ' + (CE_PUESTOS[CE.puesto] || [''])[0] + ' (' + CE_NIVEL[CE.puesto] + '), con 217 días de trabajo; el SMI (17.094 €) queda por debajo.' : 'Referencia: SMI 2026 (1.221 € × 14). ' + (CE.convenio === 'nose' ? 'El convenio aplicable podría exigir más.' : 'Sin tabla de convenio para este puesto.')}</span>
       </div>
     </div>
   </div>
