@@ -1081,6 +1081,21 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+/* V7.72 estadísticas del motor */
+.modo-estad > *:not(#ai-historial-list){display:none !important;}
+.ai-tab-ico{flex:0 0 auto !important;padding-left:14px !important;padding-right:14px !important;}
+.ms-bloque{background:var(--concrete);border-radius:14px;padding:12px;margin-bottom:10px;}
+.ms-t{font-size:12px;font-weight:700;color:var(--ink-soft);}
+.ms-grande{font-size:28px;font-weight:800;margin:2px 0 6px;}
+.ms-barra{height:8px;border-radius:99px;background:rgba(0,0,0,.08);overflow:hidden;}
+.ms-barra > div{height:100%;background:var(--orange);border-radius:99px;}
+.ms-pie{font-size:11.5px;color:var(--ink-soft);margin-top:6px;}
+.ms-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.ms-kpis > div{display:flex;flex-direction:column;gap:1px;background:var(--concrete);border-radius:12px;padding:10px;}
+.ms-kpis span{font-size:11px;font-weight:600;color:var(--ink-soft);}
+.ms-kpis b{font-size:18px;}
+.ms-kpis i{font-style:normal;font-size:11px;color:var(--ink-soft);}
+
 /* V7.72 estadísticas de trabajos */
 .te-panel{padding:14px;margin-bottom:12px;}
 .te-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
@@ -3691,7 +3706,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.72</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.73</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3781,7 +3796,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.72</div>
+        <div class="sub" id="version-badge">V7.73</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6349,6 +6364,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
   <div class="client-tabs" id="ai-panel-tabs" style="margin:0 20px 8px;">
     <div class="client-tab active" data-ai-tab="chat" onclick="aiCambiarPestana('chat')">Chat</div>
     <div class="client-tab" data-ai-tab="historial" onclick="aiCambiarPestana('historial')">Historial</div>
+    <div class="client-tab ai-tab-ico" data-ai-tab="estad" onclick="aiCambiarPestana('estad')" title="Estadísticas del motor" aria-label="Estadísticas del motor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="width:17px;height:17px;vertical-align:-3px;"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
   </div>
 
   <div id="ai-panel-body">
@@ -22456,10 +22472,33 @@ let aiHistorialSel = new Set();
 function aiCambiarPestana(tab){
   document.querySelectorAll('#ai-panel-tabs .client-tab').forEach(el=>el.classList.toggle('active', el.dataset.aiTab===tab));
   if(tab==='historial'){ abrirAiHistorial(); }
+  else if(tab==='estad'){ aiAbrirEstadisticas(); }
   else { aiMostrarVista(aiTareas.length ? 'tasks' : 'input'); }
 }
+// V7.72 (Daniel: «una tercera pestaña con el icono de estadística: cómo de preparado y enseñado está el motor y cuánto le falta»)
+async function aiAbrirEstadisticas(){
+  aiMostrarVista('historial'); document.getElementById('ai-view-historial')?.classList.add('modo-estad');
+  const cont = document.getElementById('ai-historial-list'); if(!cont || !sb) return;
+  cont.innerHTML = '<div class="empty">Cargando…</div>';
+  const {data: m, error} = await sb.rpc('estadisticas_motor'); if(error || !m){ cont.innerHTML = '<div class="empty">No se pudieron cargar.</div>'; return; }
+  const aprendido = m.reglas_activas + m.reglas_candidatas ? Math.round(m.reglas_activas / (m.reglas_activas + m.reglas_candidatas) * 100) : 0;
+  const solo = m.entradas_30 ? Math.round(m.entradas_motor_30 / m.entradas_30 * 100) : 0;
+  const n = x => Number(x || 0).toLocaleString('es-ES');
+  const barra = (pct, txt) => `<div class="ms-barra"><div style="width:${Math.max(2, Math.min(100, pct))}%"></div></div><div class="ms-pie">${txt}</div>`;
+  cont.innerHTML = `
+    <div class="ms-bloque"><div class="ms-t">Lo aprendido</div><div class="ms-grande">${aprendido} %</div>${barra(aprendido, n(m.reglas_activas) + ' reglas en uso · ' + n(m.reglas_candidatas) + ' por aprobar')}</div>
+    <div class="ms-bloque"><div class="ms-t">Lo que hace solo</div><div class="ms-grande">${solo} %</div>${barra(solo, 'de las ' + n(m.entradas_30) + ' entradas de los últimos 30 días las resolvió el motor sin Claude (' + n(m.entradas_motor_30) + ')')}</div>
+    <div class="ms-kpis">
+      <div><span>Conocimiento guardado</span><b>${n(m.conocimiento)}</b><i>usado ${n(m.reutilizado)} veces</i></div>
+      <div><span>Reglas que aplica solo</span><b>${n(m.reglas_autoaplicables)}</b><i>sin preguntar</i></div>
+      <div><span>Pendiente por aprender</span><b>${n(m.aprendizajes_propuestos)}</b><i>aprendizajes propuestos</i></div>
+      <div><span>Consultas a la IA (30 días)</span><b>${n(m.ia_30)}</b><i>${Number(m.ia_coste_30 || 0).toLocaleString('es-ES', {minimumFractionDigits: 2})} € · ${n(m.ia_evitadas)} evitadas</i></div>
+      <div><span>Plantillas de documentos</span><b>${n(m.plantillas)}</b><i>que reconoce</i></div>
+      <div><span>Nombres de clientes</span><b>${n(m.nombres)}</b><i>aprendidos</i></div>
+    </div>`;
+}
 async function abrirAiHistorial(){
-  aiMostrarVista('historial');
+  aiMostrarVista('historial'); document.getElementById('ai-view-historial')?.classList.remove('modo-estad');
   const cont = document.getElementById('ai-historial-list');
   if(!sb){ cont.innerHTML = '<div class="empty">Supabase no está conectado.</div>'; return; }
   cont.innerHTML = '<div class="empty">Cargando…</div>';
