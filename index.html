@@ -3545,7 +3545,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.56</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.57</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3635,7 +3635,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.56</div>
+        <div class="sub" id="version-badge">V7.57</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8960,6 +8960,7 @@ function setModoPresProf(modo){
   filtrarPorAnioTrim('presupuestos-tbody-standalone','pres');
   actualizarContadorPresupuestosStandalone();
   renderPresupuestosKPIs();
+  try{ plegRefrescar('pres'); }catch(e){}   // V7.57: los números de los filtros cambian con el tipo
   try{ renderAvisoHistorico(); }catch(e){}
 }
 function renderPresupuestosKPIs(){
@@ -17789,7 +17790,8 @@ function plegRefrescar(p){
   const cfg = PLEG_CFG[p], tbody = document.getElementById(cfg.tbody); if(!tbody || !document.getElementById('pleg-' + p)) return;
   const sel = {}; PLEG_GRUPOS.forEach(([k]) => { sel[k] = plegSeleccion(p, k); });
   const q = (document.getElementById(p + '-search')?.value || '').trim().toLowerCase();
-  const filas = Array.from(tbody.querySelectorAll('tr')).map(tr => ({anio: tr.dataset.anio, trim: tr.dataset.trimestre, estado: plegEstadoFila(tr, cfg.soloPill), busq: tr._busq}));
+  // V7.57 (Daniel: «pone 126 y luego abajo 23»): en Presupuestos/Proformas la tabla tiene los dos tipos; los números de los filtros cuentan solo el que se está viendo
+  const filas = Array.from(tbody.querySelectorAll('tr')).filter(tr => p !== 'pres' || typeof presModo === 'undefined' || !tr.dataset.tipo || tr.dataset.tipo === presModo).map(tr => ({anio: tr.dataset.anio, trim: tr.dataset.trimestre, estado: plegEstadoFila(tr, cfg.soloPill), busq: tr._busq}));
   const pasa = (f, salvo) => PLEG_FILTROS.every(([k]) => k === salvo || !sel[k].size || (k === 'estado' ? (f.estado ? sel.estado.has(f.estado) : true) : sel[k].has(f[k]))) && (!q || f.busq === undefined || f.busq.includes(q));
   PLEG_FILTROS.forEach(([k]) => {
     const cuenta = {}; let total = 0;
