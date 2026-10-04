@@ -3862,7 +3862,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.85</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.86</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3952,7 +3952,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.85</div>
+        <div class="sub" id="version-badge">V7.86</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7317,6 +7317,17 @@ async function bandejaContadores(forzar){
   }catch(err){ console.warn('contadores de Bandeja', err); }
   bandejaPintarCuentas();
 }
+// V7.86 (Daniel: «que recuerde los últimos sitios donde he estado, la última pestaña»): al ENTRAR en una sección (no solo al recargar), sus
+// subpestañas (las barras con id «…-subtabs») vuelven a la última que se usó. Los grupos (Trabajos, Economía…) ya abrían su última vista
+(function recordarSubpestanas(){
+  const restaurar = vista => vista.querySelectorAll('[id$="-subtabs"]').forEach(nav => {
+    let s = null; try{ s = localStorage.getItem('subtab_' + nav.id); }catch(e){}
+    const tab = s && nav.querySelector(`.client-tab[data-sub="${s}"], .docs-tab[data-sub="${s}"]`);
+    if(tab && !tab.classList.contains('active')) tab.click();
+  });
+  const obs = new MutationObserver(ms => ms.forEach(m => { const v = m.target; if(v.classList.contains('active') && !(m.oldValue || '').split(/\s+/).includes('active')) setTimeout(() => restaurar(v), 0); }));
+  document.querySelectorAll('.view').forEach(v => obs.observe(v, {attributes: true, attributeFilter: ['class'], attributeOldValue: true}));   // solo las secciones, no toda la página
+})();
 // V7.61 (Daniel: «en las secciones con más de una pestaña, al arrastrar a la izquierda o a la derecha que pase a la otra»): deslizar el dedo
 // en horizontal sobre la pantalla cambia a la pestaña de al lado (la barra de pestañas de arriba de la sección: Lista/Calendario, Correo/Pendientes, Documentos…)
 (function deslizarPestanas(){
@@ -7324,7 +7335,7 @@ async function bandejaContadores(forzar){
   document.addEventListener('touchstart', e => {
     if(e.touches.length !== 1){ valido = false; return; }
     const t = e.target;
-    valido = !(t.closest('input, textarea, select, canvas, .leaflet-container, #visor, .overlay.active, #rb, [data-no-swipe], .docs-tabs, .client-tabs, .pleg, .filters') || (function scrollH(el){ while(el && el !== document.body){ const cs = getComputedStyle(el); if((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 4) return true; el = el.parentElement; } return false; })(t));
+    valido = !(t.closest('input, textarea, select, canvas, .leaflet-container, #visor, .overlay.active, #rb, [data-no-swipe], .docs-tabs, .client-tabs, .dir-pest, .pleg, .filters') || (function scrollH(el){ while(el && el !== document.body){ const cs = getComputedStyle(el); if((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 4) return true; el = el.parentElement; } return false; })(t));
     x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
   }, {passive: true});
   document.addEventListener('touchend', e => {
@@ -7332,10 +7343,12 @@ async function bandejaContadores(forzar){
     const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
     if(Math.abs(dx) < 70 || Math.abs(dy) > 45 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - t0 > 700) return;
     const vista = document.querySelector('.view.active'); if(!vista) return;
-    const barra = [...vista.querySelectorAll('.docs-tabs, .client-tabs')].find(b => b.offsetParent && b.querySelectorAll('button, .client-tab').length > 1); if(!barra) return;
+    // V7.86 (Daniel: «en toda la web; y al llegar a la última, seguir deslizando empieza otra vez por la primera»): también las pestañas de Dirección
+    // (.dir-pest), y la lista da la vuelta: después de la última va la primera y antes de la primera, la última
+    const barra = [...vista.querySelectorAll('.docs-tabs, .client-tabs, .dir-pest')].find(b => b.offsetParent && b.querySelectorAll('button, .client-tab').length > 1); if(!barra) return;
     const tabs = [...barra.querySelectorAll(':scope > button, :scope > .client-tab, :scope > * > button')].filter(b => b.offsetParent);
-    const i = tabs.findIndex(b => b.classList.contains('active')); if(i < 0) return;
-    const sig = tabs[i + (dx < 0 ? 1 : -1)]; if(sig) sig.click();
+    const i = tabs.findIndex(b => b.classList.contains('active') || b.classList.contains('act')); if(i < 0 || tabs.length < 2) return;
+    const sig = tabs[(i + (dx < 0 ? 1 : -1) + tabs.length) % tabs.length]; if(sig) sig.click();
   }, {passive: true});
 })();
 
@@ -7749,7 +7762,7 @@ function dirMd(md){
   }
   return html;
 }
-let _dirDatos = null, _dirId = null, _dirVivo = null, _dirVerDiag = false, _dirPest = 'mando';   // V7.84: pestañas Mando | Equipo
+let _dirDatos = null, _dirId = null, _dirVivo = null, _dirVerDiag = false, _dirPest = (() => { try{ return localStorage.getItem('dir_pest') || 'mando'; }catch(e){ return 'mando'; } })();   // V7.84: pestañas Mando | Equipo; V7.86: se recuerda la última
 const dirEur = n => tbN(Math.round(n || 0), 0) + ' €';
 // V7.82 datos en vivo de EXG para el semáforo: saldo del banco, por cobrar, por facturar a la Administración, meses de trabajo en cola
 async function dirVivo(){
@@ -7846,7 +7859,7 @@ document.addEventListener('click', e => {
   const de = t.closest('[data-dir-deshacer]');
   if(de){ const x = (_dirDatos.decisiones || []).find(y => y.id === de.dataset.dirDeshacer); if(x && confirm('¿Volver a decidir «' + x.pregunta + '»?')){ x.elegida = null; const L = _dirDatos.decisiones, i = L.indexOf(x); L.unshift(L.splice(i, 1)[0]); dirPintar(); dirGuardar(); } return; }
   if(t.closest('[data-dir-diag]')){ _dirVerDiag = !_dirVerDiag; dirPintar(); return; }
-  const pe = t.closest('[data-dir-pest]'); if(pe){ _dirPest = pe.dataset.dirPest; dirPintar(); }
+  const pe = t.closest('[data-dir-pest]'); if(pe){ _dirPest = pe.dataset.dirPest; try{ localStorage.setItem('dir_pest', _dirPest); }catch(e){} dirPintar(); }
 }, true);
 
 
