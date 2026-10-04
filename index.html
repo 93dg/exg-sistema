@@ -1081,6 +1081,10 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.ce-min{display:flex;flex-direction:column;gap:3px;margin-top:10px;padding:10px 12px;border-radius:12px;background:#E2F1E6;color:#1F5E33;font-size:12.5px;}
+.ce-min.bajo{background:#F8E1DE;color:#9B2C22;}
+.ce-min > b{font-size:13.5px;}
+
 /* V7.63 calculadora de empleado */
 .ce-panel{padding:14px;margin-bottom:12px;}
 .ce-campos{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
@@ -3644,7 +3648,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.68</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.69</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3734,7 +3738,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.68</div>
+        <div class="sub" id="version-badge">V7.69</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7126,7 +7130,7 @@ const CE_RENTA = {anio: 2025, ingresos: 66678.32, gastos: 39273.97, rendimiento:
 const CE = {neto: 1200, pagas: 14, contrato: 'indefinido', at: 6.70, atManual: false, margen: 39, beneficioReal: 0, retencion: '', resumen: null, v: 2,
   jornada: '100', puesto: 'maquinista', convenio: 'construccion', edad: '30-44', bonif: 'ninguna', familia: 'soltero', hijos: '0'};
 // V7.68 (Daniel: «datos que falten como desplegables, solo los que cambian el cálculo»). Valores de referencia (revisar cada enero):
-const CE_REF = {smiAnual: 16576, baseMinMes: 1381.20, flc: 0.35, indemTemporal: 7};   // SMI 2025 (14 × 1.184), base mínima grupos 4-11, Fundación Laboral de la Construcción, indemnización fin de obra
+const CE_REF = {smiAnual: 17094, baseMinMes: 1424.50, flc: 0.35, indemTemporal: 7, smiTxt: 'SMI 2026 (RD 126/2026): 1.221 € × 14'};   // SMI 2026, base mínima = SMI prorrateado, Fundación Laboral de la Construcción, indemnización fin de obra
 const CE_PUESTOS = {maquinista: ['Maquinista', 6.70], conductor: ['Conductor de camión', 6.70], peon: ['Peón', 6.70], oficial: ['Oficial de obra', 6.70], administrativo: ['Administrativo', 1.50]};
 // Bonificaciones de cuota empresarial (RDL 1/2023), solo con contrato indefinido, € al año
 const CE_BONIF = {ninguna: ['Ninguna', 0], larga: ['Desempleado de larga duración', 1320], joven: ['Joven con Garantía Juvenil (<30)', 3300], discapacidad: ['Discapacidad (≥33 %)', 4500], exclusion: ['Riesgo de exclusión social', 1320], violencia: ['Víctima de violencia de género', 1536]};
@@ -7137,7 +7141,7 @@ const CE_AND = [[13000, 9.5], [21100, 12], [35200, 15], [60000, 18.5], [1e12, 22
 function ceCuotaIRPF(base){ base = Math.max(0, base); const m = 5550; return Math.max(0, ceEscala(base, CE_EST) - ceEscala(m, CE_EST) + ceEscala(base, CE_AND) - ceEscala(m, CE_AND)); }
 function ceIrpfTrabajador(bruto, ssT){
   const h = Number(CE.hijos) || 0, conyuge = CE.familia === 'conyuge';
-  const limite = conyuge ? [17894, 19442, 21267, 23116][Math.min(h, 3)] : (h ? [15876, 17197, 18130, 18130][Math.min(h, 3)] : 15876);   // límites de exclusión de retención (aprox.)
+  const limite = Math.max(CE_REF.smiAnual, conyuge ? [17894, 19442, 21267, 23116][Math.min(h, 3)] : (h ? [15876, 17197, 18130, 18130][Math.min(h, 3)] : 15876));   // límites de exclusión de retención (aprox.; el SMI no tributa)
   if(bruto <= limite) return 0;
   const rn = bruto - ssT - 2000;
   let red = 0; if(rn <= 14852) red = 7302; else if(rn <= 17673.52) red = 7302 - 1.75 * (rn - 14852); else if(rn <= 19747.5) red = 2364.34 - 1.14 * (rn - 17673.52);
@@ -7182,6 +7186,8 @@ function ceRender(){
   const ss = ceSS(CE.contrato, CE.at), netoAnual = CE.neto * CE.pagas, r = ceDesdeNeto(netoAnual, ss);
   const costeEmp = r.bruto + r.ssE + r.conv, enB = netoAnual;
   const smi = CE_REF.smiAnual * (Number(CE.jornada) || 100) / 100, bajoSMI = r.bruto < smi - 1;
+  // neto mensual que corresponde al bruto mínimo legal con esta configuración (lo que cobraría con el mínimo)
+  const minNetoMes = (() => { const b = ceBase(smi); return (smi - b * ss.trab - ceRet(smi, b * ss.trab)) / CE.pagas; })();
   const esc = ceEscenarios();
   // V7.66 (Daniel: «tablas no, que no se ven bien en el móvil; pon tarjetas»): una tarjeta por escenario
   const filasEsc = esc.map(e => { const ahorro = ceIrpfDueno(e.beneficio) - ceIrpfDueno(e.beneficio - costeEmp); const real = costeEmp - ahorro;
@@ -7198,7 +7204,7 @@ function ceRender(){
   app.innerHTML = `
   <div class="panel ce-panel">
     <div class="ce-campos">
-      <label class="ce-c ce-ancho"><span>Nómina neta al mes</span><input type="number" inputmode="decimal" id="ce-neto" value="${CE.neto}" min="0" step="50"></label>
+      <label class="ce-c"><span>Nómina neta al mes</span><div class="pillsel" id="ce-neto" data-menu="1"></div></label>
       <label class="ce-c"><span>Pagas al año</span><div class="pillsel" id="ce-pagas"></div></label>
       <label class="ce-c"><span>Contrato</span><div class="pillsel" id="ce-contrato" data-menu="1"></div></label>
       <label class="ce-c"><span>Jornada</span><div class="pillsel" id="ce-jornada" data-menu="1"></div></label>
@@ -7225,7 +7231,11 @@ function ceRender(){
       ${r.conv ? `<div><span>Convenio de construcción</span><b>${ceEur(r.conv)}</b><i>Fundación Laboral${CE.contrato === 'indefinido' ? '' : ' + 7 % fin de obra'}</i></div>` : ''}
       <div class="ce-total"><span>Coste total para la empresa</span><b>${ceEur(costeEmp)}</b><i>${ceEur(costeEmp / 12)} al mes</i></div>
     </div>
-    ${bajoSMI ? `<div class="ce-nota ce-riesgo">Bruto por debajo del salario mínimo para esa jornada (${ceEur(smi)} al año).</div>` : ''}
+    <div class="ce-min${bajoSMI ? ' bajo' : ''}">
+      ${bajoSMI ? '<b>Por debajo del mínimo estimado para esta configuración</b>' : '<b>Por encima del mínimo</b>'}
+      <span>Mínimo bruto legal: <b>${ceEur(smi)}</b>/año (${ceEur(smi / CE.pagas)} × ${CE.pagas}) · neto aprox. <b>${ceEur(minNetoMes)}</b>/mes</span>
+      <span>${CE.convenio === 'nose' ? 'Referencia: ' + CE_REF.smiTxt + '. El convenio podría exigir un salario superior.' : 'Referencia: ' + CE_REF.smiTxt + '. Las tablas del convenio pueden exigir más según la categoría.'}</span>
+    </div>
     ${r.base > r.bruto + 1 ? `<div class="ce-nota">Cotiza por la base mínima (${ceEur(r.base)} al año), no por el bruto.</div>` : ''}
     <div class="ce-nota">Todo el coste es gasto deducible de la actividad. La nómina no lleva IVA. Revisa con el gestor las tablas del convenio.</div>
   </div>
@@ -7243,6 +7253,9 @@ function ceRender(){
   pillsSelIniciar('ce-pagas', [['12', '12 pagas'], ['14', '14 pagas']], v => { CE.pagas = Number(v); ceGuardar(); ceRender(); });
   document.getElementById('ce-pagas').value = String(CE.pagas);
   const ceSel = (id, ops, k, despues) => { if(!document.getElementById(id)) return; pillsSelIniciar(id, ops, v => { CE[k] = v; if(despues) despues(v); ceGuardar(); ceRender(); }); document.getElementById(id).value = CE[k]; };
+  { const ops = []; for(let n = 600; n <= 3000; n += 100) ops.push([String(n), n.toLocaleString('es-ES') + ' €' + (n < minNetoMes - 0.5 ? ' · bajo el mínimo' : '')]);
+    if(!ops.some(o => o[0] === String(CE.neto))) ops.unshift([String(CE.neto), CE.neto.toLocaleString('es-ES') + ' €']);
+    pillsSelIniciar('ce-neto', ops, v => { CE.neto = Number(v); ceGuardar(); ceRender(); }); document.getElementById('ce-neto').value = String(CE.neto); }
   ceSel('ce-contrato', [['indefinido', 'Indefinido'], ['temporal', 'Temporal']], 'contrato');
   ceSel('ce-jornada', [['100', 'Completa'], ['75', 'Parcial 75 %'], ['50', 'Parcial 50 %'], ['25', 'Parcial 25 %']], 'jornada');
   ceSel('ce-puesto', Object.entries(CE_PUESTOS).map(([k, v]) => [k, v[0]]), 'puesto', v => { if(!CE.atManual) CE.at = CE_PUESTOS[v][1]; });
@@ -7251,7 +7264,7 @@ function ceRender(){
   ceSel('ce-edad', [['<30', 'Menos de 30'], ['30-44', '30 a 44'], ['45+', '45 o más']], 'edad');
   ceSel('ce-familia', [['soltero', 'General'], ['conyuge', 'Pareja sin ingresos']], 'familia');
   ceSel('ce-hijos', [['0', 'Sin hijos'], ['1', '1'], ['2', '2'], ['3', '3 o más']], 'hijos');
-  [['ce-neto', 'neto'], ['ce-at', 'at'], ['ce-margen', 'margen'], ['ce-benef', 'beneficioReal'], ['ce-ret', 'retencion']].forEach(([id, k]) => { const el = document.getElementById(id); el.onchange = () => { CE[k] = k === 'retencion' ? (el.value === '' ? '' : Number(el.value)) : (Number(el.value) || 0); if(k === 'at') CE.atManual = true; ceGuardar(); ceRender(); }; });
+  [['ce-at', 'at'], ['ce-margen', 'margen'], ['ce-benef', 'beneficioReal'], ['ce-ret', 'retencion']].forEach(([id, k]) => { const el = document.getElementById(id); el.onchange = () => { CE[k] = k === 'retencion' ? (el.value === '' ? '' : Number(el.value)) : (Number(el.value) || 0); if(k === 'at') CE.atManual = true; ceGuardar(); ceRender(); }; });
 }
 function ceGuardar(){ try{ const {resumen, ...d} = CE; localStorage.setItem('ce-datos', JSON.stringify(d)); }catch(e){} }
 document.addEventListener('click', e => { if(e.target.closest && e.target.closest('[data-view="calcempleado"]')) setTimeout(ceCargar, 50); }, true);
