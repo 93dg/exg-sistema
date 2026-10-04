@@ -1081,6 +1081,29 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.ie-barra-abajo .ie-cerrar-abajo{flex:0 0 48px !important;width:48px;height:48px;padding:0 !important;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--paper);border:1px solid var(--line);color:var(--ink);}
+@media(min-width:769px){ .ie-barra-abajo .ie-cerrar-abajo{display:none;} }
+@media(max-width:768px){ #newinvoice-overlay .close-x{display:none !important;} }
+
+/* V7.60 cabecera de listas de documentos: sin grises, Revisar a la izquierda, Ordenar y Cliente como iconos */
+.panel-head .cli-icon-btn, .factura-card-movil .fc-mas-btn{background:var(--paper) !important;border:1px solid var(--line) !important;color:var(--ink) !important;}
+.panel-head .doc-rev{margin-right:10px;order:-1;}
+@media(max-width:768px){
+  .doc-cab{display:flex !important;flex-direction:row !important;flex-wrap:nowrap !important;align-items:center !important;justify-content:flex-start !important;gap:6px !important;}
+  .doc-cab .doc-rev{flex:0 0 auto !important;width:auto !important;margin:0 !important;padding:7px 10px !important;font-size:12.5px !important;}
+  .doc-cab > *:not(.doc-rev):not(.dd-filter-row){flex:1 1 auto;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .doc-cab .dd-filter-row{flex:1 1 auto !important;min-width:0 !important;gap:4px !important;margin:0 !important;font-size:12px !important;flex-wrap:nowrap !important;justify-content:flex-end !important;}
+  .doc-cab .dd-filter-row > :first-child{flex:1 1 auto;white-space:nowrap;}
+  .doc-cab .dd-filter-row > :first-child *{white-space:nowrap;}
+  .doc-cab button.doc-rev.btn{font-size:12.5px !important;padding:7px 10px !important;min-height:0 !important;}
+  .doc-cab .dd-filter-row > :first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .doc-cab .cli-icon-btn{width:34px !important;height:34px !important;flex:0 0 34px !important;}
+  .doc-cab .cli-icon-btn svg{width:16px !important;height:16px !important;}
+}
+.panel-head .doc-cli-btn.doc-cli-on{border-color:var(--orange) !important;color:var(--orange) !important;}
+.pleg-cols button[data-pl="orden"]{display:none !important;}
+#ps-menu{max-height:60vh;overflow-y:auto;}
+
 /* V7.59 (Daniel): fecha y Nº encima del cliente; más aire entre los botones de arriba y el texto */
 @media(max-width:768px){
   .factura-card-movil:not(.fc-gasto){
@@ -3576,7 +3599,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.59</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.60</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3666,7 +3689,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.59</div>
+        <div class="sub" id="version-badge">V7.60</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -17758,6 +17781,38 @@ function plegEstadoFila(tr, soloPill){
   const el = soloPill ? tr.querySelector('.pill') : tr.querySelector('.pill, select');
   return el ? (el.classList ? Array.from(el.classList).find(x => x !== 'pill') : el.value) : null;
 }
+// V7.60 (Daniel, Albaranes: «Revisar a la izquierda, falta filtro cliente, el orden debe ser un icono de tres rayas, esos grises no me gustan»):
+// cabecera de cada lista de documentos = [Revisar] [N documentos] … [Cliente] [Ordenar ≡] [Buscar] [Quitar filtros]
+const ICO_ORDEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="width:18px;height:18px;"><path d="M4 6h16M4 12h11M4 18h6"/></svg>';
+const ICO_PERSONA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:18px;height:18px;"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>';
+function docCabecera(p, cab){
+  if(!cab || cab.dataset.cab2) return; cab.dataset.cab2 = '1'; cab.classList.add('doc-cab');
+  const fila = cab.querySelector('.dd-filter-row-compacta'); if(!fila) return;
+  const rev = [...fila.querySelectorAll('button')].find(b => /revisar/i.test(b.textContent)); if(rev){ rev.classList.add('doc-rev'); cab.insertBefore(rev, cab.firstElementChild); }
+  const mk = (cls, ico, titulo, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'cli-icon-btn ' + cls; b.title = titulo; b.setAttribute('aria-label', titulo); b.innerHTML = ico; b.onclick = fn; return b; };
+  const bCli = mk('doc-cli-btn', ICO_PERSONA, 'Filtrar por cliente', () => docMenuCliente(p, bCli));
+  const bOrd = mk('doc-ord-btn', ICO_ORDEN, 'Ordenar', () => docMenuOrden(p, bOrd));
+  fila.insertBefore(bOrd, fila.firstChild); fila.insertBefore(bCli, bOrd);
+}
+function docMenuOrden(p, ancla){
+  const chips = [...(plegCont(p, 'orden')?.querySelectorAll('.chip-filter') || [])]; if(!chips.length) return;
+  const act = chips.find(c => c.classList.contains('active'));
+  ancla.value = act ? String(chips.indexOf(act)) : '';
+  psMenuAbrir(ancla, chips.map((c, i) => [String(i), c.textContent.replace(/\s+\d+$/, '').trim()]), false, v => { chips[Number(v)]?.click(); setTimeout(() => plegRefrescar(p), 0); });
+}
+function docMenuCliente(p, ancla){
+  const tb = document.getElementById(PLEG_CFG[p]?.tbody); if(!tb) return;
+  const cuenta = {};
+  [...tb.querySelectorAll('tr')].forEach(tr => { if(p === 'pres' && typeof presModo !== 'undefined' && tr.dataset.tipo && tr.dataset.tipo !== presModo) return;
+    const d = documentosRealesById?.[docIdDeFila(tr)]; const n = (d && (d.client || d.cliente)) || ''; if(n && n !== '—') cuenta[n] = (cuenta[n] || 0) + 1; });
+  const lista = Object.entries(cuenta).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 40);
+  const buscar = document.getElementById(p + '-search'), actual = buscar ? buscar.value : '';
+  ancla.value = actual || '__todos';
+  psMenuAbrir(ancla, [['__todos', 'Todos los clientes']].concat(lista.map(([n, c]) => [n, n + ' · ' + c])), false, v => {
+    if(!buscar) return; buscar.value = v === '__todos' ? '' : v; buscar.dispatchEvent(new Event('input'));
+    ancla.classList.toggle('doc-cli-on', v !== '__todos');
+  });
+}
 function plegIniciar(){
   Object.keys(PLEG_CFG).forEach(p => {
     if(document.getElementById('pleg-' + p)) return;
@@ -17769,6 +17824,7 @@ function plegIniciar(){
     PLEG_GRUPOS.forEach(([k]) => { const f = plegCont(p, k); if(f) caja.querySelector('.pleg-guardados').appendChild(f); });   // las pastillas de siempre, tal cual
     dd.remove();   // el botón Filtros y su panel vacío ya no hacen falta
     const ddo = document.getElementById('dd-' + p + '-orden'); if(ddo) ddo.remove();   // el desplegable de Ordenar tampoco: sus pastillas ya están en la fila Orden
+    try{ docCabecera(p, cab); }catch(e){ console.warn('cabecera', e); }
     caja.addEventListener('click', ev => {
       const t = ev.target.closest('button[data-pl]');
       if(t){ const k = t.dataset.pl; _plegAnimar = k; const l = _plegEstado[p]; if(l.includes(k)) _plegEstado[p] = l.filter(x => x !== k); else l.push(k); plegGuardar(p); plegRender(p); return; }
@@ -24340,6 +24396,10 @@ function closeNewInvoiceModal(){ { const w = document.getElementById('ni-estado-
   const g = document.getElementById('ni-draft'), e = document.getElementById('ni-emitir'), modo = document.getElementById('ni-modo-pdf'), pdf = ed.querySelector('.ie-pdf-movil');
   [g, e].forEach(b => { if(b) barra.appendChild(b); });
   if(modo){ const fila = modo.closest('.tb-frow'); const w = document.createElement('div'); w.className = 'ie-barra-modo'; w.appendChild(modo); barra.appendChild(w); if(fila) fila.remove(); }
+  // V7.60 (Daniel: «la X de cerrar abajo»): en el móvil la X va en la barra de abajo, a la izquierda; la de arriba se esconde
+  { const x = document.createElement('button'); x.type = 'button'; x.className = 'btn ie-cerrar-abajo'; x.title = 'Cerrar'; x.setAttribute('aria-label', 'Cerrar');
+    x.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="width:20px;height:20px;"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    x.onclick = () => intentarCerrarNewInvoiceModal(); barra.insertBefore(x, barra.firstChild); }
   if(pdf){ pdf.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:20px;height:20px;"><path d="M12 4v10M7.5 9.5L12 14l4.5-4.5M5 19h14"/></svg>'; pdf.title = 'PDF: descargar o imprimir'; pdf.setAttribute('aria-label', 'PDF'); barra.appendChild(pdf); }
   ed.appendChild(barra);
   // el botón de guardar se convierte en icono (disquete); su texto sigue en el título para saber qué hace
