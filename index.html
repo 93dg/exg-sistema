@@ -1081,6 +1081,8 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.alert-fecha.rec-dias{font-weight:700;color:var(--orange);white-space:nowrap;}
+.alert-fecha.rec-dias.urge{color:var(--red);}
 .ie-barra-abajo .ie-cerrar-abajo{flex:0 0 48px !important;width:48px;height:48px;padding:0 !important;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--paper);border:1px solid var(--line);color:var(--ink);}
 @media(min-width:769px){ .ie-barra-abajo .ie-cerrar-abajo{display:none;} }
 @media(max-width:768px){ #newinvoice-overlay .close-x{display:none !important;} }
@@ -3599,7 +3601,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.60</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.61</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3689,7 +3691,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.60</div>
+        <div class="sub" id="version-badge">V7.61</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -3765,7 +3767,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
       <!-- ALERTAS Y RECORDATORIOS -->
       <div class="panel" id="panel-alertas" style="margin-bottom:12px;">
         <div class="panel-head" onclick="togglePanelCC('alertas')" style="cursor:pointer;justify-content:space-between;align-items:center;">
-          <h3 style="margin:0;">🔔 Alertas y recordatorios</h3>
+          <div style="display:flex;align-items:center;gap:8px;"><h3 style="margin:0;">Alertas y recordatorios</h3><span class="count" id="alertas-count" style="display:none;"></span></div>
           <div style="display:flex;align-items:center;gap:8px;">
             
             <span id="alertas-chevron" style="color:var(--ink-soft);font-size:16px;">▾</span>
@@ -7044,6 +7046,27 @@ async function bandejaContadores(forzar){
   }catch(err){ console.warn('contadores de Bandeja', err); }
   bandejaPintarCuentas();
 }
+// V7.61 (Daniel: «en las secciones con más de una pestaña, al arrastrar a la izquierda o a la derecha que pase a la otra»): deslizar el dedo
+// en horizontal sobre la pantalla cambia a la pestaña de al lado (la barra de pestañas de arriba de la sección: Lista/Calendario, Correo/Pendientes, Documentos…)
+(function deslizarPestanas(){
+  let x0 = 0, y0 = 0, t0 = 0, valido = false;
+  document.addEventListener('touchstart', e => {
+    if(e.touches.length !== 1){ valido = false; return; }
+    const t = e.target;
+    valido = !(t.closest('input, textarea, select, canvas, .leaflet-container, #visor, .overlay.active, #rb, [data-no-swipe], .docs-tabs, .client-tabs, .pleg, .filters') || (function scrollH(el){ while(el && el !== document.body){ const cs = getComputedStyle(el); if((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 4) return true; el = el.parentElement; } return false; })(t));
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
+  }, {passive: true});
+  document.addEventListener('touchend', e => {
+    if(!valido || window.innerWidth > 900) return; valido = false;
+    const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+    if(Math.abs(dx) < 70 || Math.abs(dy) > 45 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - t0 > 700) return;
+    const vista = document.querySelector('.view.active'); if(!vista) return;
+    const barra = [...vista.querySelectorAll('.docs-tabs, .client-tabs')].find(b => b.offsetParent && b.querySelectorAll('button, .client-tab').length > 1); if(!barra) return;
+    const tabs = [...barra.querySelectorAll(':scope > button, :scope > .client-tab, :scope > * > button')].filter(b => b.offsetParent);
+    const i = tabs.findIndex(b => b.classList.contains('active')); if(i < 0) return;
+    const sig = tabs[i + (dx < 0 ? 1 : -1)]; if(sig) sig.click();
+  }, {passive: true});
+})();
 function navGruposConstruir(){
   Object.entries(NAV_GRUPOS).forEach(([g, tabs]) => tabs.forEach(([v]) => {
     const vista = document.getElementById('view-' + v); if(!vista || vista.querySelector(':scope > .docs-tabs[data-grupo="' + g + '"]')) return;
@@ -10963,14 +10986,29 @@ function toggleCCDocBuscador(){
   if(b.style.display==='block') document.getElementById('control-search-m')?.focus();
 }
 
-function togglePanelCC(panel){
-  const body = document.getElementById(panel+'-body') || document.querySelector('#panel-'+panel+' .panel-body') || document.querySelector('#panel-'+panel+' .doc-toolbar + *');
-  const chev = document.getElementById(panel+'-chevron');
-  if(!body) return;
-  const oculto = body.style.display==='none';
-  body.style.display = oculto ? '' : 'none';
-  if(chev) chev.textContent = oculto ? '▾' : '▸';
+// V7.61 (Daniel: «la web siempre tiene que recordar el estado de los plegables»): cada panel plegable del Centro de control guarda si
+// está abierto o cerrado, en el móvil (al instante, sin parpadeo) y en la base (para el resto de dispositivos); nada lo abre solo
+function ccPanelBody(panel){ return panel === 'notif' ? document.getElementById('notif-body') : (document.getElementById(panel+'-body') || document.querySelector('#panel-'+panel+' .panel-body') || document.querySelector('#panel-'+panel+' .doc-toolbar + *')); }
+function ccPanelPoner(panel, abierto){
+  const body = ccPanelBody(panel), chev = document.getElementById(panel+'-chevron'); if(!body) return;
+  body.style.display = abierto ? '' : 'none'; if(chev) chev.textContent = abierto ? '▾' : '▸';
 }
+function ccPanelGuardar(panel, abierto){
+  try{ localStorage.setItem('cc-panel-' + panel, abierto ? '1' : '0'); }catch(e){}
+  try{ if(sb) sb.from('filtros_persistentes').upsert({container_id: 'cc-panel-' + panel, valor: abierto ? '1' : '0'}, {onConflict: 'container_id'}).then(()=>{}); }catch(e){}
+}
+function togglePanelCC(panel){
+  const body = ccPanelBody(panel); if(!body) return;
+  const abrir = body.style.display === 'none';
+  ccPanelPoner(panel, abrir); ccPanelGuardar(panel, abrir);
+}
+(function ccPanelesRecordar(){
+  const aplicar = () => ['alertas', 'notif'].forEach(p => { let v = null; try{ v = localStorage.getItem('cc-panel-' + p); }catch(e){} if(v !== null) ccPanelPoner(p, v === '1'); });
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', aplicar); else aplicar();
+  const servidor = () => { if(typeof sb === 'undefined' || !sb) return setTimeout(servidor, 800);
+    sb.from('filtros_persistentes').select('container_id,valor').in('container_id', ['cc-panel-alertas', 'cc-panel-notif']).then(({data}) => (data || []).forEach(f => { const p = f.container_id.replace('cc-panel-', ''); try{ localStorage.setItem(f.container_id, f.valor); }catch(e){} ccPanelPoner(p, f.valor === '1'); })); };
+  setTimeout(servidor, 500);
+})();
 
 // Avisos automáticos de ITV (flota.itv_vence = fecha hasta la que vale la última ITV favorable):
 // saltan 15 días antes del vencimiento y siguen mientras esté vencida. Se calculan cada vez, no se guardan.
@@ -11022,7 +11060,8 @@ function recVisible(d, plazo){ const v = recVence(d); if(!v || !plazo) return tr
 function recRender(){
   const cont = document.getElementById('alertas-list-bd'); if(!cont) return;
   const plazo = recPlazo(), items = _recItems.filter(r => recVisible(r.data || {}, plazo))
-    .sort((a, b) => { const va = recVence(a.data || {}), vb = recVence(b.data || {}); if(va && vb) return va.localeCompare(vb); if(va) return -1; if(vb) return 1; return String(b.created_at).localeCompare(String(a.created_at)); });   // V7.29: lo que vence primero, arriba
+    .sort((a, b) => { const pa = (a.data||{}).anclado ? 1 : 0, pb = (b.data||{}).anclado ? 1 : 0; if(pa !== pb) return pb - pa;   // V7.61: los anclados, siempre arriba
+      const va = recVence(a.data || {}), vb = recVence(b.data || {}); if(va && vb) return va.localeCompare(vb); if(va) return -1; if(vb) return 1; return String(b.created_at).localeCompare(String(a.created_at)); });   // V7.29: lo que vence primero, arriba
   const html = items.map(r=>{
     const d = r.data||{};
     const color = r.tipo==='alerta_itv'?'orange':r.tipo==='alerta_cobro_pendiente'?'red':'blue';
@@ -11034,7 +11073,7 @@ function recRender(){
       <summary class="alert-sum">
         <div class="alert-dot ${color}"></div>
         <div class="t">${icono} ${escHtml(corto)}</div>
-        ${v ? `<div class="s alert-fecha"${v < hoy ? ' style="color:var(--red);font-weight:700;"' : ''}>${txtFecha}</div>` : ''}
+        ${v ? (d.anclado ? (() => { const dias = Math.round((new Date(v + 'T12:00:00') - new Date(hoy + 'T12:00:00')) / 86400000); return `<div class="s alert-fecha rec-dias${dias <= 3 ? ' urge' : ''}">${dias > 1 ? 'quedan ' + dias + ' días' : dias === 1 ? 'mañana' : dias === 0 ? 'hoy' : 'hace ' + (-dias) + ' días'}</div>`; })() : `<div class="s alert-fecha"${v < hoy ? ' style="color:var(--red);font-weight:700;"' : ''}>${txtFecha}</div>`) : ''}
       </summary>
       <div class="alert-det-b">
         ${largo ? `<div class="rec-largo">${escHtml(recSinGritos(largo))}</div>` : ''}
@@ -11048,6 +11087,7 @@ function recRender(){
   const ocultos = _recItems.length - items.length;
   cont.innerHTML = (_recItv || '') + html + (ocultos ? `<div class="s" style="padding:8px 2px;color:var(--ink-soft);">${ocultos} más adelante</div>` : '');
   actualizarVacioAlertas();
+  { const cnt = document.getElementById('alertas-count'); if(cnt){ const nItv = (String(_recItv || '').match(/class="alert-det/g) || []).length; cnt.textContent = items.length + nItv; cnt.style.display = ''; } }   // V7.61: contador junto al título
 }
 document.addEventListener('click', ev => { const ch = ev.target.closest('#rec-filtro-plazo-chips .chip-filter'); if(!ch) return; document.querySelectorAll('#rec-filtro-plazo-chips .chip-filter').forEach(c => c.classList.toggle('active', c === ch)); recRender(); try{ if(PLEG2.rec) pleg2Refrescar('rec'); }catch(e){} });
 function actualizarVacioAlertas(){
@@ -16034,24 +16074,13 @@ async function cargarNotificaciones(){
   renderNotificaciones(data);
 }
 
-function toggleNotifPanel(){
-  const body = document.getElementById('notif-body');
-  const chev = document.getElementById('notif-chevron');
-  const open = body.style.display==='none';
-  body.style.display = open ? '' : 'none';
-  if(chev) chev.textContent = open ? '▴' : '▾';
-}
+function toggleNotifPanel(){ togglePanelCC('notif'); }
 function renderNotificaciones(lista){
-  const noLeidas = lista.filter(n=>!n.leida).length;
   const badge = document.getElementById('notif-count');
-  if(badge){ badge.textContent=noLeidas; badge.style.display=noLeidas?'':'none'; }
+  if(badge){ badge.textContent = lista.length; badge.style.display = ''; }   // V7.61: el contador siempre a la vista, también en 0
   const empty = document.getElementById('notif-empty');
   // Si hay notificaciones, abrir el panel automáticamente
-  if(lista.length){
-    const body=document.getElementById('notif-body');
-    const chev=document.getElementById('notif-chevron');
-    if(body&&body.style.display==='none'){ body.style.display=''; if(chev) chev.textContent='▴'; }
-  }
+  // (V7.61: ya no se abre solo; se respeta cómo lo dejó Daniel. El número de al lado avisa de que hay algo.)
   const barra = document.getElementById('notif-barra');
   if(barra) barra.style.display = lista.length ? 'flex' : 'none';
   if(!lista.length){
@@ -22770,6 +22799,7 @@ async function enviarAsistenteIA(){
       estado: t.falta ? 'pendiente' : 'lista',
       _ia_llamada_id: data._ia_llamada_id || null,
       _tarea_index: idx,
+      _mensaje: mensaje || '',
     }));
     if(data._ia_llamada_id && aiAdjuntos.length){
       vincularArchivosAPeticion(data._ia_llamada_id, aiAdjuntos.filter(a=>a.esImagen).map(a=>dataUrlAFile(a.dataUrl, a.nombre, a.tipo)), 'chat');
@@ -22872,6 +22902,7 @@ function aiRenderTarjeta(){
       ${!yaResuelta ? `
         <button class="ai-btn" onclick="aiEditarTarea(${aiTareaActiva})">✎ Editar/Corregir</button>
         <button class="ai-btn primary" ${bloqueada?'disabled style="opacity:.5;"':''} onclick="aiConfirmarTarea(${aiTareaActiva})">Confirmar</button>
+        <button class="ai-btn" onclick="aiTareaAEntrada(${aiTareaActiva})" title="Que lo haga Claude desde la bandeja">A la bandeja</button>
         <button class="ai-btn danger" onclick="aiDescartarTarea(${aiTareaActiva})">Descartar</button>
       ` : ''}
     </div>
@@ -23151,6 +23182,19 @@ async function aiRegistrarResultadoSiPendiente(objetoTipo, objetoTabla, objetoId
     p_ia_llamada_id: link.ia_llamada_id, p_tarea_index: link.tarea_index,
     p_objeto_tipo: objetoTipo, p_objeto_tabla: objetoTabla, p_objeto_id: objetoId, p_objeto_label: objetoLabel,
   });
+}
+// V7.61 (Daniel: «me tiene que dar otra opción, que sea entrada, para que lo registres y después lo hagas tú»): la tarea pasa a la bandeja
+// como entrada, con lo que escribió y lo que entendió el asistente; Claude la hace al revisar la bandeja y enseña al motor a hacerla solo
+async function aiTareaAEntrada(i){
+  const t = aiTareas[i]; if(!t || !sb) return;
+  const nota = [t._mensaje ? 'PEDIDO EN EL ASISTENTE: ' + t._mensaje : '', t.titulo ? 'Tarea: ' + t.titulo : '', t.entendido ? 'Entendido: ' + t.entendido : '', t.propuesta ? 'Propuesta: ' + t.propuesta : ''].filter(Boolean).join(' — ');
+  const {error} = await sb.from('documentos').insert({nota: nota.slice(0, 2000), source: 'asistente', status: 'pendiente'});
+  if(error){ mostrarToast('No se pudo: ' + errText(error), 'err'); return; }
+  t.estado = 'confirmada'; t._a_bandeja = true;
+  mostrarToast('En la bandeja: Claude lo hará cuando sigas con la bandeja.', 'ok');
+  const siguiente = aiTareas.findIndex(x=>x.estado!=='confirmada' && x.estado!=='descartada');
+  if(siguiente===-1){ aiMostrarResumen(); return; }
+  aiTareaActiva = siguiente; aiRenderTareas();
 }
 function aiDescartarTarea(i){
   aiTareas[i].estado = 'descartada';
