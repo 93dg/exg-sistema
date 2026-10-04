@@ -1081,6 +1081,14 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+/* V7.58: el editor preparando un PDF desde la tarjeta no se ve; botones de imprimir y ⋯ de las tarjetas más grandes */
+#newinvoice-overlay.imp-oculto{visibility:hidden !important;}
+@media(max-width:768px){
+  .factura-card-movil .fc-mas-btn{width:42px !important;height:42px !important;font-size:20px !important;}
+  .factura-card-movil .fc-mas-btn svg{width:21px !important;height:21px !important;}
+  .factura-card-movil .fc-pdf-btn{right:58px !important;}
+}
+
 /* V7.54 estados de presupuesto */
 .pill.enviado{background:#E3ECF7;color:#2B5C8F;}
 .pill.aceptado{background:#E2F1E6;color:#2E7D46;}
@@ -3545,7 +3553,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.57</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.58</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3635,7 +3643,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.57</div>
+        <div class="sub" id="version-badge">V7.58</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -25636,9 +25644,18 @@ function enviarDocumentoAlCliente(id){
   composeOnSentCallback = null;
   openComposeDrawer();
 }
-function imprimirDocumento(id){
+// V7.58 (Daniel: «al cerrar el PDF me aparece el editor entre medias»): desde la tarjeta, el editor se abre escondido solo para preparar
+// el PDF y se cierra en cuanto el PDF está en el visor; al cerrar el visor se sigue donde se estaba
+async function imprimirDocumento(id){
+  const ov = document.getElementById('newinvoice-overlay');
+  const yaAbierto = ov && ov.classList.contains('active') && editingDocId === id;
+  if(!yaAbierto && ov) ov.classList.add('imp-oculto');
   openDocumentViewer(id);
-  setTimeout(()=> imprimirPDF(), 300);
+  await new Promise(r => setTimeout(r, 300));
+  try{ await generarPDFDocumento('imprimir'); }
+  finally{
+    if(!yaAbierto){ try{ closeNewInvoiceModal(); }catch(e){} if(ov) ov.classList.remove('imp-oculto'); }
+  }
 }
 async function enviarAlGestorDoc(id){
   if(!exigirNivelDoc(id,'editar')) return;
