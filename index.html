@@ -3724,7 +3724,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.79</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.80</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3814,7 +3814,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.79</div>
+        <div class="sub" id="version-badge">V7.80</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -10292,7 +10292,7 @@ function renderGraficoFacturacion(){
   const anioSel = document.getElementById('econ-filtro-anio-chips')?.querySelector('.chip-filter.active')?.dataset.anio;
   const anio = anioSel ? Number(anioSel) : new Date().getFullYear();
   const docs = Object.values(documentosRealesById);
-  const esIngreso = d => (d.type==='factura' || (d.type==='albaran' && d.estado_cobro==='cobrado'));
+  const esIngreso = d => d.type==='factura';   // V7.80: «Ingresos facturados» = solo facturas (lo cobrado sin factura va aparte, en Economía)
   if(graficoModo === 'mensual'){
     const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sept','Oct','Nov','Dic'];
     const ingresos = new Array(12).fill(0), gastos = new Array(12).fill(0);
@@ -25730,6 +25730,22 @@ function renderControlDocs(){
 // V7.54 (Daniel: «los presupuestos no pueden tener esos estados»): un presupuesto no se cobra; tiene sus propios estados
 const ESTADOS_PRESUPUESTO = [['borrador','Borrador'],['pendiente_enviar','Listo para enviar'],['enviado','Enviado'],['aceptado','Aceptado'],['rechazado','Rechazado'],['revisar','Revisar']];
 // A la administración (ayuntamientos, Diputación…) no se le cobra con proforma ni albarán; a los particulares sí (Daniel 03/10/2026)
+// V7.80 REGLA DE INGRESOS (Daniel 04/10/2026): ingreso legal = SOLO facturas. Ingreso sin factura = proformas y albaranes de particulares
+// cobrados que no han acabado en factura (ni enlazados por documento_siguiente_id, ni como origen de una factura). Los de la Administración
+// nunca son sin factura: para cobrar hay que facturar, así que son pendientes de facturar. Cobro parcial: cuenta lo cobrado
+function econEnlazadosAFactura(docs){
+  const s = new Set();
+  docs.forEach(d => { if(d.type !== 'factura') return; if(d.documento_anterior_id) s.add(d.documento_anterior_id); (d.origen_albaran_ids || []).forEach(x => s.add(x)); });
+  return s;
+}
+function econImporteSinFactura(d, enlazados){
+  if(d.type !== 'proforma' && d.type !== 'albaran') return 0;
+  if(d.deleted_at || d.documento_siguiente_id || (enlazados && enlazados.has(d.id))) return 0;
+  if(esAdministracion(d.client)) return 0;
+  if(d.estado_cobro === 'cobrado') return Number(d.total || 0);
+  if(d.estado_cobro === 'parcial') return Math.min(Number(d.total || 0), Number(d.cobrado_importe || 0));
+  return 0;
+}
 const esAdministracion = nombre => /(AYUNTAMIENTO|AYTO\.|DIPUTACI|JUNTA DE ANDALUC|CONSEJER|MINISTERIO|MANCOMUNIDAD|CONFEDERACI)/i.test(String(nombre || ''));
 const estadosDeTipo = (tipo, doc) => tipo === 'presupuesto' ? ESTADOS_PRESUPUESTO
   : ((tipo === 'proforma' || tipo === 'albaran') && doc && esAdministracion(doc.client || doc.cliente)) ? ESTADOS_DOCUMENTO.filter(o => !['pendiente_cobrar','parcial','cobrado'].includes(o[0]))
@@ -26002,12 +26018,12 @@ function recalcularResumenEconomia(){
 
   const facturasRango = docs.filter(d=>d.type==='factura' && d.status!=='Borrador' && enRango(d));
   const facturadoLegal = facturasRango.reduce((s,d)=>s+(d.total||0),0);
-  const albaranesEnB = docs.filter(d=>d.type==='albaran' && d.estado_albaran==='cobrado_efectivo' && enRango(d));
-  const ingresoEnB = albaranesEnB.reduce((s,d)=>s+(d.total||0),0);
+  const enlazadosFact = econEnlazadosAFactura(docs);   // V7.80: sin factura = proformas y albaranes de particulares cobrados que no acaban en factura
+  const ingresoEnB = docs.filter(enRango).reduce((s,d)=>s+econImporteSinFactura(d, enlazadosFact),0);
 
   let ingresos, etiquetaIngreso;
   if(filtro==='oficial'){ ingresos = facturadoLegal; etiquetaIngreso = 'Facturado'; }
-  else if(filtro==='en_b'){ ingresos = ingresoEnB; etiquetaIngreso = 'Cobrado en B (albaranes)'; }
+  else if(filtro==='en_b'){ ingresos = ingresoEnB; etiquetaIngreso = 'Cobrado sin factura'; }
   else { ingresos = facturadoLegal + ingresoEnB; etiquetaIngreso = 'Ingresos (todo)'; }
 
   const gastosRango = docs.filter(d=>d.type==='gasto' && enRango(d) && (!filtro || (d.contabilidad||'oficial')===filtro)).reduce((s,d)=>s+(d.total||0),0);
