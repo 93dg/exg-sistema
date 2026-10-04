@@ -1133,6 +1133,11 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .dir-t-ico .eq-ico{width:22px;height:22px;}
 .dir-dec-ico .eq-ico{width:34px;height:34px;color:#fff;}
 .dir-ta-txt .eq-ico.mini{width:15px;height:15px;color:var(--ink);}
+.eq-nh{text-align:right;}
+.eq-nh span{display:block;font-size:10.5px;font-weight:700;color:var(--ink-soft);}
+.eq-nh b{font-size:20px;font-weight:800;letter-spacing:-.3px;}
+.eq-nh b i{font-style:normal;font-size:11px;font-weight:600;color:var(--ink-soft);}
+.eq-nd2{font-size:10.5px;color:var(--ink-soft);margin:5px 2px 0;line-height:1.35;}
 /* V7.84 Equipo: nivel de cada persona con cada máquina (0–4), su valor y lo que falta cubrir */
 .eq-hero{background:var(--asphalt);color:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;}
 .eq-hero h1{font-size:22px;margin:0;font-weight:800;}
@@ -3862,7 +3867,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.86</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.87</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3952,7 +3957,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.86</div>
+        <div class="sub" id="version-badge">V7.87</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7652,13 +7657,16 @@ const eqIco = (k, cls) => `<svg class="eq-ico ${cls || ''}" viewBox="0 0 24 24" 
 // maquinista + el plus máximo (valor 100), en proporción al valor, y nunca por debajo del convenio de su categoría. Neto = bruto − Seguridad Social del
 // trabajador − retención estimada (soltero sin hijos, la de la calculadora de Empleado), en 14 pagas
 function eqNomina(p, v, cat){
-  const T = (typeof CE_CONVENIO_TABLAS !== 'undefined' && CE_CONVENIO_TABLAS.construccion) || {}, plus = Number(_eq.plus_valor_max != null ? _eq.plus_valor_max : 40) / 100;
+  // V7.87 (Daniel: «no puede ser tan poca diferencia de uno a otro»): la subida va con el valor AL CUADRADO (poco al principio, mucho cuando ya
+  // se sabe casi todo, que es lo difícil de encontrar) y el tope por defecto pasa a +60 % sobre maquinista (elegible 40/60/80/100 %)
+  const T = (typeof CE_CONVENIO_TABLAS !== 'undefined' && CE_CONVENIO_TABLAS.construccion) || {}, plus = Number(_eq.plus_valor_max != null ? _eq.plus_valor_max : 60) / 100;
   const base = T.peon || 0, tope = (T.maquinista || 0) * (1 + plus), minCat = T[cat] || base;
-  const bruto = Math.max(minCat, base + (tope - base) * v / 100);
+  const bruto = Math.max(minCat, base + (tope - base) * Math.pow(v / 100, 2));
   let ssT = 0, ret = 0;
   try{ ssT = bruto * ceSS('indefinido').trab; ret = ceIrpfTrabajador(bruto, ssT); }catch(e){ ssT = bruto * 0.065; ret = bruto * 0.12; }
   const neto = bruto - ssT - ret;
-  return {bruto, neto, netoMes: neto / 14, minCat};
+  const horas = _eq.horas_convenio || 1736;
+  return {bruto, neto, netoMes: neto / 14, minCat, brutoHora: bruto / horas, netoHora: neto / horas, minHora: minCat / horas};
 }
 // V7.85: también en Dirección, iconos SVG en vez de emojis (los emojis guardados en los datos se traducen aquí)
 Object.assign(EQ_SVG, {
@@ -7713,7 +7721,8 @@ function eqPintar(){
       H.map(h => { const n = p.niveles[h.id] || 0, m = p.niveles[h.id + '_mec'] || 0; return `<div class="eq-maq"><div class="eq-mt">${eqIco(h.id)} ${escHtml(h.nombre)}</div>
         <div class="eq-hab"><div class="eq-hn">${eqIco('experiencia', 'mini')} Experiencia<small>${escHtml(NN[n] || '')}</small></div>${puntos(p, h.id, n)}</div>
         ${h.mec ? `<div class="eq-hab"><div class="eq-hn">${eqIco('mecanica', 'mini')} Mecánica<small>${escHtml(NM[m] || '')}</small></div>${puntos(p, h.id + '_mec', m)}</div>` : ''}</div>`; }).join('')}
-      <div class="eq-nomina"><div><span>Nómina neta justa</span><b>${tbN(nom.netoMes, 0)} €<i>/mes</i></b></div><div class="eq-nd">${tbN(nom.bruto, 0)} € brutos/año<br>${escHtml(nomCat(cat))} · mín. convenio ${tbN(nom.minCat, 0)} €</div></div>
+      <div class="eq-nomina"><div><span>Nómina neta justa</span><b>${tbN(nom.netoMes, 0)} €<i>/mes</i></b></div><div class="eq-nh"><span>Por hora</span><b>${tbN(nom.brutoHora)} €<i>/h bruto</i></b></div></div>
+      <div class="eq-nd2">${tbN(nom.bruto, 0)} € brutos/año · ${tbN(nom.netoHora)} €/h neto · ${escHtml(nomCat(cat))}, mínimo convenio ${tbN(nom.minHora)} €/h</div>
       <div class="eq-pie"><span>${eqIco('experiencia', 'mini')} Experiencia <b>${domina}</b></span><span>${eqIco('mecanica', 'mini')} Mecánica <b>${arregla}</b></span></div>
     </div>`; }).join('');
   const est = n => sinNada ? 'gris' : n === 0 ? 'rojo' : n === 1 ? 'amar' : 'verde', peor = (a, b) => ['rojo', 'amar', 'verde', 'gris'].find(x => x === a || x === b);
@@ -7721,7 +7730,7 @@ function eqPintar(){
     return {h, q, r, sq: est(q.length), sr: r ? est(r.length) : 'verde', s: peor(est(q.length), r ? est(r.length) : 'verde')}; });
   const falta = [].concat(...cob.map(c => [c.sq === 'rojo' || c.sq === 'amar' ? 'experiencia en ' + c.h.nombre.toLowerCase() : null, c.r && (c.sr === 'rojo' || c.sr === 'amar') ? 'mecánica de ' + c.h.nombre.toLowerCase() : null])).filter(Boolean);
   app.innerHTML = `<div class="eq-hero"><h1>Equipo</h1><p>Experiencia y mecánica de cada uno por máquina, y su nómina justa. Toca a una persona para poner sus niveles</p>
-      <div class="eq-plus"><span>Tope (valor 100): maquinista +</span>${[20, 30, 40, 50].map(x => `<button type="button" data-eq-plus="${x}" class="${Number(_eq.plus_valor_max != null ? _eq.plus_valor_max : 40) === x ? 'act' : ''}">${x} %</button>`).join('')}</div>
+      <div class="eq-plus"><span>Tope (valor 100): maquinista +</span>${[40, 60, 80, 100].map(x => `<button type="button" data-eq-plus="${x}" class="${Number(_eq.plus_valor_max != null ? _eq.plus_valor_max : 60) === x ? 'act' : ''}">${x} %</button>`).join('')}</div>
       <div class="eq-ley"><span>Arriba experiencia · abajo mecánica</span>${NN.slice(1).map((t, i) => `<span><i style="background:${EQ_COLOR[i + 1]}"></i>${i + 1} ${escHtml(t.split(':')[0])}</span>`).join('')}</div></div>
     ${per}
     <button type="button" class="eq-add" data-eq-add>+ Añadir persona o candidato</button>
