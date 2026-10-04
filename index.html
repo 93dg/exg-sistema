@@ -1081,6 +1081,16 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.te-queso{width:100% !important;max-width:420px;height:auto !important;margin:0 auto 4px !important;}
+.te-svg{width:100%;height:auto;display:block;overflow:visible;}
+.te-tx{fill:#fff;font-family:inherit;pointer-events:none;}
+.te-tx-n{font-size:14px;font-weight:800;}
+.te-tx-v{font-size:13px;font-weight:700;}
+.te-tx-p{font-size:12px;font-weight:600;opacity:.9;}
+.te-tx-fuera{font-family:inherit;font-size:12.5px;fill:var(--ink);}
+.te-tx-fn{font-weight:800;}
+.te-total{text-align:center;font-size:13px;color:var(--ink-soft);margin-bottom:10px;}
+
 /* V7.72 estadísticas del motor */
 .modo-estad > *:not(#ai-historial-list){display:none !important;}
 .ai-tab-ico{flex:0 0 auto !important;padding-left:14px !important;padding-right:14px !important;}
@@ -3706,7 +3716,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.74</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.75</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3796,7 +3806,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.74</div>
+        <div class="sub" id="version-badge">V7.75</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7387,15 +7397,37 @@ function teGrupos(lista){
   const orden = TE.por === 'prioridad' ? TB_PRIO : TE.por === 'tiempo' ? TB_DURACIONES : TE.por === 'dificultad' ? TB_DIFICULTADES : null;
   return Object.entries(g).sort((a, b) => orden ? ((orden.indexOf(a[0]) + 99) % 99 - (orden.indexOf(b[0]) + 99) % 99) : b[1].n - a[1].n);
 }
-function teQueso(partes){
-  const tot = partes.reduce((s, p) => s + p.v, 0) || 1; let a0 = -Math.PI / 2;
-  const R = 80, r = 48, cx = 90, cy = 90;
-  const arcos = partes.map(p => { const ang = p.v / tot * Math.PI * 2; if(ang <= 0) return '';
-    if(ang >= Math.PI * 2 - 1e-6){ const x = `<circle cx="${cx}" cy="${cy}" r="${(R + r) / 2}" fill="none" stroke="${p.c}" stroke-width="${R - r}"/>`; a0 += ang; return x; }
-    const a1 = a0 + ang, g = ang > Math.PI ? 1 : 0, P = (rad, a) => [cx + rad * Math.cos(a), cy + rad * Math.sin(a)];
-    const [x0, y0] = P(R, a0), [x1, y1] = P(R, a1), [x2, y2] = P(r, a1), [x3, y3] = P(r, a0); a0 = a1;
-    return `<path d="M${x0} ${y0} A${R} ${R} 0 ${g} 1 ${x1} ${y1} L${x2} ${y2} A${r} ${r} 0 ${g} 0 ${x3} ${y3} Z" fill="${p.c}"/>`; }).join('');
-  return `<svg viewBox="0 0 180 180" class="te-svg" aria-hidden="true">${arcos}</svg>`;
+// V7.75 (Daniel: «ese gráfico es muy pobre; con un gráfico tengo que ver todos los datos dentro»): queso relleno y grande, con el nombre,
+// la cifra y el % dentro de cada porción; las porciones pequeñas llevan la etiqueta fuera con una línea
+function teQueso(partes, fmtV){
+  const tot = partes.reduce((s, p) => s + p.v, 0) || 1, W = 400, cx = 200, R = 125;
+  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  // etiquetas de fuera: se reparten en dos columnas (izquierda y derecha) sin pisarse
+  let a0 = -Math.PI / 2; const piezas = partes.map(p => { const ang = p.v / tot * Math.PI * 2, mid = a0 + ang / 2, o = {p, a0, a1: a0 + ang, mid, ang, pct: Math.round(p.v / tot * 100)}; a0 += ang; return o; }).filter(o => o.ang > 0);
+  const fuera = piezas.filter(o => o.pct < 9), ESP = 30;
+  const cols = {der: fuera.filter(o => Math.cos(o.mid) >= 0), izq: fuera.filter(o => Math.cos(o.mid) < 0)};
+  let minY = 0, maxY = 0;
+  Object.values(cols).forEach(l => { l.sort((a, b) => Math.sin(a.mid) - Math.sin(b.mid)); let y = -Infinity;
+    l.forEach(o => { o.ly = Math.max(Math.sin(o.mid) * (R + 22), y + ESP); y = o.ly; });
+    const exceso = l.length ? l[l.length - 1].ly - (R + 40) : 0; if(exceso > 0) l.forEach(o => { o.ly -= exceso; });
+    l.forEach(o => { minY = Math.min(minY, o.ly - 16); maxY = Math.max(maxY, o.ly + 18); }); });
+  const top = Math.min(-R - 10, minY), H = Math.max(R + 10, maxY) - top, cy = -top;
+  const P = (rad, a) => [cx + rad * Math.cos(a), cy + rad * Math.sin(a)];
+  let trozos = '', textos = '';
+  piezas.forEach(o => {
+    if(o.ang >= Math.PI * 2 - 1e-6) trozos += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${o.p.c}"/>`;
+    else { const [x0, y0] = P(R, o.a0), [x1, y1] = P(R, o.a1); trozos += `<path d="M${cx} ${cy} L${x0} ${y0} A${R} ${R} 0 ${o.ang > Math.PI ? 1 : 0} 1 ${x1} ${y1} Z" fill="${o.p.c}" stroke="#fff" stroke-width="2"/>`; }
+    const nom = esc(o.p.k), val = esc(fmtV(o.p.v));
+    if(o.pct >= 9){
+      const [tx, ty] = P(R * (piezas.length === 1 ? 0 : 0.6), o.mid);
+      textos += `<text x="${tx}" y="${ty - 14}" text-anchor="middle" class="te-tx"><tspan x="${tx}" class="te-tx-n">${nom}</tspan><tspan x="${tx}" dy="16" class="te-tx-v">${val}</tspan><tspan x="${tx}" dy="15" class="te-tx-p">${o.pct} %</tspan></text>`;
+    } else {
+      const der = Math.cos(o.mid) >= 0, [ex, ey] = P(R - 3, o.mid), xCol = cx + (der ? R + 18 : -(R + 18)), yCol = cy + o.ly;
+      textos += `<polyline points="${ex},${ey} ${xCol},${yCol} ${xCol + (der ? 8 : -8)},${yCol}" fill="none" stroke="${o.p.c}" stroke-width="1.5"/>
+        <text x="${xCol + (der ? 11 : -11)}" y="${yCol - 3}" text-anchor="${der ? 'start' : 'end'}" class="te-tx-fuera"><tspan class="te-tx-fn">${nom}</tspan><tspan x="${xCol + (der ? 11 : -11)}" dy="13">${val} · ${o.pct} %</tspan></text>`;
+    }
+  });
+  return `<svg viewBox="0 0 ${W} ${Math.ceil(H)}" class="te-svg" role="img" aria-label="Gráfico de trabajos pendientes">${trozos}${textos}</svg>`;
 }
 function teRender(){
   const app = document.getElementById('te-app'); if(!app) return;
@@ -7415,7 +7447,8 @@ function teRender(){
   </div>
   <div class="panel te-panel">
     <div class="te-sel"><div class="pillsel" id="te-por" data-menu="1"></div><div class="pillsel" id="te-medida" data-menu="1"></div></div>
-    ${partes.length ? `<div class="te-queso">${teQueso(partes)}<div class="te-centro"><b>${fmtV(partes.reduce((s, p) => s + p.v, 0))}</b><span>${TE.medida === 'n' ? 'trabajos' : TE.medida === 'h' ? 'pendientes' : 'pendiente'}</span></div></div>
+    ${partes.length ? `<div class="te-queso">${teQueso(partes, fmtV)}</div>
+    <div class="te-total">Total: <b>${fmtV(partes.reduce((s, p) => s + p.v, 0))}</b></div>
     <div class="te-leyenda">${partes.map(p => `<div class="te-l"><i style="background:${p.c}"></i><b>${escHtml(String(p.k))}</b><span>${p.s.n} · ${tbFmtH(p.s.h)}${conEur ? ' · ' + tbEur(p.s.e) : ''}</span></div>`).join('')}</div>`
     : '<div class="ce-nota">No hay trabajos pendientes.</div>'}
   </div>`;
