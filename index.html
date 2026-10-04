@@ -1081,6 +1081,9 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.pleg-cols .doc-cli-btn, .pleg-cols .doc-ord-btn{width:34px !important;height:34px !important;align-self:center;padding:0 !important;background:var(--paper) !important;border:1px solid var(--line) !important;color:var(--ink) !important;}
+.pleg-cols .doc-cli-btn.doc-cli-on{border-color:var(--orange) !important;color:var(--orange) !important;}
+
 @media(max-width:768px){#view-calcempleado .topbar .desc{display:none;} #view-calcempleado .topbar h1{font-size:20px;margin:0;}}
 .ce-real{padding:12px;}
 .ce-real-t{font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:8px;}
@@ -3667,7 +3670,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.71</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.72</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3757,7 +3760,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.71</div>
+        <div class="sub" id="version-badge">V7.72</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18044,7 +18047,7 @@ const PLEG_CFG = {
   alb: {tbody: 'albaranes-tbody-standalone'},
   pres: {tbody: 'presupuestos-tbody-standalone'}
 };
-const PLEG_GRUPOS = [['anio', 'Año', 'anio'], ['trim', 'Trimestre', 'trim'], ['estado', 'Estado', 'estado'], ['orden', 'Orden', null]];   // clave, título, atributo data- de la pastilla (Orden no filtra: ordena, y no lleva cantidades)
+const PLEG_GRUPOS = [['anio', 'Año', 'anio'], ['trim', 'Trim.', 'trim'], ['estado', 'Estado', 'estado'], ['orden', 'Orden', null]];   // clave, título, atributo data- de la pastilla (Orden no filtra: ordena, y no lleva cantidades)
 const PLEG_FILTROS = PLEG_GRUPOS.filter(g => g[0] !== 'orden');
 const _plegEstado = {fact: ['orden'], alb: ['orden'], pres: ['orden']};   // grupos plegados de cada pantalla, en el orden en que se plegaron; Orden va plegado de serie
 let _plegAnimar = null;
@@ -18123,6 +18126,7 @@ function plegSeleccion(p, k){ const f = plegCont(p, k); return new Set(Array.fro
 function plegTextoPlegado(p, k, sel){   // lo que lleva el botón de un grupo plegado: su título y, si hay algo elegido, cuántos (o la flecha del orden)
   const tit = PLEG_GRUPOS.find(g => g[0] === k)[1];
   if(k === 'orden'){ const a = document.querySelector('#' + p + '-orden-chips .chip-orden.active .orden-flecha'); return tit + (a && a.textContent.trim() ? ' <b>' + a.textContent.trim() + '</b>' : ''); }
+  if(k === 'anio' && sel[k].size === 1){ const a = [...sel[k]][0]; if(a) return '<b>' + a + '</b>'; }   // V7.72: con un solo año elegido se ve el año, no «Año 1»
   return tit + (sel[k].size ? ' <b>' + sel[k].size + '</b>' : '');
 }
 function plegRender(p){
@@ -18134,6 +18138,11 @@ function plegRender(p){
   // ARRIBA: todas las cabeceras, siempre en su columna y sin moverse (como en Trabajos); la del filtro abierto se marca
   cols.style.cssText = 'display:grid;gap:6px;margin-bottom:6px;grid-template-columns:repeat(' + claves.length + ', minmax(0, 1fr));';
   cols.innerHTML = claves.map((k, i) => { const ab = abiertos.includes(k); return `<button type="button" class="tb-ftit tb-plegado ${sel[k].size ? 'con' : ''} ${ab ? 'abierto' : ''}" data-pl="${k}" style="grid-column:${i + 1};" title="${ab ? 'Plegar' : 'Desplegar'} ${tit[k]}">${plegTextoPlegado(p, k, sel)} <i>${ab ? '▾' : '▸'}</i></button>`; }).join('');
+  // V7.72 (Daniel: «Cliente y Ordenar en la misma línea que los otros filtros, Ordenar siempre a la derecha del todo»): en las listas de documentos
+  // la fila de pastillas es Año · Trim. · Estado · [Cliente] · [Ordenar]; la pastilla Orden se sustituye por el icono
+  if(!caja._iconos){ const cabD = caja.previousElementSibling; const bc = cabD && cabD.querySelector('.doc-cli-btn'), bo = cabD && cabD.querySelector('.doc-ord-btn'); if(bc && bo) caja._iconos = [bc, bo]; }
+  if(caja._iconos){ cols.querySelector('[data-pl="orden"]')?.remove(); const vis = cols.children.length;
+    cols.style.gridTemplateColumns = 'repeat(' + vis + ', minmax(0, 1fr)) auto auto'; caja._iconos.forEach(b => { b.style.gridColumn = ''; cols.appendChild(b); }); }
   claves.forEach(k => { const f = plegCont(p, k); if(f) guard.appendChild(f); });   // todas atrás, y ahora salen las abiertas en su fila
   filas.innerHTML = '';
   abiertos.forEach(k => {   // ABAJO: cada filtro abierto repite su cabecera a la izquierda de sus opciones
