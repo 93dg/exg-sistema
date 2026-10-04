@@ -3873,7 +3873,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.88</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.89</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3963,7 +3963,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.88</div>
+        <div class="sub" id="version-badge">V7.89</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7656,7 +7656,8 @@ const EQ_SVG = {
   martillo: '<path d="M9 3h6v4H9z"/><path d="M10 7h4v6l-2 8-2-8z"/>',
   experiencia: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 3.5v6.3M4.3 15.5l5.6-2.4M19.7 15.5l-5.6-2.4"/>',
   mecanica: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5l3 3 5.8-5.8a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
-  editar: '<path d="M4 20h4L19.5 8.5l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'
+  editar: '<path d="M4 20h4L19.5 8.5l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  gestion: '<rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'
 };
 const eqIco = (k, cls) => `<svg class="eq-ico ${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${EQ_SVG[k] || '<circle cx="12" cy="12" r="8"/>'}</svg>`;
 // V7.85 (Daniel: «no pueden cobrar lo mismo; nómina neta justa de cada uno a jornada completa»): el bruto va del convenio de peón (valor 0) al de
@@ -7665,18 +7666,19 @@ const eqIco = (k, cls) => `<svg class="eq-ico ${cls || ''}" viewBox="0 0 24 24" 
 function eqNomina(p, v, cat){
   // V7.88: la nómina SUMA las dos funciones. Experiencia: del convenio de peón al de maquinista + su tope. Mecánica: un plus aparte, hasta su tope
   // (en % del convenio de maquinista). Las dos suben con el nivel al cuadrado. Gestión y administración no entran aquí: se valoran aparte
-  const ve = eqExp(p), vm = eqMec(p);
+  const ve = eqExp(p), vm = eqMec(p), vg = eqGes(p);
   // V7.87 (Daniel: «no puede ser tan poca diferencia de uno a otro»): la subida va con el valor AL CUADRADO (poco al principio, mucho cuando ya
   // se sabe casi todo, que es lo difícil de encontrar) y el tope por defecto pasa a +60 % sobre maquinista (elegible 40/60/80/100 %)
   const T = (typeof CE_CONVENIO_TABLAS !== 'undefined' && CE_CONVENIO_TABLAS.construccion) || {}, plus = Number(_eq.plus_valor_max != null ? _eq.plus_valor_max : 60) / 100, plusM = Number(_eq.plus_mec_max != null ? _eq.plus_mec_max : 50) / 100;
   const base = T.peon || 0, tope = (T.maquinista || 0) * (1 + plus), minCat = T[cat] || base;
   const partExp = Math.max(minCat, base + (tope - base) * Math.pow(ve / 100, 2)), partMec = (T.maquinista || 0) * plusM * Math.pow(vm / 100, 2);
-  const bruto = partExp + partMec;
+  const plusG = Number(_eq.plus_ges_max != null ? _eq.plus_ges_max : 50) / 100, partGes = (T.administrativo || 0) * plusG * Math.pow(vg / 100, 2);   // plus sobre el convenio de administrativo
+  const bruto = partExp + partMec + partGes;
   let ssT = 0, ret = 0;
   try{ ssT = bruto * ceSS('indefinido').trab; ret = ceIrpfTrabajador(bruto, ssT); }catch(e){ ssT = bruto * 0.065; ret = bruto * 0.12; }
   const neto = bruto - ssT - ret;
   const horas = _eq.horas_convenio || 1736;
-  return {bruto, neto, netoMes: neto / 14, minCat, brutoHora: bruto / horas, netoHora: neto / horas, minHora: minCat / horas, ve, vm, partExp, partMec};
+  return {bruto, neto, netoMes: neto / 14, minCat, brutoHora: bruto / horas, netoHora: neto / horas, minHora: minCat / horas, ve, vm, vg, partExp, partMec, partGes};
 }
 // V7.85: también en Dirección, iconos SVG en vez de emojis (los emojis guardados en los datos se traducen aquí)
 Object.assign(EQ_SVG, {
@@ -7710,6 +7712,9 @@ function eqCategoria(n){
 function eqValor(p){ const H = _eq.habilidades; let tot = 0, v = 0; H.forEach(h => { tot += 4 * h.peso; v += (p.niveles[h.id] || 0) * h.peso; if(h.mec){ tot += 4 * h.peso; v += (p.niveles[h.id + '_mec'] || 0) * h.peso; } }); return tot ? Math.round(v / tot * 100) : 0; }
 // V7.88 (Daniel: «Rafa hace dos funciones, mecánico y maquinista, y es experto en las dos»): experiencia y mecánica se valoran por separado (0–100 cada una)
 function eqExp(p){ const H = _eq.habilidades; let t = 0, v = 0; H.forEach(h => { t += 4 * h.peso; v += (p.niveles[h.id] || 0) * h.peso; }); return t ? Math.round(v / t * 100) : 0; }
+// V7.89 (Daniel: «la administración se valora aparte»): tercera función, gestión y administración, con su nivel 0–4 (clave «gestion»)
+const EQ_GESTION_NIVELES = ['No la hace', 'Papeleo básico', 'Facturación y cobros', 'Lleva la administración', 'Dirige: bancos, Hacienda, licitaciones'];
+function eqGes(p){ return Math.round((p.niveles.gestion || 0) / 4 * 100); }
 function eqMec(p){ const H = _eq.habilidades.filter(h => h.mec); let t = 0, v = 0; H.forEach(h => { t += 4 * h.peso; v += (p.niveles[h.id + '_mec'] || 0) * h.peso; }); return t ? Math.round(v / t * 100) : 0; }
 async function eqGuardar(){ if(!sb || !_eqId) return; try{ await sb.from('sistema').update({data: _eq, updated_at: new Date().toISOString()}).eq('id', _eqId); }catch(e){ mostrarToast('No se pudo guardar'); } }
 async function eqCargar(){
@@ -7727,15 +7732,16 @@ function eqPintar(){
   const per = P.map(p => { p.niveles = p.niveles || {}; const v = eqValor(p), cat = eqCategoria(p.niveles), eh = tabla[cat] ? tabla[cat] / horas : null, domina = H.filter(h => (p.niveles[h.id] || 0) >= 3).length, arregla = H.filter(h => h.mec && (p.niveles[h.id + '_mec'] || 0) >= 3).length, nom = eqNomina(p, v, cat);
     return `<div class="eq-per">
       <div class="eq-cab" data-eq-abrir="${p.id}"><div class="eq-av">${escHtml(p.nombre.slice(0, 1))}</div><div class="eq-nom"><b>${escHtml(p.nombre)}</b><span>${escHtml(p.rol || '')}</span></div>
-        <div class="eq-valor2"><div><b>${nom.ve}</b><span>${eqIco('experiencia', 'mini')} exp.</span></div><div><b>${nom.vm}</b><span>${eqIco('mecanica', 'mini')} mec.</span></div></div></div>
+        <div class="eq-valor2"><div><b>${nom.ve}</b><span>${eqIco('experiencia', 'mini')} exp.</span></div><div><b>${nom.vm}</b><span>${eqIco('mecanica', 'mini')} mec.</span></div>${nom.vg ? `<div><b>${nom.vg}</b><span>${eqIco('gestion', 'mini')} ges.</span></div>` : ''}</div></div>
       <div class="eq-barra"><i style="width:${nom.ve}%"></i></div><div class="eq-barra mec"><i style="width:${nom.vm}%"></i></div>
       ${_eqAbierta !== p.id ? `<div class="eq-res" data-eq-abrir="${p.id}">${H.map(h => { const n = p.niveles[h.id] || 0, m = p.niveles[h.id + '_mec'] || 0, seg = (k, c) => `<i class="${k <= c ? 'on n' + c : ''}"></i>`;
-        return `<div class="eq-rm"><span>${eqIco(h.id)}</span><div class="eq-seg">${[1, 2, 3, 4].map(k => seg(k, n)).join('')}</div>${h.mec ? `<div class="eq-seg mec">${[1, 2, 3, 4].map(k => seg(k, m)).join('')}</div>` : '<div class="eq-seg vacio"></div>'}</div>`; }).join('')}<em>${eqIco('editar')}</em></div>` :
+        return `<div class="eq-rm"><span>${eqIco(h.id)}</span><div class="eq-seg">${[1, 2, 3, 4].map(k => seg(k, n)).join('')}</div>${h.mec ? `<div class="eq-seg mec">${[1, 2, 3, 4].map(k => seg(k, m)).join('')}</div>` : '<div class="eq-seg vacio"></div>'}</div>`; }).join('')}${p.niveles.gestion ? `<div class="eq-rm"><span>${eqIco('gestion')}</span><div class="eq-seg">${[1, 2, 3, 4].map(k => `<i class="${k <= p.niveles.gestion ? 'on n' + p.niveles.gestion : ''}"></i>`).join('')}</div><div class="eq-seg vacio"></div></div>` : ''}<em>${eqIco('editar')}</em></div>` :
       H.map(h => { const n = p.niveles[h.id] || 0, m = p.niveles[h.id + '_mec'] || 0; return `<div class="eq-maq"><div class="eq-mt">${eqIco(h.id)} ${escHtml(h.nombre)}</div>
         <div class="eq-hab"><div class="eq-hn">${eqIco('experiencia', 'mini')} Experiencia<small>${escHtml(NN[n] || '')}</small></div>${puntos(p, h.id, n)}</div>
-        ${h.mec ? `<div class="eq-hab"><div class="eq-hn">${eqIco('mecanica', 'mini')} Mecánica<small>${escHtml(NM[m] || '')}</small></div>${puntos(p, h.id + '_mec', m)}</div>` : ''}</div>`; }).join('')}
+        ${h.mec ? `<div class="eq-hab"><div class="eq-hn">${eqIco('mecanica', 'mini')} Mecánica<small>${escHtml(NM[m] || '')}</small></div>${puntos(p, h.id + '_mec', m)}</div>` : ''}</div>`; }).join('') + `<div class="eq-maq"><div class="eq-mt">${eqIco('gestion')} Gestión y administración</div>
+        <div class="eq-hab"><div class="eq-hn">Nivel<small>${escHtml(EQ_GESTION_NIVELES[p.niveles.gestion || 0])}</small></div>${puntos(p, 'gestion', p.niveles.gestion || 0)}</div></div>`}
       <div class="eq-nomina"><div><span>Nómina neta justa</span><b>${tbN(nom.netoMes, 0)} €<i>/mes</i></b></div><div class="eq-nh"><span>Por hora</span><b>${tbN(nom.brutoHora)} €<i>/h bruto</i></b></div></div>
-      <div class="eq-nd2">${tbN(nom.bruto, 0)} € brutos/año = ${tbN(nom.partExp, 0)} € maquinista${nom.partMec >= 1 ? ' + ' + tbN(nom.partMec, 0) + ' € mecánico' : ''} · ${tbN(nom.netoHora)} €/h neto · mínimo convenio ${tbN(nom.minHora)} €/h</div>
+      <div class="eq-nd2">${tbN(nom.bruto, 0)} € brutos/año = ${tbN(nom.partExp, 0)} € maquinista${nom.partMec >= 1 ? ' + ' + tbN(nom.partMec, 0) + ' € mecánico' : ''}${nom.partGes >= 1 ? ' + ' + tbN(nom.partGes, 0) + ' € gestión' : ''} · ${tbN(nom.netoHora)} €/h neto · mínimo convenio ${tbN(nom.minHora)} €/h</div>
       <div class="eq-pie"><span>${eqIco('experiencia', 'mini')} Experiencia <b>${domina}</b></span><span>${eqIco('mecanica', 'mini')} Mecánica <b>${arregla}</b></span></div>
     </div>`; }).join('');
   const est = n => sinNada ? 'gris' : n === 0 ? 'rojo' : n === 1 ? 'amar' : 'verde', peor = (a, b) => ['rojo', 'amar', 'verde', 'gris'].find(x => x === a || x === b);
@@ -7745,6 +7751,7 @@ function eqPintar(){
   app.innerHTML = `<div class="eq-hero"><h1>Equipo</h1><p>Experiencia y mecánica de cada uno por máquina, y su nómina justa. Toca a una persona para poner sus niveles</p>
       <div class="eq-plus"><span>${eqIco('experiencia', 'mini')} Tope experiencia: maquinista +</span>${[40, 60, 80, 100].map(x => `<button type="button" data-eq-plus="${x}" class="${Number(_eq.plus_valor_max != null ? _eq.plus_valor_max : 60) === x ? 'act' : ''}">${x} %</button>`).join('')}</div>
       <div class="eq-plus"><span>${eqIco('mecanica', 'mini')} Plus mecánico experto:</span>${[25, 50, 75, 100].map(x => `<button type="button" data-eq-plusm="${x}" class="${Number(_eq.plus_mec_max != null ? _eq.plus_mec_max : 50) === x ? 'act' : ''}">${x} %</button>`).join('')}</div>
+      <div class="eq-plus"><span>${eqIco('gestion', 'mini')} Plus gestión (dirige):</span>${[25, 50, 75, 100].map(x => `<button type="button" data-eq-plusg="${x}" class="${Number(_eq.plus_ges_max != null ? _eq.plus_ges_max : 50) === x ? 'act' : ''}">${x} %</button>`).join('')}</div>
       <div class="eq-ley"><span>Arriba experiencia · abajo mecánica</span>${NN.slice(1).map((t, i) => `<span><i style="background:${EQ_COLOR[i + 1]}"></i>${i + 1} ${escHtml(t.split(':')[0])}</span>`).join('')}</div></div>
     ${per}
     <button type="button" class="eq-add" data-eq-add>+ Añadir persona o candidato</button>
@@ -7759,6 +7766,7 @@ document.addEventListener('click', e => {
   const d = t.closest('[data-eq-n]');
   if(d){ const p = _eq.personas.find(x => x.id === d.dataset.eqP); if(!p) return; const k = Number(d.dataset.eqN), act = p.niveles[d.dataset.eqH] || 0; p.niveles[d.dataset.eqH] = act === k ? k - 1 : k; eqPintar(); eqGuardar(); return; }
   const pl = t.closest('[data-eq-plus]'); if(pl){ _eq.plus_valor_max = Number(pl.dataset.eqPlus); eqPintar(); eqGuardar(); return; }
+  const plg = t.closest('[data-eq-plusg]'); if(plg){ _eq.plus_ges_max = Number(plg.dataset.eqPlusg); eqPintar(); eqGuardar(); return; }
   const plm = t.closest('[data-eq-plusm]'); if(plm){ _eq.plus_mec_max = Number(plm.dataset.eqPlusm); eqPintar(); eqGuardar(); return; }
   const ab = t.closest('[data-eq-abrir]'); if(ab){ _eqAbierta = _eqAbierta === ab.dataset.eqAbrir ? null : ab.dataset.eqAbrir; eqPintar(); return; }
   if(t.closest('[data-eq-add]')){ const n = (prompt('Nombre de la persona o candidato') || '').trim(); if(!n) return; const rol = (prompt('Papel (por ejemplo: candidato, operario)') || '').trim(); _eq.personas.push({id: 'p' + Date.now(), nombre: n, rol, niveles: {}}); eqPintar(); eqGuardar(); }
