@@ -3639,7 +3639,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.66</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.67</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3729,7 +3729,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.66</div>
+        <div class="sub" id="version-badge">V7.67</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7118,7 +7118,7 @@ async function bandejaContadores(forzar){
 // V7.65: con la renta de 2025 de Rafael (tributación conjunta): margen real 39 % (26.034 € de rendimiento neto sobre 66.678 € de ingresos, ya restados
 // la cuota de autónomo y el 5 % de difícil justificación), reducción por conjunta 3.400 € y mínimos personales y familiares 7.950 € (estatal) y 8.300 € (autonómico)
 const CE_RENTA = {anio: 2025, ingresos: 66678.32, gastos: 39273.97, rendimiento: 26348.01, reduccion: 3400, minEst: 7950, minAut: 8300, cuota: 3465.80};
-const CE = {neto: 1200, pagas: 14, contrato: 'indefinido', at: 6.70, margen: 39, beneficioReal: 0, resumen: null, v: 2};
+const CE = {neto: 1200, pagas: 14, contrato: 'indefinido', at: 6.70, margen: 39, beneficioReal: 0, retencion: '', resumen: null, v: 2};
 try{ const g = JSON.parse(localStorage.getItem('ce-datos') || '{}'); if(g.v === 2) Object.assign(CE, g); }catch(e){}
 function ceEscala(base, tramos){ let c = 0, prev = 0; for(const [hasta, t] of tramos){ if(base <= prev) break; const tope = Math.min(base, hasta); c += (tope - prev) * t / 100; prev = hasta; } return c; }
 const CE_EST = [[12450, 9.5], [20200, 12], [35200, 15], [60000, 18.5], [300000, 22.5], [1e12, 24.5]];
@@ -7133,10 +7133,12 @@ function ceIrpfTrabajador(bruto, ssT){
 }
 function ceSS(contrato, at){ const indef = contrato === 'indefinido';
   return {trab: (4.70 + (indef ? 1.55 : 1.60) + 0.10 + 0.15) / 100, emp: (23.60 + (indef ? 5.50 : 6.70) + 0.20 + 0.60 + 0.75 + Number(at || 0)) / 100}; }
+// V7.67: la retención depende del trabajador; si se pone un % se usa ese, si no se estima (soltero sin hijos) y se marca como orientativa
+const ceRet = (g, ssT) => (CE.retencion !== '' && CE.retencion != null && !isNaN(Number(CE.retencion))) ? g * Number(CE.retencion) / 100 : ceIrpfTrabajador(g, ssT);
 function ceDesdeNeto(netoAnual, ss){
   let lo = netoAnual, hi = netoAnual * 2.2;
-  for(let i = 0; i < 60; i++){ const g = (lo + hi) / 2, n = g - g * ss.trab - ceIrpfTrabajador(g, g * ss.trab); if(n < netoAnual) lo = g; else hi = g; }
-  const g = (lo + hi) / 2; return {bruto: g, ssT: g * ss.trab, irpf: ceIrpfTrabajador(g, g * ss.trab), ssE: g * ss.emp};
+  for(let i = 0; i < 60; i++){ const g = (lo + hi) / 2, n = g - g * ss.trab - ceRet(g, g * ss.trab); if(n < netoAnual) lo = g; else hi = g; }
+  const g = (lo + hi) / 2; return {bruto: g, ssT: g * ss.trab, irpf: ceRet(g, g * ss.trab), ssE: g * ss.emp};
 }
 // IRPF de Rafael como en su renta: base = rendimiento neto − reducción por conjunta; cuota estatal y autonómica con sus mínimos (comprobado: da los 3.465,80 € de 2025)
 function ceIrpfDueno(beneficio){ const b = Math.max(0, beneficio - CE_RENTA.reduccion);
@@ -7151,7 +7153,7 @@ function ceEscenarios(){
   const ing = filas.map(r => Number(r.ingresos));
   if(!ing.length) return [];
   const media = ing.reduce((a, b) => a + b, 0) / ing.length, m = CE.margen / 100;
-  return [['Pesimista', Math.min(...ing), 'el peor año de los últimos ' + ing.length], ['Media', media, 'la media de ' + (hoy - 5) + '–' + (hoy - 1)], ['Optimista', Math.max(...ing), 'el mejor año de los últimos ' + ing.length]]
+  return [['Pesimista', Math.min(...ing), 'el peor año de los últimos ' + ing.length], ['Medio', media, 'la media de ' + (hoy - 5) + '–' + (hoy - 1)], ['Optimista', Math.max(...ing), 'el mejor año de los últimos ' + ing.length]]
     .map(([n, i, txt]) => ({nombre: n, ingresos: i, beneficio: i * m, txt}))
     .concat([{nombre: 'Renta ' + CE_RENTA.anio, ingresos: CE_RENTA.ingresos, beneficio: CE_RENTA.rendimiento, txt: 'lo declarado'}])
     .concat(CE.beneficioReal > 0 ? [{nombre: 'Tu cifra', ingresos: null, beneficio: CE.beneficioReal, txt: 'el beneficio que has puesto arriba'}] : []);
@@ -7163,12 +7165,11 @@ function ceRender(){
   const esc = ceEscenarios();
   // V7.66 (Daniel: «tablas no, que no se ven bien en el móvil; pon tarjetas»): una tarjeta por escenario
   const filasEsc = esc.map(e => { const ahorro = ceIrpfDueno(e.beneficio) - ceIrpfDueno(e.beneficio - costeEmp); const real = costeEmp - ahorro;
-    const pct = costeEmp ? Math.round(ahorro / costeEmp * 100) : 0, tope = ceIrpfDueno(e.beneficio);
     return `<div class="ce-esc">
       <div class="ce-esc-t"><b>${e.nombre}</b><span>${ceEur(e.beneficio)} de beneficio</span></div>
-      <div class="ce-esc-s">${e.txt}${e.ingresos != null ? ': ' + ceEur(e.ingresos) + ' facturados' : ''} · sin empleado pagarías ${ceEur(tope)} de IRPF</div>
+      <div class="ce-esc-s">${e.txt}${e.ingresos != null ? ': ' + ceEur(e.ingresos) + ' facturados' : ''}</div>
       <div class="ce-esc-n">
-        <div><span>Te desgravas</span><b>${ceEur(ahorro)}</b><i>${pct} % del coste${ahorro >= tope - 1 ? ' · todo tu IRPF' : ''}</i></div>
+        <div><span>Ahorro estimado de IRPF</span><b>${ceEur(ahorro)}</b><i>${ceEur(ahorro / 12)}/mes</i></div>
         <div><span>Coste real con alta</span><b>${ceEur(real)}</b><i>${ceEur(real / 12)}/mes</i></div>
         <div class="ce-esc-dif"><span>Más que en B</span><b>${ceEur(real - enB)}</b><i>${ceEur((real - enB) / 12)}/mes</i></div>
       </div>
@@ -7181,6 +7182,7 @@ function ceRender(){
       <label class="ce-c"><span>Pagas al año</span><div class="pillsel" id="ce-pagas"></div></label>
       <label class="ce-c"><span>Contrato</span><div class="pillsel" id="ce-contrato"></div></label>
       <label class="ce-c"><span>Accidentes de trabajo (%)</span><input type="number" inputmode="decimal" id="ce-at" value="${CE.at}" step="0.05"></label>
+      <label class="ce-c"><span>Retención de IRPF del trabajador (%) · vacío = estimada</span><input type="number" inputmode="decimal" id="ce-ret" value="${CE.retencion}" placeholder="${(ceDesdeNeto(CE.neto * CE.pagas, ceSS(CE.contrato, CE.at)).irpf / ceDesdeNeto(CE.neto * CE.pagas, ceSS(CE.contrato, CE.at)).bruto * 100).toFixed(1)} (estimada)" step="0.5"></label>
       <label class="ce-c"><span>Margen de beneficio sobre lo facturado (%) · en la renta de 2025 fue el 39 %</span><input type="number" inputmode="decimal" id="ce-margen" value="${CE.margen}" step="1"></label>
       <label class="ce-c"><span>Otro beneficio para probar (opcional)</span><input type="number" inputmode="decimal" id="ce-benef" value="${CE.beneficioReal || ''}" placeholder="opcional" step="500"></label>
     </div>
@@ -7191,10 +7193,10 @@ function ceRender(){
       <div><span>Bruto al año</span><b>${ceEur(r.bruto)}</b><i>${ceEur(r.bruto / CE.pagas)} × ${CE.pagas} pagas</i></div>
       <div><span>Seg. Social de la empresa</span><b>${ceEur(r.ssE)}</b><i>${(ss.emp * 100).toFixed(2)} % del bruto</i></div>
       <div><span>Seg. Social del trabajador</span><b>${ceEur(r.ssT)}</b><i>${(ss.trab * 100).toFixed(2)} %, se le quita de la nómina</i></div>
-      <div><span>Retención de IRPF</span><b>${ceEur(r.irpf)}</b><i>${(r.irpf / r.bruto * 100).toFixed(1)} %, se le quita de la nómina</i></div>
+      <div><span>Retención de IRPF (orientativa)</span><b>${ceEur(r.irpf)}</b><i>${(r.irpf / r.bruto * 100).toFixed(1)} %${CE.retencion === '' ? ', depende del trabajador' : ''}</i></div>
       <div class="ce-total"><span>Coste total para la empresa</span><b>${ceEur(costeEmp)}</b><i>${ceEur(costeEmp / 12)} al mes</i></div>
     </div>
-    <div class="ce-nota">Todo este coste (sueldo bruto y Seguridad Social de la empresa) es gasto de la actividad y se desgrava en el IRPF de Rafael: lo que te desgravas está en la tabla de abajo, ya restado en «Coste real». La nómina no lleva IVA, así que por IVA no hay nada que descontar.</div>
+    <div class="ce-nota">Todo el coste (bruto + Seguridad Social de la empresa) es gasto deducible de la actividad. La nómina no lleva IVA.</div>
   </div>
   <div class="panel ce-panel">
     <h3 class="ce-h">En B</h3>
@@ -7204,14 +7206,14 @@ function ceRender(){
     <h3 class="ce-h">Diferencia según cómo vaya el año</h3>
     ${esc.length ? `<div class="ce-escs">${filasEsc}</div>` : '<div class="ce-nota">Cargando el historial de facturas…</div>'}
     <div class="ce-hist">${hist}</div>
-    <div class="ce-nota">Tu IRPF se calcula como en tu renta de 2025: tributación conjunta (reducción de 3.400 €) y vuestros mínimos personales y familiares. El beneficio de cada escenario es lo facturado sin IVA por el margen de arriba (39 % en 2025, ya descontada tu cuota de autónomo). El trabajador: Andalucía 2026, soltero sin hijos. El gestor da la cifra exacta.</div>
+    <div class="ce-nota">Ahorro de IRPF estimado con vuestra renta de 2025 (conjunta). Beneficio = facturado sin IVA × margen (el margen ya descuenta la cuota de autónomo y el resto de gastos). Orientativo.</div>
     <div class="ce-nota ce-riesgo">En B no hay alta en la Seguridad Social: si hay una inspección, además de la multa por cada trabajador sin alta se reclaman todas las cuotas atrasadas con recargo, y si tiene un accidente trabajando la empresa responde de todo.</div>
   </div>`;
   pillsSelIniciar('ce-pagas', [['12', '12 pagas'], ['14', '14 pagas']], v => { CE.pagas = Number(v); ceGuardar(); ceRender(); });
   document.getElementById('ce-pagas').value = String(CE.pagas);
   pillsSelIniciar('ce-contrato', [['indefinido', 'Indefinido'], ['temporal', 'Temporal']], v => { CE.contrato = v; ceGuardar(); ceRender(); });
   document.getElementById('ce-contrato').value = CE.contrato;
-  [['ce-neto', 'neto'], ['ce-at', 'at'], ['ce-margen', 'margen'], ['ce-benef', 'beneficioReal']].forEach(([id, k]) => { const el = document.getElementById(id); el.onchange = () => { CE[k] = Number(el.value) || 0; ceGuardar(); ceRender(); }; });
+  [['ce-neto', 'neto'], ['ce-at', 'at'], ['ce-margen', 'margen'], ['ce-benef', 'beneficioReal'], ['ce-ret', 'retencion']].forEach(([id, k]) => { const el = document.getElementById(id); el.onchange = () => { CE[k] = k === 'retencion' ? (el.value === '' ? '' : Number(el.value)) : (Number(el.value) || 0); ceGuardar(); ceRender(); }; });
 }
 function ceGuardar(){ try{ const {resumen, ...d} = CE; localStorage.setItem('ce-datos', JSON.stringify(d)); }catch(e){} }
 document.addEventListener('click', e => { if(e.target.closest && e.target.closest('[data-view="calcempleado"]')) setTimeout(ceCargar, 50); }, true);
