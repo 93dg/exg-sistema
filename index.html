@@ -1165,6 +1165,17 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .c2-acc button.si{background:#3B6D11;color:#fff;}
 
 /* V7.93 Calendario de mes */
+.c3-chip{position:relative;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+.c3-chip.sigue{opacity:.8;border-radius:2px 5px 5px 2px;}
+.c3-chip.urg{box-shadow:inset 0 0 0 2px #fff;}
+.c3-chip.urg::before{content:'!';display:inline-flex;align-items:center;justify-content:center;width:11px;height:11px;border-radius:50%;background:#fff;color:#A32D2D;font-size:9px;font-weight:900;margin-right:3px;vertical-align:1px;}
+.c3-chip.arr{opacity:.35;}
+.c3-urg{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;background:#A32D2D;color:#fff;font-size:9px;font-weight:900;}
+.c3-ley s{text-decoration:none;font-weight:800;}
+.c3-tray-zona{border-radius:16px;padding:4px;margin:0 -4px;transition:background .15s;}
+.c3-moviendo .c3-tray-zona{background:#fdf0e8;outline:2px dashed var(--orange);}
+.c3-tray-zona.sobre{background:#f9dcc8 !important;}
+
 .c3-q{background:#fff;border:2px solid var(--orange);border-radius:18px;padding:12px;margin-bottom:10px;text-align:center;}
 .c3-q small{font-size:11px;font-weight:800;color:var(--orange);text-transform:uppercase;letter-spacing:.05em;}
 .c3-q h2{font-size:16px;margin:4px 0 10px;}
@@ -4040,7 +4051,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.93</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.94</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4130,7 +4141,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.93</div>
+        <div class="sub" id="version-badge">V7.94</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8178,6 +8189,10 @@ function c3PorDia(){ const m = {}; c3Cola().forEach(j => c3Ocupa(j).forEach((iso
 const c3Nom = j => tbMay(j.cliente || j.trabajo || 'Trabajo');
 const c3Corto = j => c3Nom(j).split(' ').slice(0, 2).join(' ');
 const C3_COL = {Alta: '#A32D2D', Media: '#BA7517', Baja: '#2B5C8F'};
+// V7.94 (Daniel: «se ven todos iguales, es un lío»): cada trabajo con día lleva su propio color (los que van seguidos, colores distintos);
+// la prioridad va aparte: los urgentes llevan una marca blanca «!» y en la bandeja la franja de la izquierda
+const C3_PALETA = ['#2B5C8F', '#1E8A8A', '#7B4FA0', '#BA7517', '#3B6D11', '#D9541E', '#534AB7', '#0F6E56', '#993556', '#5A6B7D', '#A32D2D', '#854F0B'];
+function c3Colores(){ const m = {}; c3Cola().forEach(j => { let h = 0; for(const ch of String(j.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; m[j.id] = C3_PALETA[h % C3_PALETA.length]; }); return m; }   // fijo por trabajo: no cambia al moverlo
 async function c3Cargar(){
   const app = document.getElementById('cal3-app'); if(!app) return;
   if(!_tbCargado){ app.innerHTML = '<div class="ce-nota">Cargando trabajos…</div>'; await tbCargar(); }
@@ -8190,7 +8205,7 @@ function c3Pintar(){
   const app = document.getElementById('cal3-app'); if(!app) return;
   const hoy = c2Hoy(), hoyIso = c2Iso(hoy), base = new Date(hoy.getFullYear(), hoy.getMonth() + _c3Mes, 1);
   const ini = new Date(base); ini.setDate(1 - ((base.getDay() + 6) % 7));
-  const PD = c3PorDia(), semanas = [];
+  const PD = c3PorDia(), COL = c3Colores(), semanas = [];
   for(let w = 0; w < 6; w++){ const fila = []; for(let k = 0; k < 7; k++){ const d = new Date(ini); d.setDate(ini.getDate() + w * 7 + k); if(k < 5) fila.push(d); } if(w > 3 && fila.every(d => d.getMonth() !== base.getMonth())) break; semanas.push(fila); }
   const preg = c3Cola().filter(j => { const o = c3Ocupa(j); if(!o.length) return false; const u = o[o.length - 1]; return u < hoyIso || (u === hoyIso && new Date().getHours() >= 15); }).sort((a, b) => c3Ocupa(a).slice(-1)[0].localeCompare(c3Ocupa(b).slice(-1)[0]))[0];
   const sin = c3Sin();
@@ -8203,12 +8218,12 @@ function c3Pintar(){
     <div class="c3-sem">${['lun', 'mar', 'mié', 'jue', 'vie'].map(t => `<span>${t}</span>`).join('')}</div>
     <div class="c3-mes">${semanas.flat().map(d => { const iso = c2Iso(d), fuera = d.getMonth() !== base.getMonth(), lab = c2Laborable(d), L = PD[iso] || [], pasado = iso < hoyIso;
       const cls = ['c3-dia', fuera ? 'fuera' : '', !lab ? 'fest' : '', iso === hoyIso ? 'hoy' : '', lab && !L.length && !pasado ? 'libre' : '', _c3Colocar && lab ? 'diana' : ''].filter(Boolean).join(' ');
-      return `<button type="button" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}</i>${!lab ? '<em>festivo</em>' : L.slice(0, 2).map(x => `<span style="background:${C3_COL[x.j.prioridad] || '#2B5C8F'}">${escHtml(c3Corto(x.j))}</span>`).join('') + (L.length > 2 ? `<b>+${L.length - 2}</b>` : '')}</button>`; }).join('')}</div>
-    <div class="c3-ley"><span><i style="background:#eef6e6;border:1px solid #cfe5b8"></i>Libre</span><span><i style="background:${C3_COL.Alta}"></i>Urgente</span><span><i style="background:${C3_COL.Media}"></i>Normal</span><span><i style="background:${C3_COL.Baja}"></i>Cuando se pueda</span></div>
-    <div class="c3-tray-cab"><b>Sin día</b><span>${sin.length} trabajo${sin.length === 1 ? '' : 's'}</span><button type="button" data-c3-nuevo>+ Trabajo</button></div>
-    <div class="c3-tray-ayuda">Mantén pulsado y arrástralo a un día, o tócalo y luego toca el día.</div>
+      return `<button type="button" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}</i>${!lab ? '<em>festivo</em>' : L.slice(0, 2).map(x => `<span class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${escHtml(c3Corto(x.j))}</span>`).join('') + (L.length > 2 ? `<b>+${L.length - 2}</b>` : '')}</button>`; }).join('')}</div>
+    <div class="c3-ley"><span><i style="background:#eef6e6;border:1px solid #cfe5b8"></i>Libre</span><span>Cada trabajo, su color</span><span><b class="c3-urg">!</b>Urgente</span><span>Mantén pulsado para moverlo</span></div>
+    <div class="c3-tray-zona"><div class="c3-tray-cab"><b>Sin día</b><span>${sin.length} trabajo${sin.length === 1 ? '' : 's'}</span><button type="button" data-c3-nuevo>+ Trabajo</button></div>
+    <div class="c3-tray-ayuda">Mantén pulsado y arrástralo a un día, o tócalo y luego toca el día. Para quitarle el día a uno, arrástralo aquí.</div>
     <div class="c3-tray">${sin.map(j => `<div class="c3-card${_c3Colocar === j.id ? ' sel' : ''}" data-c3-card="${j.id}" style="border-left-color:${C3_COL[j.prioridad] || '#2B5C8F'}"><b>${escHtml(c3Nom(j))}</b><span>${escHtml(tbMay(j.trabajo && j.cliente ? j.trabajo : ''))}${j.trabajo && j.cliente ? ' · ' : ''}${tbN(c3Dias(j))} d · ${tbMaquinas(j).map(m => eqIco(m, 'mini')).join('')}</span></div>`).join('') || '<div class="c3-vacio">Todos los trabajos tienen día</div>'}</div>
-    ${sin.length ? '<button type="button" class="c3-auto" data-c3-auto>Ponerles día automáticamente, por prioridad</button>' : ''}`;
+    </div>${sin.length ? '<button type="button" class="c3-auto" data-c3-auto>Ponerles día automáticamente, por prioridad</button>' : ''}`;
 }
 function c3Hoja(html){ c2Hoja(html); }
 // una máquina no puede estar en dos sitios a la vez: hay 2 mixtas, 1 giratoria, 1 niveladora y 1 camión
@@ -8259,17 +8274,28 @@ function c3Auto(){   // rellena desde mañana por prioridad, en el primer hueco 
 // arrastrar: mantener pulsado 300 ms una tarjeta de «Sin día» y soltar encima de un día
 (function c3Arrastre(){
   let t = null, x0 = 0, y0 = 0, card = null, fantasma = null;
-  document.addEventListener('pointerdown', e => { const c = e.target.closest && e.target.closest('[data-c3-card]'); if(!c) return; card = c; x0 = e.clientX; y0 = e.clientY;
-    t = setTimeout(() => { _c3Arr = c.dataset.c3Card; fantasma = c.cloneNode(true); fantasma.className = 'c3-card c3-fant'; document.body.appendChild(fantasma); mover(x0, y0); c.classList.add('arr'); if(navigator.vibrate) navigator.vibrate(15); }, 300); });
-  const mover = (x, y) => { if(!fantasma) return; fantasma.style.left = (x - 70) + 'px'; fantasma.style.top = (y - 30) + 'px'; document.querySelectorAll('.c3-dia.sobre').forEach(d => d.classList.remove('sobre')); fantasma.style.display = 'none'; const el = document.elementFromPoint(x, y); fantasma.style.display = ''; el?.closest('[data-c3-dia]')?.classList.add('sobre'); };
+  let origenDia = null;   // V7.94: también se cogen los trabajos ya puestos (data-c3-chip) para llevarlos a otro día o devolverlos a «Sin día»
+  document.addEventListener('pointerdown', e => { const c = e.target.closest && e.target.closest('[data-c3-card], [data-c3-chip]'); if(!c) return; card = c; x0 = e.clientX; y0 = e.clientY;
+    t = setTimeout(() => { _c3Arr = c.dataset.c3Card || c.dataset.c3Chip; origenDia = c.dataset.c3Chip ? c.dataset.dia : null;
+      const j = _tbJobs.find(x => x.id === _c3Arr); fantasma = document.createElement('div'); fantasma.className = 'c3-card c3-fant'; fantasma.innerHTML = `<b>${escHtml(j ? c3Nom(j) : '')}</b><span>${j ? tbN(c3Dias(j)) + ' d' : ''}</span>`;
+      if(origenDia) document.getElementById('cal3-app')?.classList.add('c3-moviendo');
+      document.body.appendChild(fantasma); mover(x0, y0); c.classList.add('arr'); if(navigator.vibrate) navigator.vibrate(15); }, 300); });
+  const mover = (x, y) => { if(!fantasma) return; fantasma.style.left = (x - 70) + 'px'; fantasma.style.top = (y - 30) + 'px'; document.querySelectorAll('.c3-dia.sobre, .c3-tray-zona.sobre').forEach(d => d.classList.remove('sobre')); fantasma.style.display = 'none'; const el = document.elementFromPoint(x, y); fantasma.style.display = ''; (el?.closest('[data-c3-dia]') || el?.closest('.c3-tray-zona'))?.classList.add('sobre');
+    if(y > window.innerHeight - 90) window.scrollBy(0, 12); else if(y < 90) window.scrollBy(0, -12); };   // cerca del borde, la pantalla se desplaza sola
   document.addEventListener('pointermove', e => { if(t && !_c3Arr && Math.hypot(e.clientX - x0, e.clientY - y0) > 10){ clearTimeout(t); t = null; } if(_c3Arr){ e.preventDefault(); mover(e.clientX, e.clientY); } }, {passive: false});
   document.addEventListener('touchmove', e => { if(_c3Arr) e.preventDefault(); }, {passive: false});
-  const fin = e => { clearTimeout(t); t = null; if(!_c3Arr) return; const id = _c3Arr; _c3Arr = null; if(fantasma){ fantasma.style.display = 'none'; } const el = document.elementFromPoint(e.clientX, e.clientY), dia = el?.closest('[data-c3-dia]'); fantasma?.remove(); fantasma = null; card?.classList.remove('arr');
-    document.querySelectorAll('.c3-dia.sobre').forEach(d => d.classList.remove('sobre')); c3Ignorar = Date.now();
-    const j = _tbJobs.find(x => x.id === id); if(j && dia) c3PonerDia(j, dia.dataset.c3Dia); };
+  const fin = e => { clearTimeout(t); t = null; if(!_c3Arr) return; const id = _c3Arr, od = origenDia; _c3Arr = null; origenDia = null; if(fantasma){ fantasma.style.display = 'none'; } const el = document.elementFromPoint(e.clientX, e.clientY), dia = el?.closest('[data-c3-dia]'), zona = el?.closest('.c3-tray-zona'); fantasma?.remove(); fantasma = null; card?.classList.remove('arr');
+    document.getElementById('cal3-app')?.classList.remove('c3-moviendo');
+    document.querySelectorAll('.c3-dia.sobre, .c3-tray-zona.sobre').forEach(d => d.classList.remove('sobre')); c3Ignorar = Date.now();
+    const j = _tbJobs.find(x => x.id === id); if(!j) return;
+    if(zona && od){ _c2Deshacer = c2Foto(); j.plan = {...(j.plan || {}), fecha: null}; c2Guardar([j]); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))} vuelve a «Sin día».`); return; }
+    if(!dia) return;
+    if(od){ const o = c3Ocupa(j), k = Math.max(0, o.indexOf(od)); c3PonerDia(j, c3RestarLab(dia.dataset.c3Dia, k)); }   // el día que se coge cae donde se suelta
+    else c3PonerDia(j, dia.dataset.c3Dia); };
   document.addEventListener('pointerup', fin); document.addEventListener('pointercancel', fin);
 })();
 let c3Ignorar = 0;
+function c3RestarLab(iso, k){ const d = new Date(iso + 'T00:00'); if(!c2Laborable(d)) return iso; while(k > 0){ d.setDate(d.getDate() - 1); if(c2Laborable(d)) k--; } return c2Iso(d); }
 document.addEventListener('click', e => {
   const t = e.target.closest ? e.target : null; if(!t) return;
   if(t.closest('.nav [data-view="planificacion"], [data-gtab="planificacion"]')){ setTimeout(c3Cargar, 60); return; }
