@@ -1081,14 +1081,20 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
-.te-queso{width:100% !important;max-width:520px;height:auto !important;margin:0 auto 4px !important;}
+.te-queso{width:100% !important;max-width:460px;height:auto !important;margin:0 auto 4px !important;}
 .te-svg{width:100%;height:auto;display:block;overflow:visible;}
 .te-tx{fill:#fff;font-family:inherit;pointer-events:none;}
-.te-tx-n{font-size:14px;font-weight:800;}
-.te-tx-v{font-size:13px;font-weight:700;}
+.te-tx-n{font-size:15px;font-weight:800;}
+.te-tx-v{font-size:15px;font-weight:700;}
 .te-tx-p{font-size:12px;font-weight:600;opacity:.9;}
 .te-tx-fuera{font-family:inherit;font-size:12.5px;fill:var(--ink);}
 .te-tx-fn{font-weight:800;}
+.te-et{font-family:inherit;fill:var(--ink);}
+.te-et-n{font-size:14px;font-weight:800;}
+.te-et-v{font-size:14px;font-weight:600;}
+.te-et-d{font-size:12px;fill:var(--ink-soft);}
+.te-cen-t{font-size:11px;fill:var(--ink-soft);}
+.te-cen-v{font-size:19px;font-weight:800;fill:var(--ink);}
 .te-total{text-align:center;font-size:13px;color:var(--ink-soft);margin-bottom:10px;}
 
 /* V7.72 estadísticas del motor */
@@ -1115,7 +1121,8 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .te-kpis i{font-style:normal;font-size:10.5px;color:var(--ink-soft);}
 .te-kpis .te-din{background:var(--asphalt);color:#fff;}
 .te-kpis .te-din span, .te-kpis .te-din i{color:rgba(255,255,255,.8);}
-.te-sel{display:flex;gap:6px;margin-bottom:8px;}   /* V7.77: plegados, solo se ve lo elegido; al tocar sale el menú */
+.te-sel{display:flex;gap:6px;margin-bottom:8px;}
+.te-sel .pillsel{flex:0 0 auto;width:auto;}   /* V7.77: plegados, solo se ve lo elegido; al tocar sale el menú */
 .te-sel .ps-chip{font-size:12px;padding:5px 10px;}
 .te-queso{position:relative;width:200px;height:200px;margin:4px auto 10px;}
 .te-svg{width:100%;height:100%;}
@@ -3717,7 +3724,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.77</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.78</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3807,7 +3814,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.77</div>
+        <div class="sub" id="version-badge">V7.78</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7400,45 +7407,49 @@ function teGrupos(lista){
 }
 // V7.75 (Daniel: «ese gráfico es muy pobre; con un gráfico tengo que ver todos los datos dentro»): queso relleno y grande, con el nombre,
 // la cifra y el % dentro de cada porción; las porciones pequeñas llevan la etiqueta fuera con una línea
-// V7.76 (Daniel, captura del móvil): las etiquetas de fuera se cortaban por la derecha y las porciones pequeñas salían apelotonadas arriba.
-// Ahora la porción grande se gira a la izquierda (las pequeñas quedan a la derecha, repartidas en vertical), el ancho del dibujo se calcula
-// con lo que miden las etiquetas para que quepan enteras con su %, y una porción que no llega al 1 % pone «<1 %» en vez de «0 %»
-function teQueso(partes, fmtV){
-  const tot = partes.reduce((s, p) => s + p.v, 0) || 1, R = 125, cx = 0;
+// V7.78 (Daniel: «que el gráfico se vea mejor; no escrolear para ver datos que ya están en el gráfico»; y «NO QUIERO DONUTS»: queso relleno, nunca anillo)
+// cada porción con su etiqueta fuera (nombre, cifra, %, nº de trabajos y horas), la porción grande a la izquierda y las demás a la derecha
+// repartidas sin pisarse; el ancho del dibujo se calcula con lo que miden las etiquetas. Sin lista debajo: todo está en el gráfico
+function teQueso(partes, fmtV, centro){
+  const tot = partes.reduce((s, p) => s + p.v, 0) || 1, R = 112, cx = 0, cy = 0;
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const pctTxt = v => { const x = v / tot * 100; return x > 0 && x < 1 ? '<1' : String(Math.round(x)); };
-  const vis = partes.filter(p => p.v > 0);
-  // giro: el centro de la porción más grande, a la izquierda
+  const vis = partes.filter(p => p.v > 0); if(!vis.length) return '';
   let iMax = 0; vis.forEach((p, i) => { if(p.v > vis[iMax].v) iMax = i; });
   const antes = vis.slice(0, iMax).reduce((s, p) => s + p.v, 0) / tot * Math.PI * 2;
   let a0 = Math.PI - antes - vis[iMax].v / tot * Math.PI;
-  const piezas = vis.map(p => { const ang = p.v / tot * Math.PI * 2, mid = a0 + ang / 2, o = {p, a0, a1: a0 + ang, mid, ang, pct: Math.round(p.v / tot * 100), pt: pctTxt(p.v)}; a0 += ang; return o; });
-  const fuera = piezas.filter(o => o.pct < 9 && piezas.length > 1), ESP = 32;
-  const cols = {der: fuera.filter(o => Math.cos(o.mid) >= 0), izq: fuera.filter(o => Math.cos(o.mid) < 0)};
-  let minY = -R - 10, maxY = R + 10, minX = -R - 6, maxX = R + 6;
-  const ancho = t => t.length * 7.1;   // 12,5 px de letra: unos 7 px por carácter
-  Object.entries(cols).forEach(([lado, l]) => { l.sort((a, b) => Math.sin(a.mid) - Math.sin(b.mid)); let y = -Infinity;
-    l.forEach(o => { o.ly = Math.max(Math.sin(o.mid) * (R + 18), y + ESP); y = o.ly; });
-    const exceso = l.length ? l[l.length - 1].ly - (R + 30) : 0; if(exceso > 0) l.forEach(o => { o.ly -= exceso; });
-    l.forEach(o => { o.txt2 = fmtV(o.p.v) + ' · ' + o.pt + ' %'; const w = Math.max(ancho(String(o.p.k)), ancho(o.txt2)) + 14 + R + 18;
+  const piezas = vis.map(p => { const ang = p.v / tot * Math.PI * 2, o = {p, a0, a1: a0 + ang, mid: a0 + ang / 2, ang, pt: pctTxt(p.v)}; a0 += ang; return o; });
+  const ESP = 40, ancho = (t, px) => t.length * px * 0.56;
+  // todas las etiquetas a la derecha (en el móvil el dibujo sale más grande); la porción de la izquierda sale por abajo o por arriba
+  const norm = a => ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2), dentro = (o, a) => { const d = norm(a - o.a0); return d > 0.08 && d < o.ang - 0.08; };
+  piezas.forEach(o => { o.anc = Math.cos(o.mid) >= 0 ? o.mid : dentro(o, Math.PI / 2) ? Math.PI / 2 + 0.25 : dentro(o, -Math.PI / 2) ? -Math.PI / 2 - 0.25 : o.mid; });
+  // las porciones grandes (25 % o más) llevan sus datos dentro, en blanco; las demás, fuera a la derecha
+  piezas.forEach(o => { o.dentro = piezas.length === 1 || o.ang / (Math.PI * 2) >= 0.25; });
+  const cols = {der: piezas.filter(o => !o.dentro)};
+  let minY = -R - 8, maxY = R + 8, minX = -R - 6, maxX = R + 6;
+  Object.entries(cols).forEach(([lado, l]) => { l.sort((a, b) => Math.sin(a.anc) - Math.sin(b.anc)); let y = -Infinity;
+    l.forEach(o => { o.ly = Math.max(Math.sin(o.anc) * (R + 14), y + ESP); y = o.ly; });
+    const exceso = l.length ? l[l.length - 1].ly - Math.max(R + 24, (l.length - 1) * ESP / 2) : 0; if(exceso > 0) l.forEach(o => { o.ly -= exceso; });
+    l.forEach(o => {
+      o.l1 = String(o.p.k); o.l1b = fmtV(o.p.v); o.l2 = o.pt + ' %' + (o.p.det ? ' · ' + o.p.det : '');
+      const w = Math.max(ancho(o.l1 + '  ' + o.l1b, 14), ancho(o.l2, 12)) + R + 30;
       if(lado === 'der') maxX = Math.max(maxX, w); else minX = Math.min(minX, -w);
-      minY = Math.min(minY, o.ly - 16); maxY = Math.max(maxY, o.ly + 18); }); });
-  const cy = 0, P = (rad, a) => [cx + rad * Math.cos(a), cy + rad * Math.sin(a)];
+      minY = Math.min(minY, o.ly - 18); maxY = Math.max(maxY, o.ly + 20); }); });
+  const P = (rad, a) => [cx + rad * Math.cos(a), cy + rad * Math.sin(a)], f = n => n.toFixed(1);
   let trozos = '', textos = '';
   piezas.forEach(o => {
-    if(o.ang >= Math.PI * 2 - 1e-6) trozos += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${o.p.c}"/>`;
-    else { const [x0, y0] = P(R, o.a0), [x1, y1] = P(R, o.a1); trozos += `<path d="M${cx} ${cy} L${x0} ${y0} A${R} ${R} 0 ${o.ang > Math.PI ? 1 : 0} 1 ${x1} ${y1} Z" fill="${o.p.c}" stroke="#fff" stroke-width="2"/>`; }
-    const nom = esc(o.p.k), val = esc(fmtV(o.p.v));
-    if(!fuera.includes(o)){
-      const [tx, ty] = P(R * (piezas.length === 1 ? 0 : 0.6), o.mid);
-      textos += `<text x="${tx}" y="${ty - 14}" text-anchor="middle" class="te-tx"><tspan x="${tx}" class="te-tx-n">${nom}</tspan><tspan x="${tx}" dy="16" class="te-tx-v">${val}</tspan><tspan x="${tx}" dy="15" class="te-tx-p">${o.pt} %</tspan></text>`;
-    } else {
-      const der = Math.cos(o.mid) >= 0, [ex, ey] = P(R - 3, o.mid), xCol = cx + (der ? R + 18 : -(R + 18)), yCol = cy + o.ly;
-      textos += `<polyline points="${ex},${ey} ${xCol},${yCol} ${xCol + (der ? 8 : -8)},${yCol}" fill="none" stroke="${o.p.c}" stroke-width="1.5"/>
-        <text x="${xCol + (der ? 11 : -11)}" y="${yCol - 3}" text-anchor="${der ? 'start' : 'end'}" class="te-tx-fuera"><tspan class="te-tx-fn">${nom}</tspan><tspan x="${xCol + (der ? 11 : -11)}" dy="13">${esc(o.txt2)}</tspan></text>`;
-    }
+    if(o.ang >= Math.PI * 2 - 1e-6) trozos += `<circle cx="0" cy="0" r="${R}" fill="${o.p.c}"/>`;
+    else { const [x0, y0] = P(R, o.a0), [x1, y1] = P(R, o.a1), g = o.ang > Math.PI ? 1 : 0;
+      trozos += `<path d="M0 0 L${f(x0)} ${f(y0)} A${R} ${R} 0 ${g} 1 ${f(x1)} ${f(y1)}Z" fill="${o.p.c}" stroke="var(--paper,#fff)" stroke-width="2.5" stroke-linejoin="round"/>`; }
+    if(o.dentro){ const [tx, ty] = P(piezas.length === 1 ? 0 : R * 0.52, o.mid), d2 = o.p.det ? `<tspan x="${f(tx)}" dy="15" class="te-tx-p">${esc(o.p.det)}</tspan>` : '';
+      textos += `<text x="${f(tx)}" y="${f(ty - (d2 ? 22 : 14))}" text-anchor="middle" class="te-tx"><tspan x="${f(tx)}" class="te-tx-n">${esc(o.p.k)} · ${o.pt} %</tspan><tspan x="${f(tx)}" dy="18" class="te-tx-v">${esc(fmtV(o.p.v))}</tspan>${d2}</text>`; return; }
+    const der = true, [ex, ey] = P(R + 2, o.anc), xCol = Math.max(R + 16, ex + 12), yCol = o.ly, xt = xCol + (der ? 8 : -8);
+    textos += `<polyline points="${f(ex)},${f(ey)} ${f(xCol)},${f(yCol)} ${f(xt - (der ? 3 : -3))},${f(yCol)}" fill="none" stroke="${o.p.c}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${f(ex)}" cy="${f(ey)}" r="2.2" fill="${o.p.c}"/>
+      <text x="${f(xt)}" y="${f(yCol - 2)}" text-anchor="${der ? 'start' : 'end'}" class="te-et"><tspan class="te-et-n">${esc(o.l1)}</tspan><tspan class="te-et-v" dx="5">${esc(o.l1b)}</tspan><tspan x="${f(xt)}" dy="15" class="te-et-d">${esc(o.l2)}</tspan></text>`;
   });
-  return `<svg viewBox="${Math.floor(minX)} ${Math.floor(minY)} ${Math.ceil(maxX - minX)} ${Math.ceil(maxY - minY)}" class="te-svg" role="img" aria-label="Gráfico de trabajos pendientes">${trozos}${textos}</svg>`;
+  const cen = '';   // sin texto en el centro: el total ya está en las tarjetas de arriba
+  return `<svg viewBox="${Math.floor(minX)} ${Math.floor(minY)} ${Math.ceil(maxX - minX)} ${Math.ceil(maxY - minY)}" class="te-svg" role="img" aria-label="Gráfico de trabajos pendientes">${trozos}${cen}${textos}</svg>`;
 }
 function teRender(){
   const app = document.getElementById('te-app'); if(!app) return;
@@ -7458,9 +7469,7 @@ function teRender(){
   </div>
   <div class="panel te-panel">
     <div class="te-sel"><div class="pillsel" id="te-por" data-menu="1"></div><div class="pillsel" id="te-medida" data-menu="1"></div></div>
-    ${partes.length ? `<div class="te-queso">${teQueso(partes, fmtV)}</div>
-    <div class="te-total">Total: <b>${fmtV(partes.reduce((s, p) => s + p.v, 0))}</b></div>
-    <div class="te-leyenda">${partes.map(p => `<div class="te-l"><i style="background:${p.c}"></i><b>${escHtml(String(p.k))}</b><span>${p.s.n} · ${tbFmtH(p.s.h)}${conEur ? ' · ' + tbEur(p.s.e) : ''}</span></div>`).join('')}</div>`
+    ${partes.length ? `<div class="te-queso">${teQueso(partes.map(p => ({...p, det: [TE.medida !== 'n' ? p.s.n + (p.s.n === 1 ? ' trabajo' : ' trab.') : '', TE.medida !== 'h' ? tbN(p.s.h) + ' h' : ''].filter(Boolean).join(' · ')})), fmtV, [fmtV(partes.reduce((s, p) => s + p.v, 0)), t.n + ' trabajos'])}</div>`
     : '<div class="ce-nota">No hay trabajos pendientes.</div>'}
   </div>`;
   pillsSelIniciar('te-por', [['prioridad', 'Por prioridad'], ['flota', 'Por flota'], ['lugar', 'Por lugar'], ['tiempo', 'Por tiempo'], ['dificultad', 'Por dificultad']], v => { TE.por = v; teGuardar(); teRender(); });
