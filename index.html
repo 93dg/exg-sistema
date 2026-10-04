@@ -1124,6 +1124,8 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .tc2-x{width:34px;height:34px;flex:0 0 34px;border-radius:50%;border:none;background:var(--concrete);color:var(--red);display:flex;align-items:center;justify-content:center;padding:0;}
 .exp-top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:34px;}
 .exp-bts{display:flex;gap:6px;}
+.exp-arch-b{display:inline-flex;align-items:center;gap:5px;height:34px;padding:0 12px;border-radius:999px;border:none;background:var(--concrete);color:var(--ink);font-weight:700;font-size:13px;font-family:inherit;}
+.exp-arch-b svg{width:16px;height:16px;}
 .exp-docs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0 4px;}
 button.ie-hist-p{font-family:inherit;cursor:pointer;}
 .exp-card-movil{position:relative;}
@@ -3543,7 +3545,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.55</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.56</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3633,7 +3635,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.55</div>
+        <div class="sub" id="version-badge">V7.56</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18936,7 +18938,11 @@ function renderExpedientesTabla(){
   const rows = Object.values(expedientesById).sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
   const urlArchivo = e => e.archivo_path ? 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/'+encodeURI(e.archivo_path) : '';
   const originalHtml = e => urlArchivo(e) ? `<span class="fc-ver-original" data-url="${escHtml(urlArchivo(e))}">${ICO_CLIP} Original</span>` : '';
-  const adjuntosHtml = e => (Array.isArray(e.adjuntos) ? e.adjuntos : []).map(a => `<span class="fc-ver-original" data-url="${escHtml(a.url || '')}">${ICO_CLIP} ${escHtml(a.nombre || a.tipo || 'Documento')}</span>`).join('');
+  // V7.56 (Daniel: «¿por qué salen documentos distintos con el clip de arriba y el archivo de abajo?»): todos los archivos del expediente
+  // (el principal y los adjuntos) se abren en el mismo visor, con flechas para pasar de uno a otro; el clip dice cuántos hay
+  window._expArch = window._expArch || {};
+  const listaArch = e => { const l = []; if(urlArchivo(e)) l.push({u: urlArchivo(e), t: (e.archivo_path || '').split('/').pop() || 'Archivo'}); (Array.isArray(e.adjuntos) ? e.adjuntos : []).forEach(a => { if(a.url) l.push({u: a.url, t: a.nombre || a.tipo || 'Documento'}); }); window._expArch[e.id] = l; return l; };
+  const adjuntosHtml = e => { const l = listaArch(e), off = urlArchivo(e) ? 1 : 0; return (Array.isArray(e.adjuntos) ? e.adjuntos : []).filter(a => a.url).map((a, i) => `<span class="fc-ver-original" onclick="event.stopPropagation();visorAbrirLista(window._expArch['${e.id}'], ${i + off})">${ICO_CLIP} ${escHtml(a.nombre || a.tipo || 'Documento')}</span>`).join(''); };
   const archivosHtml = e => `<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-start;">${originalHtml(e)}${adjuntosHtml(e)}</div>`;
   const botonTrabajo = e => e.estado==='adjudicado' ? `<button class="btn primary" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();crearDocumentoDesdeExpediente('${e.id}')">Crear trabajo</button>` : '';
   document.getElementById('expedientes-tbl').innerHTML = rows.map(e=>`
@@ -18960,10 +18966,10 @@ function renderExpedientesTabla(){
     const estado = e.estado ? pill(e.estado) : (fin && fin.estado_cobro ? pill(fin.estado_cobro) : '');
     const fecha = e.fecha ? String(e.fecha).slice(0,10).split('-').reverse().join('/') : '';
     const urlA = fin && fin.archivo_path ? 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/' + encodeURI(fin.archivo_path) : urlArchivo(e);
-    const abrir = fin && !fin.cargadoAparte ? `openDocumentViewer('${fin.id}')` : (urlA ? `abrirVisorDesdeUrl('${escHtml(urlA)}')` : '');
+    const abrir = fin && !fin.cargadoAparte ? `openDocumentViewer('${fin.id}')` : (fin && urlA ? `abrirVisorDesdeUrl('${escHtml(urlA)}')` : (listaArch(e).length ? `visorAbrirLista(window._expArch['${e.id}'], 0)` : ''));
     return `
     <div class="exp-card-movil" ${abrir ? `onclick="${abrir}" style="cursor:pointer;"` : ''}>
-      <div class="exp-top">${estado}<span class="exp-bts">${fin && !fin.cargadoAparte ? `<button type="button" class="fc-mas-btn" onclick="event.stopPropagation();imprimirDocumento('${fin.id}')" title="Imprimir" aria-label="Imprimir">${ICO_PRINT}</button>` : ''}${urlA ? `<button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirVisorDesdeUrl('${escHtml(urlA)}')" title="Archivo" aria-label="Archivo">${ICO_CLIP}</button>` : ''}</span></div>
+      <div class="exp-top">${estado}<span class="exp-bts">${!fin && listaArch(e).length ? `<button type="button" class="exp-arch-b" onclick="event.stopPropagation();visorAbrirLista(window._expArch['${e.id}'], 0)" title="Archivos" aria-label="Archivos">${ICO_CLIP} ${listaArch(e).length}</button>` : ''}${fin && !fin.cargadoAparte ? `<button type="button" class="fc-mas-btn" onclick="event.stopPropagation();imprimirDocumento('${fin.id}')" title="Imprimir" aria-label="Imprimir">${ICO_PRINT}</button>` : ''}${fin && urlA ? `<button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirVisorDesdeUrl('${escHtml(urlA)}')" title="Archivo" aria-label="Archivo">${ICO_CLIP}</button>` : ''}</span></div>
       <div class="exp-titulo">${escHtml(tit)}</div>
       <div class="exp-sub">${escHtml(fin && fin.client ? fin.client : 'Ayuntamiento de Fuente Obejuna')}${fecha ? ' · ' + fecha : ''}</div>
       ${e.descripcion ? `<div class="exp-desc">${escHtml(e.descripcion)}</div>` : ''}
