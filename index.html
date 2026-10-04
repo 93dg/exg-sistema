@@ -1186,6 +1186,13 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .c3-mini button[disabled]{opacity:.25;}
 .c3-mini b{min-width:38px;text-align:center;font-size:22px;font-weight:800;line-height:1;}
 .c3-mini b small{display:block;font-size:10px;font-weight:600;color:var(--ink-soft);}
+.c3-dcards{display:flex;flex-direction:column;gap:8px;margin-bottom:6px;}
+.c3-dcard{display:flex;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-left:6px solid #2B5C8F;border-radius:14px;padding:10px 10px 10px 12px;}
+.c3-dc-txt{flex:1;min-width:0;}
+.c3-dc-txt b{display:block;font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.c3-dc-txt span{display:block;font-size:12px;color:var(--ink-soft);}
+.c3-dcard .c3-mini button{width:36px;height:36px;font-size:22px;}
+html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-menu-btn, html.c2-hoja #global-add-fab{visibility:hidden !important;}   /* con una hoja abierta, los botones flotantes no tapan sus botones */
 /* V7.93 Calendario de mes; V7.95: días más altos (hasta 3 trabajos con sitio para cogerlos con el dedo) y sin «+ Trabajo» (se añade con el «+» de abajo) */
 .c3-chip{position:relative;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 .c3-chip.sigue{opacity:.8;border-radius:2px 5px 5px 2px;}
@@ -4073,7 +4080,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.98</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.99</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4163,7 +4170,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.98</div>
+        <div class="sub" id="version-badge">V7.99</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8077,8 +8084,8 @@ function c2Mover(j, cambio, texto){   // aplica un cambio, guarda, repinta y mar
   ['A', 'B'].forEach(eq => { const p = R[eq][0]; if(p && !p.j.plan.inicio){ p.j.plan.inicio = c2Fecha(p.ini); cambiados.push(p.j); } });
   c2Guardar([...new Set(cambiados)]); c2Pintar(); c2Aviso(texto(n));
 }
-function c2Hoja(html){ c2Cerrar(); document.querySelector('.c2-toast')?.remove(); const v = document.createElement('div'); v.className = 'c2-velo'; v.dataset.c2Cerrar = '1'; const h = document.createElement('div'); h.className = 'c2-sheet'; h.innerHTML = html; document.body.append(v, h); }
-function c2Cerrar(){ document.querySelectorAll('.c2-velo, .c2-sheet').forEach(e => e.remove()); }
+function c2Hoja(html){ c2Cerrar(); document.querySelector('.c2-toast')?.remove(); document.documentElement.classList.add('c2-hoja'); const v = document.createElement('div'); v.className = 'c2-velo'; v.dataset.c2Cerrar = '1'; const h = document.createElement('div'); h.className = 'c2-sheet'; h.innerHTML = html; document.body.append(v, h); }
+function c2Cerrar(){ document.querySelectorAll('.c2-velo, .c2-sheet').forEach(e => e.remove()); document.documentElement.classList.remove('c2-hoja'); }
 function c2HojaNuevo(){
   const n = _c2Nuevo, M = [['mixta', 'Mixta'], ['giratoria', 'Giratoria'], ['niveladora', 'Niveladora'], ['camion', 'Camión'], ['martillo', 'Martillo']];
   const prev = n.c3 ? '' : (() => { if(!n.flota.length) return '<div class="c2-prev mal">Marca qué máquinas hacen falta.</div>';
@@ -8261,13 +8268,14 @@ function c3PonerDia(j, iso){
   const o = c3Ocupa(j), ch = c3Choques(j, o, c3Uso(j));
   c2Aviso(`${escHtml(c3Nom(j))}: <b>${c2FechaTxt(o[0])}${o.length > 1 ? ' → ' + c2FechaTxt(o[o.length - 1]) : ''}</b>${ch.length ? '. Ojo: esos días no queda ' + ch.map(m => ({mixta: 'mixta', giratoria: 'giratoria', niveladora: 'niveladora', camion: 'camión'})[m] + ' libre').join(' ni ') + '.' : ''}`);
 }
-function c3HojaDia(iso){
-  const L = (c3PorDia()[iso] || []).filter((x, k, a) => a.findIndex(y => y.j === x.j) === k), sin = c3Sin();
+function c3HojaDia(iso){   // V7.99 (Daniel): un día con trabajos = sus tarjetas, cada una con − / +, y nada más. Un día libre = lo que se puede poner
+  const L = (c3PorDia()[iso] || []).filter((x, k, a) => a.findIndex(y => y.j === x.j) === k), sin = c3Sin(), COL = c3Colores();
   c3Hoja(`<h2>${c2FechaTxt(iso).replace(/^./, c => c.toUpperCase())}</h2>
-    ${L.length ? L.map(({j, i}) => { const o = c3Ocupa(j); return `<div class="c3-hd"><div class="c3-hdr"><div><b>${escHtml(c3Nom(j))}</b><span>${escHtml(tbMay(j.trabajo && j.cliente ? j.trabajo : ''))} · día ${i + 1} · hasta el ${c2FechaTxt(o[o.length - 1])}</span></div>
-        <div class="c3-mini"><button type="button" data-c3-dias="-1" data-id="${j.id}" data-dia="${iso}" ${c3Dias(j) <= 1 ? 'disabled' : ''} aria-label="Un día menos">−</button><b>${c3Dias(j)}<small>días</small></b><button type="button" data-c3-dias="1" data-id="${j.id}" data-dia="${iso}" aria-label="Un día más">+</button></div></div>
-      <div class="c3-hb" data-c3-hd="1"><button type="button" class="si" data-c3-fin="${j.id}">Terminado</button><button type="button" data-c3-mover="${j.id}">Otro día</button><button type="button" data-c3-quitar="${j.id}">Quitar</button></div></div>`; }).join('') : '<div class="c3-libre">Día libre</div>'}
-    ${sin.length ? `<div class="c2-lbl">Poner aquí</div><div class="c3-poner">${sin.map(j => `<button type="button" data-c3-poner="${j.id}" data-dia="${iso}" style="border-left-color:${C3_COL[j.prioridad] || '#2B5C8F'}"><b>${escHtml(c3Corto(j))}</b><span>${tbN(c3Dias(j))} d</span></button>`).join('')}</div>` : ''}
+    ${L.length ? `<div class="c3-dcards">${L.map(({j, i}) => { const o = c3Ocupa(j); return `<div class="c3-dcard" style="border-left-color:${COL[j.id] || '#2B5C8F'}">
+        <div class="c3-dc-txt"><b>${escHtml(c3Nom(j))}</b><span>${escHtml(tbMay(j.trabajo && j.cliente ? j.trabajo : '') || '')}${j.trabajo && j.cliente ? ' · ' : ''}hasta el ${c2FechaTxt(o[o.length - 1])}</span></div>
+        <div class="c3-mini"><button type="button" data-c3-dias="-1" data-id="${j.id}" data-dia="${iso}" ${c3Dias(j) <= 1 ? 'disabled' : ''} aria-label="Un día menos">−</button><b>${c3Dias(j)}<small>día${c3Dias(j) === 1 ? '' : 's'}</small></b><button type="button" data-c3-dias="1" data-id="${j.id}" data-dia="${iso}" aria-label="Un día más">+</button></div>
+      </div>`; }).join('')}</div>`
+    : `<div class="c3-libre">Día libre</div>${sin.length ? `<div class="c2-lbl">Poner aquí</div><div class="c3-poner">${sin.map(j => `<button type="button" data-c3-poner="${j.id}" data-dia="${iso}" style="border-left-color:${C3_COL[j.prioridad] || '#2B5C8F'}"><b>${escHtml(c3Corto(j))}</b><span>${tbN(c3Dias(j))} d</span></button>`).join('')}</div>` : ''}`}
     <button type="button" class="c2-ok gris" data-c2-cerrar="1">Cerrar</button>`);
 }
 // V7.96 (Daniel: «seleccionar uno que ya está en el calendario para añadir o quitar días, súper sencillo, más/menos»): tocar un trabajo
