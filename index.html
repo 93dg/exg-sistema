@@ -3601,7 +3601,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.61</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.62</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3691,7 +3691,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.61</div>
+        <div class="sub" id="version-badge">V7.62</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11062,7 +11062,7 @@ function recRender(){
   const plazo = recPlazo(), items = _recItems.filter(r => recVisible(r.data || {}, plazo))
     .sort((a, b) => { const pa = (a.data||{}).anclado ? 1 : 0, pb = (b.data||{}).anclado ? 1 : 0; if(pa !== pb) return pb - pa;   // V7.61: los anclados, siempre arriba
       const va = recVence(a.data || {}), vb = recVence(b.data || {}); if(va && vb) return va.localeCompare(vb); if(va) return -1; if(vb) return 1; return String(b.created_at).localeCompare(String(a.created_at)); });   // V7.29: lo que vence primero, arriba
-  const html = items.map(r=>{
+  const pinta = r=>{
     const d = r.data||{};
     const color = r.tipo==='alerta_itv'?'orange':r.tipo==='alerta_cobro_pendiente'?'red':'blue';
     const icono = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:15px;height:15px;vertical-align:-2px;margin-right:2px;">' + (r.tipo==='alerta_itv' ? '<path d="M5 17h14v-5l-2-5H7l-2 5z"/><circle cx="8" cy="17" r="1.6"/><circle cx="16" cy="17" r="1.6"/>' : r.tipo==='alerta_cobro_pendiente' ? '<circle cx="12" cy="12" r="9"/><path d="M15 9.5a3 3 0 1 0 0 5M8 11h5M8 13.5h5"/>' : '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>') + '</svg>';
@@ -11083,9 +11083,10 @@ function recRender(){
         <div class="rec-acc">${d.ver ? (Array.isArray(d.ver) ? d.ver : [d.ver]).map((v, i) => `<button type="button" class="rec-b rec-b-pri" onclick="recVer('${r.id}', ${i})">${escHtml(v.etiqueta || 'Ver')}</button>`).join('') : ''}<button type="button" class="rec-b ${d.ver ? '' : 'rec-b-pri'}" onclick="recABandeja('${r.id}')">A la bandeja</button><button type="button" class="rec-b" onclick="recPosponer('${r.id}')">Posponer</button><button type="button" class="rec-b" onclick="marcarRecordatorioResuelto('${r.id}')">Hecho</button></div>
       </div>
     </details>`;
-  }).join('');
+  };
+  const anclados = items.filter(r => (r.data||{}).anclado).map(pinta).join(''), html = items.filter(r => !(r.data||{}).anclado).map(pinta).join('');
   const ocultos = _recItems.length - items.length;
-  cont.innerHTML = (_recItv || '') + html + (ocultos ? `<div class="s" style="padding:8px 2px;color:var(--ink-soft);">${ocultos} más adelante</div>` : '');
+  cont.innerHTML = anclados + (_recItv || '') + html + (ocultos ? `<div class="s" style="padding:8px 2px;color:var(--ink-soft);">${ocultos} más adelante</div>` : '');
   actualizarVacioAlertas();
   { const cnt = document.getElementById('alertas-count'); if(cnt){ const nItv = (String(_recItv || '').match(/class="alert-det/g) || []).length; cnt.textContent = items.length + nItv; cnt.style.display = ''; } }   // V7.61: contador junto al título
 }
