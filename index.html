@@ -1144,6 +1144,10 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .eq-barra + .eq-barra{margin-top:-4px;}
 .eq-barra.mec i{background:var(--asphalt);}
 .eq-plus .eq-ico.mini{color:rgba(255,255,255,.8);}
+.eq-ajb{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:5px 11px;border-radius:99px;border:1px solid rgba(255,255,255,.3);font-size:12px;font-weight:700;color:#fff;}
+.eq-ajb .eq-ico.mini{color:#fff;}
+.eq-ajb span{font-size:10px;opacity:.8;}
+.eq-aj{margin-top:2px;}
 /* V7.84 Equipo: nivel de cada persona con cada máquina (0–4), su valor y lo que falta cubrir */
 .eq-hero{background:var(--asphalt);color:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;}
 .eq-hero h1{font-size:22px;margin:0;font-weight:800;}
@@ -3873,7 +3877,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.89</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V7.90</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -3963,7 +3967,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V7.89</div>
+        <div class="sub" id="version-badge">V7.90</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7657,7 +7661,8 @@ const EQ_SVG = {
   experiencia: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 3.5v6.3M4.3 15.5l5.6-2.4M19.7 15.5l-5.6-2.4"/>',
   mecanica: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5l3 3 5.8-5.8a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
   editar: '<path d="M4 20h4L19.5 8.5l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
-  gestion: '<rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'
+  gestion: '<rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  ajustes: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>'
 };
 const eqIco = (k, cls) => `<svg class="eq-ico ${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${EQ_SVG[k] || '<circle cx="12" cy="12" r="8"/>'}</svg>`;
 // V7.85 (Daniel: «no pueden cobrar lo mismo; nómina neta justa de cada uno a jornada completa»): el bruto va del convenio de peón (valor 0) al de
@@ -7722,6 +7727,13 @@ async function eqCargar(){
   if(sb){ try{ const {data} = await sb.from('sistema').select('id, data').eq('tipo', 'equipo').eq('data->>clave', 'equipo:niveles').limit(1).maybeSingle(); if(data){ _eq = data.data; _eqId = data.id; } }catch(e){} }
   eqPintar();
 }
+// V7.90 (Daniel: «lo de los ajustes estos pliégalos»): los topes de nómina van plegados bajo «Ajustes de nómina»; se recuerda si estaban abiertos
+let _eqAjustes = (() => { try{ return localStorage.getItem('eq_ajustes') === '1'; }catch(e){ return false; } })();
+function eqAjustesHtml(){ return `<div class="eq-aj">
+      <div class="eq-plus"><span>${eqIco('experiencia', 'mini')} Tope experiencia: maquinista +</span>${[40, 60, 80, 100].map(x => `<button type="button" data-eq-plus="${x}" class="${Number(_eq.plus_valor_max != null ? _eq.plus_valor_max : 60) === x ? 'act' : ''}">${x} %</button>`).join('')}</div>
+      <div class="eq-plus"><span>${eqIco('mecanica', 'mini')} Plus mecánico experto:</span>${[25, 50, 75, 100].map(x => `<button type="button" data-eq-plusm="${x}" class="${Number(_eq.plus_mec_max != null ? _eq.plus_mec_max : 50) === x ? 'act' : ''}">${x} %</button>`).join('')}</div>
+      <div class="eq-plus"><span>${eqIco('gestion', 'mini')} Plus gestión (dirige):</span>${[25, 50, 75, 100].map(x => `<button type="button" data-eq-plusg="${x}" class="${Number(_eq.plus_ges_max != null ? _eq.plus_ges_max : 50) === x ? 'act' : ''}">${x} %</button>`).join('')}</div>
+      </div>`; }
 function eqPintar(){
   const app = document.getElementById('eq-app'); if(!app) return;
   if(!_eq){ app.innerHTML = '<div class="ce-nota">Cargando…</div>'; return; }
@@ -7749,9 +7761,8 @@ function eqPintar(){
     return {h, q, r, sq: est(q.length), sr: r ? est(r.length) : 'verde', s: peor(est(q.length), r ? est(r.length) : 'verde')}; });
   const falta = [].concat(...cob.map(c => [c.sq === 'rojo' || c.sq === 'amar' ? 'experiencia en ' + c.h.nombre.toLowerCase() : null, c.r && (c.sr === 'rojo' || c.sr === 'amar') ? 'mecánica de ' + c.h.nombre.toLowerCase() : null])).filter(Boolean);
   app.innerHTML = `<div class="eq-hero"><h1>Equipo</h1><p>Experiencia y mecánica de cada uno por máquina, y su nómina justa. Toca a una persona para poner sus niveles</p>
-      <div class="eq-plus"><span>${eqIco('experiencia', 'mini')} Tope experiencia: maquinista +</span>${[40, 60, 80, 100].map(x => `<button type="button" data-eq-plus="${x}" class="${Number(_eq.plus_valor_max != null ? _eq.plus_valor_max : 60) === x ? 'act' : ''}">${x} %</button>`).join('')}</div>
-      <div class="eq-plus"><span>${eqIco('mecanica', 'mini')} Plus mecánico experto:</span>${[25, 50, 75, 100].map(x => `<button type="button" data-eq-plusm="${x}" class="${Number(_eq.plus_mec_max != null ? _eq.plus_mec_max : 50) === x ? 'act' : ''}">${x} %</button>`).join('')}</div>
-      <div class="eq-plus"><span>${eqIco('gestion', 'mini')} Plus gestión (dirige):</span>${[25, 50, 75, 100].map(x => `<button type="button" data-eq-plusg="${x}" class="${Number(_eq.plus_ges_max != null ? _eq.plus_ges_max : 50) === x ? 'act' : ''}">${x} %</button>`).join('')}</div>
+      <button type="button" class="eq-ajb" data-eq-aj>${eqIco('ajustes', 'mini')} Ajustes de nómina <span>${_eqAjustes ? '▴' : '▾'}</span></button>
+      ${_eqAjustes ? eqAjustesHtml() : ''}
       <div class="eq-ley"><span>Arriba experiencia · abajo mecánica</span>${NN.slice(1).map((t, i) => `<span><i style="background:${EQ_COLOR[i + 1]}"></i>${i + 1} ${escHtml(t.split(':')[0])}</span>`).join('')}</div></div>
     ${per}
     <button type="button" class="eq-add" data-eq-add>+ Añadir persona o candidato</button>
@@ -7766,6 +7777,7 @@ document.addEventListener('click', e => {
   const d = t.closest('[data-eq-n]');
   if(d){ const p = _eq.personas.find(x => x.id === d.dataset.eqP); if(!p) return; const k = Number(d.dataset.eqN), act = p.niveles[d.dataset.eqH] || 0; p.niveles[d.dataset.eqH] = act === k ? k - 1 : k; eqPintar(); eqGuardar(); return; }
   const pl = t.closest('[data-eq-plus]'); if(pl){ _eq.plus_valor_max = Number(pl.dataset.eqPlus); eqPintar(); eqGuardar(); return; }
+  if(t.closest('[data-eq-aj]')){ _eqAjustes = !_eqAjustes; try{ localStorage.setItem('eq_ajustes', _eqAjustes ? '1' : '0'); }catch(e){} eqPintar(); return; }
   const plg = t.closest('[data-eq-plusg]'); if(plg){ _eq.plus_ges_max = Number(plg.dataset.eqPlusg); eqPintar(); eqGuardar(); return; }
   const plm = t.closest('[data-eq-plusm]'); if(plm){ _eq.plus_mec_max = Number(plm.dataset.eqPlusm); eqPintar(); eqGuardar(); return; }
   const ab = t.closest('[data-eq-abrir]'); if(ab){ _eqAbierta = _eqAbierta === ab.dataset.eqAbrir ? null : ab.dataset.eqAbrir; eqPintar(); return; }
