@@ -4256,7 +4256,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.27</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.28</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4347,7 +4347,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.27</div>
+        <div class="sub" id="version-badge">V8.28</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -19169,6 +19169,7 @@ async function registrarRetraso(code){
 
 /* Clientes — se cargan de verdad desde Supabase (tabla entidades) */
 const clientes = [];
+window.clientes = clientes;   // V8.28 (Daniel: «reactividad 0»): la fusión y otros arreglos usaban window.clientes, que no existía, y la lista no se actualizaba
 function toggleSeleccionarTodoDoc(master, claseChk){
   document.querySelectorAll('.'+claseChk).forEach(chk=>{ const fila = chk.closest('tr, .factura-card-movil'); chk.checked = master.checked && !(fila && fila.style.display==='none'); });
   // la casilla de la tarjeta móvil es solo un espejo visual — nunca se cuenta aparte,
@@ -19566,6 +19567,7 @@ async function confirmarFusionDesdeComparacion(){
     document.querySelectorAll('.clientes-sel-chk:checked').forEach(cb=>cb.checked=false);
     actualizarSeleccionClientes();
     renderClientesTable(); // render inmediato con datos en memoria
+    try{ actualizarPanelesSinActividad(); cargarDuplicadosClientes(); }catch(e){}   // V8.28: también los paneles de arriba (sin actividad, sospechosos, duplicados)
     if(typeof cargarDatosReales==='function') cargarDatosReales(); // sync en background
     // Limpiar caché de revisión para que se re-analice
     try{ const c=JSON.parse(localStorage.getItem('clientes_revision_cache_v2')||'{}'); idsEliminados.forEach(id=>delete c[id]); localStorage.setItem('clientes_revision_cache_v2',JSON.stringify(c)); }catch(e){}
@@ -19593,6 +19595,7 @@ async function confirmarFusionDesdeComparacion(){
   document.querySelectorAll('.clientes-sel-chk:checked').forEach(cb=>cb.checked=false);
   actualizarSeleccionClientes();
   renderClientesTable(); // render inmediato
+  try{ actualizarPanelesSinActividad(); }catch(e){}
   cargarDuplicadosClientes();
   cargarIdentidadPendiente();
   if(typeof cargarDatosReales==='function') cargarDatosReales(); // sync en background
