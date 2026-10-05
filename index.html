@@ -1443,6 +1443,8 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .emp-pest button.act{background:var(--orange);border-color:var(--orange);color:#fff;}
 .per-av-ico{background:var(--ink) !important;color:#fff !important;font-weight:900;font-size:20px;display:flex;align-items:center;justify-content:center;}
 #view-personal .eq-hero h1{display:none;}
+.per-tarj{all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px;}
+.per-tarj-cab{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
 /* V8.10 Economía rediseñada */
 .e2-hb{all:unset;cursor:pointer;display:block;width:100%;}
 .e2-hero .row button{all:unset;cursor:pointer;flex:1;}
@@ -4323,7 +4325,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.44</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.45</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4414,7 +4416,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.44</div>
+        <div class="sub" id="version-badge">V8.45</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4881,9 +4883,9 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 
     <!-- ================= FLOTA ================= -->
     <div class="view" id="view-personal">
-      <div class="client-tabs" id="personal-subtabs"><div class="client-tab active" data-psub="nomina">Habilidades y nómina</div><div class="client-tab" data-psub="fichas">Fichas</div></div>
-      <div id="personal-nomina"><div id="eq-app"></div></div>
-      <div id="personal-fichas" style="display:none;"></div>
+      <div class="client-tabs" id="personal-subtabs"><div class="client-tab active" data-psub="fichas">Fichas</div><div class="client-tab" data-psub="nomina">Valor</div></div>
+      <div id="personal-fichas"></div>
+      <div id="personal-nomina" style="display:none;"><div id="eq-app"></div></div>
     </div>
     <div class="view" id="view-flota">
       <div class="topbar">
@@ -13872,9 +13874,9 @@ async function renderPersonalEmpresa(){
     return `<button type="button" class="per-card" onclick="abrirFichaPersona('${k}')"><div class="per-av">${escHtml((p.nombre || '?').charAt(0))}</div><div class="per-c"><b>${escHtml(p.nombre || k)}</b><i>${escHtml(p.rol || '')}</i>${avisos.map(a => `<span class="per-mal">${a}</span>`).join('')}</div><span class="per-flecha">›</span></button>`; }).join('')}</div>`;
 }
 // V8.43b (Daniel): Personal con dos subpestañas: «Habilidades y nómina» (la vista del equipo) y «Fichas» (tarjetas normales que abren la ficha de cada persona)
-function perSubActual(){ try{ return localStorage.getItem('personal_sub') || 'nomina'; }catch(e){ return 'nomina'; } }
+function perSubActual(){ try{ return localStorage.getItem('personal_sub2') || 'fichas'; }catch(e){ return 'fichas'; } }
 async function perSub(k){
-  try{ localStorage.setItem('personal_sub', k); }catch(e){}
+  try{ localStorage.setItem('personal_sub2', k); }catch(e){}
   document.querySelectorAll('#personal-subtabs [data-psub]').forEach(t => t.classList.toggle('active', t.dataset.psub === k));
   document.getElementById('personal-nomina').style.display = k === 'nomina' ? '' : 'none';
   document.getElementById('personal-fichas').style.display = k === 'fichas' ? '' : 'none';
@@ -13882,11 +13884,16 @@ async function perSub(k){
   if(!_eq){ try{ const {data} = await sb.from('sistema').select('id, data').eq('tipo', 'equipo').eq('data->>clave', 'equipo:niveles').limit(1).maybeSingle(); if(data){ _eq = data.data; _eqId = data.id; } }catch(e){} }
   if(k === 'nomina') eqPintar(); else perPintarFichas();
 }
-function perPintarFichas(){
+function perEdad(f){ const d = perFechaEs(f); if(!d) return ''; const h = new Date(); let e = h.getFullYear() - d.getFullYear(); if(h < new Date(h.getFullYear(), d.getMonth(), d.getDate())) e--; return e; }
+function perPintarFichas(){   // V8.45 (Daniel): tarjeta grande con los datos que más se buscan de cada uno; tocarla abre su ficha
   const el = document.getElementById('personal-fichas'); if(!el) return;
-  const est = (f, que) => { const d = perFechaEs(f); if(!d) return ''; const n = Math.round((d - new Date()) / 864e5); return n < 0 ? `<span class="fl-chip" style="background:#fbeaea;color:#A32D2D;">${que} caducado</span>` : n < 90 ? `<span class="fl-chip" style="background:#fbf2df;color:#854F0B;">${que} caduca en ${n} días</span>` : ''; };
-  el.innerHTML = perTodas().map(p => { const nv = perVehiculos(p.id).length, ns = perSeguros(p.id).length;
-    return `<button type="button" class="fl-card" style="margin-bottom:8px;" onclick="abrirFichaPersona('${p.id}')"><div class="fl-ico per-av-ico">${escHtml((p.nombre || '?').charAt(0))}</div><div style="flex:1;min-width:0;"><div class="fl-nombre">${flE(p.nombre)}</div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:2px;">${flE(p.rol || '')}</div><div class="fl-fila">${p.dni ? `<span class="fl-chip">DNI ${flE(p.dni)}</span>` : '<span class="fl-chip nd">Falta DNI</span>'}${p.carnet ? `<span class="fl-chip">Carnet ${flE((p.carnet.permisos || '').split(' ')[0])}</span>` : '<span class="fl-chip nd">Falta carnet</span>'}${nv ? `<span class="fl-chip">${nv} vehículo${nv === 1 ? '' : 's'}</span>` : ''}${ns ? `<span class="fl-chip">${ns} seguro${ns === 1 ? '' : 's'}</span>` : ''}${est(p.dni_caduca, 'DNI')}${p.carnet ? est(p.carnet.caduca, 'Carnet') : ''}</div></div></button>`; }).join('');
+  const est = (f, que) => { const d = perFechaEs(f); if(!d) return ''; const n = Math.round((d - new Date()) / 864e5); return n < 0 ? `<div class="fl-falta" style="background:#fbeaea;color:#791F1F;">${que} caducado desde el ${f}</div>` : n < 90 ? `<div class="fl-falta">${que} caduca en ${n} días (${f})</div>` : ''; };
+  const F = v => v || 'Falta';
+  el.innerHTML = perTodas().map(p => { const veh = perVehiculos(p.id), seg = perSeguros(p.id), coste = seg.reduce((a, x) => a + (Number(x.coste) || 0), 0), edad = perEdad(p.nacimiento);
+    const pares = [['DNI', F(p.dni)], ['DNI válido hasta', F(p.dni_caduca)], ['Nacimiento', p.nacimiento ? p.nacimiento + (edad !== '' ? ` (${edad} años)` : '') : 'Falta'], ['Domicilio', F(p.domicilio)],
+      ['Carnet de conducir', p.carnet ? F(p.carnet.permisos) : 'Falta'], ['Carnet caduca', p.carnet ? F(p.carnet.caduca) : 'Falta'],
+      ['Vehículos a su nombre', veh.length ? veh.map(m => m.modelo || m.name).join(', ') : 'Ninguno'], ['Seguros a su nombre', seg.length ? `${seg.length} · ${coste.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} € al año` : 'Ninguno']];
+    return `<button type="button" class="per-tarj" onclick="abrirFichaPersona('${p.id}')"><div class="per-tarj-cab"><div class="fl-ico per-av-ico">${escHtml((p.nombre || '?').charAt(0))}</div><div style="flex:1;min-width:0;"><div class="fl-nombre">${flE(p.nombre)}</div><div style="font-size:13px;color:var(--ink-soft);margin-top:2px;">${flE(p.rol || '')}</div></div></div>${flKvHtml(pares)}${est(p.dni_caduca, 'DNI')}${p.carnet ? est(p.carnet.caduca, 'Carnet') : ''}</button>`; }).join('');
 }
 document.addEventListener('click', ev => { const t = ev.target.closest && ev.target.closest('#personal-subtabs [data-psub]'); if(t) perSub(t.dataset.psub); });
 let _perFicha = null, _perTab = 'resumen';
