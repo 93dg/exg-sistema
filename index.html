@@ -1376,6 +1376,15 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .tb-cli-nuevo{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-soft);}
 .tb-cli-nuevo button{all:unset;cursor:pointer;font-weight:700;color:var(--orange);}
 .c3-chip.urg.cont-der, .c3-chip.urg.cont-izq{box-shadow:none;}
+.c3-dia span.c3-chip{overflow:visible !important;text-overflow:clip !important;display:flex !important;align-items:center;gap:3px;}
+.c3-dia span.c3-chip:not(.cont-izq){z-index:2;}
+.c3-dia span.c3-chip.cont-izq{z-index:0;}
+.c3-chip.urg::before{flex:0 0 auto;}
+.c3-txt{flex:0 0 auto;}
+.c3-txt{display:block;position:relative;z-index:3;font-style:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:calc(var(--n) * 100% + (var(--n) - 1) * 13px);}
+.c3-nav-ab{align-items:center;}
+.c3-mes-ab{margin-right:auto;display:flex;flex-direction:column;line-height:1.15;}
+.c3-mes-ab b{font-size:20px;font-weight:900;} .c3-mes-ab span{font-size:12.5px;font-weight:700;color:var(--green);}
 /* V8.10 Economía rediseñada */
 .e2-hb{all:unset;cursor:pointer;display:block;width:100%;}
 .e2-hero .row button{all:unset;cursor:pointer;flex:1;}
@@ -4256,7 +4265,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.28</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.29</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4347,7 +4356,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.28</div>
+        <div class="sub" id="version-badge">V8.29</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8441,6 +8450,7 @@ const c3Corto = j => c3Nom(j).split(' ').slice(0, 2).join(' ');
 const _c3Trozos = {};
 const _c3OcSet = new WeakMap();
 function c3OcupaSet(j){ const k = JSON.stringify(j.plan || null) + '|' + c3Dias(j); const g = _c3OcSet.get(j); if(g && g.k === k) return g.s; const s = new Set(c3Ocupa(j)); _c3OcSet.set(j, {k, s}); return s; }
+function c3Texto(j){ return [c3Nom(j), j.trabajo && tbMay(j.trabajo) !== c3Nom(j) ? tbMay(j.trabajo) : '', j.lugar ? tbMay(j.lugar) : ''].filter(Boolean).join(' · '); }   // V8.29: el texto entero, de corrido por la barra
 function c3IdxSemana(j, iso){   // cuántos días de este trabajo hay antes en la misma semana (el texto empieza de nuevo cada semana)
   const d = new Date(iso + 'T00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); const lunes = c2Iso(d);
   return c3Ocupa(j).filter(x => x >= lunes && x < iso).length;
@@ -8478,15 +8488,16 @@ function c3Pintar(){
     ${preg ? `<div class="c3-q"><small>Pregunta del día</small><h2>¿Terminasteis ${escHtml(c3Nom(preg))}${preg.trabajo && preg.cliente ? ' · ' + escHtml(tbMay(preg.trabajo)) : ''}?</h2>
       <div class="c2-bt"><button type="button" class="si" data-c3-fin="${preg.id}">Sí, terminado</button>${[[1, '+1 día'], [2, '+2 días'], [5, '+1 semana']].map(([n, t]) => `<button type="button" data-c3-mas="${n}" data-id="${preg.id}">${t}</button>`).join('')}</div></div>` : ''}
     ${_c3Colocar ? `<div class="c3-col">Toca el día para <b>${escHtml(c3Nom(_tbJobs.find(j => j.id === _c3Colocar) || {}))}</b><button type="button" data-c3-cancelar>Cancelar</button></div>` : ''}
-    <div class="c3-cab"><div><b>${MESES_LARGOS[base.getMonth()].replace(/^./, c => c.toUpperCase())} ${base.getFullYear()}</b><span>${libresMes} día${libresMes === 1 ? '' : 's'} libre${libresMes === 1 ? '' : 's'}</span></div></div>
+
     <div class="c3-sem">${['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].map((t, k) => `<span${k > 5 ? ' class="fin"' : ''}>${t}</span>`).join('')}</div>
     <div class="c3-mes">${semanas.flat().map(d => { const iso = c2Iso(d), fuera = d.getMonth() !== base.getMonth(), lab = c2Laborable(d), L = PD[iso] || [], pasado = iso < hoyIso;
       const finde = d.getDay() === 0 || d.getDay() === 6, festivo = C2_FESTIVOS.includes(iso), sab = d.getDay() === 6 && !festivo;   // V8.21: el sábado se trabaja por la mañana
       const cls = ['c3-dia', fuera ? 'fuera' : '', festivo ? 'fest' : '', finde && !sab ? 'finde' : '', sab ? 'sab' : '', sab && !L.length && !pasado && !fuera ? 'libre' : '', iso === hoyIso ? 'hoy' : '', lab && !L.length && !pasado ? 'libre' : '', _c3Colocar ? 'diana' : ''].filter(Boolean).join(' ');
       return `<div role="button" tabindex="0" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}${festivo ? ' <em>festivo</em>' : sab ? '<em class="sab">mañ.</em>' : ''}</i>${L.slice(0, 3).map(x => { const O = c3OcupaSet(x.j), dw = d.getDay(), ant = new Date(d), sig = new Date(d); ant.setDate(d.getDate() - 1); sig.setDate(d.getDate() + 1);
         const ci = dw !== 1 && O.has(c2Iso(ant)), cd = dw !== 0 && O.has(c2Iso(sig));   // V8.27: si sigue el día de al lado (misma semana), la barra continúa
-        return `<span class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}${ci ? ' cont-izq' : ''}${cd ? ' cont-der' : ''}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${escHtml(c3Trozo(x.j, c3IdxSemana(x.j, iso))) || '&nbsp;'}</span>`; }).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '')}</div>`; }).join('')}</div>
-    <div class="c3-nav-ab">${_c3Mes ? '<button type="button" class="hoy" data-c3-mes="0">Hoy</button>' : ''}<button type="button" data-c3-mes="-1" aria-label="Mes anterior">‹</button><button type="button" data-c3-mes="1" aria-label="Mes siguiente">›</button></div>
+        let n = 1; if(!ci){ const q = new Date(d); while(q.getDay() !== 0){ q.setDate(q.getDate() + 1); if(O.has(c2Iso(q))) n++; else break; } }   // V8.29: días seguidos del tramo
+        return `<span class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}${ci ? ' cont-izq' : ''}${cd ? ' cont-der' : ''}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${ci ? '&nbsp;' : `<i class="c3-txt" style="--n:${n}">${escHtml(c3Texto(x.j))}</i>`}</span>`; }).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '')}</div>`; }).join('')}</div>
+    <div class="c3-nav-ab"><div class="c3-mes-ab"><b>${MESES_LARGOS[base.getMonth()].replace(/^./, c => c.toUpperCase())} ${base.getFullYear()}</b><span>${libresMes} día${libresMes === 1 ? '' : 's'} libre${libresMes === 1 ? '' : 's'}</span></div>${_c3Mes ? '<button type="button" class="hoy" data-c3-mes="0">Hoy</button>' : ''}<button type="button" data-c3-mes="-1" aria-label="Mes anterior">‹</button><button type="button" data-c3-mes="1" aria-label="Mes siguiente">›</button></div>
     <div class="c3-ley"><span><i style="background:#eef6e6;border:1px solid #cfe5b8"></i>Libre</span><span>Cada trabajo, su color</span><span><b class="c3-urg">!</b>Urgente</span><span>Toca un trabajo para darle más o menos días · mantén pulsado para moverlo</span></div>
     <div class="c3-tray-zona"><div class="c3-tray-cab"><b>Sin día</b><span>${sin.length} trabajo${sin.length === 1 ? '' : 's'}</span></div>
     <div class="c3-tray-ayuda">Mantén pulsado y arrástralo a un día, o tócalo y luego toca el día. Para quitarle el día a uno, arrástralo aquí.</div>
