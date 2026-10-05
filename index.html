@@ -1691,7 +1691,7 @@ details.ce-pleg[open] > summary{margin-bottom:10px;}
 
 .alert-fecha.rec-dias{font-weight:700;color:var(--orange);white-space:nowrap;}
 .alert-fecha.rec-dias.urge{color:var(--red);}
-.ie-barra-abajo .ie-cerrar-abajo{flex:0 0 48px !important;width:48px;height:48px;padding:0 !important;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--paper);border:1px solid var(--line);color:var(--ink);}
+.ie-barra-abajo .ie-cerrar-abajo{order:99;flex:0 0 48px !important;width:48px;height:48px;padding:0 !important;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--paper);border:1px solid var(--line);color:var(--ink);}
 @media(min-width:769px){ .ie-barra-abajo .ie-cerrar-abajo{display:none;} }
 @media(max-width:768px){ #newinvoice-overlay .close-x{display:none !important;} }
 
@@ -4209,7 +4209,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.13</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.14</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4299,7 +4299,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.13</div>
+        <div class="sub" id="version-badge">V8.14</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7819,6 +7819,8 @@ function ceRender(){
         <b>${bajoSMI ? 'Por debajo del mínimo legal estimado' : convConocido ? 'Por encima del mínimo legal estimado' : 'Mínimo pendiente de confirmar por convenio'}</b>
         <span>Mínimo bruto: <b>${ceEur(smi / CE.pagas)}</b>/mes (${CE.pagas} pagas) o <b>${ceEur(smi)}</b>/año</span>
         <span>Neto aproximado equivalente: <b>${ceEur(minNetoMes)}</b>/mes</span>
+        ${(Number(CE.jornada) || 100) < 100 ? (() => { const pj = (Number(CE.jornada) || 100) / 100, hs = 40 * pj, hd = hs / 5, fmtH = h => { const m = Math.round(h * 60); return Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : ''); };   /* V8.14 (reporte de Daniel): cuántas horas son al día */
+          return `<span>Jornada al ${Math.round(pj * 100)} %: <b>${fmtH(hs)} a la semana</b> = <b>${fmtH(hd)} al día</b> de lunes a viernes (sobre 40 h semanales; ${Math.round(1736 * pj)} h al año)</span>`; })() : ''}
         <span>${tablaConv ? CE_CONV_TXT + ', ' + (CE_PUESTOS[CE.puesto] || [''])[0] + ' (' + CE_NIVEL[CE.puesto] + '), con 217 días de trabajo; el SMI (17.094 €) queda por debajo.' : 'Referencia: SMI 2026 (1.221 € × 14). ' + (CE.convenio === 'nose' ? 'El convenio aplicable podría exigir más.' : 'Sin tabla de convenio para este puesto.')}</span>
       </div>
     </div>
@@ -8364,7 +8366,7 @@ const c3Dias = j => { const h = tbDurHoras(j.duracion); return Math.max(1, Math.
 // V8.06 (reporte de Daniel): sábados y domingos salen en el calendario. Normalmente vacíos; un trabajo puede empezar en fin de semana (sueltos,
 // mantenimientos) o sumar un fin de semana suelto en mitad (plan.findes = días trabajados de más, cuentan como días del trabajo)
 function c3Ocupa(j){ if(!j.plan || !j.plan.fecha) return []; const out = [], F = new Set(j.plan.findes || []), d = new Date(j.plan.fecha + 'T00:00'); let n = c3Dias(j), guard = 0, primero = true;
-  while(n > 0 && guard++ < 400){ const iso = c2Iso(d); if(c2Laborable(d) || F.has(iso) || (primero && !C2_FESTIVOS.includes(iso))){ out.push(iso); n--; } primero = false; d.setDate(d.getDate() + 1); } return out; }
+  while(n > 0 && guard++ < 400){ const iso = c2Iso(d); if(c2Laborable(d) || F.has(iso) || primero){ out.push(iso); n--; } primero = false; d.setDate(d.getDate() + 1); } return out; }
 const c3Cola = () => (_tbJobs || []).filter(j => C2_ESTADOS.includes(j.estado));
 const c3Sin = () => c3Cola().filter(j => !j.plan || !j.plan.fecha).sort((a, b) => c2Prio(a) - c2Prio(b) || a.orden - b.orden);
 function c3PorDia(){ const m = {}; c3Cola().forEach(j => c3Ocupa(j).forEach((iso, i) => { (m[iso] = m[iso] || []).push({j, i}); })); return m; }
@@ -8400,8 +8402,8 @@ function c3Pintar(){
     <div class="c3-sem">${['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].map((t, k) => `<span${k > 4 ? ' class="fin"' : ''}>${t}</span>`).join('')}</div>
     <div class="c3-mes">${semanas.flat().map(d => { const iso = c2Iso(d), fuera = d.getMonth() !== base.getMonth(), lab = c2Laborable(d), L = PD[iso] || [], pasado = iso < hoyIso;
       const finde = d.getDay() === 0 || d.getDay() === 6, festivo = C2_FESTIVOS.includes(iso);
-      const cls = ['c3-dia', fuera ? 'fuera' : '', festivo ? 'fest' : '', finde ? 'finde' : '', iso === hoyIso ? 'hoy' : '', lab && !L.length && !pasado ? 'libre' : '', _c3Colocar && !festivo ? 'diana' : ''].filter(Boolean).join(' ');
-      return `<div role="button" tabindex="0" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}</i>${festivo ? '<em>festivo</em>' : L.slice(0, 3).map(x => `<span class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${escHtml(c3Corto(x.j))}</span>`).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '')}</div>`; }).join('')}</div>
+      const cls = ['c3-dia', fuera ? 'fuera' : '', festivo ? 'fest' : '', finde ? 'finde' : '', iso === hoyIso ? 'hoy' : '', lab && !L.length && !pasado ? 'libre' : '', _c3Colocar ? 'diana' : ''].filter(Boolean).join(' ');
+      return `<div role="button" tabindex="0" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}${festivo ? ' <em>festivo</em>' : ''}</i>${L.slice(0, 3).map(x => `<span class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${escHtml(c3Corto(x.j))}</span>`).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '')}</div>`; }).join('')}</div>
     <div class="c3-ley"><span><i style="background:#eef6e6;border:1px solid #cfe5b8"></i>Libre</span><span>Cada trabajo, su color</span><span><b class="c3-urg">!</b>Urgente</span><span>Toca un trabajo para darle más o menos días · mantén pulsado para moverlo</span></div>
     <div class="c3-tray-zona"><div class="c3-tray-cab"><b>Sin día</b><span>${sin.length} trabajo${sin.length === 1 ? '' : 's'}</span></div>
     <div class="c3-tray-ayuda">Mantén pulsado y arrástralo a un día, o tócalo y luego toca el día. Para quitarle el día a uno, arrástralo aquí.</div>
@@ -8416,7 +8418,6 @@ function c3Uso(excluir){ const u = {}; c3Cola().forEach(j => { if(j === excluir)
 function c3Choques(j, dias, uso){ const n = c3Necesita(j), out = new Set(); dias.forEach(iso => Object.entries(n).forEach(([m, k]) => { if(((uso[iso] || {})[m] || 0) + k > C3_CAP[m]) out.add(m); })); return [...out]; }
 const C3_NOM_MAQ = {mixta: 'las dos mixtas', giratoria: 'la giratoria', niveladora: 'la niveladora', camion: 'el camión'};
 function c3PonerDia(j, iso){
-  if(C2_FESTIVOS.includes(iso)){ mostrarToast('Ese día es festivo'); return; }
   const antes = JSON.stringify(j.plan || null); j.plan = {...(j.plan || {}), fecha: iso, extra: (j.plan && j.plan.extra) || 0}; _c3Colocar = null;
   c2Guardar([j]); c3Pintar(); _c2Deshacer = [[j.id, antes, j.estado, j.terminado_at || null]];
   const o = c3Ocupa(j), ch = c3Choques(j, o, c3Uso(j));
@@ -8424,7 +8425,7 @@ function c3PonerDia(j, iso){
 }
 function c3HojaDia(iso){   // V7.99 (Daniel): un día con trabajos = sus tarjetas, cada una con − / +, y nada más. Un día libre = lo que se puede poner
   const L = (c3PorDia()[iso] || []).filter((x, k, a) => a.findIndex(y => y.j === x.j) === k), sin = c3Sin(), COL = c3Colores();
-  const dd = new Date(iso + 'T00:00'), finde = dd.getDay() === 0 || dd.getDay() === 6;
+  const dd = new Date(iso + 'T00:00'), finde = dd.getDay() === 0 || dd.getDay() === 6 || C2_FESTIVOS.includes(iso);   // V8.14: los festivos, como los fines de semana
   const alrededor = finde ? c3Cola().filter(j => { const o = c3Ocupa(j); return o.length && o[0] < iso && o[o.length - 1] > iso && !L.some(x => x.j === j); }) : [];
   const extraHtml = alrededor.length ? `<div class="c2-lbl">Trabajar este día en</div><div class="c3-poner">${alrededor.map(j => `<button type="button" data-c3-finde="${j.id}" data-dia="${iso}" style="border-left-color:${COL[j.id] || '#2B5C8F'}"><b>${escHtml(c3Corto(j))}</b><span>cuenta como 1 día</span></button>`).join('')}</div>` : '';
   c3Hoja(`<h2>${c2FechaTxt(iso).replace(/^./, c => c.toUpperCase())}</h2>
@@ -8432,7 +8433,7 @@ function c3HojaDia(iso){   // V7.99 (Daniel): un día con trabajos = sus tarjeta
         const paso = `<div class="c3-mini"><button type="button" data-c3-dias="-1" data-id="${j.id}" data-dia="${iso}" ${c3Dias(j) <= 1 ? 'disabled' : ''} aria-label="Un día menos">−</button><b>${c3Dias(j)}<small>día${c3Dias(j) === 1 ? '' : 's'}</small></b><button type="button" data-c3-dias="1" data-id="${j.id}" data-dia="${iso}" aria-label="Un día más">+</button></div>`;
         const quitarFinde = finde && (j.plan.findes || []).includes(iso) ? `<button type="button" class="c3-nofinde" data-c3-nofinde="${j.id}" data-dia="${iso}">No trabajar este día</button>` : '';
         return tbCartaHtml(j, false, '', quitarFinde + `<div class="c3-dc-pie"><div class="c3-dc-fechas" style="--jc:${COL[j.id] || '#2B5C8F'}">Día ${i + 1} de ${c3Dias(j)}<br>${c2FechaTxt(o[0])} → ${c2FechaTxt(o[o.length - 1])}</div>${paso}</div>`); }).join('')}</div>`
-    : `${extraHtml}<div class="c3-libre${finde ? ' finde' : ''}">${finde ? 'Fin de semana' : 'Día libre'}</div>${sin.length ? `<div class="c2-lbl">Poner aquí</div><div class="c3-poner">${sin.map(j => `<button type="button" data-c3-poner="${j.id}" data-dia="${iso}" style="border-left-color:${C3_COL[j.prioridad] || '#2B5C8F'}"><b>${escHtml(c3Corto(j))}</b><span>${tbN(c3Dias(j))} d</span></button>`).join('')}</div>` : ''}`}
+    : `${extraHtml}<div class="c3-libre${finde ? ' finde' : ''}">${C2_FESTIVOS.includes(iso) ? 'Festivo' : finde ? 'Fin de semana' : 'Día libre'}</div>${sin.length ? `<div class="c2-lbl">Poner aquí</div><div class="c3-poner">${sin.map(j => `<button type="button" data-c3-poner="${j.id}" data-dia="${iso}" style="border-left-color:${C3_COL[j.prioridad] || '#2B5C8F'}"><b>${escHtml(c3Corto(j))}</b><span>${tbN(c3Dias(j))} d</span></button>`).join('')}</div>` : ''}`}
     <button type="button" class="c2-ok gris" data-c2-cerrar="1">Cerrar</button>`);
 }
 // V7.96 (Daniel: «seleccionar uno que ya está en el calendario para añadir o quitar días, súper sencillo, más/menos»): tocar un trabajo
@@ -8488,11 +8489,25 @@ function c3Auto(){   // rellena desde mañana por prioridad, en el primer hueco 
     const j = _tbJobs.find(x => x.id === id); if(!j) return;
     if(zona && od){ _c2Deshacer = c2Foto(); j.plan = {...(j.plan || {}), fecha: null}; c2Guardar([j]); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))} vuelve a «Sin día».`); return; }
     if(!dia) return;
-    if(od){ const o = c3Ocupa(j), k = Math.max(0, o.indexOf(od)); c3PonerDia(j, c3RestarLab(dia.dataset.c3Dia, k)); }   // el día que se coge cae donde se suelta
+    if(od){ const T = dia.dataset.c3Dia, o = c3Ocupa(j), finAntes = o[o.length - 1]; if(T === od) return;
+      if(!c2Laborable(new Date(T + 'T00:00'))){   // a un sábado, domingo o festivo: ese día se trabaja (cuenta como un día del trabajo)
+        _c2Deshacer = c2Foto(); if(T < j.plan.fecha) j.plan.fecha = T; else j.plan = {...j.plan, findes: [...new Set([...(j.plan.findes || []), T])]};
+        c2Guardar([j]); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))}: se trabaja el ${c2FechaTxt(T)}.`);
+      } else c3PonerDia(j, c3MoverLab(j.plan.fecha, c3LabEntre(od, T)));   // a un día normal: todo el trabajo se mueve lo mismo
+      c3PreguntarSiguientes(j, finAntes); }
     else c3PonerDia(j, dia.dataset.c3Dia); };
   document.addEventListener('pointerup', fin); document.addEventListener('pointercancel', fin);
 })();
 let c3Ignorar = 0;
+// V8.14 (reporte de Daniel): al mover un trabajo, preguntar si los que van después se mueven lo mismo (para no dejar huecos ni pisarse)
+function c3LabEntre(a, b){ if(a === b) return 0; const s = a < b ? 1 : -1, d = new Date(a + 'T00:00'); let n = 0, g = 0; while(c2Iso(d) !== b && g++ < 800){ d.setDate(d.getDate() + s); if(c2Laborable(d)) n += s; } return n; }
+function c3MoverLab(iso, k){ const d = new Date(iso + 'T00:00'), s = k < 0 ? -1 : 1; let n = Math.abs(k), g = 0; while(n > 0 && g++ < 800){ d.setDate(d.getDate() + s); if(c2Laborable(d)) n--; } return c2Iso(d); }
+function c3PreguntarSiguientes(j, finAntes){
+  const o = c3Ocupa(j), delta = c3LabEntre(finAntes, o[o.length - 1]); if(!delta) return;
+  const sig = c3Cola().filter(x => x !== j && x.plan && x.plan.fecha && x.plan.fecha > finAntes); if(!sig.length) return;
+  c3Hoja(`<h2>¿Mover también los de después?</h2><p style="font-size:14px;margin:0 0 12px;">${escHtml(c3Nom(j))} se ha movido ${Math.abs(delta)} día${Math.abs(delta) === 1 ? '' : 's'} ${delta < 0 ? 'antes' : 'después'}. Hay ${sig.length} trabajo${sig.length === 1 ? '' : 's'} con día después de él.</p>
+    <div class="c2-acc"><button type="button" class="si" data-c3-sigmover="${delta}" data-desde="${finAntes}" data-id="${j.id}">Sí, moverlos ${Math.abs(delta)} día${Math.abs(delta) === 1 ? '' : 's'}</button><button type="button" data-c2-cerrar="1">No, dejarlos</button></div>`);
+}
 function c3RestarLab(iso, k){ const d = new Date(iso + 'T00:00'); if(!c2Laborable(d)) return iso; while(k > 0){ d.setDate(d.getDate() - 1); if(c2Laborable(d)) k--; } return c2Iso(d); }
 document.addEventListener('click', e => {
   const t = e.target.closest ? e.target : null; if(!t) return;
@@ -8513,6 +8528,9 @@ document.addEventListener('click', e => {
       if(!_c2Deshacer || dd.dataset.primero !== '0') _c2Deshacer = c2Foto();
       j.plan = {...(j.plan || {}), extra: (j.plan && j.plan.extra || 0) + n}; c2Guardar([j]); c3Pintar(); if(dd.dataset.dia) c3HojaDia(dd.dataset.dia); else c3HojaTrabajo(j); document.querySelectorAll('[data-c3-dias]').forEach(b => { b.dataset.primero = '0'; });
       return; }   // la hoja ya enseña los días y las fechas nuevas; sin aviso que la tape
+    const sm = t.closest('[data-c3-sigmover]'); if(sm){ const k = Number(sm.dataset.c3Sigmover), desde = sm.dataset.desde, j0 = jOf(sm.dataset.id);
+      const mover = c3Cola().filter(x => x !== j0 && x.plan && x.plan.fecha && x.plan.fecha > desde); mover.forEach(x => { x.plan.fecha = c3MoverLab(x.plan.fecha, k); });
+      c2Guardar(mover); c2Cerrar(); c3Pintar(); c2Aviso(`<b>${mover.length} trabajo${mover.length === 1 ? '' : 's'} movido${mover.length === 1 ? '' : 's'}</b> ${Math.abs(k)} día${Math.abs(k) === 1 ? '' : 's'}.`); return; }
     const ds = t.closest('[data-c3-desplazar]'); if(ds){ c3Desplazar(Number(ds.dataset.c3Desplazar), ds.dataset.desde); return; }
     return;
   }
@@ -14281,7 +14299,8 @@ async function rbCapturar(){
   const ponerColores = doc => { doc.querySelectorAll('[data-rbi]').forEach(el => { const v = colores[Number(el.getAttribute('data-rbi'))]; if(v) Object.entries(v).forEach(([p, c]) => el.style.setProperty(p, c, 'important')); }); };
   const quitarMarcas = () => { document.querySelectorAll('[data-rbi]').forEach(el => el.removeAttribute('data-rbi')); document.querySelectorAll('[data-rbx],[data-rbarriba]').forEach(el => { el.removeAttribute('data-rbx'); el.removeAttribute('data-rbarriba'); }); };
   const conTiempo = (pr, ms) => Promise.race([pr, new Promise((_, ko) => setTimeout(() => ko(new Error('la captura tardó más de ' + ms / 1000 + ' s')), ms))]);
-  const opciones = (extra) => ({x: window.scrollX, y: window.scrollY, width: window.innerWidth, height: window.innerHeight, scale: Math.max(0.6, Math.min(2, 800 / window.innerWidth)), logging: false, useCORS: true, ignoreElements: fuera, ...extra});
+  const vv = window.visualViewport;   // V8.14 (reporte de Daniel: la captura salía recortada con el teclado del iPhone): se copia la zona visible real
+  const opciones = (extra) => ({x: vv ? vv.pageLeft : window.scrollX, y: vv ? vv.pageTop : window.scrollY, width: vv ? Math.round(vv.width) : window.innerWidth, height: vv ? Math.round(vv.height) : window.innerHeight, scale: Math.max(0.6, Math.min(2, 800 / window.innerWidth)), logging: false, useCORS: true, ignoreElements: fuera, ...extra});
   let ultimoError = '';
   try{
     for(const intento of [1, 2]){   // 1: se quitan los colores modernos de los estilos; 2: además se revisan los colores ya calculados de lo que se ve
