@@ -1360,6 +1360,22 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 #view-clientes #cli-filtros-strip{margin-left:auto;flex:0 0 auto;justify-content:flex-end;}
 #view-clientes #cli-cuenta{font-size:16px;color:var(--ink-soft);white-space:nowrap;} #view-clientes #cli-cuenta b{color:var(--ink);font-weight:800;}
 #view-clientes #cli-sticky-spacer{display:none !important;}
+.c3-dia{overflow:visible !important;}
+.c3-chip.sigue{opacity:1 !important;}
+.c3-dia span.c3-chip.cont-izq{margin-left:-6px !important;border-top-left-radius:0 !important;border-bottom-left-radius:0 !important;padding-left:7px !important;}
+.c3-dia span.c3-chip.cont-der{margin-right:-6px !important;border-top-right-radius:0 !important;border-bottom-right-radius:0 !important;}
+.c3-dia span.c3-chip{position:relative;z-index:1;}
+.tb-cli-sug:empty{display:none;}
+.tb-cli-sug{margin:-4px 0 10px;display:flex;flex-direction:column;gap:6px;}
+.tb-cli-av{background:#fbf2df;border:1px solid #f0d9a6;border-radius:12px;padding:8px 10px;}
+.tb-cli-av > b{display:block;font-size:12.5px;color:#854F0B;margin-bottom:4px;}
+.tb-cli-av button{all:unset;cursor:pointer;display:flex;justify-content:space-between;gap:8px;width:100%;box-sizing:border-box;padding:6px 2px;border-top:1px solid #f0d9a6;font-size:13px;font-weight:700;}
+.tb-cli-av button i{font-style:normal;font-weight:600;color:var(--ink-soft);white-space:nowrap;}
+.tb-cli-lst{display:flex;flex-wrap:wrap;gap:6px;}
+.tb-cli-lst button{all:unset;cursor:pointer;font-size:12.5px;font-weight:700;background:var(--concrete);border-radius:99px;padding:6px 11px;}
+.tb-cli-nuevo{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-soft);}
+.tb-cli-nuevo button{all:unset;cursor:pointer;font-weight:700;color:var(--orange);}
+.c3-chip.urg.cont-der, .c3-chip.urg.cont-izq{box-shadow:none;}
 /* V8.10 Economía rediseñada */
 .e2-hb{all:unset;cursor:pointer;display:block;width:100%;}
 .e2-hero .row button{all:unset;cursor:pointer;flex:1;}
@@ -4240,7 +4256,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.26</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.27</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4331,7 +4347,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.26</div>
+        <div class="sub" id="version-badge">V8.27</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8423,6 +8439,8 @@ const c3Nom = j => tbMay(j.cliente || j.trabajo || 'Trabajo');
 const c3Corto = j => c3Nom(j).split(' ').slice(0, 2).join(' ');
 // V8.22 (reporte de Daniel): el texto del trabajo se reparte por sus días (cliente · obra · lugar), un trozo en cada día, para leerlo de un vistazo
 const _c3Trozos = {};
+const _c3OcSet = new WeakMap();
+function c3OcupaSet(j){ const k = JSON.stringify(j.plan || null) + '|' + c3Dias(j); const g = _c3OcSet.get(j); if(g && g.k === k) return g.s; const s = new Set(c3Ocupa(j)); _c3OcSet.set(j, {k, s}); return s; }
 function c3IdxSemana(j, iso){   // cuántos días de este trabajo hay antes en la misma semana (el texto empieza de nuevo cada semana)
   const d = new Date(iso + 'T00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); const lunes = c2Iso(d);
   return c3Ocupa(j).filter(x => x >= lunes && x < iso).length;
@@ -8465,7 +8483,9 @@ function c3Pintar(){
     <div class="c3-mes">${semanas.flat().map(d => { const iso = c2Iso(d), fuera = d.getMonth() !== base.getMonth(), lab = c2Laborable(d), L = PD[iso] || [], pasado = iso < hoyIso;
       const finde = d.getDay() === 0 || d.getDay() === 6, festivo = C2_FESTIVOS.includes(iso), sab = d.getDay() === 6 && !festivo;   // V8.21: el sábado se trabaja por la mañana
       const cls = ['c3-dia', fuera ? 'fuera' : '', festivo ? 'fest' : '', finde && !sab ? 'finde' : '', sab ? 'sab' : '', sab && !L.length && !pasado && !fuera ? 'libre' : '', iso === hoyIso ? 'hoy' : '', lab && !L.length && !pasado ? 'libre' : '', _c3Colocar ? 'diana' : ''].filter(Boolean).join(' ');
-      return `<div role="button" tabindex="0" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}${festivo ? ' <em>festivo</em>' : sab ? '<em class="sab">mañ.</em>' : ''}</i>${L.slice(0, 3).map(x => `<span class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${escHtml(c3Trozo(x.j, c3IdxSemana(x.j, iso))) || '&nbsp;'}</span>`).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '')}</div>`; }).join('')}</div>
+      return `<div role="button" tabindex="0" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}${festivo ? ' <em>festivo</em>' : sab ? '<em class="sab">mañ.</em>' : ''}</i>${L.slice(0, 3).map(x => { const O = c3OcupaSet(x.j), dw = d.getDay(), ant = new Date(d), sig = new Date(d); ant.setDate(d.getDate() - 1); sig.setDate(d.getDate() + 1);
+        const ci = dw !== 1 && O.has(c2Iso(ant)), cd = dw !== 0 && O.has(c2Iso(sig));   // V8.27: si sigue el día de al lado (misma semana), la barra continúa
+        return `<span class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}${ci ? ' cont-izq' : ''}${cd ? ' cont-der' : ''}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${escHtml(c3Trozo(x.j, c3IdxSemana(x.j, iso))) || '&nbsp;'}</span>`; }).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '')}</div>`; }).join('')}</div>
     <div class="c3-nav-ab">${_c3Mes ? '<button type="button" class="hoy" data-c3-mes="0">Hoy</button>' : ''}<button type="button" data-c3-mes="-1" aria-label="Mes anterior">‹</button><button type="button" data-c3-mes="1" aria-label="Mes siguiente">›</button></div>
     <div class="c3-ley"><span><i style="background:#eef6e6;border:1px solid #cfe5b8"></i>Libre</span><span>Cada trabajo, su color</span><span><b class="c3-urg">!</b>Urgente</span><span>Toca un trabajo para darle más o menos días · mantén pulsado para moverlo</span></div>
     <div class="c3-tray-zona"><div class="c3-tray-cab"><b>Sin día</b><span>${sin.length} trabajo${sin.length === 1 ? '' : 's'}</span></div>
@@ -22954,6 +22974,37 @@ function tbRender(){
 }
 // ---- editor (hoja desde abajo) ----
 // Todo el texto de esta sección va en mayúsculas, como el resto de la web (regla global al escribir, y tbDatos lo fuerza al guardar).
+// V8.27 (reporte de Daniel: «a mi tío le llama varias veces el mismo cliente y no se acuerda de que ya tiene el trabajo»): al escribir el cliente
+// salen los clientes que ya existen y, sobre todo, los trabajos que ya hay de ese cliente. No obliga a crear el cliente: se puede guardar en Clientes con un toque
+let _tbCliNombres = null;
+async function tbCliCargar(){ if(_tbCliNombres) return _tbCliNombres; try{ const {data} = await sb.from('entidades').select('id, nombre, tipo').is('deleted_at', null); _tbCliNombres = (data || []).filter(e => (e.tipo || '') !== 'proveedor').map(e => ({id: e.id, n: e.nombre})); }catch(e){ _tbCliNombres = []; } return _tbCliNombres; }
+const tbNorm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim();
+function tbClienteSugerir(hoja, idActual){
+  const inp = hoja.querySelector('#tb-f-cliente'); if(!inp) return;
+  let box = document.createElement('div'); box.className = 'tb-cli-sug'; inp.closest('label').after(box);
+  const pintar = async () => {
+    const q = tbNorm(inp.value); if(q.length < 2){ box.innerHTML = ''; return; }
+    const pal = q.split(' ').filter(w => w.length > 1), casa = t => { const n = tbNorm(t); return pal.every(w => n.includes(w)); };
+    const trabajos = _tbJobs.filter(j => j.id !== idActual && casa(j.cliente));
+    const cli = (await tbCliCargar()).filter(c => casa(c.n)).slice(0, 5);
+    const exacto = cli.some(c => tbNorm(c.n) === q);
+    let h = '';
+    if(trabajos.length) h += `<div class="tb-cli-av"><b>Ojo: ya hay ${trabajos.length === 1 ? 'un trabajo' : trabajos.length + ' trabajos'} de este cliente</b>${trabajos.slice(0, 4).map(j => `<button type="button" data-tb-abrir-otro="${j.id}"><span>${escHtml(tbMay(j.cliente))}${j.trabajo ? ' · ' + escHtml(tbMay(j.trabajo)) : ''}</span><i>${escHtml(tbEstado(j.estado))}</i></button>`).join('')}</div>`;
+    if(cli.length && !exacto) h += `<div class="tb-cli-lst">${cli.map(c => `<button type="button" data-tb-cli="${escHtml(c.n)}">${escHtml(c.n)}</button>`).join('')}</div>`;
+    if(!cli.length && q.length >= 4) h += `<div class="tb-cli-nuevo"><span>No está en Clientes.</span><button type="button" data-tb-cli-guardar="1">Guardarlo en Clientes</button></div>`;
+    box.innerHTML = h;
+  };
+  let t = null; inp.addEventListener('input', () => { clearTimeout(t); t = setTimeout(pintar, 180); });
+  box.addEventListener('click', async e => {
+    const c = e.target.closest('[data-tb-cli]'); if(c){ inp.value = c.dataset.tbCli; pintar(); return; }
+    const o = e.target.closest('[data-tb-abrir-otro]'); if(o){ tbCerrarEditor(); setTimeout(() => tbAbrirEditor(o.dataset.tbAbrirOtro), 60); return; }
+    const g = e.target.closest('[data-tb-cli-guardar]'); if(g){ const nombre = inp.value.trim().toUpperCase(); if(!nombre) return;
+      const {data, error} = await sb.from('entidades').insert({nombre, tipo: 'cliente', clase_nombre: 'persona'}).select('id').single();
+      if(error){ mostrarToast('No se pudo guardar: ' + errText(error), 'err'); return; }
+      (_tbCliNombres || (_tbCliNombres = [])).push({id: data.id, n: nombre}); mostrarToast('Guardado en Clientes', 'ok'); pintar(); }
+  });
+  if(inp.value) pintar();
+}
 function tbAbrirEditor(id){
   _tbEditando = id || null; const j = id ? _tbJobs.find(x => x.id === id) : {prioridad: 'Media', prioridades: ['Media'], estado: 'Pendiente', dificultad: '', flota: [], lugar: '', cliente: '', trabajo: '', duracion: '', nota: ''};
   if(!j) return;
@@ -23001,6 +23052,7 @@ function tbAbrirEditor(id){
       if(campo === 'duracion') hoja.dataset.durActual = '';   // tocar una pastilla sustituye la duración escrita antes
     }));
   });
+  tbClienteSugerir(hoja, id);
   fondo.style.display = 'flex'; document.body.classList.add('tb-modal');
   hoja.scrollTop = 0; _tbInicial = tbFotoFormulario();
   if(!id) setTimeout(() => document.getElementById('tb-f-cliente')?.focus(), 80);
