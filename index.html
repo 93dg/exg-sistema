@@ -1439,6 +1439,10 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .per-falta{color:#854F0B;font-style:normal;font-weight:800;}
 .per-docs{display:flex;flex-direction:column;gap:6px;} .per-doc{display:block;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--concrete);color:var(--ink);text-decoration:none;font-weight:700;font-size:13.5px;}
 .per-link{color:var(--orange);cursor:pointer;text-decoration:none;}
+.emp-pest{display:flex;gap:8px;margin:4px 0 12px;} .emp-pest button{all:unset;cursor:pointer;flex:1;text-align:center;padding:11px 0;border-radius:99px;border:1px solid var(--line);background:var(--paper);font-weight:800;font-size:14px;}
+.emp-pest button.act{background:var(--orange);border-color:var(--orange);color:#fff;}
+.per-av-ico{background:var(--ink) !important;color:#fff !important;font-weight:900;font-size:20px;display:flex;align-items:center;justify-content:center;}
+#emp-personal-wrap .eq-hero h1{display:none;}
 /* V8.10 Economía rediseñada */
 .e2-hb{all:unset;cursor:pointer;display:block;width:100%;}
 .e2-hero .row button{all:unset;cursor:pointer;flex:1;}
@@ -4319,7 +4323,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.41</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.42</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4410,7 +4414,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.41</div>
+        <div class="sub" id="version-badge">V8.42</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6294,10 +6298,13 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
             <button class="btn primary" onclick="abrirNuevoDocEmpresa()">+ Nuevo documento</button>
           </div>
           </div>
+          <div class="emp-pest" id="emp-pest"><button type="button" data-emp-pest="docs" class="act">Documentos</button><button type="button" data-emp-pest="personal">Personal</button></div>
+          <div id="emp-docs-wrap">
           <div class="emp-datos" id="empresa-datos"></div>
-          <div id="empresa-personal"></div>
           <div class="emp-cats" id="empresa-cats"></div>
           <div id="empresa-docs-cards"></div>
+          </div>
+          <div id="emp-personal-wrap" style="display:none;"><div id="eq-app"></div></div>
         </div>
 
         <!-- ================= REPORTES ================= -->
@@ -8235,7 +8242,7 @@ function eqPintar(){
   const sinNada = P.every(p => !Object.values(p.niveles || {}).some(Boolean));
   const per = P.map(p => { p.niveles = p.niveles || {}; const v = eqValor(p), cat = eqCategoria(p.niveles), eh = tabla[cat] ? tabla[cat] / horas : null, domina = H.filter(h => (p.niveles[h.id] || 0) >= 3).length, arregla = H.filter(h => h.mec && (p.niveles[h.id + '_mec'] || 0) >= 3).length, nom = eqNomina(p, v, cat);
     return `<div class="eq-per">
-      <div class="eq-cab" data-eq-abrir="${p.id}"><div class="eq-av">${escHtml(p.nombre.slice(0, 1))}</div><div class="eq-nom"><b>${escHtml(p.nombre)}</b><span>${escHtml(p.rol || '')}</span></div>
+      <div class="eq-cab" data-eq-abrir="${p.id}"><div class="eq-av">${escHtml(p.nombre.slice(0, 1))}</div><div class="eq-nom"><b class="per-link" onclick="event.stopPropagation();abrirFichaPersona('${p.id}')">${escHtml(p.nombre)}</b><span>${escHtml(p.rol || '')}</span></div>
         <div class="eq-valor2"><div><b>${nom.ve}</b><span>${eqIco('experiencia', 'mini')} exp.</span></div><div><b>${nom.vm}</b><span>${eqIco('mecanica', 'mini')} mec.</span></div>${nom.vg ? `<div><b>${nom.vg}</b><span>${eqIco('gestion', 'mini')} ges.</span></div>` : ''}</div></div>
       <div class="eq-barra"><i style="width:${nom.ve}%"></i></div><div class="eq-barra mec"><i style="width:${nom.vm}%"></i></div>
       ${_eqAbierta !== p.id ? `<div class="eq-res" data-eq-abrir="${p.id}">${H.map(h => { const n = p.niveles[h.id] || 0, m = p.niveles[h.id + '_mec'] || 0, seg = (k, c) => `<i class="${k <= c ? 'on n' + c : ''}"></i>`;
@@ -9008,8 +9015,8 @@ async function dirCargar(forzar){
 }
 function dirPintar(){
   const app0 = document.getElementById('dir-app'); if(!app0) return;
-  const pest = `<div class="dir-pest">${[['mando', 'Mando'], ['equipo', 'Equipo'], ['valor', 'Valor']].map(([k, l]) => `<button type="button" data-dir-pest="${k}" class="${_dirPest === k ? 'act' : ''}">${l}</button>`).join('')}</div>`;
-  if(_dirPest === 'equipo'){ app0.innerHTML = pest + '<div id="eq-app"></div>'; if(_eq) eqPintar(); else eqCargar(); return; }
+  const pest = `<div class="dir-pest">${[['mando', 'Mando'], ['valor', 'Valor']].map(([k, l]) => `<button type="button" data-dir-pest="${k}" class="${_dirPest === k ? 'act' : ''}">${l}</button>`).join('')}</div>`;
+  if(_dirPest === 'equipo') _dirPest = 'mando';   // V8.42: Equipo está ahora en Empresa › Personal
   if(_dirPest === 'valor'){ app0.innerHTML = pest + '<div id="vl-app"></div>'; if(_vl) vlPintar(); else vlCargar(); return; }
   app0.innerHTML = pest + '<div id="dir-mando"></div>'; const app = document.getElementById('dir-mando');
   const d = _dirDatos; if(!d){ app.innerHTML = '<div class="ce-nota">Todavía no hay datos de Dirección.</div>'; return; }
@@ -13859,24 +13866,61 @@ async function renderPersonalEmpresa(){
     const avisos = [est(p.dni_caduca, 'DNI'), p.carnet ? est(p.carnet.caduca, 'Carnet') : ''].filter(Boolean);
     return `<button type="button" class="per-card" onclick="abrirFichaPersona('${k}')"><div class="per-av">${escHtml((p.nombre || '?').charAt(0))}</div><div class="per-c"><b>${escHtml(p.nombre || k)}</b><i>${escHtml(p.rol || '')}</i>${avisos.map(a => `<span class="per-mal">${a}</span>`).join('')}</div><span class="per-flecha">›</span></button>`; }).join('')}</div>`;
 }
+let _perFicha = null, _perTab = 'resumen';
+function perTodas(){   // las personas del equipo (Personal) con sus datos de DNI y carnet
+  const A = (_flAsis && _flAsis.personas) || _perData || {}, E = (typeof _eq !== 'undefined' && _eq && _eq.personas) || [];
+  const ids = [...new Set(E.map(p => p.id).concat(Object.keys(A)))];
+  return ids.map(id => { const e = E.find(p => p.id === id) || {}, a = A[id] || {}; return {id, ...a, nombre: a.nombre || e.nombre || id, rol: e.rol || a.rol || '', niveles: e.niveles}; });
+}
+function perVehiculos(k){   // vehículos de los que es titular (según el permiso de circulación de su ficha)
+  const todos = [].concat(typeof fleet !== 'undefined' ? fleet : [], typeof flotaParticular !== 'undefined' ? flotaParticular : []);
+  return todos.filter(m => { const t = (String(m.fichaTecnica || '').match(/(?:^|\n)\s*(?:Titular(?: del permiso)?(?: \([^)]*\))?|Propietario)\s*:\s*([^\n]+)/i) || [])[1] || ''; return t && flClavePersona(t.split(/[—;(]/)[0]) === k; });
+}
+function perSeguros(k){   // seguros de los que es titular (Asistencia), con su vehículo, compañía, póliza y coste
+  const A = (_flAsis && _flAsis.aseguradoras) || {}, out = [], todos = [].concat(typeof fleet !== 'undefined' ? fleet : [], typeof flotaParticular !== 'undefined' ? flotaParticular : []);
+  ((_flAsis && _flAsis.vehiculos) || []).forEach(v => (v.seguros || []).forEach(sg => { if(sg.titular !== k) return; const m = todos.find(x => x.id === v.flota_id) || {}, pz = ((_flAsis && _flAsis.polizas) || []).find(x => x.flota_id === v.flota_id && String(x.numero_poliza || '').replace(/\D/g, '').slice(0, 6) === String(sg.poliza || '').replace(/\D/g, '').slice(0, 6));
+    out.push({veh: m.name || m.modelo || v.nombre || '', vid: v.flota_id, cia: (A[sg.aseg] || {}).nombre || sg.aseg, poliza: sg.poliza, desde: sg.desde, hasta: sg.hasta, coste: pz ? (pz.coste_anual || pz.prima_ultimo_recibo) : null}); }));
+  return out;
+}
 async function abrirFichaPersona(k){
-  const P = _perData || await perCargar(), p = P[k]; if(!p) return;
-  const kv = pares => `<div class="per-kv">${pares.map(([a, b, extra]) => `<div><span>${escHtml(a)}</span><b>${b ? escHtml(b) : '<em class="per-falta">Falta</em>'}</b>${extra || ''}</div>`).join('')}</div>`;
-  const docs = perDocs(p), fotos = [];
+  if(!_flAsis) await flAsisCargar(); if(typeof _eq !== 'undefined' && !_eq){ try{ const {data} = await sb.from('sistema').select('id, data').eq('tipo', 'equipo').eq('data->>clave', 'equipo:niveles').limit(1).maybeSingle(); if(data){ _eq = data.data; _eqId = data.id; } }catch(e){} }
+  _perFicha = k; _perTab = 'resumen';
+  let ov = document.getElementById('per-overlay'); if(!ov){ ov = document.createElement('div'); ov.id = 'per-overlay'; ov.className = 'fl-overlay'; document.body.appendChild(ov); }
+  ov.classList.add('abierto'); perPintarFicha();
+}
+function perTabFicha(t){ _perTab = t; perPintarFicha(); }
+function perCerrarFicha(){ document.getElementById('per-overlay')?.classList.remove('abierto'); _perFicha = null; }
+function perPintarFicha(){
+  const ov = document.getElementById('per-overlay'); if(!ov || !_perFicha) return;
+  const p = perTodas().find(x => x.id === _perFicha) || {id: _perFicha, nombre: _perFicha}, k = _perFicha;
+  const veh = perVehiculos(k), seg = perSeguros(k), docs = perDocs(p), fotos = [];
   docs.forEach(d => { (Array.isArray(d.archivos) && d.archivos.length ? d.archivos : (d.archivo_url ? [{url: d.archivo_url, nombre: d.nombre}] : [])).forEach(a => fotos.push({u: a.url, t: d.nombre + (a.nombre && a.nombre !== d.nombre ? ' · ' + a.nombre : '')})); });
-  const html = `<div class="per-ficha">
-    <h4>Datos personales</h4>${kv([['Nombre', p.nombre], ['DNI', p.dni], ['Nacimiento', p.nacimiento], ['Domicilio', p.domicilio], ['Papel en la empresa', p.rol]])}
-    <h4>DNI</h4>${kv([['Número', p.dni], ['Válido hasta', p.dni_caduca, perEstadoFecha(p.dni_caduca)]])}
-    <h4>Carnet de conducir</h4>${kv([['Permisos', p.carnet && p.carnet.permisos], ['Expedido', p.carnet && p.carnet.expedido], ['Caduca', p.carnet && p.carnet.caduca, p.carnet ? perEstadoFecha(p.carnet.caduca) : '']])}
-    <h4>Documentos · ${fotos.length}</h4>${fotos.length ? `<div class="per-docs">${fotos.map(f => `<a href="${escHtml(f.u)}" target="_blank" rel="noopener" class="per-doc"><span class="nm">${escHtml(f.t)}</span></a>`).join('')}</div>` : '<div class="per-falta">Falta: ningún documento subido</div>'}
-  </div>`;
-  mostrarModalGenerico(p.nombre || 'Persona', html);
+  const F = v => v || 'Falta';
+  const tabs = [['resumen', 'Resumen'], ['docs', 'Documentos'], ['veh', 'Vehículos'], ['seg', 'Seguros']], cnt = {docs: fotos.length, veh: veh.length, seg: seg.length};
+  let h = '';
+  if(_perTab === 'resumen'){
+    h += `<div class="fl-sec"><h4>Datos personales</h4>${flKvHtml([['Nombre', F(p.nombre)], ['DNI', F(p.dni)], ['Nacimiento', F(p.nacimiento)], ['Domicilio', F(p.domicilio)], ['Papel en la empresa', F(p.rol)]])}</div>`;
+    h += `<div class="fl-sec"><h4>DNI</h4>${flKvHtml([['Número', F(p.dni)], ['Válido hasta', F(p.dni_caduca)]])}${perEstadoFecha(p.dni_caduca)}</div>`;
+    h += `<div class="fl-sec"><h4>Carnet de conducir</h4>${p.carnet ? flKvHtml([['Permisos', F(p.carnet.permisos)], ['Expedido', F(p.carnet.expedido)], ['Caduca', F(p.carnet.caduca)]]) + perEstadoFecha(p.carnet.caduca) : '<div class="fl-falta" style="margin-top:0;">Falta: datos del carnet de conducir</div>'}</div>`;
+    h += `<div class="fl-sec"><h4>Resumen</h4>${flKvHtml([['Vehículos a su nombre', String(veh.length)], ['Seguros a su nombre', String(seg.length)], ['Coste de sus seguros', seg.some(x => x.coste) ? seg.reduce((a, x) => a + (Number(x.coste) || 0), 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' € al año' : '—'], ['Documentos', String(fotos.length)]])}</div>`;
+  } else if(_perTab === 'docs'){
+    h += fotos.length ? `<div class="fl-sec"><h4>Documentos · ${fotos.length}</h4><div class="per-docs">${fotos.map(f => `<a href="${escHtml(f.u)}" target="_blank" rel="noopener" class="per-doc"><span class="nm">${escHtml(f.t)}</span></a>`).join('')}</div></div>` : '<div class="fl-sec"><div class="fl-falta" style="margin-top:0;">Falta: ningún documento suyo (DNI, carnet…)</div></div>';
+  } else if(_perTab === 'veh'){
+    h += veh.length ? veh.map(m => `<button type="button" class="fl-card" onclick="perCerrarFicha();abrirFichaMaquina('${m.id}')"><div class="fl-ico ${flIcoClase(m)}">${flIcono(m)}</div><div style="flex:1;min-width:0;"><div class="fl-nombre">${flE(m.modelo || m.name)}</div><div class="fl-fila">${m.matricula ? `<span class="fl-placa">${flE(m.matricula)}</span>` : ''}<span class="fl-chip">${flE(m.clase || m.type || '')}</span></div></div></button>`).join('') : '<div class="fl-sec"><div class="fl-vacio">No consta como titular de ningún vehículo.</div></div>';
+  } else {
+    h += seg.length ? seg.map(x => `<div class="fl-sec"><h4>${flE(x.veh || 'Vehículo')}</h4>${flKvHtml([['Compañía', x.cia], ['Póliza', F(x.poliza)], ['Coste', x.coste ? Number(x.coste).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' € al año' : 'Falta']].concat(x.desde ? [['Empieza', x.desde.split('-').reverse().join('/')]] : []).concat(x.hasta ? [['Baja prevista', x.hasta.split('-').reverse().join('/')]] : []))}</div>`).join('') : '<div class="fl-sec"><div class="fl-vacio">No consta como titular de ningún seguro.</div></div>';
+  }
+  ov.innerHTML = `<div class="fl-cab"><div class="fl-cab-top"><div class="fl-ico per-av-ico">${escHtml((p.nombre || '?').charAt(0))}</div><div class="fl-cab-tit"><div class="fl-nombre">${flE(p.nombre)}</div><div class="fl-fila" style="margin-top:4px;"><span style="font-size:12px;color:var(--ink-soft);">${flE(p.rol || '')}</span></div></div><button type="button" class="fl-ib" title="Cerrar" aria-label="Cerrar" onclick="perCerrarFicha()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div><div class="fl-tabs">${tabs.map(([t, l]) => `<button type="button" class="fl-tab ${t === _perTab ? 'act' : ''}" onclick="perTabFicha('${t}')">${l}${cnt[t] ? `<b>${cnt[t]}</b>` : ''}</button>`).join('')}</div></div><div class="fl-cuerpo">${h}</div>`;
 }
 window.abrirFichaPersona = abrirFichaPersona;
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-emp-pest]'); if(!b) return;   // V8.42: Empresa › Documentos / Personal
+  document.querySelectorAll('#emp-pest [data-emp-pest]').forEach(x => x.classList.toggle('act', x === b));
+  const per = b.dataset.empPest === 'personal'; document.getElementById('emp-docs-wrap').style.display = per ? 'none' : ''; document.getElementById('emp-personal-wrap').style.display = per ? '' : 'none';
+  { const qa = document.querySelector('#view-empresa .quickactions'); if(qa) qa.style.display = per ? 'none' : ''; }
+  if(per){ if(!_flAsis) flAsisCargar(); if(typeof _eq !== 'undefined' && _eq) eqPintar(); else eqCargar(); } });
 function renderDocsEmpresa(){
   const cont = document.getElementById('empresa-docs-cards');
   if(!cont) return;
-  try{ renderPersonalEmpresa(); }catch(e){}
   // pestañas por tipo de documento (con cuántos hay) y buscador: la lista deja de ser un solo montón
   const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const cats = {}; EMPRESA_DOCS.forEach(d => { const k = (d.categoria || 'Sin tipo').trim(); cats[k] = (cats[k] || 0) + 1; });
