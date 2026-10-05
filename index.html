@@ -1402,6 +1402,10 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 #cal3-app .c3-dia span.c3-chip.cont-izq{margin-left:-4px !important;}
 #cal3-app .c3-dia span.c3-chip.cont-der{margin-right:-4px !important;}
 #cal3-app .c3-nav-ab{padding-right:64px;}
+/* V8.32 (reporte de Daniel: «nada en minúscula cuando la primera debe ir en mayúscula»): datos, etiquetas, chips y líneas empiezan con mayúscula en toda la web */
+.fl-kv-i b, .fl-kv-i span, .fl-doc .nm{display:block;}
+.fl-kv-i b::first-letter, .fl-kv-i span::first-letter, .fl-nota::first-letter, .fl-aviso-lin::first-letter, .fl-chip::first-letter, .fl-chips span::first-letter, .rec-lista li::first-letter, .rec-fila span::first-letter, .ct-g2::first-letter, .ct-g3::first-letter, .fl-doc .nm::first-letter, .gr-cob::first-letter, .fl-falta::first-letter{text-transform:uppercase;}
+.fl-chips span{display:inline-block;}
 /* V8.10 Economía rediseñada */
 .e2-hb{all:unset;cursor:pointer;display:block;width:100%;}
 .e2-hero .row button{all:unset;cursor:pointer;flex:1;}
@@ -4282,7 +4286,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.31</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.32</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4373,7 +4377,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.31</div>
+        <div class="sub" id="version-badge">V8.32</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8506,9 +8510,9 @@ function c3Pintar(){
   const hoy = c2Hoy(), hoyIso = c2Iso(hoy), base = new Date(hoy.getFullYear(), hoy.getMonth() + _c3Mes, 1);
   const ini = new Date(base); ini.setDate(1 - ((base.getDay() + 6) % 7));
   const PD = c3PorDia(), COL = c3Colores(), semanas = [];
-  for(let w = 0; w < 6; w++){ const fila = []; for(let k = 0; k < 7; k++){ const d = new Date(ini); d.setDate(ini.getDate() + w * 7 + k); fila.push(d); } if(w > 3 && fila.every(d => d.getMonth() !== base.getMonth())) break; semanas.push(fila); }
+  for(let w = 0; w < 6; w++){ const fila = []; for(let k = 0; k < 7; k++){ const d = new Date(ini); d.setDate(ini.getDate() + w * 7 + k); fila.push(d); } /* V8.32 (Daniel: «no quiero que el calendario cambie de tamaño al pasar de mes»): siempre 6 semanas */ semanas.push(fila); }
   const preg = c3Cola().filter(j => { const o = c3Ocupa(j); if(!o.length) return false; const u = o[o.length - 1]; return u < hoyIso || (u === hoyIso && new Date().getHours() >= 15); }).sort((a, b) => c3Ocupa(a).slice(-1)[0].localeCompare(c3Ocupa(b).slice(-1)[0]))[0];
-  const sin = c3Sin();
+  const sinTodos = c3Sin(), sin = tbFiltrar(sinTodos);   // V8.32: «Sin día» con los mismos filtros que la Lista
   const libresMes = semanas.flat().filter(d => d.getMonth() === base.getMonth() && c2Laborable(d) && c2Iso(d) >= hoyIso && !PD[c2Iso(d)]).length;
   app.innerHTML = `
     ${preg ? `<div class="c3-q"><small>Pregunta del día</small><h2>¿Terminasteis ${escHtml(c3Nom(preg))}${preg.trabajo && preg.cliente ? ' · ' + escHtml(tbMay(preg.trabajo)) : ''}?</h2>
@@ -8525,12 +8529,13 @@ function c3Pintar(){
         const lun = new Date(d); lun.setDate(d.getDate() - ((d.getDay() + 6) % 7));
         return `<span data-run="${x.j.id}|${c2Iso(lun)}" class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}${ci ? ' cont-izq' : ''}${cd ? ' cont-der' : ''}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${ci ? '&nbsp;' : `<i class="c3-txt" style="--n:${n}">${escHtml(c3Texto(x.j))}</i>`}</span>`; }).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '')}</div>`; }).join('')}</div>
     <div class="c3-nav-ab"><div class="c3-mes-ab"><b>${MESES_LARGOS[base.getMonth()].replace(/^./, c => c.toUpperCase())} ${base.getFullYear()}</b><span>${libresMes} día${libresMes === 1 ? '' : 's'} libre${libresMes === 1 ? '' : 's'}</span></div>${_c3Mes ? '<button type="button" class="hoy" data-c3-mes="0">Hoy</button>' : ''}<button type="button" data-c3-mes="-1" aria-label="Mes anterior">‹</button><button type="button" data-c3-mes="1" aria-label="Mes siguiente">›</button></div>
-    <div class="c3-ley"><span><i style="background:#eef6e6;border:1px solid #cfe5b8"></i>Libre</span><span>Cada trabajo, su color</span><span><b class="c3-urg">!</b>Urgente</span><span>Toca un trabajo para darle más o menos días · mantén pulsado para moverlo</span></div>
     <div class="c3-tray-zona"><div class="c3-tray-cab"><b>Sin día</b><span>${sin.length} trabajo${sin.length === 1 ? '' : 's'}</span></div>
-    <div class="c3-tray-ayuda">Mantén pulsado y arrástralo a un día, o tócalo y luego toca el día. Para quitarle el día a uno, arrástralo aquí.</div>
+    <div class="tb-filtros2" id="c3-filtros"></div>
     <div class="c3-tray">${sin.map(j => `<div class="c3-card${_c3Colocar === j.id ? ' sel' : ''}" data-c3-card="${j.id}" style="border-left-color:${C3_COL[j.prioridad] || '#2B5C8F'}"><b>${escHtml(c3Nom(j))}</b><span>${escHtml(tbMay(j.trabajo && j.cliente ? j.trabajo : ''))}${j.trabajo && j.cliente ? ' · ' : ''}${tbN(c3Dias(j))} d · ${tbMaquinas(j).map(m => eqIco(m, 'mini')).join('')}</span></div>`).join('') || '<div class="c3-vacio">Todos los trabajos tienen día</div>'}</div>
     </div>${sin.length ? '<button type="button" class="c3-auto" data-c3-auto>Ponerles día automáticamente, por prioridad</button>' : ''}`;
   requestAnimationFrame(c3AjustarTextos);
+  tbRenderFiltros(sinTodos, 'c3-filtros');
+  const cf = document.getElementById('c3-filtros'); if(cf && !cf.dataset.ok){ cf.dataset.ok = '1'; cf.addEventListener('click', tbClicFiltro); }
 }
 function c3Hoja(html){ c2Hoja(html); }
 // una máquina no puede estar en dos sitios a la vez: hay 2 mixtas, 1 giratoria, 1 niveladora y 1 camión
@@ -22773,8 +22778,8 @@ function tbOpcionesFiltro(g, todos){   // los valores que hay en esta vista, con
   return tbOrdenValores(g, [...presentes]).map(v => ({v, n: cuenta[v] || 0}));
 }
 const TB_ORDEN_CAB = ['dificultad', 'tiempo', 'maquina', 'lugar'];   // orden fijo de las cabeceras de arriba: ninguna cambia de sitio al abrir o cerrar otra
-function tbRenderFiltros(todos){
-  const cont = document.getElementById('tb-filtros2'); if(!cont) return;
+function tbRenderFiltros(todos, idCont){
+  const cont = document.getElementById(idCont || 'tb-filtros2'); if(!cont) return;
   // con un solo valor no hay nada que filtrar (salvo que ya haya algo elegido): ese grupo no sale
   const ops = {}, visibles = TB_ORDEN_CAB.filter(g => { ops[g] = tbOpcionesFiltro(g, todos); return ops[g].length >= 2 || _tbFil[g].length; });
   _tbPleg = _tbPleg.filter(g => TB_GRUPOS.includes(g));
@@ -22799,7 +22804,7 @@ function tbClicFiltro(ev){
   const b = ev.target.closest('button[data-g]'); if(!b) return;
   if(b.dataset.g === 'todos'){ Object.keys(_tbFil).forEach(g => { if(_tbFil[g].length){ _tbFil[g] = []; tbGuardarFiltro(g); } }); }
   else { const g = b.dataset.g, v = b.dataset.v, i = _tbFil[g].indexOf(v); if(i >= 0) _tbFil[g].splice(i, 1); else _tbFil[g].push(v); tbGuardarFiltro(g); }
-  tbRender();
+  tbRender(); if(document.getElementById('cal3-app')?.offsetParent) c3Pintar();   // V8.32: los filtros son los mismos en Lista y en «Sin día» del calendario
 }
 async function tbGuardarPlegados(){
   if(!sb) return;
