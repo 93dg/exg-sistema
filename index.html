@@ -1319,6 +1319,11 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .as-sintit{font-size:13px;font-weight:800;margin:10px 2px 6px;}
 .as-fuente{font-size:10px;color:var(--ink-soft);margin:8px 2px 0;}
 
+.sal-card{background:var(--asphalt);color:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;}
+.sal-card span{display:block;font-size:12px;font-weight:700;color:rgba(255,255,255,.75);}
+.sal-card b{display:block;font-size:30px;font-weight:800;letter-spacing:-.5px;margin:2px 0;}
+.sal-card i{display:block;font-style:normal;font-size:12px;color:rgba(255,255,255,.85);}
+.sal-card small{display:block;font-size:10.5px;color:rgba(255,255,255,.55);margin-top:6px;}
 /* V7.92 Dirección › Valor */
 .vl-hero{background:var(--asphalt);color:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;}
 .vl-ht{font-size:13px;font-weight:800;color:rgba(255,255,255,.8);display:flex;align-items:center;gap:6px;}
@@ -4137,7 +4142,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.07</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.08</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4227,7 +4232,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.07</div>
+        <div class="sub" id="version-badge">V8.08</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5543,6 +5548,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 
       <!-- RESUMEN -->
       <div class="sub-view" id="econ-resumen">
+        <div id="econ-saldo"></div>
         <div class="kpi-strip">
           <div class="kpi"><div class="lbl">Facturado mes</div><div class="val" id="resumen-facturado">0,00 €</div></div>
           <div class="kpi"><div class="lbl">Cobrado mes</div><div class="val green" id="resumen-cobrado">0,00 €</div></div>
@@ -8488,6 +8494,56 @@ document.addEventListener('click', async e => { const b = e.target.closest && e.
   const {error} = await sb.from('sistema').update({data: _asis}).eq('id', _asisId); mostrarToast(error ? 'No se pudo guardar' : 'Póliza guardada', error ? 'err' : 'ok'); }, true);
 // V8.02: también al volver a Flota con Asistencia como última subpestaña (se restaura sin clic del usuario)
 new MutationObserver(() => { const v = document.getElementById('flota-asistencia'); if(v && v.style.display !== 'none' && v.offsetParent && !document.querySelector('#fl-asis .as-lista, #fl-asis .fl-vacio')) asisCargar(); }).observe(document.getElementById('flota-asistencia') || document.body, {attributes: true, attributeFilter: ['style']});
+// ===== V8.08 DINERO EN CUENTA (reporte de Daniel: «calcularlo con los movimientos del correo; Fintable se mira una vez y desde ahí ya no,
+// para ver si es prescindible»). Los avisos de Ruralvía (abono, cargo, recibos, préstamo, tarjeta) traen el importe y casi todos el saldo.
+// Se guardan en Sistema (tipo=alerta_banco) y el saldo es el del último aviso; si no hay avisos más nuevos, el último de Fintable
+let _saldoSync = false;
+const saldoNum = t => Number(String(t).replace(/\./g, '').replace(',', '.'));
+function saldoParsear(asunto, texto){
+  const t = String(texto || '').replace(/\s+/g, ' '), a = String(asunto || '').toLowerCase();
+  const tipo = /abono/.test(a) ? 'abono' : /pr[eé]stamo/.test(a) ? 'prestamo' : /recibo/.test(a) ? 'recibo' : /tarjeta/.test(a) ? 'tarjeta' : /cargo/.test(a) ? 'cargo' : null;
+  if(!tipo) return null;
+  const f = t.match(/(\d{2})-(\d{2})-(\d{4})/), imp = t.match(/importe de (-?[\d.]+,\d{2}) ?EUR/i) || t.match(/compra de (-?[\d.]+,\d{2}) ?EUR/i), sal = t.match(/saldo actual es(?: de)? (-?[\d.]+,\d{2}) ?EUR/i);
+  if(!imp) return null;
+  let importe = Math.abs(saldoNum(imp[1])); if(tipo !== 'abono') importe = -importe;
+  const conc = tipo === 'recibo' ? (t.match(/recibo de (.+?) en su cuenta/i) || [])[1] : tipo === 'tarjeta' ? (t.match(/ en (.+?)\. Quedamos/i) || [])[1] : null;
+  return {tipo, fecha: f ? `${f[3]}-${f[2]}-${f[1]}` : null, importe, saldo: sal ? saldoNum(sal[1]) : null, concepto: conc || null, cuenta: (t.match(/\*\*(\d{4})/) || [])[1] || null};
+}
+async function saldoSincronizar(){   // lee los avisos nuevos de Ruralvía del correo de la empresa (sin abrir nada si Gmail no está conectado)
+  if(_saldoSync || !sb) return false; _saldoSync = true;
+  try{
+    if(!(await asegurarTokenGmail())) return false;
+    const lista = await gmailApi(`messages?q=${encodeURIComponent('from:ruralvia@cajarural.com newer_than:45d')}&maxResults=100`);
+    const ids = (lista.messages || []).map(m => m.id); if(!ids.length) return false;
+    const {data: ya} = await sb.from('sistema').select('data->>msg_id').eq('tipo', 'alerta_banco');
+    const hechos = new Set((ya || []).map(r => r.msg_id)), nuevos = ids.filter(id => !hechos.has(id));
+    const filas = [];
+    for(const id of nuevos.slice(0, 40)){
+      try{ const m = await gmailApi(`messages/${id}?format=full`); const h = (m.payload && m.payload.headers) || [], asunto = (h.find(x => /^subject$/i.test(x.name)) || {}).value || '';
+        const c = extraerCuerpoMensaje(m.payload); const txt = c.tipo === 'html' ? String(c.contenido).replace(/<[^>]+>/g, ' ') : c.contenido;
+        const p = saldoParsear(asunto, txt); if(p) filas.push({tipo: 'alerta_banco', data: {msg_id: id, ts: new Date(Number(m.internalDate)).toISOString(), ...p}}); }catch(e){ console.warn('Aviso del banco', id, e); }
+    }
+    if(filas.length){ const {error} = await sb.from('sistema').insert(filas); if(error) console.warn(error); }
+    return filas.length > 0;
+  }catch(e){ console.warn('Saldo desde el correo:', e); return false; }
+  finally{ _saldoSync = false; }
+}
+async function saldoPintar(){
+  const box = document.getElementById('econ-saldo'); if(!box || !sb) return;
+  let av = null, fin = null, n = 0;
+  try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').not('data->>saldo', 'is', null).order('data->>ts', {ascending: false}).limit(1); av = data && data[0] ? data[0].data : null;
+    const {count} = await sb.from('sistema').select('id', {count: 'exact', head: true}).eq('tipo', 'alerta_banco'); n = count || 0; }catch(e){}
+  try{ const {data} = await sb.from('movimientos_banco').select('fecha, saldo').not('saldo', 'is', null).order('fecha', {ascending: false}).order('orden', {ascending: true}).limit(1); fin = data && data[0]; }catch(e){}
+  const eur = v => Number(v).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  const cuando = iso => { const d = new Date(iso); return DIAS_SEMANA_CORTOS[(d.getDay() + 6) % 7].toLowerCase() + ' ' + d.getDate() + ' ' + MESES_CORTOS[d.getMonth()] + ' · ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  const usarAv = av && (!fin || av.ts.slice(0, 10) >= fin.fecha);
+  if(!usarAv && !fin){ box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="sal-card"><span>Dinero en cuenta</span><b>${eur(usarAv ? av.saldo : fin.saldo)}</b>
+    <i>${usarAv ? 'Aviso del banco · ' + cuando(av.ts) : 'Fintable · ' + fin.fecha.split('-').reverse().join('/')}</i>
+    <small>${n} aviso${n === 1 ? '' : 's'} del banco leídos del correo${fin ? ' · Fintable: último dato del ' + fin.fecha.split('-').reverse().join('/') : ''}</small></div>`;
+}
+async function saldoCargar(){ await saldoPintar(); if(await saldoSincronizar()) await saldoPintar(); }
+document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('.nav [data-view="economia"], [data-gtab="economia"], #econ-subtabs [data-sub="resumen"]'); if(t) setTimeout(saldoCargar, 80); }, true);
 // V7.81 DIRECCIÓN (Daniel 04/10/2026: «una sección nueva en la web»): por ahora enseña el diagnóstico guardado en Sistema (tipo=direccion,
 // clave direccion:diagnostico). Cada apartado es una tarjeta plegable; la primera sale abierta. El texto va en markdown sencillo
 // (párrafos, **negrita**, listas, listas numeradas, casillas «- [ ]» y tablas con |)
