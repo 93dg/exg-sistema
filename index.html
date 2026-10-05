@@ -1329,6 +1329,10 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .vf-card b{display:block;font-size:24px;font-weight:800;letter-spacing:-.3px;margin:2px 0;}
 .vf-card i{display:block;font-style:normal;font-size:11.5px;color:var(--ink-soft);}
 .fl-chip.venta{background:#eef6e6;color:#27500A;border-color:#cfe5b8;font-weight:700;}
+.fl-falta{margin-top:8px;font-size:12.5px;font-weight:700;color:#854F0B;background:#fbf2df;border-radius:10px;padding:7px 10px;}
+.fl-ret{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;}
+.fl-ret a{font-weight:700;color:var(--ink);text-decoration:none;flex:0 0 auto;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fl-ret span{flex:1;min-width:0;color:var(--ink-soft);font-size:11.5px;}
 /* V8.10 Economía rediseñada */
 .e2-hb{all:unset;cursor:pointer;display:block;width:100%;}
 .e2-hero .row button{all:unset;cursor:pointer;flex:1;}
@@ -4209,7 +4213,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.16</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.17</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4299,7 +4303,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.16</div>
+        <div class="sub" id="version-badge">V8.17</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -17045,7 +17049,8 @@ document.getElementById('fleet-grid').innerHTML = fleet.map(m=>`
 /* ===== FLOTA: la ficha de cada máquina como ficha clara por secciones =====
    El texto de la ficha técnica (campo ficha_tecnica) se reparte en secciones: Resumen, Técnica, ITV, Seguro, Impuestos, Docs y Notas.
    Nada se descarta: lo que no encaja en ningún sitio va a "Otros datos" y el texto original completo está siempre en Notas. */
-const FL_TABS = [['resumen', 'Resumen'], ['tecnica', 'Técnica'], ['itv', 'ITV'], ['seguro', 'Seguro'], ['impuestos', 'Impuestos'], ['docs', 'Docs'], ['notas', 'Notas']];
+// V8.17 (Daniel: «está mal organizado»): Técnica e ITV juntas, Permiso aparte, sin pestaña Docs (cada documento en su pestaña)
+const FL_TABS = [['resumen', 'Resumen'], ['permiso', 'Permiso'], ['tecnica', 'Técnica e ITV'], ['seguro', 'Seguro'], ['impuestos', 'Impuestos'], ['mant', 'Mantenimiento'], ['notas', 'Notas']];
 let _flTab = 'resumen', _flFichaId = null, _flItvTodo = false;
 const flE = s => escHtml(String(s == null ? '' : s));
 const flEur = n => Number(n).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';   // formatEur no existía en la web: por eso la pestaña Historial de Flota salía siempre vacía
@@ -17698,39 +17703,71 @@ function abrirFichaMaquina(id){
 })();
 function cerrarFichaMaquina(){ _flFichaId = null; document.getElementById('fl-overlay')?.classList.remove('abierto'); }
 function flCambiarTab(t){ _flTab = t; _flItvTodo = false; renderFichaMaquina(); const b = document.querySelector('#fl-overlay .fl-tab.act'); if(b && b.scrollIntoView) b.scrollIntoView({inline: 'center', block: 'nearest'}); const cu = document.querySelector('#fl-overlay .fl-cuerpo'); if(cu) cu.scrollTop = 0; }
-function flDocGrupo(n){
+function flDocGrupo(n, d){
+  if(d && d.grupo) return d.grupo;
   const s = String(n || '');
-  return /itv|inspecci/i.test(s) ? 'ITV' : /seguro|p[oó]liza|mapfre|allianz/i.test(s) ? 'Seguro' : /ivtm|impuesto/i.test(s) ? 'Impuestos' : /factura|taller|compra|venta/i.test(s) ? 'Facturas y taller' : /mantenimiento/i.test(s) ? 'Mantenimiento' : /ficha|permiso|marcado|conformidad|certificado/i.test(s) ? 'Identificación y fichas' : 'Otros';
+  return /permiso/i.test(s) ? 'Permiso' : /seguro|p[oó]liza|mapfre|allianz|generali|occident|g[eé]nesis/i.test(s) ? 'Seguro' : /ivtm|impuesto/i.test(s) ? 'Impuestos'
+    : /itv|inspecci|ficha|marcado|conformidad|certificado|homologaci/i.test(s) ? 'Técnica e ITV' : /mantenimiento|factura|taller|compra|repara/i.test(s) ? 'Mantenimiento' : 'Otros';
 }
-const FL_DOC_ORDEN = ['Identificación y fichas', 'ITV', 'Seguro', 'Impuestos', 'Facturas y taller', 'Mantenimiento', 'Otros'];
+const FL_DOC_ORDEN = ['Permiso', 'Técnica e ITV', 'Seguro', 'Impuestos', 'Mantenimiento', 'Otros'];
 function flDocsHtml(m, soloGrupo){
-  const docs = (m.documentos || []).map(d => ({...d, g: flDocGrupo(d.nombre)})).filter(d => !soloGrupo || d.g === soloGrupo);
+  const docs = (m.documentos || []).filter(d => !d.retirado).map(d => ({...d, g: flDocGrupo(d.nombre, d)})).filter(d => !soloGrupo || d.g === soloGrupo);
   if(!docs.length) return soloGrupo ? '' : '<div class="fl-vacio">Sin documentos adjuntos.</div>';
   const porG = {}; docs.forEach(d => { (porG[d.g] = porG[d.g] || []).push(d); });
-  return FL_DOC_ORDEN.filter(g => porG[g]).map(g => `<div class="fl-sec"><h4>${flE(g)} · ${porG[g].length}</h4><div class="fl-docs-g">${porG[g].map(d => `<a class="fl-doc" href="${flE(d.url)}" target="_blank" rel="noopener"><span class="ic">${/\.pdf/i.test(d.path || d.url || '') ? '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 14h6M9 17h4"/></svg>' : '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>'}</span><span class="nm">${flE(d.nombre)}</span>${d.origen === 'correo' ? '<span class="or">del correo</span>' : ''}<span class="x" title="Quitar" onclick="event.preventDefault();event.stopPropagation();borrarDocMaquina('${m.id}','${flE(d.path)}')">✕</span></a>`).join('')}</div></div>`).join('');
+  return FL_DOC_ORDEN.filter(g => porG[g]).map(g => `<div class="fl-sec"><h4>${soloGrupo ? 'Documentos' : flE(g)} · ${porG[g].length}</h4><div class="fl-docs-g">${porG[g].map(d => `<a class="fl-doc" href="${flE(d.url)}" target="_blank" rel="noopener"><span class="ic">${/\.pdf/i.test(d.path || d.url || '') ? '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 14h6M9 17h4"/></svg>' : '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>'}</span><span class="nm">${flE(d.nombre)}</span>${d.origen === 'correo' ? '<span class="or">del correo</span>' : ''}<span class="x" title="Quitar" onclick="event.preventDefault();event.stopPropagation();borrarDocMaquina('${m.id}','${flE(d.path)}')">✕</span></a>`).join('')}</div></div>`).join('');
 }
 function flKvHtml(pares, ancho){ return pares.length ? `<div class="fl-kv">${pares.map(([k, v]) => `<div class="fl-kv-i ${(ancho || !k || String(v).length > 48) ? 'ancho' : ''}">${k ? `<span>${flE(k)}</span>` : ''}<b>${flE(v)}</b></div>`).join('')}</div>` : ''; }
+// V8.17: titular del vehículo y del seguro, y teléfonos, en la ficha (datos de Flota › Asistencia)
+let _flAsis = null, _flAsisCargando = false;
+async function flAsisCargar(){ try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'asistencia_seguros').limit(1).maybeSingle(); _flAsis = data ? data.data : {}; }catch(e){ _flAsis = {}; } }
+function flPersonaDe(txt){ const P = (_flAsis && _flAsis.personas) || {}; if(/rafael/i.test(txt)) return P.rafa; if(/manuel|manolo/i.test(txt)) return P.manolo; return null; }
+function flTitularHtml(m){
+  const t = (String(m.fichaTecnica || '').match(/(?:^|\n)\s*(?:Titular(?: del permiso)?(?: \([^)]*\))?|Propietario)\s*:\s*([^\n]+)/i) || [])[1] || '';
+  if(!t) return '<div class="fl-sec"><h4>Titular del vehículo</h4><div class="fl-falta">Falta: no consta el titular en la ficha</div></div>';
+  const nombre = t.split(/[—;(]/)[0].replace(/,\s*$/, '').trim(), dir = (/—\s*([^;(]+)/.exec(t) || [])[1], p = flPersonaDe(nombre);
+  const pares = [['Nombre', p ? p.nombre : nombre]]; if(p && p.dni) pares.push(['DNI', p.dni]); if(p && p.nacimiento) pares.push(['Nacimiento', p.nacimiento]); if(dir) pares.push(['Dirección', dir.trim()]);
+  return `<div class="fl-sec"><h4>Titular del vehículo</h4>${flKvHtml(pares)}${!p ? '<div class="fl-falta">Falta: DNI y nacimiento del titular</div>' : ''}</div>`;
+}
+function flSeguroResumenHtml(m){
+  if(!_flAsis) return '';
+  const v = (_flAsis.vehiculos || []).find(x => x.flota_id === m.id); const A = _flAsis.aseguradoras || {}, P = _flAsis.personas || {};
+  if(!v || !(v.seguros || []).length) return '<div class="fl-sec"><h4>Seguro</h4><div class="fl-falta">Falta: no hay ningún seguro registrado</div></div>';
+  const fmtT = t => String(t).replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
+  return v.seguros.map(sg => { const a = A[sg.aseg] || {}, p = P[sg.titular];
+    const pares = [['Compañía', a.nombre || sg.aseg], ['Póliza', sg.poliza || 'falta']]; if(sg.desde) pares.push(['Desde', sg.desde]); if(sg.hasta) pares.push(['Hasta', sg.hasta]);
+    if(p) pares.push(['Titular del seguro', p.nombre], ['DNI', p.dni], ['Nacimiento', p.nacimiento]);
+    const tels = [a.tel ? `<a class="as-b p" href="tel:${a.tel}"><b>${fmtT(a.tel)}</b></a>` : '', a.tel2 ? `<a class="as-b" href="tel:${a.tel2}">${a.tel2_txt ? `<small>${flE(a.tel2_txt)}</small>` : ''}<b>${fmtT(a.tel2)}</b></a>` : ''].filter(Boolean);
+    return `<div class="fl-sec"><h4>Seguro${sg.hasta ? ' hasta ' + flE(sg.hasta) : sg.desde ? ' desde ' + flE(sg.desde) : ''}</h4>${flKvHtml(pares)}${!p ? '<div class="fl-falta">Falta: titular del seguro</div>' : ''}${/falta|incomplet/i.test(sg.poliza || 'falta') ? '<div class="fl-falta">Falta: número de póliza completo</div>' : ''}${tels.length ? `<div class="as-tels n${tels.length}" style="margin-top:8px;">${tels.join('')}</div>` : ''}</div>`; }).join('');
+}
+async function flRecuperarDoc(id, path){
+  const m = flBuscar(id); if(!m || !sb) return; const d = (m.documentos || []).find(x => x.path === path); if(!d) return;
+  delete d.retirado; delete d.motivo; await sb.from('flota').update({documentos: m.documentos}).eq('id', id); renderFichaMaquina(); mostrarToast('Documento recuperado', 'ok');
+}
 function renderFichaMaquina(){
   const ov = document.getElementById('fl-overlay'), m = flBuscar(_flFichaId); if(!ov || !m) return;
-  const R = flParsear(m.fichaTecnica, m.name), nd = (m.documentos || []).length;
-  const cnt = {itv: R.itv ? R.itv.items.length : 0, docs: nd, impuestos: R.impuestos.length};
+  if(_flTab === 'itv') _flTab = 'tecnica'; if(_flTab === 'docs') _flTab = 'notas';
+  if(!_flAsis && !_flAsisCargando){ _flAsisCargando = true; flAsisCargar().then(() => { _flAsisCargando = false; if(_flFichaId) renderFichaMaquina(); }); }
+  const R = flParsear(m.fichaTecnica, m.name), nd = (m.documentos || []).filter(d => !d.retirado).length;
+  const nG = g => (m.documentos || []).filter(d => !d.retirado && flDocGrupo(d.nombre, d) === g).length;
+  const cnt = {permiso: nG('Permiso'), tecnica: nG('Técnica e ITV'), seguro: nG('Seguro'), impuestos: nG('Impuestos'), mant: nG('Mantenimiento'), notas: nG('Otros')};
   const tabs = FL_TABS.map(([k, l]) => `<button type="button" class="fl-tab ${k === _flTab ? 'act' : ''}" onclick="flCambiarTab('${k}')">${l}${cnt[k] ? `<b>${cnt[k]}</b>` : ''}</button>`).join('');
   let h = '';
   if(_flTab === 'resumen'){
     if(R.proxima) h += `<div class="fl-itv-hero ${R.proxima.estado}"><div><div class="pq">${flE(R.proxima.base)}</div><div class="gr">${flE(R.proxima.txt.length ? String(R.proxima.f.getDate()).padStart(2, '0') + '/' + String(R.proxima.f.getMonth() + 1).padStart(2, '0') + '/' + R.proxima.f.getFullYear() : '')}</div></div><div class="pq" style="margin-left:auto;text-align:right;font-size:13px;">${flTextoDias(R.proxima.d)}</div></div>`;
     else h += `<div class="fl-itv-hero nd"><div><div class="pq">ITV</div><div class="gr" style="font-size:18px;">Sin fecha de próxima ITV</div></div></div>`;
     h += `<div class="fl-sec"><h4>Estado</h4><div class="fl-estado">${[['disponible', 'Operativa'], ['averiada', 'Averiada'], ['taller', 'En taller'], ['vendida', 'Vendida']].map(([k, l]) => `<button type="button" class="${(m.state === k || (k === 'disponible' && m.state === 'activo')) ? 'act' : ''}" onclick="flCambiarEstado('${m.id}', '${k}')">${l}</button>`).join('')}</div></div>`;
-    const tiles = (R.titulo ? [['Descripción', R.titulo]] : []).concat(flResumenPares(R)); const cia = flCompania(R);
-    if(cia) tiles.push(['Seguro', cia]);
-    if(R.ivtm) tiles.push(['IVTM ' + R.ivtm.anio, R.ivtm.importe + ' €' + (R.ivtm.pagado ? ' · pagado ' + R.ivtm.pagado : ' · sin pagar')]);
-    h += tiles.length ? `<div class="fl-sec"><h4>Datos clave</h4>${flKvHtml(tiles)}</div>` : (m.fichaTecnica ? '' : `<div class="fl-sec"><div class="fl-vacio">Sin ficha técnica todavía. Añádela en la pestaña Notas.</div></div>`);
+    h += flTitularHtml(m) + flSeguroResumenHtml(m, R);
+    const tiles = []; if(R.ivtm) tiles.push(['Impuesto ' + R.ivtm.anio, R.ivtm.importe + ' €' + (R.ivtm.pagado ? ' · pagado ' + R.ivtm.pagado : ' · sin pagar')]);
+    const vz = typeof _valFlota !== 'undefined' && _valFlota && _valFlota[m.id]; if(vz && vz.estimado) tiles.push(['Venta estimada', '≈ ' + Math.round(vz.estimado).toLocaleString('es-ES') + ' €']);
+    const tit = (R.titulo ? [['Descripción', R.titulo]] : []).concat(flResumenPares(R).filter(([k]) => !/titular|propietari/i.test(k)));
+    if(tiles.concat(tit).length) h += `<div class="fl-sec"><h4>Datos clave</h4>${flKvHtml(tiles.concat(tit))}</div>`;
     if(R.avisos.length) h += `<div class="fl-sec"><h4>Por revisar</h4>${R.avisos.map(a => `<div class="fl-aviso-lin">${flE(a)}</div>`).join('')}</div>`;
-    h += `<div class="fl-sec"><h4>Documentos</h4><div class="fl-vacio">${nd ? nd + ' adjuntos (ficha, permiso, ITV, seguro, impuestos, facturas…)' : 'Sin documentos adjuntos.'} <a href="#" onclick="flCambiarTab('docs');return false;" style="color:var(--orange);font-weight:700;">Ver</a></div></div>`;
   } else if(_flTab === 'tecnica'){
     const sec = (t, a) => a.length ? `<div class="fl-sec"><h4>${t}</h4>${flKvHtml(a)}</div>` : '';
-    h += sec('Identificación', (R.titulo ? [['Descripción', R.titulo]] : []).concat(R.ident)) + sec('Pesos y medidas', R.pesos) + sec('Motor', R.motor) + sec('Otros datos', R.otros);
+    h += sec('Identificación', (R.titulo ? [['Descripción', R.titulo]] : []).concat(R.ident.filter(([k]) => !/permiso|titular|propietari|servicio|expedi|domicilio/i.test(k)))) + sec('Pesos y medidas', R.pesos) + sec('Motor', R.motor) + sec('Otros datos', R.otros);
     if(!h) h = '<div class="fl-sec"><div class="fl-vacio">Sin datos técnicos en la ficha.</div></div>';
-  } else if(_flTab === 'itv'){
+  }
+  if(_flTab === 'tecnica'){   // V8.17: la ITV va dentro de Técnica
     const I = R.itv;
     if(R.proxima) h += `<div class="fl-itv-hero ${R.proxima.estado}"><div><div class="pq">${flE(R.proxima.base)}</div><div class="gr">${String(R.proxima.f.getDate()).padStart(2, '0')}/${String(R.proxima.f.getMonth() + 1).padStart(2, '0')}/${R.proxima.f.getFullYear()}</div></div><div class="pq" style="margin-left:auto;font-size:13px;">${flTextoDias(R.proxima.d)}</div></div>`;
     if(I && I.items.length){
@@ -17740,8 +17777,7 @@ function renderFichaMaquina(){
     const notas = I ? (I.cabecera ? [I.cabecera.replace(/^[()\s]+|[()\s:]+$/g, '')] : []).concat(I.notas) : [];
     const extra = [].concat(R.otros.filter(([k]) => /^itv$/i.test(k)).map(([k, v]) => k + ': ' + v));
     if(notas.concat(extra).length) h += `<div class="fl-sec"><h4>Notas de la ITV</h4>${notas.concat(extra).map(n => `<div class="fl-nota" style="margin-top:0;margin-bottom:6px;">${flE(n)}</div>`).join('')}</div>`;
-    h += flDocsHtml(m, 'ITV');
-    if(!h) h = '<div class="fl-sec"><div class="fl-vacio">Sin datos de ITV en la ficha.</div></div>';
+    h += flDocsHtml(m, 'Técnica e ITV');
   } else if(_flTab === 'seguro'){
     if(R.seguro){
       const L = R.seguro.lineas, lin = re => L.find(x => re.test(x)), cob = lin(/^Coberturas\s*:/i), pri = lin(/^Prima\s*:/i), seg = lin(/^Seguro\s*:/i);
@@ -17758,17 +17794,26 @@ function renderFichaMaquina(){
       if(cob) h += `<div class="fl-sec"><h4>Coberturas</h4><div class="fl-chips">${cob.replace(/^Coberturas\s*:\s*/i, '').split(/;\s*/).filter(Boolean).map(x => `<span>${flE(x.replace(/\.$/, ''))}</span>`).join('')}</div></div>`;
       if(otras.length) h += `<div class="fl-sec"><h4>Más datos</h4>${otras.map(x => `<div class="fl-nota" style="margin-top:0;margin-bottom:6px;">${flE(x)}</div>`).join('')}</div>`;
     } else h += '<div class="fl-sec"><div class="fl-vacio">Sin datos del seguro en la ficha.</div></div>';
-    h += flDocsHtml(m, 'Seguro');
+    h = flSeguroResumenHtml(m, R) + h + flDocsHtml(m, 'Seguro');
   } else if(_flTab === 'impuestos'){
     if(R.impuestos.length) h += R.impuestos.map(ls => { const pagado = /PAGADO/i.test(ls.join(' ')); return `<div class="fl-sec"><h4>${/^IVTM\s*[—-]/i.test(ls[0]) ? 'Pagos registrados' : 'Impuesto de vehículos (IVTM)'}${pagado ? ' · <span style="color:var(--green);">pagado</span>' : ''}</h4><div style="font-weight:700;font-size:14px;line-height:1.35;">${flE(ls[0])}</div>${ls.slice(1).map(x => `<div class="fl-nota" style="margin-top:6px;">${flE(x)}</div>`).join('')}</div>`; }).join('');
     else h += '<div class="fl-sec"><div class="fl-vacio">Sin datos de impuestos en la ficha.</div></div>';
     h += flDocsHtml(m, 'Impuestos');
-  } else if(_flTab === 'docs'){
-    h += flDocsHtml(m) + `<label class="btn primary" style="cursor:pointer;display:flex;justify-content:center;margin-top:4px;">📎 Adjuntar documento<input type="file" accept="image/*,application/pdf" style="display:none;" onchange="subirDocMaquina('${m.id}',this)"></label><div class="sub-t" id="mq-status-${m.id}" style="margin-top:6px;"></div>`;
-  } else {
+  } else if(_flTab === 'permiso'){
+    const per = R.ident.filter(([k]) => /permiso|matricul|servicio|expedi|bastidor|identificaci/i.test(k));   // el titular ya va arriba, en su bloque
+    h += flTitularHtml(m) + (per.length ? `<div class="fl-sec"><h4>Permiso de circulación</h4>${flKvHtml(per)}</div>` : '<div class="fl-sec"><div class="fl-vacio">Sin datos del permiso en la ficha.</div></div>') + flDocsHtml(m, 'Permiso');
+  } else if(_flTab === 'mant'){
+    if(m.notas_historial) h += `<div class="fl-sec"><h4>Reparaciones e historial</h4>${recDetalleHtml(m.notas_historial)}</div>`;
+    h += flDocsHtml(m, 'Mantenimiento');
+    if(!h) h = '<div class="fl-sec"><div class="fl-vacio">Sin reparaciones ni facturas de taller todavía.</div></div>';
+  } else if(_flTab === 'notas'){
+    h += flDocsHtml(m, 'Otros');
+    const ret = (m.documentos || []).filter(d => d.retirado);
+    if(ret.length) h += `<div class="fl-sec"><h4>Retirados · ${ret.length}</h4><div class="fl-vacio" style="margin-bottom:6px;">Repetidos o peor versión de otro documento. No se han borrado.</div>${ret.map(d => `<div class="fl-ret"><a href="${flE(d.url)}" target="_blank" rel="noopener">${flE(d.nombre)}</a><span>${flE(d.motivo || '')}</span><button type="button" class="btn sm" onclick="flRecuperarDoc('${m.id}', '${flE(d.path)}')">Recuperar</button></div>`).join('')}</div>`;
     h += `<div class="fl-sec"><h4>Editar</h4><div class="field" style="margin-bottom:10px;"><div class="l">Nombre de la máquina</div><input class="search-box" style="width:100%;" id="mq-nombre-${m.id}" value="${flE(m.name)}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Modelo (sale arriba en la tarjeta)</div><input class="search-box" style="width:100%;" id="mq-modelo-${m.id}" value="${flE(m.modelo || '')}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Lo que es (sale debajo: Mixta, Niveladora, Turismo…)</div><input class="search-box" style="width:100%;" id="mq-clase-${m.id}" value="${flE(m.clase || '')}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Matrícula</div><input class="search-box mono" style="width:100%;" id="mq-matricula-${m.id}" value="${flE(m.matricula)}"></div><div class="field" style="margin-bottom:10px;"><div class="l">Ficha técnica (texto completo)</div><textarea class="search-box" style="width:100%;height:220px;font-family:'IBM Plex Mono',monospace;font-size:12px;" id="mq-ficha-${m.id}">${flE(m.fichaTecnica)}</textarea></div><button class="btn primary" style="width:100%;" onclick="guardarFichaMaquinaInline('${m.id}')">Guardar</button><div class="sub-t" id="mq-status-${m.id}" style="margin-top:6px;"></div></div>`;
     h += `<div class="fl-sec"><h4>Texto original</h4><details><summary style="cursor:pointer;color:var(--ink-soft);font-size:12.5px;">Ver el texto completo tal como está guardado</summary><pre class="fl-pre">${flE(m.fichaTecnica || '(vacío)')}</pre></details><button type="button" class="btn sm" style="margin-top:10px;" onclick="copiarFichaMaquinaTodo('${m.id}')">Copiar la ficha completa</button></div>`;
   }
+  if(_flTab !== 'resumen') h += `<label class="btn" style="cursor:pointer;display:flex;justify-content:center;margin-top:4px;">Adjuntar documento<input type="file" accept="image/*,application/pdf" style="display:none;" onchange="subirDocMaquina('${m.id}',this)"></label><div class="sub-t" id="mq-status-${m.id}" style="margin-top:6px;"></div>`;
   ov.innerHTML = `<div class="fl-cab"><div class="fl-cab-top"><div class="fl-ico">${flIcono(m)}</div><div class="fl-cab-tit"><div class="fl-nombre">${flE(m.modelo || m.name)}</div><div class="fl-fila" style="margin-top:4px;">${m.matricula ? `<span class="fl-placa">${flE(m.matricula)}</span>` : ''}<span style="font-size:12px;color:var(--ink-soft);">${flE(m.clase || m.type || m.name)}</span></div></div><button type="button" class="fl-ib" title="Copiar ficha" aria-label="Copiar ficha" onclick="copiarFichaMaquinaInline('${m.id}')">📋</button><button type="button" class="fl-ib" title="Cerrar" aria-label="Cerrar" onclick="cerrarFichaMaquina()">✕</button></div><div class="fl-tabs">${tabs}</div></div><div class="fl-cuerpo">${h}</div>`;
 }
 async function subirDocMaquina(id, input){
@@ -17784,7 +17829,8 @@ async function subirDocMaquina(id, input){
   if(error){ statusEl.textContent = 'Error al subir: '+error.message; statusEl.style.color = 'var(--red)'; return; }
   const url = sb.storage.from(DOC_BUCKET).getPublicUrl(path).data.publicUrl;
   m.documentos = m.documentos || [];
-  m.documentos.push({nombre: file.name, path, url});
+  const G = {permiso: 'Permiso', tecnica: 'Técnica e ITV', seguro: 'Seguro', impuestos: 'Impuestos', mant: 'Mantenimiento', notas: 'Otros'}[_flTab];
+  m.documentos.push({nombre: file.name, path, url, ...(G ? {grupo: G} : {})});
   const {error: dbErr} = await sb.from('flota').update({documentos: m.documentos}).eq('id', id);
   if(dbErr){ statusEl.textContent = 'Se subió, pero no se pudo guardar el enlace: '+dbErr.message; statusEl.style.color = 'var(--orange)'; }
   else { statusEl.textContent = 'Adjuntado ✓'; statusEl.style.color = 'var(--green)'; }
@@ -18359,7 +18405,7 @@ async function cargarDatosReales(){
           existente.fichaTecnica = m.ficha_tecnica || '';
           existente.documentos = m.documentos || [];
         } else {
-          fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', modelo: m.modelo || '', clase: m.clase || '', state: m.estado==='activo' ? 'disponible' : m.estado, matricula: m.matricula||'', fichaTecnica: m.ficha_tecnica||'', documentos: m.documentos||[]});
+          fleet.push({id: m.id, name: m.nombre, type: m.tipo || '', modelo: m.modelo || '', clase: m.clase || '', state: m.estado==='activo' ? 'disponible' : m.estado, matricula: m.matricula||'', fichaTecnica: m.ficha_tecnica||'', documentos: m.documentos||[], notas_historial: m.notas_historial || ''});
         }
       });
       renderFleetGrid();
