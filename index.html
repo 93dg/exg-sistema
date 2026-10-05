@@ -4325,7 +4325,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.45</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.46</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4416,7 +4416,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.45</div>
+        <div class="sub" id="version-badge">V8.46</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8868,6 +8868,7 @@ let _e2det = null;   // V8.13: dato abierto (se despliega debajo)
 let _e2 = null, _e2cf = 'todo', _e2anio = new Date().getFullYear(), _e2per = 'año', _e2menu = null;
 async function econ2Cargar(){
   const box = document.getElementById('econ2'); if(!box || !sb) return;
+  e2DeudaCargar();
   if(!_e2){ box.innerHTML = '<div class="dir-cargando">Cargando…</div>';
     const docs = []; let desde = 0;
     while(true){ const {data, error} = await sb.from('documentos_economicos').select('id, tipo, numero, importe, cobrado_importe, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'proforma', 'albaran', 'gasto']).range(desde, desde + 999);
@@ -8901,6 +8902,7 @@ function econ2Detalle(k, {sel, e}){   // V8.13: el detalle que se despliega al t
     return o.slice(0, max).map(([c, v]) => `<div class="e2-fila"><div><b>${escHtml(c)}</b><span>${Math.round(v / tot * 100)} %</span></div><strong>${e(v)}</strong></div>`).join('') + (o.length > max ? `<div class="e2-mas">y ${o.length - max} más</div>` : ''); };
   if(k === 'saldo') return (_e2.avisos || []).length ? (_e2.avisos || []).map(a => `<div class="e2-fila"><div><b>${escHtml(a.concepto || ({abono: 'Abono', cargo: 'Cargo', recibo: 'Recibo', prestamo: 'Préstamo', tarjeta: 'Tarjeta'})[a.tipo] || '')}</b><span>${fch(a.fecha)}${a.saldo != null ? ' · saldo ' + e(a.saldo) : ''}</span></div><strong class="${a.importe >= 0 ? 'pos' : 'neg'}">${a.importe >= 0 ? '+' : ''}${e(a.importe)}</strong></div>`).join('') : '<div class="e2-mas">Aún no hay avisos del banco leídos.</div>';
   if(k === 'flota') return ((_valFlotaRaw && _valFlotaRaw.items) || []).filter(x => x.maquina).map(x => { const f = (typeof fleet !== 'undefined' ? fleet : []).find(m => m.id === x.flota_id); return `<div class="e2-fila"><div><b>${escHtml(f ? (f.modelo || f.name) : 'Máquina')}</b><span>${x.min && x.max ? 'entre ' + e(x.min) + ' y ' + e(x.max) : ''}</span></div><strong>≈ ${e(x.estimado)}</strong></div>`; }).join('');
+  if(k === 'deuda') return (_e2Deuda || []).map(x => `<div class="e2-fila"><div><b>${escHtml(x.quien)}</b><span>${escHtml(x.que || '')}</span></div><strong>${x.imp == null ? '<em style="font-style:normal;color:#E8A33A;">Falta</em>' : (x.aprox ? '≈ ' : '') + e(x.imp)}</strong></div>`).join('') || '<div class="e2-mas">No hay deudas apuntadas.</div>';
   if(k === 'cobrar') return lista(_e2.filter(r => r.pend > 0 || r.sinFact > 0), r => r.pend + r.sinFact, r => dias(r.fecha) + ' días' + (r.sinFact > 0 ? ' · (sin facturar)' : ''));   // V8.36: con lo de la Administración sin facturar, marcado
   if(k === 'adm') return lista(_e2.filter(r => r.sinFact > 0), r => r.sinFact, r => dias(r.fecha) + ' días');
   if(k === 'ing'){ const imp = r => (_e2cf !== 'sin' ? r.legal : 0) + (_e2cf !== 'oficial' ? r.sinF : 0); return '<div class="e2-sub">Por cliente</div>' + porCli(sel, imp); }
@@ -8909,6 +8911,18 @@ function econ2Detalle(k, {sel, e}){   // V8.13: el detalle que se despliega al t
     return [1, 2, 3, 4].map(t => { const rs = _e2.filter(r => r.an === _e2anio && r.tr === t), i = rs.reduce((a, r) => a + imp(r), 0), g = rs.reduce((a, r) => a + r.gasto, 0); if(!i && !g) return '';
       return `<div class="e2-fila"><div><b>${t}T ${_e2anio}</b><span>ingresos ${e(i)} · gastos ${e(g)}</span></div><strong class="${i - g >= 0 ? 'pos' : 'neg'}">${i - g >= 0 ? '+' : '−'}${e(Math.abs(i - g))}</strong></div>`; }).join(''); }
   return '';
+}
+// V8.46 (reporte de Daniel: «falta deuda»): lo que se debe — préstamos (lo que queda según su cuadro) y deudas apuntadas (Magarín, planta de escombros, Cano, Hacienda)
+let _e2Deuda = null;
+async function e2DeudaCargar(){
+  try{ const {data} = await sb.from('sistema').select('id, tipo, data').in('tipo', ['deuda', 'prestamo']);
+    const hoyIso = new Date().toISOString().slice(0, 10), items = [];
+    (data || []).forEach(r => { const d = r.data || {};
+      if(r.tipo === 'prestamo'){ if(d.estado === 'cerrado') return; let saldo = Number(d.capital || 0); try{ const c = prCuadro(d), pag = c.filter(f => f.iso <= hoyIso); if(pag.length) saldo = pag[pag.length - 1].pendiente; }catch(e){}
+        items.push({quien: d.entidad || 'Préstamo', que: (d.nombre || 'Préstamo') + ' · cuota ' + Number(d.cuota || 0).toLocaleString('es-ES', {minimumFractionDigits: 2}) + ' €/mes hasta ' + String(d.vencimiento || '').split('-').reverse().join('/'), imp: saldo}); }
+      else if(d.estado !== 'pagada') items.push({quien: d.acreedor, que: d.concepto, imp: d.importe == null ? null : Number(d.importe), aprox: !!d.aproximado}); });
+    _e2Deuda = items.sort((a, b) => (b.imp || 0) - (a.imp || 0)); }catch(e){ _e2Deuda = []; }
+  if(document.getElementById('econ2')?.offsetParent && _e2) econ2Pintar();
 }
 function econ2Pintar(){
   const box = document.getElementById('econ2'); if(!box || !_e2) return;
@@ -8932,6 +8946,7 @@ function econ2Pintar(){
   box.innerHTML = `<div class="e2-fil">${pill('cf', nomCf)}${pill('an', _e2anio)}${pill('per', perTxt)}</div>
     <div class="e2-hero"><button type="button" class="e2-hb" data-e2-det="saldo"><span>Dinero en cuenta</span><div class="big">${saldo != null ? fmt(saldo, 2) + ' €' : '—'}</div><i>${al ? 'Aviso del banco · ' + cuando(al.ts) : 'Último dato del banco'}</i></button>
       <div class="row"><button type="button" data-e2-det="flota"><i>Valor flota · máquinas</i><b>${flota ? '≈ ' + e(flota) : '—'}</b></button><button type="button" data-e2-det="cobrar"><i>Pendiente de cobrar</i><b>${e(v.cobrar || 0)}</b></button></div>
+      <div class="row"><button type="button" data-e2-det="deuda"><i>Deuda</i><b>${_e2Deuda ? e(_e2Deuda.reduce((a, x) => a + (x.imp || 0), 0)) + (_e2Deuda.some(x => x.imp == null) ? ' <small>+ lo que falta</small>' : '') : '…'}</b></button></div>
       ${['saldo', 'flota', 'cobrar'].includes(_e2det) ? `<div class="e2-det oscuro">${econ2Detalle(_e2det, {sel, e})}</div>` : ''}</div>
     <div class="e2-tiles">
       <div class="e2-t v${_e2det === 'ing' ? ' abierto' : ''}" data-e2-det="ing"><span>Ingresos ${etq}</span><b>${e(I)}</b><i>${_e2cf === 'todo' ? fmt(L, 0) + ' con factura · ' + fmt(B, 0) + ' sin' : _e2cf === 'oficial' ? 'solo con factura' : 'solo sin factura'}</i></div>
