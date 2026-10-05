@@ -4240,7 +4240,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.25</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.26</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4331,7 +4331,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.25</div>
+        <div class="sub" id="version-badge">V8.26</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4918,7 +4918,8 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
               <div class="dd-filter-panel" style="min-width:260px;max-height:60vh;overflow-y:auto;">
                 <p class="dd-section-label">Tipo</p>
                 <div class="filters" id="clientes-filtro-tipo-chips" style="margin:0 0 6px;">
-                  <div class="chip-filter" data-tipo="ayuntamiento" onclick="this.classList.toggle('active');renderClientesTable()">Ayuntamiento</div>
+                  <div class="chip-filter" data-tipo="administración" onclick="this.classList.toggle('active');renderClientesTable()">Administración</div>
+                  <div class="chip-filter" data-tipo="entidad" onclick="this.classList.toggle('active');renderClientesTable()">Entidad</div>
                   <div class="chip-filter" data-tipo="empresa" onclick="this.classList.toggle('active');renderClientesTable()">Empresa</div>
                   <div class="chip-filter" data-tipo="particular" onclick="this.classList.toggle('active');renderClientesTable()">Particular</div>
                 </div>
@@ -20026,7 +20027,7 @@ function renderClientesMovil(clientesFiltrados, faltan){
   if(!lista) return;
   { let c = document.getElementById('cli-cuenta'); const rv = document.getElementById('cli-btn-revisar');   // V8.25: «N clientes» al lado de Revisar, como «N facturas»
     if(!c && rv){ c = document.createElement('span'); c.id = 'cli-cuenta'; rv.after(c); }
-    if(c) c.innerHTML = `<b>${clientesFiltrados.length}</b> cliente${clientesFiltrados.length === 1 ? '' : 's'}`; }
+    const tot = clientesFiltrados.length + (Number(faltan) || 0); if(c) c.innerHTML = `<b>${tot}</b> cliente${tot === 1 ? '' : 's'}`; }
   if(!clientesFiltrados.length){
     lista.innerHTML = '<div style="padding:16px 10px;color:var(--ink-soft);text-align:center;">Sin clientes con estos filtros</div>';
     return;
@@ -20802,15 +20803,17 @@ renderClientesTable();
 async function cargarEntidadesReales(){
   if(!sb) return;
   try{
-    const {data} = await sb.from('entidades').select('*').order('created_at',{ascending:false});
+    const {data} = await sb.from('entidades').select('*').is('deleted_at', null).order('created_at',{ascending:false});   // V8.26: sin las borradas
     (data||[]).forEach(e=>{
       const tipoMap = {proveedor:'Proveedor', ayuntamiento:'Ayuntamiento', empresa:'Empresa', particular:'Particular', cliente:'Particular'};
       const claseMap = {'persona':'Particular','empresa':'Empresa','organismo':'Entidad','obra':'Particular','nombre_parcial':'Particular','dudoso_con_nif':'Particular','direccion':'Particular'};
+      // V8.26 (reporte de Daniel: «filtros desfasados»): el tipo sale de la clase de la ficha; un organismo de la Administración es «Administración», el resto de organismos «Entidad»
+      const tipoDe = e => (e.tipo || '').toLowerCase() === 'proveedor' ? 'Proveedor' : (e.es_administracion || (e.clase_nombre === 'organismo' && esAdministracion(e.nombre))) ? 'Administración' : (claseMap[e.clase_nombre] || tipoMap[(e.tipo||'').toLowerCase()] || 'Particular');
       const existente = clientes.find(c=>c.name===e.nombre);
       if(existente){
         existente.id = e.id;
         existente.name = MAY(e.nombre) || existente.name;
-        existente.type = tipoMap[(e.tipo||'').toLowerCase()] || existente.type;
+        existente.type = tipoDe(e) || existente.type;
         existente.nif = e.nif || existente.nif || '';
         existente.email = e.email || existente.email || '';
         existente.telefono = e.telefono || existente.telefono || '';
@@ -20819,7 +20822,7 @@ async function cargarEntidadesReales(){
         existente.cp = e.cp || existente.cp || '';
         existente.provincia = MAY(e.provincia) || existente.provincia || '';
       } else {
-        clientes.push({id: e.id, name: MAY(e.nombre), type: claseMap[e.clase_nombre] || tipoMap[(e.tipo||'').toLowerCase()] || 'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio: e.prioridad||'media', prioManual: !!e.prioridad_manual, prioRazon: e.prioridad_razon||'', nif: e.nif||'', email: e.email||'', telefono: e.telefono||'', direccion: MAY(e.direccion), poblacion: MAY(e.poblacion), provincia: MAY(e.provincia), cp: e.cp||'', clase_nombre: e.clase_nombre||''});
+        clientes.push({id: e.id, name: MAY(e.nombre), type: tipoDe(e), zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio: e.prioridad||'media', prioManual: !!e.prioridad_manual, prioRazon: e.prioridad_razon||'', nif: e.nif||'', email: e.email||'', telefono: e.telefono||'', direccion: MAY(e.direccion), poblacion: MAY(e.poblacion), provincia: MAY(e.provincia), cp: e.cp||'', clase_nombre: e.clase_nombre||''});
       }
     });
     renderClientesTable();
