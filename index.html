@@ -1333,6 +1333,9 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .fl-ret{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;}
 .fl-ret a{font-weight:700;color:var(--ink);text-decoration:none;flex:0 0 auto;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .fl-ret span{flex:1;min-width:0;color:var(--ink-soft);font-size:11.5px;}
+.fl-iban{display:flex;align-items:center;gap:10px;margin-top:10px;padding:9px 12px;border-radius:12px;background:var(--concrete);}
+.fl-iban div{flex:1;min-width:0;} .fl-iban span{display:block;font-size:11px;font-weight:700;color:var(--ink-soft);}
+.fl-iban b{display:block;font-family:'IBM Plex Mono',monospace;font-size:13.5px;letter-spacing:.2px;} .fl-iban i{display:block;font-style:normal;font-size:11px;color:var(--ink-soft);}
 /* V8.10 Economía rediseñada */
 .e2-hb{all:unset;cursor:pointer;display:block;width:100%;}
 .e2-hero .row button{all:unset;cursor:pointer;flex:1;}
@@ -4213,7 +4216,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.17</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.18</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4303,7 +4306,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.17</div>
+        <div class="sub" id="version-badge">V8.18</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -17719,7 +17722,11 @@ function flDocsHtml(m, soloGrupo){
 function flKvHtml(pares, ancho){ return pares.length ? `<div class="fl-kv">${pares.map(([k, v]) => `<div class="fl-kv-i ${(ancho || !k || String(v).length > 48) ? 'ancho' : ''}">${k ? `<span>${flE(k)}</span>` : ''}<b>${flE(v)}</b></div>`).join('')}</div>` : ''; }
 // V8.17: titular del vehículo y del seguro, y teléfonos, en la ficha (datos de Flota › Asistencia)
 let _flAsis = null, _flAsisCargando = false;
-async function flAsisCargar(){ try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'asistencia_seguros').limit(1).maybeSingle(); _flAsis = data ? data.data : {}; }catch(e){ _flAsis = {}; } }
+async function flAsisCargar(){ try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'asistencia_seguros').limit(1).maybeSingle(); _flAsis = data ? data.data : {}; }catch(e){ _flAsis = {}; }
+  try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'config_empresa').limit(1).maybeSingle(); if(data && data.data) _flAsis.empresa = data.data; }catch(e){} }
+// V8.18 (Daniel: «al contratar el seguro me piden el IBAN y tengo que salir a Empresa»): la cuenta para domiciliar, en el seguro de cada ficha, con copiar
+function flIbanHtml(){ const e = _flAsis && _flAsis.empresa; if(!e || !e.iban) return '';
+  return `<div class="fl-iban"><div><span>Cuenta para domiciliar</span><b>${flE(e.iban)}</b><i>${flE(e.titular || '')}</i></div><button type="button" class="btn sm" onclick="navigator.clipboard.writeText('${flE(String(e.iban).replace(/\s/g, ''))}').then(() => mostrarToast('IBAN copiado', 'ok'))">Copiar</button></div>`; }
 function flPersonaDe(txt){ const P = (_flAsis && _flAsis.personas) || {}; if(/rafael/i.test(txt)) return P.rafa; if(/manuel|manolo/i.test(txt)) return P.manolo; return null; }
 function flTitularHtml(m){
   const t = (String(m.fichaTecnica || '').match(/(?:^|\n)\s*(?:Titular(?: del permiso)?(?: \([^)]*\))?|Propietario)\s*:\s*([^\n]+)/i) || [])[1] || '';
@@ -17731,13 +17738,13 @@ function flTitularHtml(m){
 function flSeguroResumenHtml(m){
   if(!_flAsis) return '';
   const v = (_flAsis.vehiculos || []).find(x => x.flota_id === m.id); const A = _flAsis.aseguradoras || {}, P = _flAsis.personas || {};
-  if(!v || !(v.seguros || []).length) return '<div class="fl-sec"><h4>Seguro</h4><div class="fl-falta">Falta: no hay ningún seguro registrado</div></div>';
+  if(!v || !(v.seguros || []).length) return `<div class="fl-sec"><h4>Seguro</h4><div class="fl-falta">Falta: no hay ningún seguro registrado</div>${flIbanHtml()}</div>`;
   const fmtT = t => String(t).replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
   return v.seguros.map(sg => { const a = A[sg.aseg] || {}, p = P[sg.titular];
     const pares = [['Compañía', a.nombre || sg.aseg], ['Póliza', sg.poliza || 'falta']]; if(sg.desde) pares.push(['Desde', sg.desde]); if(sg.hasta) pares.push(['Hasta', sg.hasta]);
     if(p) pares.push(['Titular del seguro', p.nombre], ['DNI', p.dni], ['Nacimiento', p.nacimiento]);
     const tels = [a.tel ? `<a class="as-b p" href="tel:${a.tel}"><b>${fmtT(a.tel)}</b></a>` : '', a.tel2 ? `<a class="as-b" href="tel:${a.tel2}">${a.tel2_txt ? `<small>${flE(a.tel2_txt)}</small>` : ''}<b>${fmtT(a.tel2)}</b></a>` : ''].filter(Boolean);
-    return `<div class="fl-sec"><h4>Seguro${sg.hasta ? ' hasta ' + flE(sg.hasta) : sg.desde ? ' desde ' + flE(sg.desde) : ''}</h4>${flKvHtml(pares)}${!p ? '<div class="fl-falta">Falta: titular del seguro</div>' : ''}${/falta|incomplet/i.test(sg.poliza || 'falta') ? '<div class="fl-falta">Falta: número de póliza completo</div>' : ''}${tels.length ? `<div class="as-tels n${tels.length}" style="margin-top:8px;">${tels.join('')}</div>` : ''}</div>`; }).join('');
+    return `<div class="fl-sec"><h4>Seguro${sg.hasta ? ' hasta ' + flE(sg.hasta) : sg.desde ? ' desde ' + flE(sg.desde) : ''}</h4>${flKvHtml(pares)}${!p ? '<div class="fl-falta">Falta: titular del seguro</div>' : ''}${/falta|incomplet/i.test(sg.poliza || 'falta') ? '<div class="fl-falta">Falta: número de póliza completo</div>' : ''}${tels.length ? `<div class="as-tels n${tels.length}" style="margin-top:8px;">${tels.join('')}</div>` : ''}${flIbanHtml()}</div>`; }).join('');
 }
 async function flRecuperarDoc(id, path){
   const m = flBuscar(id); if(!m || !sb) return; const d = (m.documentos || []).find(x => x.path === path); if(!d) return;
@@ -17793,7 +17800,7 @@ function renderFichaMaquina(){
       if(pri) h += `<div class="fl-sec"><h4>Prima</h4>${tot ? `<div class="fl-grande">${flE(tot[1])} €<span style="font-size:13px;font-weight:600;color:var(--ink-soft);"> al año</span></div>` : ''}<div class="fl-nota" style="margin-top:${tot ? 6 : 0}px;">${flE(pri.replace(/^Prima\s*:\s*/i, ''))}</div></div>`;
       if(cob) h += `<div class="fl-sec"><h4>Coberturas</h4><div class="fl-chips">${cob.replace(/^Coberturas\s*:\s*/i, '').split(/;\s*/).filter(Boolean).map(x => `<span>${flE(x.replace(/\.$/, ''))}</span>`).join('')}</div></div>`;
       if(otras.length) h += `<div class="fl-sec"><h4>Más datos</h4>${otras.map(x => `<div class="fl-nota" style="margin-top:0;margin-bottom:6px;">${flE(x)}</div>`).join('')}</div>`;
-    } else h += '<div class="fl-sec"><div class="fl-vacio">Sin datos del seguro en la ficha.</div></div>';
+    }   // V8.18: sin el aviso «Sin datos del seguro»: arriba ya sale el seguro o «Falta: …»
     h = flSeguroResumenHtml(m, R) + h + flDocsHtml(m, 'Seguro');
   } else if(_flTab === 'impuestos'){
     if(R.impuestos.length) h += R.impuestos.map(ls => { const pagado = /PAGADO/i.test(ls.join(' ')); return `<div class="fl-sec"><h4>${/^IVTM\s*[—-]/i.test(ls[0]) ? 'Pagos registrados' : 'Impuesto de vehículos (IVTM)'}${pagado ? ' · <span style="color:var(--green);">pagado</span>' : ''}</h4><div style="font-weight:700;font-size:14px;line-height:1.35;">${flE(ls[0])}</div>${ls.slice(1).map(x => `<div class="fl-nota" style="margin-top:6px;">${flE(x)}</div>`).join('')}</div>`; }).join('');
