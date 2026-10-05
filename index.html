@@ -4304,7 +4304,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.37</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.38</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4395,7 +4395,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.37</div>
+        <div class="sub" id="version-badge">V8.38</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7276,6 +7276,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
       <div class="ie-more-body">
         <span id="ni-otras-acciones" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
         <button type="button" class="btn sm" onclick="editingDocId && abrirMoverSeccion([editingDocId])">Mover a otra sección</button>
+        <button type="button" class="btn sm" id="ni-volver" style="display:none;" onclick="editingDocId && volverAFaseAnterior(editingDocId)"></button>
         <button type="button" class="btn sm" onclick="document.getElementById('ie-dictado').classList.toggle('open')">Rellenar desde texto o foto</button>
         <button type="button" id="ni-ver-original" onclick="abrirVisorArchivoOriginal()" class="btn sm" style="display:none;">Ver archivo original</button>
       </div>
@@ -26943,7 +26944,9 @@ function openDocumentViewer(id){
   document.getElementById('ni-otras-acciones').innerHTML = accionesDocumento(doc).filter(x=>x.t!=='Editar' && x.t!=='Imprimir' && !x.t.startsWith('Pasar a') && !x.t.startsWith('← Volver a')).map(x=>`<button type="button" class="btn sm" onclick="${x.fn}">${x.t}</button>`).join('');
   // PASAR A… — desplegable único con la transición principal preseleccionada
   {
-    const opciones = transicionesDocumento(doc);
+    // V8.38 (01/10 se tocó «Volver a Albarán» 6 s después de «Pasar a Proforma» sin querer): «Volver a…» ya no va en las pastillas, va en Más acciones
+    const todasTr = transicionesDocumento(doc), opciones = todasTr.filter(t => !t.volver), trVolver = todasTr.find(t => t.volver);
+    { const bv = document.getElementById('ni-volver'); if(bv){ bv.style.display = trVolver ? '' : 'none'; if(trVolver) bv.textContent = '← Volver a ' + tipoDocEtiqueta(trVolver.tipo, false); } }
     const wrap = document.getElementById('ni-pasar-a-wrap');
     if(opciones.length){
       wrap.style.display = 'flex';
