@@ -1368,6 +1368,8 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .e2-q b{display:block;color:var(--ink);font-size:11px;}
 .e2-q button.act i{background:var(--orange);}
 
+.te-concl{margin:10px 2px 2px;padding:10px 12px;border-radius:12px;background:var(--concrete);font-size:13px;line-height:1.45;}
+.te-concl b{font-weight:800;}
 /* V7.92 Dirección › Valor */
 .vl-hero{background:var(--asphalt);color:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;}
 .vl-ht{font-size:13px;font-weight:800;color:rgba(255,255,255,.8);display:flex;align-items:center;gap:6px;}
@@ -4186,7 +4188,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.10</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.11</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4276,7 +4278,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.10</div>
+        <div class="sub" id="version-badge">V8.11</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7935,6 +7937,20 @@ function teQueso(partes, fmtV, centro){
   const cen = '';   // sin texto en el centro: el total ya está en las tarjetas de arriba
   return `<svg viewBox="${Math.floor(minX)} ${Math.floor(minY)} ${Math.ceil(maxX - minX)} ${Math.ceil(maxY - minY)}" class="te-svg" role="img" aria-label="Gráfico de trabajos pendientes">${trozos}${cen}${textos}</svg>`;
 }
+// V8.11 (reporte de Daniel: «falta debajo una frase de conclusión»): una o dos frases sacadas de lo que enseña el gráfico, según la agrupación y la medida
+function teConclusion(partes, t){
+  if(!partes.length) return '';
+  const tot = partes.reduce((a, p) => a + p.v, 0); if(!tot) return '';
+  const pct = v => Math.round(v / tot * 100), top = partes.slice().sort((a, b) => b.v - a.v)[0], masN = partes.slice().sort((a, b) => b.s.n - a.s.n)[0];
+  const que = TE.medida === 'h' ? 'del tiempo pendiente' : TE.medida === 'e' ? 'del dinero pendiente' : 'de los trabajos pendientes';
+  const T = {'1M': 'los trabajos de un mes', '1S': 'los de una semana', '2-3D': 'los de 2–3 días', '1D': 'los de un día', '4-6H': 'los de medio día', '1-2H': 'los de 1–2 horas'};
+  const nom = k => TE.por === 'tiempo' && T[k] ? T[k] : '«' + String(k) + '»', tr = n => n + (n === 1 ? ' trabajo' : ' trabajos');
+  const f = [`${nom(top.k).replace(/^l/, 'L').replace(/^«/, '«')} se lleva${TE.por === 'tiempo' && T[top.k] ? 'n' : ''} el <b>${pct(top.v)} %</b> ${que}${TE.medida !== 'n' ? ' con ' + tr(top.s.n) : ''}.`];
+  if(TE.medida !== 'n' && masN !== top && masN.s.n > top.s.n) f.push(`Donde más trabajos hay es en ${nom(masN.k)} (${masN.s.n}), pero solo son el ${pct(masN.v)} %.`);
+  else if(partes.length > 1){ const seg = partes.slice().sort((a, b) => b.v - a.v)[1]; f.push(`Entre ${nom(top.k)} y ${nom(seg.k)} suman el ${pct(top.v + seg.v)} %.`); }
+  if(t && t.h) f.push(`En total, ${t.h / 160 >= 1 ? tbN(t.h / 160) + ' meses' : Math.round(t.h / 8) + ' días'} de trabajo en cola.`);
+  return `<div class="te-concl">${f.join(' ')}</div>`;
+}
 function teRender(){
   const app = document.getElementById('te-app'); if(!app) return;
   const lista = typeof tbPendientes === 'function' ? tbPendientes() : [], t = lista.length ? tbSuma(lista) : {n: 0, h: 0, e: 0, sin: 0};
@@ -7955,6 +7971,7 @@ function teRender(){
     <div class="te-sel"><div class="pillsel" id="te-por" data-menu="1"></div><div class="pillsel" id="te-medida" data-menu="1"></div></div>
     ${partes.length ? `<div class="te-queso">${teQueso(partes.map(p => ({...p, det: [TE.medida !== 'n' ? p.s.n + (p.s.n === 1 ? ' trabajo' : ' trab.') : '', TE.medida !== 'h' ? tbFmtT(p.s.h) : ''].filter(Boolean).join(' · ')})), fmtV, [fmtV(partes.reduce((s, p) => s + p.v, 0)), t.n + ' trabajos'])}</div>`
     : '<div class="ce-nota">No hay trabajos pendientes.</div>'}
+    ${teConclusion(partes, t)}
   </div>`;
   pillsSelIniciar('te-por', [['prioridad', 'Por prioridad'], ['flota', 'Por flota'], ['lugar', 'Por lugar'], ['tiempo', 'Por tiempo'], ['dificultad', 'Por dificultad']], v => { TE.por = v; teGuardar(); teRender(); });
   document.getElementById('te-por').value = TE.por;
