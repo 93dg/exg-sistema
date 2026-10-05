@@ -4209,7 +4209,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.15</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.16</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4299,7 +4299,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.15</div>
+        <div class="sub" id="version-badge">V8.16</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -17124,20 +17124,22 @@ async function visorPintar(soloZoom){
   }
   if(!_visorEsPdf && (VISOR_EXCEL.test(nombreV) || VISOR_WORD.test(nombreV))){ await visorPintarDoc(c, soloZoom); return; }
   if(!_visorEsPdf){
-    if(soloZoom){ const im = c.querySelector('img'); if(im) im.style.width = (_visorZoom * 100) + '%'; return; }
+    // V8.16 (Daniel: «en el PC el visor sale súper aumentado»): a zoom 1 la imagen cabe entera, a lo ancho y a lo alto
+    const ajuste = im => { const cw = Math.max(200, c.clientWidth - 16), ch = Math.max(200, c.clientHeight - 16), nw = im.naturalWidth || cw, nh = im.naturalHeight || ch; const base = Math.min(cw / nw, ch / nh, 1.5); im.style.maxWidth = 'none'; im.style.width = Math.round(nw * base * _visorZoom) + 'px'; im.style.height = 'auto'; };
+    if(soloZoom){ const im = c.querySelector('img'); if(im) ajuste(im); return; }
     c.innerHTML = '<div class="visor-msg">Abriendo…</div>';
-    const im = new Image(); im.alt = ''; im.className = 'visor-img'; im.style.width = (_visorZoom * 100) + '%';
-    im.onload = () => { c.innerHTML = ''; c.appendChild(im); };
+    const im = new Image(); im.alt = ''; im.className = 'visor-img';
+    im.onload = () => { c.innerHTML = ''; c.appendChild(im); ajuste(im); };
     im.onerror = () => { visorSinVista(c); };
     im.src = _visorUrl; return;
   }
   try{
     const lib = await visorCargarPdfJs(); const url = _visorVer || _visorUrl;
     if(!_visorPdf || _visorPdf.url !== url){ c.innerHTML = '<div class="visor-msg">Abriendo…</div>'; _visorPdf = {url, doc: await lib.getDocument({url}).promise}; }
-    const doc = _visorPdf.doc, ancho = Math.max(240, c.clientWidth - 16), dpr = Math.min(window.devicePixelRatio || 1, 2.5), marca = ++visorPintar._n; c.innerHTML = '';
+    const doc = _visorPdf.doc, ancho = Math.max(240, c.clientWidth - 16), alto = Math.max(240, c.clientHeight - 16), dpr = Math.min(window.devicePixelRatio || 1, 2.5), marca = ++visorPintar._n; c.innerHTML = '';
     for(let i = 1; i <= doc.numPages; i++){
       if(marca !== visorPintar._n || !document.getElementById('visor')?.classList.contains('abierto')) return;
-      const pag = await doc.getPage(i), v0 = pag.getViewport({scale: 1}), esc = (ancho / v0.width) * _visorZoom, vp = pag.getViewport({scale: esc * dpr});
+      const pag = await doc.getPage(i), v0 = pag.getViewport({scale: 1}), esc = Math.min(ancho / v0.width, alto / v0.height) * _visorZoom,   /* V8.16: la página entera cabe */ vp = pag.getViewport({scale: esc * dpr});
       const cv = document.createElement('canvas'); cv.className = 'visor-pag'; cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height); cv.style.width = Math.floor(vp.width / dpr) + 'px'; cv.style.height = Math.floor(vp.height / dpr) + 'px';
       c.appendChild(cv); await pag.render({canvasContext: cv.getContext('2d'), viewport: vp}).promise;
     }
