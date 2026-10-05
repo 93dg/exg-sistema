@@ -1409,6 +1409,10 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 /* V8.33 (Daniel: «el tamaño como en octubre»): el mes siempre mide lo mismo que uno de 5 semanas; si tiene 6, las filas son algo más bajas */
 #cal3-app .c3-mes{grid-auto-rows:calc(520px / var(--filas, 5));}
 #cal3-app .c3-dia{min-height:0 !important;height:100%;}
+/* V8.34 (reporte de Daniel): los días pasados se ven distintos de hoy y de los que vienen */
+#cal3-app .c3-dia.pasado{background:#eeede8 !important;}
+#cal3-app .c3-dia.pasado > i{color:#a9a69d;}
+#cal3-app .c3-dia.pasado span.c3-chip{opacity:.55;}
 /* V8.10 Economía rediseñada */
 .e2-hb{all:unset;cursor:pointer;display:block;width:100%;}
 .e2-hero .row button{all:unset;cursor:pointer;flex:1;}
@@ -4289,7 +4293,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.33</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.34</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4380,7 +4384,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.33</div>
+        <div class="sub" id="version-badge">V8.34</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8525,7 +8529,7 @@ function c3Pintar(){
     <div class="c3-sem">${['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].map((t, k) => `<span${k > 5 ? ' class="fin"' : ''}>${t}</span>`).join('')}</div>
     <div class="c3-mes" style="--filas:${semanas.length}">${semanas.flat().map(d => { const iso = c2Iso(d), fuera = d.getMonth() !== base.getMonth(), lab = c2Laborable(d), L = PD[iso] || [], pasado = iso < hoyIso;
       const finde = d.getDay() === 0 || d.getDay() === 6, festivo = C2_FESTIVOS.includes(iso), sab = d.getDay() === 6 && !festivo;   // V8.21: el sábado se trabaja por la mañana
-      const cls = ['c3-dia', fuera ? 'fuera' : '', festivo ? 'fest' : '', finde && !sab ? 'finde' : '', sab ? 'sab' : '', sab && !L.length && !pasado && !fuera ? 'libre' : '', iso === hoyIso ? 'hoy' : '', lab && !L.length && !pasado ? 'libre' : '', _c3Colocar ? 'diana' : ''].filter(Boolean).join(' ');
+      const cls = ['c3-dia', fuera ? 'fuera' : '', pasado && !fuera ? 'pasado' : '', festivo ? 'fest' : '', finde && !sab ? 'finde' : '', sab ? 'sab' : '', sab && !L.length && !pasado && !fuera ? 'libre' : '', iso === hoyIso ? 'hoy' : '', lab && !L.length && !pasado ? 'libre' : '', _c3Colocar ? 'diana' : ''].filter(Boolean).join(' ');
       return `<div role="button" tabindex="0" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}${festivo ? ' <em>festivo</em>' : sab ? '<em class="sab">mañ.</em>' : ''}</i>${L.slice(0, 3).map(x => { const O = c3OcupaSet(x.j), dw = d.getDay(), ant = new Date(d), sig = new Date(d); ant.setDate(d.getDate() - 1); sig.setDate(d.getDate() + 1);
         const ci = dw !== 1 && O.has(c2Iso(ant)), cd = dw !== 0 && O.has(c2Iso(sig));   // V8.27: si sigue el día de al lado (misma semana), la barra continúa
         let n = 1; if(!ci){ const q = new Date(d); while(q.getDay() !== 0){ q.setDate(q.getDate() + 1); if(O.has(c2Iso(q))) n++; else break; } }   // V8.29: días seguidos del tramo
@@ -22802,7 +22806,7 @@ function tbClicFiltro(ev){
   if(t){   // tocar el título de un filtro lo pliega o lo despliega, y se recuerda
     const g = t.dataset.t; _tbAnimar = g;
     if(_tbPleg.includes(g)) _tbPleg = _tbPleg.filter(x => x !== g); else _tbPleg.push(g);
-    tbGuardarPlegados(); tbRender(); return;
+    tbGuardarPlegados(); tbRender(); if(document.getElementById('cal3-app')?.offsetParent) c3Pintar(); return;   // V8.34: también en el calendario
   }
   const b = ev.target.closest('button[data-g]'); if(!b) return;
   if(b.dataset.g === 'todos'){ Object.keys(_tbFil).forEach(g => { if(_tbFil[g].length){ _tbFil[g] = []; tbGuardarFiltro(g); } }); }
