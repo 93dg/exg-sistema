@@ -1385,6 +1385,10 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .c3-nav-ab{align-items:center;}
 .c3-mes-ab{margin-right:auto;display:flex;flex-direction:column;line-height:1.15;}
 .c3-mes-ab b{font-size:20px;font-weight:900;} .c3-mes-ab span{font-size:12.5px;font-weight:700;color:var(--green);}
+.c3-dia span.c3-chip{height:20px;box-sizing:border-box;padding-top:0 !important;padding-bottom:0 !important;line-height:20px;}
+.c3-dia span.c3-chip.cont-izq{margin-left:-7px !important;}
+.c3-dia span.c3-chip.cont-der{margin-right:-7px !important;}
+.c3-txt{width:auto;}
 /* V8.10 Economía rediseñada */
 .e2-hb{all:unset;cursor:pointer;display:block;width:100%;}
 .e2-hero .row button{all:unset;cursor:pointer;flex:1;}
@@ -4265,7 +4269,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.29</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.30</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4356,7 +4360,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.29</div>
+        <div class="sub" id="version-badge">V8.30</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8450,6 +8454,15 @@ const c3Corto = j => c3Nom(j).split(' ').slice(0, 2).join(' ');
 const _c3Trozos = {};
 const _c3OcSet = new WeakMap();
 function c3OcupaSet(j){ const k = JSON.stringify(j.plan || null) + '|' + c3Dias(j); const g = _c3OcSet.get(j); if(g && g.k === k) return g.s; const s = new Set(c3Ocupa(j)); _c3OcSet.set(j, {k, s}); return s; }
+// V8.30 (reporte de Daniel: «el texto a veces sobresale, la línea a veces se corta»): el texto mide exactamente lo que mide su tramo de barra
+function c3AjustarTextos(){
+  document.querySelectorAll('#cal3-app .c3-txt').forEach(t => {
+    const ch = t.closest('.c3-chip'); if(!ch) return; const run = ch.dataset.run;
+    const todos = [...document.querySelectorAll('#cal3-app .c3-chip')].filter(c => c.dataset.run === run), ult = todos[todos.length - 1] || ch;
+    const w = ult.getBoundingClientRect().right - t.getBoundingClientRect().left - 5; t.style.width = Math.max(10, Math.floor(w)) + 'px';
+  });
+}
+window.addEventListener('resize', () => { if(document.getElementById('cal3-app')) c3AjustarTextos(); });
 function c3Texto(j){ return [c3Nom(j), j.trabajo && tbMay(j.trabajo) !== c3Nom(j) ? tbMay(j.trabajo) : '', j.lugar ? tbMay(j.lugar) : ''].filter(Boolean).join(' · '); }   // V8.29: el texto entero, de corrido por la barra
 function c3IdxSemana(j, iso){   // cuántos días de este trabajo hay antes en la misma semana (el texto empieza de nuevo cada semana)
   const d = new Date(iso + 'T00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); const lunes = c2Iso(d);
@@ -8496,13 +8509,15 @@ function c3Pintar(){
       return `<div role="button" tabindex="0" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}${festivo ? ' <em>festivo</em>' : sab ? '<em class="sab">mañ.</em>' : ''}</i>${L.slice(0, 3).map(x => { const O = c3OcupaSet(x.j), dw = d.getDay(), ant = new Date(d), sig = new Date(d); ant.setDate(d.getDate() - 1); sig.setDate(d.getDate() + 1);
         const ci = dw !== 1 && O.has(c2Iso(ant)), cd = dw !== 0 && O.has(c2Iso(sig));   // V8.27: si sigue el día de al lado (misma semana), la barra continúa
         let n = 1; if(!ci){ const q = new Date(d); while(q.getDay() !== 0){ q.setDate(q.getDate() + 1); if(O.has(c2Iso(q))) n++; else break; } }   // V8.29: días seguidos del tramo
-        return `<span class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}${ci ? ' cont-izq' : ''}${cd ? ' cont-der' : ''}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${ci ? '&nbsp;' : `<i class="c3-txt" style="--n:${n}">${escHtml(c3Texto(x.j))}</i>`}</span>`; }).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '')}</div>`; }).join('')}</div>
+        const lun = new Date(d); lun.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+        return `<span data-run="${x.j.id}|${c2Iso(lun)}" class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}${ci ? ' cont-izq' : ''}${cd ? ' cont-der' : ''}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${ci ? '&nbsp;' : `<i class="c3-txt" style="--n:${n}">${escHtml(c3Texto(x.j))}</i>`}</span>`; }).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '')}</div>`; }).join('')}</div>
     <div class="c3-nav-ab"><div class="c3-mes-ab"><b>${MESES_LARGOS[base.getMonth()].replace(/^./, c => c.toUpperCase())} ${base.getFullYear()}</b><span>${libresMes} día${libresMes === 1 ? '' : 's'} libre${libresMes === 1 ? '' : 's'}</span></div>${_c3Mes ? '<button type="button" class="hoy" data-c3-mes="0">Hoy</button>' : ''}<button type="button" data-c3-mes="-1" aria-label="Mes anterior">‹</button><button type="button" data-c3-mes="1" aria-label="Mes siguiente">›</button></div>
     <div class="c3-ley"><span><i style="background:#eef6e6;border:1px solid #cfe5b8"></i>Libre</span><span>Cada trabajo, su color</span><span><b class="c3-urg">!</b>Urgente</span><span>Toca un trabajo para darle más o menos días · mantén pulsado para moverlo</span></div>
     <div class="c3-tray-zona"><div class="c3-tray-cab"><b>Sin día</b><span>${sin.length} trabajo${sin.length === 1 ? '' : 's'}</span></div>
     <div class="c3-tray-ayuda">Mantén pulsado y arrástralo a un día, o tócalo y luego toca el día. Para quitarle el día a uno, arrástralo aquí.</div>
     <div class="c3-tray">${sin.map(j => `<div class="c3-card${_c3Colocar === j.id ? ' sel' : ''}" data-c3-card="${j.id}" style="border-left-color:${C3_COL[j.prioridad] || '#2B5C8F'}"><b>${escHtml(c3Nom(j))}</b><span>${escHtml(tbMay(j.trabajo && j.cliente ? j.trabajo : ''))}${j.trabajo && j.cliente ? ' · ' : ''}${tbN(c3Dias(j))} d · ${tbMaquinas(j).map(m => eqIco(m, 'mini')).join('')}</span></div>`).join('') || '<div class="c3-vacio">Todos los trabajos tienen día</div>'}</div>
     </div>${sin.length ? '<button type="button" class="c3-auto" data-c3-auto>Ponerles día automáticamente, por prioridad</button>' : ''}`;
+  requestAnimationFrame(c3AjustarTextos);
 }
 function c3Hoja(html){ c2Hoja(html); }
 // una máquina no puede estar en dos sitios a la vez: hay 2 mixtas, 1 giratoria, 1 niveladora y 1 camión
