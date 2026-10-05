@@ -1324,6 +1324,11 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .sal-card b{display:block;font-size:30px;font-weight:800;letter-spacing:-.5px;margin:2px 0;}
 .sal-card i{display:block;font-style:normal;font-size:12px;color:rgba(255,255,255,.85);}
 .sal-card small{display:block;font-size:10.5px;color:rgba(255,255,255,.55);margin-top:6px;}
+.vf-card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:12px;}
+.vf-card span{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);}
+.vf-card b{display:block;font-size:24px;font-weight:800;letter-spacing:-.3px;margin:2px 0;}
+.vf-card i{display:block;font-style:normal;font-size:11.5px;color:var(--ink-soft);}
+.fl-chip.venta{background:#eef6e6;color:#27500A;border-color:#cfe5b8;font-weight:700;}
 /* V7.92 Dirección › Valor */
 .vl-hero{background:var(--asphalt);color:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;}
 .vl-ht{font-size:13px;font-weight:800;color:rgba(255,255,255,.8);display:flex;align-items:center;gap:6px;}
@@ -4142,7 +4147,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.08</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.09</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4232,7 +4237,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.08</div>
+        <div class="sub" id="version-badge">V8.09</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5549,6 +5554,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
       <!-- RESUMEN -->
       <div class="sub-view" id="econ-resumen">
         <div id="econ-saldo"></div>
+        <div id="econ-valflota"></div>
         <div class="kpi-strip">
           <div class="kpi"><div class="lbl">Facturado mes</div><div class="val" id="resumen-facturado">0,00 €</div></div>
           <div class="kpi"><div class="lbl">Cobrado mes</div><div class="val green" id="resumen-cobrado">0,00 €</div></div>
@@ -8544,6 +8550,22 @@ async function saldoPintar(){
 }
 async function saldoCargar(){ await saldoPintar(); if(await saldoSincronizar()) await saldoPintar(); }
 document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('.nav [data-view="economia"], [data-gtab="economia"], #econ-subtabs [data-sub="resumen"]'); if(t) setTimeout(saldoCargar, 80); }, true);
+// ===== V8.09 VALOR DE VENTA DE LA FLOTA (reportes de Daniel): estimado de segunda mano en España por vehículo (Sistema, tipo=valoracion_flota);
+// en Flota cada tarjeta lleva «Venta ≈ X €» y en Economía el total de las máquinas (sin coches)
+let _valFlota = null, _valFlotaRaw = null;
+async function valFlotaCargar(){
+  if(!sb) return; try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'valoracion_flota').eq('data->>clave', 'flota:valoracion').limit(1).maybeSingle();
+    _valFlotaRaw = data ? data.data : null; _valFlota = {}; ((_valFlotaRaw && _valFlotaRaw.items) || []).forEach(x => { _valFlota[x.flota_id] = x; }); }catch(e){}
+  try{ if(typeof renderFleetGrid === 'function') renderFleetGrid(); }catch(e){}
+  valFlotaEconomia();
+}
+function valFlotaEconomia(){
+  const box = document.getElementById('econ-valflota'); if(!box || !_valFlotaRaw) return;
+  const M = (_valFlotaRaw.items || []).filter(x => x.maquina && x.estimado), tot = M.reduce((a, x) => a + x.estimado, 0), mn = M.reduce((a, x) => a + (x.min || x.estimado), 0), mx = M.reduce((a, x) => a + (x.max || x.estimado), 0);
+  const e = v => Math.round(v).toLocaleString('es-ES') + ' €';
+  box.innerHTML = `<div class="vf-card"><span>Valor de la flota · máquinas</span><b>≈ ${e(tot)}</b><i>Entre ${e(mn)} y ${e(mx)} · ${M.length} máquinas · venta de segunda mano en España</i></div>`;
+}
+document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('.nav [data-view="flota"], .nav [data-view="economia"], [data-gtab="economia"]'); if(t) setTimeout(valFlotaCargar, 120); }, true);
 // V7.81 DIRECCIÓN (Daniel 04/10/2026: «una sección nueva en la web»): por ahora enseña el diagnóstico guardado en Sistema (tipo=direccion,
 // clave direccion:diagnostico). Cada apartado es una tarjeta plegable; la primera sale abierta. El texto va en markdown sencillo
 // (párrafos, **negrita**, listas, listas numeradas, casillas «- [ ]» y tablas con |)
@@ -17452,6 +17474,7 @@ function renderFleetGrid(){
     const cia = flCompania(R); if(cia) ch.push(`<span class="fl-chip">Seguro ${flE(cia)}</span>`);
     if(R.ivtm) ch.push(`<span class="fl-chip ${R.ivtm.pagado ? 'ok' : 'aviso'}">IVTM ${R.ivtm.anio}${R.ivtm.pagado ? ' ✓' : ''}</span>`);
     const nd = (m.documentos || []).length; if(nd) ch.push(`<span class="fl-chip">📎 ${nd}</span>`);
+    const vz = _valFlota && _valFlota[m.id]; if(vz) ch.push(vz.estimado ? `<span class="fl-chip venta" title="${flE(vz.fuente || '')}">Venta ≈ ${Math.round(vz.estimado).toLocaleString('es-ES')} €</span>` : '<span class="fl-chip nd">Venta por estimar</span>');   // V8.09
     return `<button type="button" class="fl-card" data-flota-id="${m.id || ''}" onclick="abrirFichaMaquina('${m.id || ''}')">
       <div class="fl-ico">${flIcono(m)}</div>
       <div class="fl-card-cuerpo">
