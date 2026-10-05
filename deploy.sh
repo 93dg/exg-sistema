@@ -46,4 +46,6 @@ MARCADO=$(curl -s -X POST "${SUPABASE_URL}/rest/v1/rpc/exg_marcar_version_public
   -H "Content-Type: application/json" \
   -d "{\"p_caso_id\":\"${CASO_ID}\",\"p_version\":\"${VERSION}\"}")
 echo "EXG version_final: $MARCADO"
+# 05/10/2026: comprobar que GitHub Pages publica de verdad (la V8.45 falló y la V8.46 se quedó atascada sin que nadie lo viera)
+./herramientas/estado_publicacion.sh "$(git rev-parse HEAD)" 240 || echo "⚠ La web todavía NO está al día: no decir «publicado» hasta que estado_publicacion.sh dé ✓"
 echo "Ahora se puede cerrar el caso ${CASO_ID} con cerrar_tarea_exg."
