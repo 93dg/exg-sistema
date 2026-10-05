@@ -4209,7 +4209,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.14</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.15</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4299,7 +4299,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.14</div>
+        <div class="sub" id="version-badge">V8.15</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12939,7 +12939,8 @@ function recSinGritos(t){   // «PEDIR A COVAP LAS FACTURAS…» → «Pedir a C
   return String(t).replace(/^[^a-záéíóúñ]+(?=[\s:]|$)/, m => m.split(/(\s+)/).map((w, i) => /\s/.test(w) || SIG.test(w.replace(/[^\w]/g, '')) || /\d/.test(w) ? w : (i === 0 ? w.charAt(0) + w.slice(1).toLowerCase() : w.toLowerCase())).join(''));
 }
 function recDetalleHtml(desc){
-  const partes = String(desc).replace(/\s+/g, ' ').split(/(?<=[a-záéíóúñ)\d€][.;])\s+(?=[A-ZÁÉÍÓÚÑ«(¿])/).map(x => x.trim().replace(/[.;]$/, '')).filter(x => x.length > 2);
+  // V8.15 (reporte de Daniel: «no quiero pelotones de texto»): un punto por línea — saltos de línea, enumeraciones «1) … 2) …», preguntas y frases
+  const partes = String(desc).split(/\n+/).flatMap(l => l.replace(/\s+/g, ' ').split(/(?<=[a-záéíóúñ)\d€?][.;?:])\s+(?=[A-ZÁÉÍÓÚÑ«(¿])|\s+(?=\d{1,2}\)\s)|(?<=\?)\s+(?=\S)/)).map(x => x.trim().replace(/[.;]$/, '')).filter(x => x.length > 2);
   const resaltar = t => escHtml(t).replace(/((?<![\d.,])\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?\s?€|(?<![\d.,])\d+(?:,\d{1,2})?\s?€|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b)/g, '<b>$1</b>');
   const li = (t, oculto) => `<li${oculto ? ' class="rec-oculto"' : ''}>${resaltar(t)}</li>`;
   return `<ul class="rec-lista">${partes.map((p, i) => li(p, i >= 4)).join('')}</ul>` + (partes.length > 4 ? `<span class="rec-mas" onclick="const u=this.previousElementSibling;u.classList.toggle('ver');this.textContent=u.classList.contains('ver')?'Ver menos':'Ver ${partes.length - 4} más'">Ver ${partes.length - 4} más</span>` : '');
@@ -26289,6 +26290,11 @@ async function guardarGasto(){
 function closeNewInvoiceModal(){ { const w = document.getElementById('ni-estado-modo-wrap'); if(w) w.style.display = 'none'; } document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); document.getElementById('ie-dictado').classList.remove('open'); document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview'); window.__newInvoiceDirty = false; }
 // aviso de cambios sin guardar — solo se llama desde los cierres iniciados por el usuario
 // (botón ✕ y clic fuera), nunca desde el cierre automático tras guardar con éxito
+function ieUrlOriginal(){   // el archivo original (foto, PDF o Excel) del documento abierto en el editor, si lo tiene
+  const d = typeof editingDocId !== 'undefined' && editingDocId && typeof documentosRealesById !== 'undefined' ? documentosRealesById[editingDocId] : null; if(!d) return '';
+  if(d.archivo_url) return d.archivo_url; if(d.justificante_url) return d.justificante_url;
+  if(d.archivo_path) return 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/' + d.archivo_path; return '';
+}
 (function ieBarraAbajo(){   // V7.33 (Daniel): abajo, al alcance del pulgar: [Guardar (icono)] [Emitir si toca] [modo del PDF: Completo ▾] [PDF]
   const ed = document.querySelector('#newinvoice-overlay .invoice-editor'); if(!ed || ed.querySelector('.ie-barra-abajo')) return;
   const barra = document.createElement('div'); barra.className = 'ie-barra-abajo';
@@ -26299,6 +26305,11 @@ function closeNewInvoiceModal(){ { const w = document.getElementById('ni-estado-
   { const x = document.createElement('button'); x.type = 'button'; x.className = 'btn ie-cerrar-abajo'; x.title = 'Cerrar'; x.setAttribute('aria-label', 'Cerrar');
     x.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="width:20px;height:20px;"><path d="M6 6l12 12M18 6L6 18"/></svg>';
     x.onclick = () => intentarCerrarNewInvoiceModal(); barra.insertBefore(x, barra.firstChild); }
+  { const c = document.createElement('button'); c.type = 'button'; c.className = 'btn ie-ico ie-clip'; c.title = 'Ver el archivo original'; c.setAttribute('aria-label', 'Ver el archivo original'); c.style.display = 'none';   // V8.15 (reporte de Daniel)
+    c.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:21px;height:21px;"><path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.4 3.4 0 0 1 4.8 4.8l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg>';
+    c.onclick = () => { const u = ieUrlOriginal(); if(u) visorAbrir(u, 'Archivo original'); }; barra.appendChild(c);
+    const ov = document.getElementById('newinvoice-overlay');
+    if(ov) new MutationObserver(() => { c.style.display = ov.classList.contains('active') && ieUrlOriginal() ? '' : 'none'; }).observe(ov, {attributes: true, attributeFilter: ['class']}); }
   if(pdf){ pdf.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:20px;height:20px;"><path d="M12 4v10M7.5 9.5L12 14l4.5-4.5M5 19h14"/></svg>'; pdf.title = 'PDF: descargar o imprimir'; pdf.setAttribute('aria-label', 'PDF'); barra.appendChild(pdf); }
   ed.appendChild(barra);
   // el botón de guardar se convierte en icono (disquete); su texto sigue en el título para saber qué hace
