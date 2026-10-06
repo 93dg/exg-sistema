@@ -4382,7 +4382,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.54</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.55</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4473,7 +4473,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.54</div>
+        <div class="sub" id="version-badge">V8.55</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18031,7 +18031,7 @@ function flGrupo(k){
   if(/asientos|plazas|neum[aá]ticos|reforma|observaciones|kilometraje|modelo|compra|coste|pendiente|itv|ficha t[eé]cnica|vendido/i.test(k)) return 'otros';
   if(/^(tara|mtma|mma|masa|anchura|longitud|altura|v[ií]a|voladizo|distancia eje|carga)/i.test(k)) return 'pesos';
   if(/^(motor|potencia|combustible|velocidad|cilindrada|cilindros)/i.test(k)) return 'motor';
-  if(/^(matr[ií]cula|vin\b|bastidor|n[ºo°.]|n[uú]mero|tipo\/variante|marca|titular|propietario|servicio|matriculaci|primera matriculaci|permiso|a[nñ]o de fabricaci|otro n)/i.test(k)) return 'ident';
+  if(/^(matr[ií]cula|vin\b|bastidor|n[ºo°.]|n[uú]mero|tipo\/variante|marca|denominaci|clasificaci|titular|propietario|servicio|matriculaci|primera matriculaci|permiso|a[nñ]o de fabricaci|otro n)/i.test(k)) return 'ident';
   return 'otros';
 }
 function flPares(linea){   // "Anchura total: 1.766 mm — Longitud total: 4.546 mm" -> dos pares
@@ -18218,7 +18218,7 @@ function renderFichaMaquina(){
     h += `<div class="fl-sec"><h4>Estado</h4><div class="fl-estado">${[['disponible', 'Operativa'], ['averiada', 'Averiada'], ['taller', 'En taller'], ['vendida', 'Vendida']].map(([k, l]) => `<button type="button" class="${(m.state === k || (k === 'disponible' && m.state === 'activo')) ? 'act' : ''}" onclick="flCambiarEstado('${m.id}', '${k}')">${l}</button>`).join('')}</div></div>`;
     h += flTitularHtml(m) + flSeguroResumenHtml(m, R);
     const tiles = []; if(R.ivtm) tiles.push(['Impuesto ' + R.ivtm.anio, R.ivtm.importe + ' €' + (R.ivtm.pagado ? ' · pagado ' + R.ivtm.pagado : ' · sin pagar')]);
-    { const adq = (/(?:fecha de adquisici[oó]n|adquirid[oa]|fecha de compra)\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i.exec(m.fichaTecnica || '') || [])[1];   // V8.39 (reporte de Daniel)
+    { const adq = (/(?:fecha de adquisici[oó]n|adquirid[oa]|fecha de compra)\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i.exec(m.fichaTecnica || '') || /^Compra\s*:[^\n]*?(\d{1,2}\/\d{1,2}\/\d{4})/im.exec(m.fichaTecnica || '') || [])[1];   // V8.55: tambien vale «Compra: subasta AUTO1, 28/05/2026»   // V8.39 (reporte de Daniel)
       if(adq) tiles.push(['Adquirido', adq]); else h += `<div class="fl-sec"><div class="fl-falta" style="margin-top:0;display:flex;align-items:center;justify-content:space-between;gap:8px;">Falta: fecha de adquisición<button type="button" class="btn sm" onclick="flPonerAdquisicion('${m.id}')">Ponerla</button></div></div>`; }
     const vz = typeof _valFlota !== 'undefined' && _valFlota && _valFlota[m.id]; if(vz && vz.estimado) tiles.push(['Venta estimada', '≈ ' + Math.round(vz.estimado).toLocaleString('es-ES') + ' €']);
     const tit = (R.titulo ? [['Descripción', R.titulo]] : []).concat(flResumenPares(R).filter(([k]) => !/titular|propietari/i.test(k)));
@@ -18263,7 +18263,7 @@ function renderFichaMaquina(){
     else h += '<div class="fl-sec"><div class="fl-vacio">Sin datos de impuestos en la ficha.</div></div>';
     h += flDocsHtml(m, 'Impuestos');
   } else if(_flTab === 'permiso'){
-    const per = R.ident.filter(([k]) => /permiso|matricul|servicio|expedi|bastidor|identificaci/i.test(k));   // el titular ya va arriba, en su bloque
+    const per = R.ident.filter(([k]) => /permiso|matr[ií]cul|servicio|expedi|bastidor|identificaci|marca|tipo\/variante|denominaci|clasificaci|certificado|n[ºo.]*\s*serie/i.test(k));   // V8.55: el permiso muestra todos sus datos (antes «Matrícula» con tilde no entraba)   // el titular ya va arriba, en su bloque
     h += flTitularHtml(m) + (per.length ? `<div class="fl-sec"><h4>Permiso de circulación</h4>${flKvHtml(per)}</div>` : '<div class="fl-sec"><div class="fl-vacio">Sin datos del permiso en la ficha.</div></div>') + flDocsHtml(m, 'Permiso');
   } else if(_flTab === 'mant'){
     if(m.notas_historial) h += `<div class="fl-sec"><h4>Reparaciones e historial</h4>${recDetalleHtml(m.notas_historial)}</div>`;
