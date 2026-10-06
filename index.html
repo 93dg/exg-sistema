@@ -4382,7 +4382,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.58</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.59</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4473,7 +4473,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.58</div>
+        <div class="sub" id="version-badge">V8.59</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14695,7 +14695,9 @@ function rbSanearComputados(doc){   // segunda vuelta: cualquier propiedad calcu
 }
 async function rbCapturar(){
   // V8.56 (reporte de Daniel: la foto no coincide con lo que veía al pulsar): si la librería ya está cargada, no se espera NADA antes de medir; todo se lee en el instante de la pulsación
-  const G = (() => { const v = window.visualViewport; return {x: Math.round(v ? v.pageLeft : window.scrollX), y: Math.round(v ? v.pageTop : window.scrollY), w: Math.round(v ? v.width : window.innerWidth), h: Math.round(v ? v.height : window.innerHeight)}; })();
+  // V8.59 (reporte de Daniel, 3.ª vuelta: la foto sale corrida y sin la barra): sin teclado ni zoom, la pantalla es la de la ventana (scrollY e innerHeight); con teclado o zoom, la zona visible real (V8.14)
+  const SY = Math.round(window.scrollY), SX = Math.round(window.scrollX);
+  const G = (() => { const v = window.visualViewport, ih = window.innerHeight, iw = window.innerWidth, aparte = v && (v.height < ih - 80 || v.scale > 1.01); return aparte ? {x: Math.round(v.pageLeft), y: Math.round(v.pageTop), w: Math.round(v.width), h: Math.round(v.height)} : {x: SX, y: SY, w: iw, h: ih}; })();
   if(typeof html2canvas !== 'function'){ try{ await cargarLib('html2canvas'); }catch(e){ console.warn(e); } }
   if(typeof html2canvas !== 'function') return {cap: null, error: 'html2canvas no cargó'};
   const ocultar = ['report-bug-btn', 'asistente-ia-fab', 'mob-menu-btn', 'global-add-fab', 'mob-menu-panel'].map(i => document.getElementById(i)).filter(Boolean);
@@ -14720,22 +14722,31 @@ async function rbCapturar(){
   // V8.58 (reporte de Daniel: «peor», la barra inferior no salía en la foto): en el iPhone la copia de la página tiene otro alto de pantalla y lo FIJO (barra de abajo) se colocaba fuera del recorte. Se anota dónde está cada elemento fijo en la pantalla real y en la copia se pone en ese mismo sitio, sin depender del alto de la copia
   const fijos = [];
   try{ for(const el of document.body.querySelectorAll('*')){ if(el.offsetParent !== null || ocultar.includes(el)) continue; const cs = getComputedStyle(el); if(cs.position !== 'fixed' || cs.visibility === 'hidden' || cs.display === 'none') continue;
-      const r = el.getBoundingClientRect(); if(!r.width || !r.height || r.bottom < 0 || r.top > G.h || r.right < 0 || r.left > G.w) continue; el.setAttribute('data-rbfix', fijos.length); fijos.push({t: r.top, l: r.left, w: r.width, h: r.height}); } }catch(e){}
+      const r = el.getBoundingClientRect(); if(!r.width || !r.height || r.bottom < 0 || r.top > G.h || r.right < 0 || r.left > G.w) continue; el.setAttribute('data-rbfix', fijos.length); fijos.push({t: r.top + SY, l: r.left + SX, w: r.width, h: r.height}); } }catch(e){}
   const fijarCopia = doc => { try{ doc.querySelectorAll('[data-rbfix]').forEach(el => { const f = fijos[Number(el.getAttribute('data-rbfix'))]; if(!f) return; const s = el.style;
       s.setProperty('position', 'absolute', 'important'); s.setProperty('bottom', 'auto', 'important'); s.setProperty('right', 'auto', 'important'); s.setProperty('margin', '0', 'important'); s.setProperty('transform', 'none', 'important'); s.setProperty('box-sizing', 'border-box', 'important');
       s.setProperty('width', f.w + 'px', 'important'); s.setProperty('height', f.h + 'px', 'important'); s.setProperty('top', '0px', 'important'); s.setProperty('left', '0px', 'important');
-      const r0 = el.getBoundingClientRect(); s.setProperty('top', (f.t - r0.top) + 'px', 'important'); s.setProperty('left', (f.l - r0.left) + 'px', 'important'); }); }catch(e){ console.warn(e); } };   // se mide dónde cae con top/left a 0 y se corrige la diferencia: vale con cualquier elemento padre colocado
+      const r0 = el.getBoundingClientRect(), vw = doc.defaultView; s.setProperty('top', (f.t - (r0.top + (vw.scrollY || 0))) + 'px', 'important'); s.setProperty('left', (f.l - (r0.left + (vw.scrollX || 0))) + 'px', 'important'); }); }catch(e){ console.warn(e); } };   // coordenadas de documento: se mide dónde cae con top/left a 0 (sumando el desplazamiento de la copia) y se corrige la diferencia
   const quitarMarcas = () => { document.querySelectorAll('[data-rbfix]').forEach(el => el.removeAttribute('data-rbfix')); document.querySelectorAll('[data-rbi]').forEach(el => el.removeAttribute('data-rbi')); document.querySelectorAll('[data-rbx],[data-rbarriba]').forEach(el => { el.removeAttribute('data-rbx'); el.removeAttribute('data-rbarriba'); }); };
   const conTiempo = (pr, ms) => Promise.race([pr, new Promise((_, ko) => setTimeout(() => ko(new Error('la captura tardó más de ' + ms / 1000 + ' s')), ms))]);
   // V8.14: se copia la zona visible real. V8.56: la zona se mide al pulsar (G) y la copia no se desplaza: se sube con top:-y y lo fijo (barra inferior, botones) queda en su sitio, igual que en pantalla
-  const opciones = (extra) => ({x: 0, y: 0, width: G.w, height: G.h, scrollX: 0, scrollY: 0, windowWidth: G.w, windowHeight: G.h, scale: Math.max(0.6, Math.min(2, 800 / window.innerWidth)), logging: false, useCORS: true, ignoreElements: fuera, ...extra});
-  const subirCopia = doc => { try{ const h = doc.documentElement; h.style.setProperty('position', 'relative', 'important'); h.style.setProperty('top', (-G.y) + 'px', 'important'); h.style.setProperty('left', (-G.x) + 'px', 'important'); }catch(e){} };
+  // V8.59: la copia va de arriba de la página hasta el final de la pantalla, con el desplazamiento a 0. Dentro se pone una MARCA (un cuadrito de color) justo debajo de la pantalla; al terminar se busca dónde ha caído de verdad y se recorta ahí. Así no importa cómo coloque Safari del iPhone la copia
+  const ALTO = G.y + G.h + 14; let esc = Math.max(0.4, Math.min(2, 800 / window.innerWidth)); if(G.w * ALTO * esc * esc > 12e6) esc = Math.max(0.4, Math.sqrt(12e6 / (G.w * ALTO)));
+  const opciones = (extra) => ({x: 0, y: 0, width: G.w, height: ALTO, scrollX: 0, scrollY: 0, windowWidth: G.w, windowHeight: ALTO, scale: esc, logging: false, useCORS: true, ignoreElements: fuera, ...extra});
+  const subirCopia = doc => { try{ const m = doc.createElement('div'); m.setAttribute('data-rbmarca', '1'); m.style.cssText = 'position:absolute;left:0;top:' + (G.y + G.h + 3) + 'px;width:8px;height:7px;background:#ff00fe;z-index:2147483647;margin:0;padding:0;border:0;'; doc.documentElement.appendChild(m); }catch(e){} };
+  const recortar = cap => { const dia = {G, SY, esc: Number(esc.toFixed(2)), lienzo: cap.width + 'x' + cap.height}; try{
+      const cx = cap.getContext('2d'), fa = Math.min(cap.width, Math.ceil(12 * esc)), datos = cx.getImageData(0, 0, fa, cap.height).data; let y0 = -1, y1 = -1;
+      for(let y = 0; y < cap.height; y++){ let n = 0; for(let x = 0; x < fa; x++){ const i = (y * fa + x) * 4; if(datos[i] > 200 && datos[i + 1] < 70 && datos[i + 2] > 200) n++; } if(n >= Math.max(2, Math.floor(esc * 3))){ if(y0 < 0) y0 = y; y1 = y; } else if(y0 >= 0) break; }
+      const desfase = y0 >= 0 ? y0 - (G.y + G.h + 3) * esc : 0; dia.marca = y0 >= 0 ? 'hallada' : 'no hallada'; dia.desfase = Number((desfase / esc).toFixed(1));
+      const w = Math.round(G.w * esc), h = Math.round(G.h * esc); let ini = Math.round(G.y * esc + desfase); ini = Math.max(0, Math.min(ini, cap.height - h)); dia.inicio = Math.round(ini / esc);
+      const fin = document.createElement('canvas'); fin.width = w; fin.height = h; fin.getContext('2d').drawImage(cap, 0, ini, w, h, 0, 0, w, h); fin._diag = dia; return fin;
+    }catch(e){ dia.error = String(e && e.message || e).slice(0, 80); cap._diag = dia; return cap; } };
   let ultimoError = '';
   try{
     for(const intento of [1, 2]){   // 1: se quitan los colores modernos de los estilos; 2: además se revisan los colores ya calculados de lo que se ve
       try{
         const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { subirCopia(doc); fijarCopia(doc); doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); }})), 9000);
-        if(cap && cap.width > 0) return {cap, error: ''};
+        if(cap && cap.width > 0){ const fin = recortar(cap); return {cap: fin, error: '', diag: fin._diag}; }
       }catch(e){ ultimoError = String(e && e.message || e).slice(0, 160); console.warn('captura, intento ' + intento, e); }
     }
   } finally { quitarMarcas(); ocultar.forEach(e => { e.style.visibility = e.dataset.vis || ''; delete e.dataset.vis; }); }
@@ -14765,7 +14776,7 @@ async function openReportBug(){
   let res = {cap: null, error: ''};
   try{ res = await rbCapturar(); } catch(e){ res = {cap: null, error: String(e && e.message || e).slice(0, 160)}; }
   finally { _rb.ocupado = false; if(boton) boton.classList.remove('rb-esperando'); if(toasts) toasts.style.visibility = ''; }
-  let cap = res.cap; _rb.sinCaptura = false;
+  let cap = res.cap; _rb.sinCaptura = false; _rb.diag = res.diag || null;   // V8.59: cómo se midió y se recortó la captura, para ver qué hace cada móvil
   if(!cap){ cap = rbSinCaptura(); _rb.sinCaptura = true; try{ aiRegistrarEvento('captura_fallida', (seccionActualNombre() + ': ' + res.error).slice(0, 120)); }catch(e){} }
   _rb.cap = cap; _rb.marcas = []; _rb.actual = null; _rb.blob = null; _rb.meta = null;
   const lz = document.getElementById('rb-lienzo'); lz.width = cap.width; lz.height = cap.height;
@@ -14911,7 +14922,7 @@ async function rbEnviar(otro){   // un solo toque: la captura con lo marcado + l
     const categoria = etiquetas.includes('fallo') ? 'fallo' : etiquetas.length ? 'mejorar_diseno' : texto ? 'fallo' : 'marcado';
     const fila = {tipo: 'mejora', data: {
       texto: `[${seccion}] ${cuerpo || (marcas.length ? 'Revisar lo marcado en la captura' : 'Revisar esta pantalla')}`,
-      captura_url: capturaUrl, referencias: referencias.length ? referencias : null, sin_captura: _rb.sinCaptura || null, estado: 'pendiente', protocolo_exg: PROTOCOLO_EXG_REPORTE, seccion, categoria, etiquetas: etiquetas.length ? etiquetas : null, marcas: marcas.length ? marcas : null,
+      captura_url: capturaUrl, captura_diag: _rb.diag || null, referencias: referencias.length ? referencias : null, sin_captura: _rb.sinCaptura || null, estado: 'pendiente', protocolo_exg: PROTOCOLO_EXG_REPORTE, seccion, categoria, etiquetas: etiquetas.length ? etiquetas : null, marcas: marcas.length ? marcas : null,
       created_context: {url: window.location.href, timestamp: new Date().toISOString(), pantalla: {ancho: window.innerWidth, alto: window.innerHeight}}}};
     if(fallo) fila.data.captura_fallo = fallo;
     const ins = await tope(sb.from('sistema').insert(fila), 15000);
