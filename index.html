@@ -4363,6 +4363,23 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <!-- jsPDF: ahora en lib/, se carga después de abrir la web (V7.18, velocidad) -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style id="v860-compacto">
+/* V8.64 (Daniel: cada palabra de tipo con su color en todos los sitios, y el tipo entre el estado y el icono de imprimir) */
+.tp-albaran{color:#A8731F;font-weight:700;} .tp-factura{color:#1F7A77;font-weight:700;} .tp-proforma{color:#6E4FA0;font-weight:700;} .tp-presupuesto{color:#5A6B82;font-weight:700;}
+.tp-albaran.tp-claro{color:#F0C46A;} .tp-factura.tp-claro{color:#86D8D3;} .tp-proforma.tp-claro{color:#C9B6EC;} .tp-presupuesto.tp-claro{color:#BCC8DA;}
+.fc-tipo-tag{flex:none;margin-left:9px;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;}
+.factura-card-movil .fc-estado-wrap{align-items:center;flex-wrap:nowrap;min-width:0;}
+@media(max-width:400px){
+  .fc-tipo-tag{margin-left:6px;font-size:9.5px;letter-spacing:.02em;}
+  .factura-card-movil .fc-estado-wrap{padding-right:84px !important;}
+  .factura-card-movil .fc-estado-wrap .pill{padding:4px 8px 4px 7px !important;font-size:10.5px !important;gap:5px !important;}
+  .factura-card-movil .fc-mas-btn{width:32px !important;height:32px !important;}
+  .factura-card-movil .fc-pdf-btn{right:46px !important;}
+}
+@media(max-width:375px){   /* si en una pantalla muy estrecha no cabe junto al estado, el tipo baja a la línea de debajo en vez de pisar el icono de imprimir */
+  .factura-card-movil .fc-estado-wrap{flex-wrap:wrap !important;row-gap:1px !important;}
+  .factura-card-movil .fc-tipo-tag{margin-left:2px !important;}
+}
+
 /* V8.63 (Daniel: «un borde o un fondo de color muy sutil» para reconocer a simple vista albarán, proforma y factura): barra fina a la izquierda y un tinte del 5 %. Albarán ámbar (como «Por facturar»), factura verde azulado (como el apartado Facturas), proforma violeta, presupuesto gris azulado */
 .factura-card-movil.fc-tipo-albaran:not(.fc-pendiente-revision){background:linear-gradient(rgba(201,138,43,.06),rgba(201,138,43,.06)),var(--paper);box-shadow:inset 4px 0 0 #D4A24E,0 1px 3px rgba(0,0,0,0.08);}
 .factura-card-movil.fc-tipo-factura:not(.fc-pendiente-revision){background:linear-gradient(rgba(22,112,111,.055),rgba(22,112,111,.055)),var(--paper);box-shadow:inset 4px 0 0 #4A9C98,0 1px 3px rgba(0,0,0,0.08);}
@@ -4405,7 +4422,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.63</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.64</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4496,7 +4513,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.63</div>
+        <div class="sub" id="version-badge">V8.64</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11535,7 +11552,7 @@ function renderizarFilaYCardFactura(doc, entidad, trabajo, alPrincipio){
       <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${doc.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
       <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
       <input type="checkbox" class="fc-check fact-sel-chk-espejo" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="sincCheckMovilFactura('${doc.id}', this.checked)">
-      <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}</div>
+      <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}<span class="fc-tipo-tag tp-${doc.type || 'factura'}">${TIPO_DOC_NOMBRE[doc.type || 'factura'] || 'Factura'}</span></div>
       <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
       ${obraHtml}
       <div class="fc-meta">${metaHtml}</div>
@@ -13153,6 +13170,33 @@ function ccDocsMontarFiltro(){ try{
   if(!PLEG2.ccdocs) pleg2Crear({id: 'ccdocs', despuesDe: '#cc-docs-ancla', plegados: ['tipo', 'estado'], grupos: [['tipo', 'Tipo', 'cc-doc-tipo-chips'], ['estado', 'Estado', 'cc-doc-estado-chips']]});
 }catch(e){ console.warn(e); } }
 document.addEventListener('DOMContentLoaded', () => setTimeout(ccDocsMontarFiltro, 0));
+
+// V8.64 (Daniel): albarán, factura, proforma y presupuesto salen SIEMPRE de su color, en cualquier sitio de la web (títulos, pestañas, filtros, tablas, tarjetas, avisos). Se recorre el texto ya pintado y cada palabra se envuelve; si el fondo es oscuro se usa la variante clara
+const TP_PALABRA = /(^|[^\p{L}\p{N}_])(albar[aá]n(?:es)?|facturas?|proformas?|presupuestos?)(?![\p{L}\p{N}_])/giu, TP_PRUEBA = /albar[aá]n|factura|proforma|presupuesto/i;
+const TP_NO = 'script,style,textarea,input,select,option,[contenteditable],.no-tp,.tp-albaran,.tp-factura,.tp-proforma,.tp-presupuesto,svg,title,code,pre,canvas';
+const tpFondoOscuro = new WeakMap();
+function tpEsOscuro(el){
+  if(tpFondoOscuro.has(el)) return tpFondoOscuro.get(el);
+  let n = el, r = false;
+  for(let i = 0; n && i < 8; i++, n = n.parentElement){ const bg = getComputedStyle(n).backgroundColor, m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/.exec(bg); if(m && (m[4] === undefined || Number(m[4]) > 0.4)){ r = (0.299 * m[1] + 0.587 * m[2] + 0.114 * m[3]) / 255 < 0.5; break; } }
+  tpFondoOscuro.set(el, r); return r;
+}
+function tpClase(w){ const k = w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); return k.startsWith('albar') ? 'albaran' : k.startsWith('factur') ? 'factura' : k.startsWith('proform') ? 'proforma' : 'presupuesto'; }
+function tpPintar(raiz){ try{
+  if(!raiz || (raiz.nodeType !== 1 && raiz.nodeType !== 11)) return;
+  if(raiz.nodeType === 1 && raiz.closest && raiz.closest(TP_NO)) return;
+  const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, {acceptNode: n => { const t = n.nodeValue; if(!t || t.length < 7 || !TP_PRUEBA.test(t)) return NodeFilter.FILTER_REJECT; const p = n.parentElement; return (!p || p.closest(TP_NO)) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; }}), nodos = [];
+  while(w.nextNode()) nodos.push(w.currentNode);
+  nodos.forEach(n => { const t = n.nodeValue, oscuro = tpEsOscuro(n.parentElement); let ult = 0, hay = false; const fr = document.createDocumentFragment(); TP_PALABRA.lastIndex = 0; let m;
+    while((m = TP_PALABRA.exec(t))){ const ini = m.index + m[1].length; if(ini > ult) fr.appendChild(document.createTextNode(t.slice(ult, ini))); const s = document.createElement('span'); s.className = 'tp-' + tpClase(m[2]) + (oscuro ? ' tp-claro' : ''); s.textContent = m[2]; fr.appendChild(s); ult = ini + m[2].length; hay = true; }
+    if(hay){ if(ult < t.length) fr.appendChild(document.createTextNode(t.slice(ult))); n.parentNode.replaceChild(fr, n); } });
+}catch(e){ console.warn('pintar tipos', e); } }
+(function tpIniciar(){
+  let cola = new Set(), prog = false;
+  const obs = new MutationObserver(ms => { ms.forEach(m => { if(m.type === 'characterData'){ if(m.target.parentElement) cola.add(m.target.parentElement); } else m.addedNodes.forEach(n => { if(n.nodeType === 1) cola.add(n); else if(n.nodeType === 3 && n.parentElement) cola.add(n.parentElement); }); }); if(!prog){ prog = true; setTimeout(() => { const lote = Array.from(cola); cola = new Set(); prog = false; obs.disconnect(); lote.forEach(tpPintar); obs.observe(document.body, {childList: true, subtree: true, characterData: true}); }, 90); } });
+  const arrancar = () => { tpPintar(document.body); obs.observe(document.body, {childList: true, subtree: true, characterData: true}); };
+  if(document.body) arrancar(); else document.addEventListener('DOMContentLoaded', arrancar);
+})();
 function recMontarFiltro(){ try{ if(!PLEG2.rec) pleg2Crear({id: 'rec', despuesDe: '#rec-filtro-ancla', plegados: ['plazo', 'tema'], grupos: [['plazo', 'Plazo', 'rec-filtro-plazo-chips', 'unico'], ['tema', 'Tipo', 'rec-filtro-tema-chips']]}); }catch(e){} }
 document.addEventListener('DOMContentLoaded', () => setTimeout(recMontarFiltro, 0));
 function recVence(d){ const v = d.vence || d.fecha_limite || null; if(v) return String(v).slice(0, 10); const f = d.fecha ? String(d.fecha).slice(0, 10) : null; return f && f > new Date().toISOString().slice(0, 10) ? f : null; }
@@ -27797,13 +27841,13 @@ function renderControlDocs(){
         const archivoBtn = urlArch ? `<span class="fc-ver-original" onclick="event.stopPropagation();abrirVisorDesdeUrl('${urlArch}')">${ICO_CLIP} Archivo</span>` : '';
         const extraHtml = (archivoBtn || fallosHtml) ? `<div class="fc-extra">${archivoBtn}${fallosHtml}</div>` : '';
         const estadoHtml = controlDocsEstadoPill(d,'m');
-        const tipoNum = `${String(tipoDocEtiqueta(d.type||'')).replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/, '')} · ${d.numero||'—'}`;   // sin el emoji del tipo
+        const tipoNum = `Nº ${d.numero||'—'}`;   // V8.64: el tipo va arriba, entre el estado y el icono de imprimir
         const cliente = d.client && d.client !== '—' ? d.client : 'Sin cliente';
         return `<div class="factura-card-movil fc-tipo-${d.type}" data-doc-id="${d.id}" onclick="openDocumentViewer('${d.id}')">
           <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${d.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
           <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${d.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
           <input type="checkbox" class="fc-check ctrl-sel-chk" data-id="${d.id}" onclick="event.stopPropagation();" onchange="actualizarSeleccionDoc('ctrl-sel-chk','ctrl-borrar-sel-btn','ctrl-sel-count')">
-          <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}</div>
+          <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}<span class="fc-tipo-tag tp-${d.type}">${TIPO_DOC_NOMBRE[d.type] || d.type}</span></div>
           <div class="fc-cliente">${svgEsc(cliente)}</div>
           <div class="fc-meta">
             <span class="fc-meta-ico">${ICO_CAL} ${fecha}</span>
@@ -28249,7 +28293,7 @@ function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta
     <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${doc.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
     <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
     <input type="checkbox" class="fc-check ${cbClass}" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="actualizarSeleccionDoc('${cbClass}', '${cbClass}'.replace('-chk','-borrar-sel-btn'), '${cbClass}'.replace('-chk','-sel-count'))">
-    <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}</div>
+    <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}<span class="fc-tipo-tag tp-${tipo}">${TIPO_DOC_NOMBRE[tipo] || tipo}</span></div>
     <div class="fc-cliente">${entidad ? entidad.name : 'Falta cliente'}</div>
     ${obraHtml}
     <div class="fc-meta">${metaHtml}</div>
