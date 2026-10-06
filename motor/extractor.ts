@@ -22,7 +22,7 @@ const EMISOR = {
   telefonos: ["670983221", "957584084"],
   nombres: ["EXCAVACIONES GOMEZ", "RAFAEL GOMEZ MARTINEZ"],
   emails: ["EXGOMEZ"],
-  direcciones: [/\bINDUSTRIA\s*S\.?\s*\/?\s*N\b/, /C\/\.?\s*SEVILLA/, /\bCALLE INDUSTRIA\b/],
+  direcciones: [/\bINDUSTRIA\s*S\.?\s*\/?\s*N\b/, /\bINDUSTRIA\s*,?\s*(N[º°O]?\s*)?12\b/, /C\/\.?\s*SEVILLA/, /\bCALLE INDUSTRIA\b/],
 };
 export function esDatoEmisor(t: any): boolean {
   const n = norm(t); if (!n) return false;

@@ -4382,7 +4382,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.55</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.56</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4473,7 +4473,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.55</div>
+        <div class="sub" id="version-badge">V8.56</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7362,7 +7362,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
               <div class="ie-company-name">RAFAEL GÓMEZ MARTÍNEZ</div>
               <div id="ie-company-fiscal">
               <div>NIF 75706590C</div>
-              <div>Calle Industria s/n</div>
+              <div>Calle Industria 12</div>
               <div>14290 Fuente Obejuna (Córdoba)</div>
               <div>exgomez.m@gmail.com</div>
               </div>
@@ -14027,7 +14027,7 @@ function perPintarFicha(){
   const tabs = [['resumen', 'Resumen'], ['docs', 'Documentos'], ['veh', 'Vehículos'], ['seg', 'Seguros']], cnt = {docs: fotos.length, veh: veh.length, seg: seg.length};
   let h = '';
   if(_perTab === 'resumen'){
-    h += `<div class="fl-sec"><h4>Datos personales</h4>${flKvHtml([['Nombre', F(p.nombre)], ['DNI', F(p.dni)], ['Nacimiento', F(p.nacimiento)], ['Domicilio', F(p.domicilio)], ['Papel en la empresa', F(p.rol)]])}</div>`;
+    h += `<div class="fl-sec"><h4>Datos personales</h4>${flKvHtml([['Nombre', F(p.nombre)], ['DNI', F(p.dni)], ['Nacimiento', F(p.nacimiento)], ['Domicilio', F(p.domicilio)], ['Papel en la empresa', F(p.rol)]].concat(p.firma ? [['Firma', p.firma]] : []))}</div>`;   // V8.56: constancia de que la firma está guardada (en privado, no se enseña el archivo)
     h += `<div class="fl-sec"><h4>DNI</h4>${flKvHtml([['Número', F(p.dni)], ['Válido hasta', F(p.dni_caduca)]])}${perEstadoFecha(p.dni_caduca)}</div>`;
     h += `<div class="fl-sec"><h4>Carnet de conducir</h4>${p.carnet ? flKvHtml([['Permisos', F(p.carnet.permisos)], ['Expedido', F(p.carnet.expedido)], ['Caduca', F(p.carnet.caduca)]]) + perEstadoFecha(p.carnet.caduca) : '<div class="fl-falta" style="margin-top:0;">Falta: datos del carnet de conducir</div>'}</div>`;
     h += `<div class="fl-sec"><h4>Resumen</h4>${flKvHtml([['Vehículos a su nombre', String(veh.length)], ['Seguros a su nombre', String(seg.length)], ['Coste de sus seguros', seg.some(x => x.coste) ? seg.reduce((a, x) => a + (Number(x.coste) || 0), 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' € al año' : '—'], ['Documentos', String(fotos.length)]])}</div>`;
@@ -14687,7 +14687,9 @@ function rbSanearComputados(doc){   // segunda vuelta: cualquier propiedad calcu
   });
 }
 async function rbCapturar(){
-  try{ await cargarLib('html2canvas'); }catch(e){ console.warn(e); }
+  // V8.56 (reporte de Daniel: la foto no coincide con lo que veía al pulsar): si la librería ya está cargada, no se espera NADA antes de medir; todo se lee en el instante de la pulsación
+  const G = (() => { const v = window.visualViewport; return {x: Math.round(v ? v.pageLeft : window.scrollX), y: Math.round(v ? v.pageTop : window.scrollY), w: Math.round(v ? v.width : window.innerWidth), h: Math.round(v ? v.height : window.innerHeight)}; })();
+  if(typeof html2canvas !== 'function'){ try{ await cargarLib('html2canvas'); }catch(e){ console.warn(e); } }
   if(typeof html2canvas !== 'function') return {cap: null, error: 'html2canvas no cargó'};
   const ocultar = ['report-bug-btn', 'asistente-ia-fab', 'mob-menu-btn', 'global-add-fab', 'mob-menu-panel'].map(i => document.getElementById(i)).filter(Boolean);
   ocultar.forEach(e => { e.dataset.vis = e.style.visibility; e.style.visibility = 'hidden'; });
@@ -14710,19 +14712,22 @@ async function rbCapturar(){
   const ponerColores = doc => { doc.querySelectorAll('[data-rbi]').forEach(el => { const v = colores[Number(el.getAttribute('data-rbi'))]; if(v) Object.entries(v).forEach(([p, c]) => el.style.setProperty(p, c, 'important')); }); };
   const quitarMarcas = () => { document.querySelectorAll('[data-rbi]').forEach(el => el.removeAttribute('data-rbi')); document.querySelectorAll('[data-rbx],[data-rbarriba]').forEach(el => { el.removeAttribute('data-rbx'); el.removeAttribute('data-rbarriba'); }); };
   const conTiempo = (pr, ms) => Promise.race([pr, new Promise((_, ko) => setTimeout(() => ko(new Error('la captura tardó más de ' + ms / 1000 + ' s')), ms))]);
-  const vv = window.visualViewport;   // V8.14 (reporte de Daniel: la captura salía recortada con el teclado del iPhone): se copia la zona visible real
-  const opciones = (extra) => ({x: vv ? vv.pageLeft : window.scrollX, y: vv ? vv.pageTop : window.scrollY, width: vv ? Math.round(vv.width) : window.innerWidth, height: vv ? Math.round(vv.height) : window.innerHeight, scale: Math.max(0.6, Math.min(2, 800 / window.innerWidth)), logging: false, useCORS: true, ignoreElements: fuera, ...extra});
+  // V8.14: se copia la zona visible real. V8.56: la zona se mide al pulsar (G) y la copia no se desplaza: se sube con top:-y y lo fijo (barra inferior, botones) queda en su sitio, igual que en pantalla
+  const opciones = (extra) => ({x: 0, y: 0, width: G.w, height: G.h, scrollX: 0, scrollY: 0, windowWidth: G.w, windowHeight: G.h, scale: Math.max(0.6, Math.min(2, 800 / window.innerWidth)), logging: false, useCORS: true, ignoreElements: fuera, ...extra});
+  const subirCopia = doc => { try{ const h = doc.documentElement; h.style.setProperty('position', 'relative', 'important'); h.style.setProperty('top', (-G.y) + 'px', 'important'); h.style.setProperty('left', (-G.x) + 'px', 'important'); }catch(e){} };
   let ultimoError = '';
   try{
     for(const intento of [1, 2]){   // 1: se quitan los colores modernos de los estilos; 2: además se revisan los colores ya calculados de lo que se ve
       try{
-        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); }})), 9000);
+        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { subirCopia(doc); doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); }})), 9000);
         if(cap && cap.width > 0) return {cap, error: ''};
       }catch(e){ ultimoError = String(e && e.message || e).slice(0, 160); console.warn('captura, intento ' + intento, e); }
     }
   } finally { quitarMarcas(); ocultar.forEach(e => { e.style.visibility = e.dataset.vis || ''; delete e.dataset.vis; }); }
   return {cap: null, error: ultimoError};
 }
+// V8.56: la librería de captura se precarga al rato de abrir la web, así al pulsar Reportar no hay que esperarla y la foto se hace en el mismo instante
+window.addEventListener('load', () => setTimeout(() => { try{ cargarLib('html2canvas').catch(() => {}); }catch(e){} }, 4000));
 function rbSinCaptura(){   // si de verdad no se puede hacer la captura, el reporte se abre igual (con las etiquetas y el texto) y se manda sin imagen
   const cv = document.createElement('canvas'); cv.width = Math.max(300, window.innerWidth) * 2; cv.height = Math.max(300, window.innerHeight) * 2; const x = cv.getContext('2d');
   x.fillStyle = '#2a2a2e'; x.fillRect(0, 0, cv.width, cv.height); x.fillStyle = '#ddd'; x.textAlign = 'center'; x.font = '600 ' + Math.round(cv.width / 16) + 'px sans-serif';
@@ -18218,7 +18223,7 @@ function renderFichaMaquina(){
     h += `<div class="fl-sec"><h4>Estado</h4><div class="fl-estado">${[['disponible', 'Operativa'], ['averiada', 'Averiada'], ['taller', 'En taller'], ['vendida', 'Vendida']].map(([k, l]) => `<button type="button" class="${(m.state === k || (k === 'disponible' && m.state === 'activo')) ? 'act' : ''}" onclick="flCambiarEstado('${m.id}', '${k}')">${l}</button>`).join('')}</div></div>`;
     h += flTitularHtml(m) + flSeguroResumenHtml(m, R);
     const tiles = []; if(R.ivtm) tiles.push(['Impuesto ' + R.ivtm.anio, R.ivtm.importe + ' €' + (R.ivtm.pagado ? ' · pagado ' + R.ivtm.pagado : ' · sin pagar')]);
-    { const adq = (/(?:fecha de adquisici[oó]n|adquirid[oa]|fecha de compra)\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i.exec(m.fichaTecnica || '') || /^Compra\s*:[^\n]*?(\d{1,2}\/\d{1,2}\/\d{4})/im.exec(m.fichaTecnica || '') || [])[1];   // V8.55: tambien vale «Compra: subasta AUTO1, 28/05/2026»   // V8.39 (reporte de Daniel)
+    { const adq = (/(?:fecha de adquisici[oó]n|adquirid[oa]|fecha de compra)\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i.exec(m.fichaTecnica || '') || /permiso expedido\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i.exec(m.fichaTecnica || '') || /^Compra\s*:[^\n]*?(\d{1,2}\/\d{1,2}\/\d{4})/im.exec(m.fichaTecnica || '') || [])[1];   // V8.56 (regla de Daniel): la adquisición es la fecha de expedición del permiso, la que sale bajo la matriculación; si no, «Compra: … dd/mm/aaaa»   // V8.39 (reporte de Daniel)
       if(adq) tiles.push(['Adquirido', adq]); else h += `<div class="fl-sec"><div class="fl-falta" style="margin-top:0;display:flex;align-items:center;justify-content:space-between;gap:8px;">Falta: fecha de adquisición<button type="button" class="btn sm" onclick="flPonerAdquisicion('${m.id}')">Ponerla</button></div></div>`; }
     const vz = typeof _valFlota !== 'undefined' && _valFlota && _valFlota[m.id]; if(vz && vz.estimado) tiles.push(['Venta estimada', '≈ ' + Math.round(vz.estimado).toLocaleString('es-ES') + ' €']);
     const tit = (R.titulo ? [['Descripción', R.titulo]] : []).concat(flResumenPares(R).filter(([k]) => !/titular|propietari/i.test(k)));
@@ -18263,7 +18268,7 @@ function renderFichaMaquina(){
     else h += '<div class="fl-sec"><div class="fl-vacio">Sin datos de impuestos en la ficha.</div></div>';
     h += flDocsHtml(m, 'Impuestos');
   } else if(_flTab === 'permiso'){
-    const per = R.ident.filter(([k]) => /permiso|matr[ií]cul|servicio|expedi|bastidor|identificaci|marca|tipo\/variante|denominaci|clasificaci|certificado|n[ºo.]*\s*serie/i.test(k));   // V8.55: el permiso muestra todos sus datos (antes «Matrícula» con tilde no entraba)   // el titular ya va arriba, en su bloque
+    const per = R.ident.filter(([k]) => /permiso|matr[ií]cul|servicio|expedi|bastidor|identificaci|marca|denominaci/i.test(k));   // V8.56: el permiso muestra solo datos del permiso (matrícula con tilde, marca, denominación, expedición); nº de serie, certificado y clasificación son de la ficha técnica   // el titular ya va arriba, en su bloque
     h += flTitularHtml(m) + (per.length ? `<div class="fl-sec"><h4>Permiso de circulación</h4>${flKvHtml(per)}</div>` : '<div class="fl-sec"><div class="fl-vacio">Sin datos del permiso en la ficha.</div></div>') + flDocsHtml(m, 'Permiso');
   } else if(_flTab === 'mant'){
     if(m.notas_historial) h += `<div class="fl-sec"><h4>Reparaciones e historial</h4>${recDetalleHtml(m.notas_historial)}</div>`;
@@ -22597,7 +22602,7 @@ function generarPDFDocumento(accion, modoForzado){
     if(cfg.hasFiscalHeader){
       let yf = yc;
       yf += 5; doc.text('NIF 75706590C', xTexto, yf);
-      yf += 4.5; doc.text('CALLE INDUSTRIA S/N', xTexto, yf);
+      yf += 4.5; doc.text('CALLE INDUSTRIA 12', xTexto, yf);
       yf += 4.5; doc.text('14290 FUENTE OBEJUNA (CÓRDOBA)', xTexto, yf);
       yf += 4.5; doc.text('exgomez.m@gmail.com', xTexto, yf); // el email se deja tal cual, en mayúsculas no es un email válido a la vista
     }
@@ -22809,7 +22814,7 @@ function togglePreview(){
         <img class="ie-logo" src="${document.querySelector('.ie-logo').src}">
         <div class="ie-company-text">
           <div class="ie-company-name">RAFAEL GÓMEZ MARTÍNEZ</div>
-          ${cfg.hasFiscalHeader ? `<div>NIF 75706590C</div><div>CALLE INDUSTRIA S/N</div><div>14290 FUENTE OBEJUNA (CÓRDOBA)</div><div>exgomez.m@gmail.com</div>` : ''}
+          ${cfg.hasFiscalHeader ? `<div>NIF 75706590C</div><div>CALLE INDUSTRIA 12</div><div>14290 FUENTE OBEJUNA (CÓRDOBA)</div><div>exgomez.m@gmail.com</div>` : ''}
         </div>
       </div>
       <div class="ie-doc-meta">
