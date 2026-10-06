@@ -458,6 +458,7 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .pill.cancelado, .pill.descartado, .pill.urgente, .pill.averiada, .pill.noadjudicado{background:var(--red-soft);color:var(--red);}
 .pill.posible{background:var(--concrete-2);color:var(--ink-soft);border:1px dashed var(--ink-soft);}
 .pill.pendiente_enviar{background:#2B5C7A;color:#fff;}
+.pill.trabajo_activo{background:#DFF1F6;color:#0E6A82;}
 
 .estado-cobro-dd{position:relative;display:inline-block;}
 .estado-cobro-dd .pill{cursor:pointer;border:1px solid transparent;}
@@ -4442,6 +4443,22 @@ svg.leaflet-image-layer.leaflet-interactive path {
 /* V8.67 (reporte de Daniel: «al reportar sale bien y como lo veo yo no»): el desplegable de estado se cortaba al llegar al borde de la tarjeta porque las tarjetas recortan lo que se sale de ellas; la captura no lo hacía y por eso salía completo. La tarjeta con el menú abierto no recorta */
 .factura-card-movil.fc-menu-abierto, .factura-card-movil:has(.estado-cobro-dd.open){content-visibility:visible !important;contain:none !important;overflow:visible !important;position:relative;z-index:40;}
 .estado-cobro-dd.open .estado-cobro-menu{z-index:60;}
+/* V8.68 (Daniel: «el visor funciona perfecto pero no me gusta que sea todo negro, te saca de la pantalla, parece otra pestaña»): solo diseño. El visor es una hoja clara que sube sobre la pantalla dejando ver un poco de la web debajo; barra con el color papel y los iconos en naranja sin círculo */
+.visor{inset:calc(env(safe-area-inset-top,0px) + 26px) 0 0 0 !important;background:var(--concrete) !important;border-radius:20px 20px 0 0;box-shadow:0 -100vh 0 100vh rgba(27,31,36,.42), 0 -6px 30px rgba(0,0,0,.18) !important;overflow:hidden;}
+.visor::before{content:'';position:absolute;top:7px;left:50%;transform:translateX(-50%);width:38px;height:4px;border-radius:2px;background:var(--line);z-index:2;pointer-events:none;}
+.visor .visor-c{padding-top:54px !important;background:var(--concrete);}
+.visor-t{position:absolute !important;top:19px;left:20px;right:20px;text-align:center;z-index:3;flex:none !important;pointer-events:none;}   /* el título arriba, centrado, como una hoja; los iconos abajo */
+.visor-top{justify-content:space-between !important;}
+.visor-top{background:var(--paper) !important;color:var(--ink) !important;border-top:1px solid var(--line) !important;gap:2px !important;}
+.visor-t{color:var(--ink) !important;}
+.visor-bt{border:none !important;background:none !important;color:var(--orange) !important;border-radius:0 !important;width:44px !important;height:44px !important;flex:0 0 44px !important;}
+.visor-bt svg{width:24px !important;height:24px !important;}
+#visor-cuenta{color:var(--ink) !important;}
+.visor-msg{color:var(--ink-soft) !important;opacity:1 !important;}
+.visor-pag{box-shadow:0 2px 12px rgba(27,31,36,.16) !important;} .visor-img{box-shadow:0 2px 12px rgba(27,31,36,.16);}
+.visor-hojas button{border:1px solid var(--line) !important;background:var(--paper) !important;color:var(--ink) !important;}
+.visor-hojas button.on{background:var(--orange) !important;border-color:var(--orange) !important;color:#fff !important;}
+html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0px) + 84px) !important;}
 </style>
 </head>
 <body>
@@ -4464,7 +4481,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.67</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.68</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4555,7 +4572,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.67</div>
+        <div class="sub" id="version-badge">V8.68</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4725,6 +4742,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
               <label><input type="checkbox" checked data-estado="pendiente_cobrar" onchange="renderControlDocs()"> Pend. cobrar</label>
               <label><input type="checkbox" checked data-estado="parcial" onchange="renderControlDocs()"> Cobrado parcial</label>
               <label><input type="checkbox" checked data-estado="borrador" onchange="renderControlDocs()"> Borrador</label>
+              <label><input type="checkbox" checked data-estado="trabajo_activo" onchange="renderControlDocs()"> Trabajo activo</label>
               <label><input type="checkbox" checked data-estado="en_proceso" onchange="renderControlDocs()"> En proceso</label>
               <label><input type="checkbox" checked data-estado="Pendiente" onchange="renderControlDocs()"> Presup. pendiente</label>
               <label><input type="checkbox" checked data-estado="Validado" onchange="renderControlDocs()"> Presup. validado</label>
@@ -5395,6 +5413,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
                 <p class="dd-section-label">Estado</p>
                 <div class="filters" id="alb-filtro-estado-chips" style="margin:0;">
                   <div class="chip-filter" data-estado="borrador">Borrador</div>
+                  <div class="chip-filter" data-estado="trabajo_activo">Trabajo activo</div>
                   <div class="chip-filter" data-estado="revisar">Revisar</div>
                   <div class="chip-filter" data-estado="pendiente_enviar">Listo para entregar</div>
                   <div class="chip-filter" data-estado="pendiente_cobrar">Pendiente de cobrar</div>
@@ -11586,7 +11605,7 @@ function renderizarFilaYCardFactura(doc, entidad, trabajo, alPrincipio){
     const metaHtml = `<span class="fc-meta-ico">${ICO_CAL} ${fechaCorta}</span><span class="fc-meta-sep">|</span><span class="fc-meta-ico">${ICO_DOC} Nº ${doc.numero||'—'}</span>`;   // V8.07 (reporte de Daniel «repetición»): fuera «Cobrado X» de esta línea; lo cobrado ya sale en la etiqueta de estado y, si es parcial, abajo en Cobrado / Falta
     const card = document.createElement('div');
     card.className = 'factura-card-movil fc-tipo-' + (doc.type || 'factura');   // V8.63: borde y fondo muy suaves según el tipo de documento
-    if(!doc.numero && !['borrador','pendiente_enviar'].includes(doc.estado_cobro)) card.classList.add('fc-pendiente-revision');
+    if(!doc.numero && !['borrador','trabajo_activo','pendiente_enviar'].includes(doc.estado_cobro)) card.classList.add('fc-pendiente-revision');
     card.id = 'mcard-'+doc.id;
     card.dataset.docId = doc.id;
     card.onclick = () => openDocumentViewer(doc.id);
@@ -13047,7 +13066,7 @@ function openEntryDrawer(src, title){
 
 
 let jobs = [];
-const stateLabels = {enviado:'Enviado', aceptado:'Aceptado', rechazado:'Rechazado', disponible:'Operativa', averiada:'Averiada', taller:'En taller', vendida:'Vendida', posible:'Posible trabajo', pendiente:'Pendiente de fecha', planificado:'Planificado', porconfirmar:'Por confirmar con el cliente', confirmado:'Confirmado', encurso:'En curso', terminado:'Terminado', facturado:'Facturado', cobrado:'Cobrado', cancelado:'Cancelado'};
+const stateLabels = {trabajo_activo:'Trabajo activo', enviado:'Enviado', aceptado:'Aceptado', rechazado:'Rechazado', disponible:'Operativa', averiada:'Averiada', taller:'En taller', vendida:'Vendida', posible:'Posible trabajo', pendiente:'Pendiente de fecha', planificado:'Planificado', porconfirmar:'Por confirmar con el cliente', confirmado:'Confirmado', encurso:'En curso', terminado:'Terminado', facturado:'Facturado', cobrado:'Cobrado', cancelado:'Cancelado'};
 const jobStates = ['posible','pendiente','planificado','porconfirmar','confirmado','encurso','terminado','facturado','cobrado','cancelado'];
 
 function pill(state,sm){ return `<span class="pill ${state}${sm?' pill-sm':''}">${stateLabels[state]||state}</span>`; }
@@ -13200,7 +13219,7 @@ async function cargarAlertasYRecordatorios(){
 let _recItems = [], _recItv = null, _recCargado = false;
 
 // V8.57 (reporte de Daniel: «los filtros no están actualizados como estaba la web»): Documentos pendientes usa las mismas píldoras que el resto. Sin ninguna elegida = todos. Antes los desplegables del móvil no filtraban nada: renderControlDocs solo leía los de escritorio
-const CC_DOC_TIPOS = [['factura', 'Factura'], ['albaran', 'Albarán'], ['presupuesto', 'Presupuesto'], ['proforma', 'Proforma']], CC_DOC_ESTADOS = [['pendiente_enviar', 'Listo p. entregar'], ['pendiente_cobrar', 'Pend. cobrar'], ['parcial', 'Cobrado parcial'], ['borrador', 'Borrador'], ['revisar', 'Por revisar'], ['aceptado', 'Aceptado'], ['rectificativa', 'Rectificativa']];
+const CC_DOC_TIPOS = [['factura', 'Factura'], ['albaran', 'Albarán'], ['presupuesto', 'Presupuesto'], ['proforma', 'Proforma']], CC_DOC_ESTADOS = [['trabajo_activo', 'Trabajo activo'], ['pendiente_enviar', 'Listo p. entregar'], ['pendiente_cobrar', 'Pend. cobrar'], ['parcial', 'Cobrado parcial'], ['borrador', 'Borrador'], ['revisar', 'Por revisar'], ['aceptado', 'Aceptado'], ['rectificativa', 'Rectificativa']];
 function ccDocsFiltroSync(){
   const act = id => Array.from(document.querySelectorAll('#' + id + ' .chip-filter.active')).map(x => x.dataset.ccv);
   window._ccTiposSel = act('cc-doc-tipo-chips'); window._ccEstadosSel = act('cc-doc-estado-chips');   // sin ninguna elegida = todos los pendientes
@@ -18904,7 +18923,7 @@ async function revisarTipoDocumento(prefijo){
         propuesto: `La carpeta original dice "${CARPETA_POR_TIPO[tipoSugerido]}" — revisar y confirmar`,
         tipoSugerido,
       });
-    } else if(!d.numero && !['borrador','pendiente_enviar'].includes(d.estado_cobro||'')){
+    } else if(!d.numero && !['borrador','trabajo_activo','pendiente_enviar'].includes(d.estado_cobro||'')){
       // señal más débil: sin número y ya avanzado de estado — candidato, sin sugerencia de tipo
       hallazgos.push({
         id: d.id,
@@ -27977,9 +27996,9 @@ function econImporteSinFactura(d, enlazados){
 }
 const esAdministracion = nombre => /(AYUNTAMIENTO|AYTO\.|DIPUTACI|JUNTA DE ANDALUC|CONSEJER|MINISTERIO|MANCOMUNIDAD|CONFEDERACI)/i.test(String(nombre || ''));
 const estadosDeTipo = (tipo, doc) => tipo === 'presupuesto' ? ESTADOS_PRESUPUESTO
-  : ((tipo === 'proforma' || tipo === 'albaran') && doc && esAdministracion(doc.client || doc.cliente)) ? ESTADOS_DOCUMENTO.filter(o => !['pendiente_cobrar','parcial','cobrado'].includes(o[0]))
-  : ESTADOS_DOCUMENTO;
-const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['pendiente_enviar','Listo para entregar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Cobrado parcial'],['cobrado','Cobrado'],['rectificativa','Rectificativa'],['revisar','Revisar'],['nula','Nula']];
+  : ((tipo === 'proforma' || tipo === 'albaran') && doc && esAdministracion(doc.client || doc.cliente)) ? ESTADOS_DOCUMENTO.filter(o => !['pendiente_cobrar','parcial','cobrado'].includes(o[0]) && (tipo === 'albaran' || o[0] !== 'trabajo_activo'))
+  : tipo === 'albaran' ? ESTADOS_DOCUMENTO : ESTADOS_DOCUMENTO.filter(o => o[0] !== 'trabajo_activo');   // V8.68 (Daniel): «Trabajo activo» es una fase del albarán abierto
+const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['trabajo_activo','Trabajo activo'],['pendiente_enviar','Listo para entregar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Cobrado parcial'],['cobrado','Cobrado'],['rectificativa','Rectificativa'],['revisar','Revisar'],['nula','Nula']];
 function estadoDocumentoSelect(tipo, id, actual, contexto){
   const act = actual || 'pendiente_enviar';
   const label = estadosDeTipo(tipo, documentosRealesById?.[id]).concat(ESTADOS_DOCUMENTO).find(o=>o[0]===act)?.[1] || stateLabels[act] || act;
