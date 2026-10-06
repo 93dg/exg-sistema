@@ -1479,6 +1479,20 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .rec-est-lista button.act{background:var(--e);color:#fff;}
 .rec-est-con{display:flex;flex-direction:column;gap:4px;margin-top:12px;font-size:12px;font-weight:700;color:var(--ink-soft);} .rec-est-con input{font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;}
 #alertas-list-bd .rec-card .t .rec-est, #alertas-list-bd .rec-card .t .rec-est em{font-size:11.5px !important;font-weight:800;}
+
+/* V8.54 (reporte de Daniel: las tarjetas desperdician espacio y no se lee el título): sin icono, márgenes mínimos, título normal en hasta 2 líneas, estado y fecha en una sola fila */
+#alertas-list-bd details.rec-card{margin:0 0 5px;border-radius:10px;border-left-width:4px;}
+#alertas-list-bd details.rec-card > summary.alert-sum{padding:7px 8px 7px 9px;gap:6px;}
+#alertas-list-bd .rec-card .rec-ico{display:none;}
+#alertas-list-bd .rec-card .alert-sum .t{white-space:normal;overflow:visible;gap:4px;}
+#alertas-list-bd .rec-card .rec-tit{font-weight:500;font-size:14px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
+#alertas-list-bd .rec-card[open] .rec-tit{-webkit-line-clamp:unset;font-weight:700;}
+#alertas-list-bd .rec-card .rec-fila{display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0;}
+#alertas-list-bd .rec-card .rec-fila .rec-est{flex:0 1 auto;min-width:0;}
+#alertas-list-bd .rec-card .rec-pil{font-size:11px;padding:2px 7px;font-weight:700;}
+#alertas-list-bd .rec-card > summary::after{align-self:flex-start;font-size:11px;margin-top:2px;}
+#alertas-list-bd .rec-card .alert-det-b{padding:4px 10px 10px;}
+@media (max-width:700px){ #panel-alertas #alertas-body > .panel-body{padding-left:6px;padding-right:6px;} }
 .tb-ok.tb-eur{font-weight:900;color:#3B6D11;}
 .tb-cob{display:flex;flex-direction:column;gap:8px;} .tb-cob > button{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--paper);}
 .tb-cob > button b{font-size:15px;} .tb-cob > button span{font-size:12px;color:var(--ink-soft);}
@@ -1522,6 +1536,8 @@ button.e2-fila{cursor:pointer;}
 .e2-hero i{display:block;font-style:normal;font-size:11.5px;color:rgba(255,255,255,.7);}
 .e2-hero .row{display:flex;gap:8px;margin-top:10px;border-top:1px solid rgba(255,255,255,.15);padding-top:10px;}
 .e2-hero .row div{flex:1;} .e2-hero .row b{display:block;font-size:17px;}
+/* V8.54 (reporte de Daniel: Deuda y Pendiente de cobrar no pueden tener el mismo color): lo que nos deben en verde, lo que debemos en rojo */
+.e2-hero .row button[data-e2-det="cobrar"] b{color:#8FD16A;} .e2-hero .row button[data-e2-det="deuda"] b{color:#FF8A7A;}
 .e2-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px;}
 .e2-t{border-radius:14px;padding:10px 12px;border:1px solid var(--line);background:var(--paper);position:relative;min-width:0;}
 .e2-t span{font-size:11px;font-weight:700;color:var(--ink-soft);}
@@ -4366,7 +4382,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.53</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.54</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4457,7 +4473,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.53</div>
+        <div class="sub" id="version-badge">V8.54</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13176,9 +13192,7 @@ function recRender(){
     const est = E ? `<span class="rec-est" style="--e:${E[1]}" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">${E[0]}${d.con ? ` <em>· ${escHtml(d.con)}</em>` : ''}${desde != null ? ` <em>· ${desde === 0 ? 'hoy' : desde === 1 ? '1 día' : desde + ' días'}</em>` : ''}</span>` : `<span class="rec-est sin" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">Poner estado</span>`;
     return `<details class="alert-det rec-card t-${tema}">
       <summary class="alert-sum">
-        <div class="rec-ico">${icono}</div>
-        <div class="t">${escHtml(corto)}${est}</div>
-        ${pild}
+        <div class="t"><span class="rec-tit">${escHtml(corto)}</span><span class="rec-fila">${est}${pild}</span></div>
       </summary>
       <div class="alert-det-b">
         ${largo ? `<div class="rec-largo">${escHtml(recSinGritos(largo))}</div>` : ''}
@@ -14647,6 +14661,15 @@ function rbQuitarColorModerno(txt){
   }
   return salida + txt.slice(ultimo);
 }
+// V8.54 (reporte de Daniel: «Esta pantalla no se puede capturar» en Control): Safari da los colores mezclados como color(srgb r g b / a), también desde el canvas,
+// y la herramienta de captura no los entiende. Se pasan a rgba a mano, en cualquier propiedad (sombras, degradados, rellenos de iconos...), no solo en las de color.
+function rbColorARgba(txt){
+  if(!txt || !/(color|lab|lch|oklab|oklch)\(/i.test(txt)) return txt;
+  return txt.replace(/color\(\s*[\w-]+\s+([-\d.e]+%?)\s+([-\d.e]+%?)\s+([-\d.e]+%?)(?:\s*\/\s*([-\d.e]+%?))?\s*\)/gi, (m, r, g, b, a) => {
+    const n = x => { const v = parseFloat(x); return x.endsWith('%') ? v / 100 : v; }, k = x => Math.max(0, Math.min(255, Math.round(n(x) * 255)));
+    return 'rgba(' + k(r) + ',' + k(g) + ',' + k(b) + ',' + (a == null ? 1 : Math.max(0, Math.min(1, n(a)))) + ')';
+  }).replace(/(?:^|[^\w-])(lab|lch|oklab|oklch|color)\([^()]*\)/gi, m => m.replace(/(lab|lch|oklab|oklch|color)\([^()]*\)/i, 'rgba(128,128,128,0.35)'));
+}
 function rbSanearEstilos(doc){
   doc.querySelectorAll('details:not([open]) > *:not(summary)').forEach(e => { e.style.display = 'none'; });   // lo plegado no se pinta en la captura
 
@@ -14655,13 +14678,12 @@ function rbSanearEstilos(doc){
   Array.from(doc.styleSheets).forEach(h => { try{ Array.from(h.cssRules).forEach(regla); }catch(e){} });
   doc.querySelectorAll('[style]').forEach(el => { const s = el.getAttribute('style'); if(MAL.test(s)) el.setAttribute('style', rbQuitarColorModerno(s)); });
 }
-function rbSanearComputados(doc){   // segunda vuelta, más lenta: cualquier color que el navegador ya haya convertido a color(...) se pasa a rgb
-  const cv = doc.createElement('canvas').getContext('2d'), props = ['color', 'backgroundColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor', 'textDecorationColor'];
+function rbSanearComputados(doc){   // segunda vuelta: cualquier propiedad calculada con color(...)/lab/oklch (no solo las de color) se pasa a rgba
   const vista = doc.defaultView; let n = 0;
   doc.querySelectorAll('body *').forEach(el => {
     if(n > 4000) return; const r = el.getBoundingClientRect(); if(r.bottom < -50 || r.top > vista.innerHeight + 50) return; n++;
     const cs = vista.getComputedStyle(el);
-    props.forEach(pr => { const v = cs[pr]; if(v && /^(color|lab|lch|oklab|oklch)\(/i.test(v)){ let rgb = 'rgba(128,128,128,0.35)'; try{ cv.fillStyle = '#000'; cv.fillStyle = v; rgb = cv.fillStyle; }catch(e){} el.style.setProperty(pr.replace(/[A-Z]/g, x => '-' + x.toLowerCase()), rgb, 'important'); } });
+    for(let i = 0; i < cs.length; i++){ const pr = cs[i], v = cs.getPropertyValue(pr); if(v && /(color|lab|lch|oklab|oklch)\(/i.test(v)){ try{ el.style.setProperty(pr, rbColorARgba(v), 'important'); }catch(e){} } }
   });
 }
 async function rbCapturar(){
@@ -14678,10 +14700,10 @@ async function rbCapturar(){
   try{ document.querySelectorAll(RB_SEL).forEach(el => { const r = el.getBoundingClientRect(); if(!r.height) return; if(r.top > window.innerHeight + 150) el.setAttribute('data-rbx', '1'); else if(r.bottom < -150) el.setAttribute('data-rbarriba', '1'); }); }catch(e){}
   // V7.29 (Daniel: «¿por qué no se ve igual la imagen al reportar?»): los colores modernos (color-mix…) que la captura no entiende salían transparentes.
   // Ahora se copian los colores YA CALCULADOS por el navegador de lo que se ve en pantalla, pasados a rgb, y se ponen tal cual en la copia.
-  const cvc = document.createElement('canvas').getContext('2d'), aRgb = v => { try{ cvc.fillStyle = '#000'; cvc.fillStyle = v; return cvc.fillStyle; }catch(e){ return null; } };
+  const cvc = document.createElement('canvas').getContext('2d'), aRgb = v => { try{ cvc.fillStyle = '#000'; cvc.fillStyle = v; return rbColorARgba(cvc.fillStyle); }catch(e){ return rbColorARgba(v); } };
   const PROPS = ['color', 'background-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color'], colores = [];
   try{ let k = 0; for(const el of document.body.querySelectorAll('*')){ if(k > 3000) break; const r = el.getBoundingClientRect(); if(!r.width || r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth) continue;
-      const cs = getComputedStyle(el), v = {}; let hay = false; PROPS.forEach(p => { const c = cs.getPropertyValue(p); if(c && c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)'){ const x = /^rgba?\(/i.test(c) ? c : aRgb(c); if(x){ v[p] = x; hay = true; } } });   // todos los colores reales, también los rgb: la regla original puede haberse quitado al sanear
+      const cs = getComputedStyle(el), v = {}; let hay = false; PROPS.forEach(p => { const c = cs.getPropertyValue(p); if(c && c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)'){ const x = /^rgba?\(/i.test(c) ? c : rbColorARgba(aRgb(c)); if(x){ v[p] = x; hay = true; } } });   // todos los colores reales, también los rgb: la regla original puede haberse quitado al sanear
       if(/inset/.test(cs.boxShadow)){ v['box-shadow'] = 'none'; hay = true; }   // la captura pinta mal las sombras interiores: tapaban el color de las pastillas
       if(r.height === 0 && cs.overflow === 'visible'){ v['height'] = '0px'; v['padding-top'] = '0px'; v['padding-bottom'] = '0px'; v['border-width'] = '0px'; v['justify-content'] = cs.justifyContent; v['display'] = cs.display; hay = true; }   // lo que en pantalla no ocupa alto (la X flotante del editor) tampoco en la foto
       if(hay){ el.setAttribute('data-rbi', k); colores[k] = v; k++; } } }catch(e){}
@@ -14694,7 +14716,7 @@ async function rbCapturar(){
   try{
     for(const intento of [1, 2]){   // 1: se quitan los colores modernos de los estilos; 2: además se revisan los colores ya calculados de lo que se ve
       try{
-        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); if(intento === 2) rbSanearComputados(doc); }})), 9000);
+        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); }})), 9000);
         if(cap && cap.width > 0) return {cap, error: ''};
       }catch(e){ ultimoError = String(e && e.message || e).slice(0, 160); console.warn('captura, intento ' + intento, e); }
     }
