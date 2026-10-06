@@ -4382,7 +4382,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.57</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.58</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4473,7 +4473,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.57</div>
+        <div class="sub" id="version-badge">V8.58</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14717,7 +14717,15 @@ async function rbCapturar(){
       if(r.height === 0 && cs.overflow === 'visible'){ v['height'] = '0px'; v['padding-top'] = '0px'; v['padding-bottom'] = '0px'; v['border-width'] = '0px'; v['justify-content'] = cs.justifyContent; v['display'] = cs.display; hay = true; }   // lo que en pantalla no ocupa alto (la X flotante del editor) tampoco en la foto
       if(hay){ el.setAttribute('data-rbi', k); colores[k] = v; k++; } } }catch(e){}
   const ponerColores = doc => { doc.querySelectorAll('[data-rbi]').forEach(el => { const v = colores[Number(el.getAttribute('data-rbi'))]; if(v) Object.entries(v).forEach(([p, c]) => el.style.setProperty(p, c, 'important')); }); };
-  const quitarMarcas = () => { document.querySelectorAll('[data-rbi]').forEach(el => el.removeAttribute('data-rbi')); document.querySelectorAll('[data-rbx],[data-rbarriba]').forEach(el => { el.removeAttribute('data-rbx'); el.removeAttribute('data-rbarriba'); }); };
+  // V8.58 (reporte de Daniel: «peor», la barra inferior no salía en la foto): en el iPhone la copia de la página tiene otro alto de pantalla y lo FIJO (barra de abajo) se colocaba fuera del recorte. Se anota dónde está cada elemento fijo en la pantalla real y en la copia se pone en ese mismo sitio, sin depender del alto de la copia
+  const fijos = [];
+  try{ for(const el of document.body.querySelectorAll('*')){ if(el.offsetParent !== null || ocultar.includes(el)) continue; const cs = getComputedStyle(el); if(cs.position !== 'fixed' || cs.visibility === 'hidden' || cs.display === 'none') continue;
+      const r = el.getBoundingClientRect(); if(!r.width || !r.height || r.bottom < 0 || r.top > G.h || r.right < 0 || r.left > G.w) continue; el.setAttribute('data-rbfix', fijos.length); fijos.push({t: r.top, l: r.left, w: r.width, h: r.height}); } }catch(e){}
+  const fijarCopia = doc => { try{ doc.querySelectorAll('[data-rbfix]').forEach(el => { const f = fijos[Number(el.getAttribute('data-rbfix'))]; if(!f) return; const s = el.style;
+      s.setProperty('position', 'absolute', 'important'); s.setProperty('bottom', 'auto', 'important'); s.setProperty('right', 'auto', 'important'); s.setProperty('margin', '0', 'important'); s.setProperty('transform', 'none', 'important'); s.setProperty('box-sizing', 'border-box', 'important');
+      s.setProperty('width', f.w + 'px', 'important'); s.setProperty('height', f.h + 'px', 'important'); s.setProperty('top', '0px', 'important'); s.setProperty('left', '0px', 'important');
+      const r0 = el.getBoundingClientRect(); s.setProperty('top', (f.t - r0.top) + 'px', 'important'); s.setProperty('left', (f.l - r0.left) + 'px', 'important'); }); }catch(e){ console.warn(e); } };   // se mide dónde cae con top/left a 0 y se corrige la diferencia: vale con cualquier elemento padre colocado
+  const quitarMarcas = () => { document.querySelectorAll('[data-rbfix]').forEach(el => el.removeAttribute('data-rbfix')); document.querySelectorAll('[data-rbi]').forEach(el => el.removeAttribute('data-rbi')); document.querySelectorAll('[data-rbx],[data-rbarriba]').forEach(el => { el.removeAttribute('data-rbx'); el.removeAttribute('data-rbarriba'); }); };
   const conTiempo = (pr, ms) => Promise.race([pr, new Promise((_, ko) => setTimeout(() => ko(new Error('la captura tardó más de ' + ms / 1000 + ' s')), ms))]);
   // V8.14: se copia la zona visible real. V8.56: la zona se mide al pulsar (G) y la copia no se desplaza: se sube con top:-y y lo fijo (barra inferior, botones) queda en su sitio, igual que en pantalla
   const opciones = (extra) => ({x: 0, y: 0, width: G.w, height: G.h, scrollX: 0, scrollY: 0, windowWidth: G.w, windowHeight: G.h, scale: Math.max(0.6, Math.min(2, 800 / window.innerWidth)), logging: false, useCORS: true, ignoreElements: fuera, ...extra});
@@ -14726,7 +14734,7 @@ async function rbCapturar(){
   try{
     for(const intento of [1, 2]){   // 1: se quitan los colores modernos de los estilos; 2: además se revisan los colores ya calculados de lo que se ve
       try{
-        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { subirCopia(doc); doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); }})), 9000);
+        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { subirCopia(doc); fijarCopia(doc); doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); }})), 9000);
         if(cap && cap.width > 0) return {cap, error: ''};
       }catch(e){ ultimoError = String(e && e.message || e).slice(0, 160); console.warn('captura, intento ' + intento, e); }
     }
