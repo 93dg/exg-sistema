@@ -4363,6 +4363,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <!-- jsPDF: ahora en lib/, se carga después de abrir la web (V7.18, velocidad) -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style id="v860-compacto">
+
 /* V8.64 (Daniel: cada palabra de tipo con su color en todos los sitios, y el tipo entre el estado y el icono de imprimir) */
 .tp-albaran{color:#A8731F;font-weight:700;} .tp-factura{color:#1F7A77;font-weight:700;} .tp-proforma{color:#6E4FA0;font-weight:700;} .tp-presupuesto{color:#5A6B82;font-weight:700;}
 .tp-albaran.tp-claro{color:#F0C46A;} .tp-factura.tp-claro{color:#86D8D3;} .tp-proforma.tp-claro{color:#C9B6EC;} .tp-presupuesto.tp-claro{color:#BCC8DA;}
@@ -4400,6 +4401,19 @@ svg.leaflet-image-layer.leaflet-interactive path {
   .factura-card-movil .fc-total-block{padding-left:0 !important;gap:12px !important;margin-top:0 !important;}
   .factura-card-movil .fc-check{width:18px !important;height:18px !important;margin:2px 0 0 0 !important;}
 }
+/* V8.65 (reportes de Daniel de las 19:27 y 19:43): pie de la tarjeta con el archivo (icono) a la izquierda y lápiz, imprimir y ⋯ a la derecha; importes que no se salen; tarjeta desplegable */
+.factura-card-movil .fte-doc{grid-column:1 / -1 !important;grid-row:auto !important;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;padding-top:8px;border-top:1px solid var(--line);}
+.fte-izq{display:flex;align-items:center;gap:8px;min-width:0;flex:1;} .fte-izq .fte-t{flex:0 1 auto;}
+.fte-ico{display:inline-flex !important;align-items:center;gap:3px;color:var(--orange);} .fte-ico svg{width:17px;height:17px;} .fte-ico b{font-size:11px;font-weight:800;}
+.fte-acc{display:flex;gap:8px;align-items:center;flex:none;}
+.factura-card-movil .fte-acc .fc-mas-btn{position:static !important;width:34px !important;height:34px !important;top:auto !important;right:auto !important;margin:0 !important;}
+.factura-card-movil .fte-acc .fc-mas-btn svg{width:16px !important;height:16px !important;}
+.factura-card-movil .fc-estado-wrap{padding-right:0 !important;}
+.factura-card-movil:not(.fc-gasto){grid-template-columns:20px minmax(0,1fr) auto !important;}
+.factura-card-movil .fc-total-block{flex-wrap:wrap !important;justify-content:flex-end !important;max-width:100%;row-gap:2px !important;}
+.factura-card-movil .fc-detalle{display:none;grid-column:2 / -1;margin-top:8px;padding:8px 0 2px;border-top:1px dashed var(--line);font-size:13px;line-height:1.35;}
+.factura-card-movil.fc-abierta .fc-detalle{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 12px;}
+.fc-detalle span{color:var(--ink-soft);} .fc-detalle b{font-weight:700;overflow-wrap:anywhere;}
 </style>
 </head>
 <body>
@@ -4422,7 +4436,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.64</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.65</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4513,7 +4527,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.64</div>
+        <div class="sub" id="version-badge">V8.65</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -18036,10 +18050,16 @@ const FTE_SEL = '.factura-card-movil, .gasto-card, .gm-card, .cliente-card, .exp
 const fteUrl = d => d && (d.archivo_url || (d.archivo_path ? 'https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/' + d.archivo_path : null) || d.justificante_url || null);
 const fteDia = v => { try{ const x = new Date(v); return isNaN(x) ? '' : x.toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit'}); }catch(e){ return ''; } };
 const FTE_TP = {factura: 'factura', albaran: 'albarán', presupuesto: 'presupuesto', proforma: 'proforma', gasto: 'gasto'};
-function fteHtml(txt, url, lista){   // lista: [{u, t}] cuando la ficha salió de varios archivos: el visor deja pasar de uno a otro deslizando
+// V8.65 (reporte de Daniel): «Fuente» abreviada y «Archivo» convertido en un icono que ocupa su sitio. Con archivo: 📎 + origen (si salió de varios, el número); sin archivo: «Fte. · origen»
+function fteIzq(txt, url, lista){
   const varios = Array.isArray(lista) && lista.length > 1;
+  const ico = url ? '<a href="' + escHtml(url) + '" class="fte-lnk fte-ico"' + (varios ? ' data-lista="' + escHtml(JSON.stringify(lista)) + '"' : '') + ' onclick="event.stopPropagation()" title="' + (varios ? 'Ver los ' + lista.length + ' archivos' : 'Ver el archivo') + '" aria-label="Ver el archivo">' + ICO_CLIP + (varios ? '<b>' + lista.length + '</b>' : '') + '</a>' : '';
+  return ico + (txt ? '<span class="fte-t">' + (url ? '' : 'Fte. · ') + escHtml(txt) + '</span>' : '');
+}
+function fteHtml(txt, url, lista){   // lista: [{u, t}] cuando la ficha salió de varios archivos: el visor deja pasar de uno a otro deslizando
   if(!url && /^\s*a mano\s*$/i.test(String(txt || ''))) return '';   // Daniel 03/10/2026: si la fuente es «a mano» y no hay archivo que ver, no se pone
-  return '<div class="fte"><span class="fte-t">Fuente · ' + escHtml(txt) + '</span>' + (url ? '<a href="' + escHtml(url) + '" class="fte-lnk"' + (varios ? ' data-lista="' + escHtml(JSON.stringify(lista)) + '"' : '') + ' onclick="event.stopPropagation()">' + (varios ? 'Archivos ' + lista.length : 'Archivo') + '</a>' : '') + '</div>'; }
+  return '<div class="fte">' + fteIzq(txt, url, lista) + '</div>';
+}
 function fteDeDocumento(d){ return d ? {txt: impOrigenGasto(d), url: fteUrl(d)} : null; }
 // VELOCIDAD (V7.20): antes cada tarjeta recorría todos los documentos para buscar el primero de su cliente o trabajo; ahora se hace un índice una vez
 let _fteIdx = {n: -1, t: 0, ent: null, trab: null};
@@ -18090,7 +18110,9 @@ function fteResolver(el){
 }
 function fteAplicar(el){
   if(!el || el.dataset.fteOk) return; if(el.closest('tbody, table') && !el.matches('.tb-card')) return;
-  let r = null; try{ r = fteResolver(el); }catch(e){ return; } if(!r) return;
+  let r = null; try{ r = fteResolver(el); }catch(e){ return; }
+  if(el.matches('.factura-card-movil') && !el.classList.contains('fc-gasto')){ el.dataset.fteOk = '1'; fteDocumento(el, r); return; }
+  if(!r) return;
   el.dataset.fteOk = '1';
   // si la tarjeta ya traía su enlace «Original», se SUSTITUYE por Archivo (no se dejan los dos)
   if(r.url) el.querySelectorAll('.fc-ver-original').forEach(x => { if(x.closest('.gasto-adjuntos') || x.closest('.exp-adjuntos')) return; x.remove(); });
@@ -18100,6 +18122,34 @@ function fteAplicar(el){
   const dest = el.matches('.tb-card') ? (el.querySelector('.tb-cuerpo') || el) : el;   // la tarjeta de trabajo es una cuadrícula (cuerpo, ✕, ✓): la línea va dentro del cuerpo
   if(tpl.content.firstChild) dest.appendChild(tpl.content.firstChild);
 }
+function fteDocumento(el, r){
+  if(r && r.url) el.querySelectorAll('.fc-ver-original').forEach(x => x.remove());
+  el.querySelectorAll('.fc-extra').forEach(x => { if(!x.children.length) x.remove(); });
+  const pie = document.createElement('div'); pie.className = 'fte fte-doc';
+  const izq = document.createElement('div'); izq.className = 'fte-izq'; izq.innerHTML = r ? fteIzq(/^\s*a mano\s*$/i.test(String(r.txt || '')) && !r.url ? '' : r.txt, r.url, r.lista) : ''; pie.appendChild(izq);
+  const acc = document.createElement('div'); acc.className = 'fte-acc';
+  const lapiz = document.createElement('button'); lapiz.type = 'button'; lapiz.className = 'fc-mas-btn fc-lapiz-btn'; lapiz.title = 'Editar'; lapiz.setAttribute('aria-label', 'Editar'); lapiz.innerHTML = ICO_LAPIZ;
+  lapiz.onclick = ev => { ev.stopPropagation(); if(el.dataset.docId) openDocumentViewer(el.dataset.docId); };
+  acc.appendChild(lapiz);
+  const pdf = el.querySelector(':scope > .fc-pdf-btn'), mas = el.querySelector(':scope > .fc-mas-btn:not(.fc-pdf-btn)');
+  if(pdf) acc.appendChild(pdf); if(mas) acc.appendChild(mas);
+  pie.appendChild(acc); el.appendChild(pie);
+}
+// V8.65: al tocar una tarjeta de documento se despliega en su sitio (antes abría el visor; ahora eso lo hace el lápiz)
+function fcDetalleHtml(d){
+  const e = x => escHtml(String(x == null ? '' : x)), eur = x => Number(x || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  const total = Number(d.importe || d.total || 0), cob = Number(d.cobrado_importe || 0), pct = d.iva_pct == null || d.iva_pct === '' ? null : Number(d.iva_pct);
+  const base = pct ? total / (1 + pct / 100) : null;
+  let fecha = ''; try{ const x = new Date(d.dateRaw || d.fecha_devengo || d.created_at); fecha = isNaN(x) ? '' : x.toLocaleDateString('es-ES'); }catch(er){}
+  const f = [['Cliente', d.client], ['Tipo', TIPO_DOC_NOMBRE[d.type] || d.type], ['Nº', d.numero || d.num], ['Fecha', fecha], ['Obra', d.obra_texto || d.job], ['Forma de pago', d.forma_pago], ['Subtotal', base != null ? eur(base) : ''], ['IVA', pct ? pct + ' % · ' + eur(total - base) : (d.tratamiento_iva === 'isp' ? 'ISP (inversión del sujeto pasivo)' : '')], ['Total', eur(total)], ['Cobrado', cob ? eur(cob) : ''], ['Falta', cob && cob < total ? eur(total - cob) : ''], ['Concepto', String(d.concepto || '').slice(0, 160)]].filter(x => x[1]);
+  return f.map(([k, v]) => '<span>' + e(k) + '</span><b>' + e(v) + '</b>').join('');
+}
+function fcAlternar(card){
+  const abrir = !card.classList.contains('fc-abierta'); card.classList.toggle('fc-abierta', abrir);
+  if(abrir && !card.querySelector(':scope > .fc-detalle')){ const d = documentosRealesById[card.dataset.docId]; if(d){ const x = document.createElement('div'); x.className = 'fc-detalle'; x.innerHTML = fcDetalleHtml(d); const pie = card.querySelector(':scope > .fte-doc'); pie ? card.insertBefore(x, pie) : card.appendChild(x); } }
+}
+document.addEventListener('click', ev => { const t = ev.target; if(!t || !t.closest) return; const card = t.closest('.factura-card-movil'); if(!card || card.classList.contains('fc-gasto') || !card.dataset.docId) return;
+  if(t.closest('button, a, input, select, label, .fc-estado-wrap, .fte-lnk, .fc-fallos, .fc-detalle')) return; ev.stopImmediatePropagation(); ev.preventDefault(); fcAlternar(card); }, true);
 function fteRecorrer(raiz){ if(!raiz || raiz.nodeType !== 1) return; if(raiz.matches && raiz.matches(FTE_SEL)) fteAplicar(raiz); raiz.querySelectorAll && raiz.querySelectorAll(FTE_SEL).forEach(fteAplicar); }
 (function(){
   let cola = new Set(), prog = false;
@@ -28306,6 +28356,7 @@ const ICO_CAL = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" str
 const ICO_SEND = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>';
 const ICO_CLIP = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
 const ICO_WARN = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="7" x2="12" y2="13"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>';
+const ICO_LAPIZ = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 const ICO_PRINT = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
 function gestorMovilHtml(id, enviado, fecha){
   const ddId = 'gestor-dd-'+id;
