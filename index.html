@@ -1471,6 +1471,14 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .cc-tb .rec-sec b{color:var(--c);} .cc-tb .rec-sec i{background:var(--c);}
 .rec-sec[data-rec-sec]{cursor:pointer;user-select:none;-webkit-user-select:none;} .rec-sec-fl{margin-left:auto;color:var(--ink-soft);font-size:14px;}
 .rec-sec.plegado{opacity:.75;}
+.rec-card .alert-sum .t{display:flex;flex-direction:column;gap:3px;min-width:0;}
+.rec-est{align-self:flex-start;display:inline-block;font-size:11.5px !important;line-height:1.35 !important;font-weight:800;color:var(--e);background:color-mix(in srgb, var(--e) 12%, transparent);border-radius:99px;padding:2px 8px;cursor:pointer;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+.rec-est em{font-style:normal;font-weight:700;opacity:.85;font-size:inherit !important;}
+.rec-est.sin{--e:#8a877f;border:1px dashed #c9c6bd;background:transparent;}
+.rec-est-lista{display:flex;flex-wrap:wrap;gap:7px;} .rec-est-lista button{all:unset;cursor:pointer;font-size:13px;font-weight:800;color:var(--e);border:1.5px solid var(--e);border-radius:99px;padding:6px 12px;}
+.rec-est-lista button.act{background:var(--e);color:#fff;}
+.rec-est-con{display:flex;flex-direction:column;gap:4px;margin-top:12px;font-size:12px;font-weight:700;color:var(--ink-soft);} .rec-est-con input{font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;}
+#alertas-list-bd .rec-card .t .rec-est, #alertas-list-bd .rec-card .t .rec-est em{font-size:11.5px !important;font-weight:800;}
 /* V8.10 Economía rediseñada */
 .e2-hb{all:unset;cursor:pointer;display:block;width:100%;}
 .e2-hero .row button{all:unset;cursor:pointer;flex:1;}
@@ -4351,7 +4359,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.50</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.51</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4442,7 +4450,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.50</div>
+        <div class="sub" id="version-badge">V8.51</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13111,7 +13119,7 @@ const REC_TEMAS = [['itv', 'ITV'], ['seguros', 'Seguros'], ['cobros', 'Cobros, p
 function recTema(r){ const d = r.data || {}, t = [d.titulo, d.titulo_corto, d.descripcion].join(' ');
   if(r.tipo === 'alerta_itv' || /\bITV\b/i.test(d.titulo_corto || d.titulo || '')) return 'itv';
   if(/seguro|p[oó]liza|mapfre|generali|allianz|l[ií]nea directa|g[eé]nesis|occident/i.test(t)) return 'seguros';
-  if(r.tipo === 'alerta_cobro_pendiente' || /factur|cobr|albar[aá]n|proforma|recibo|cargo|pag[oa]r?\b|deuda|fintable|banco/i.test(t)) return 'cobros';
+  if(r.tipo === 'alerta_cobro_pendiente' || /factur|cobr|albar[aá]n|proforma|recibo|cargo|pag[oa]r?\b|deuda|deben?\b|fintable|banco/i.test(t)) return 'cobros';
   if(/hacienda|aeat|gestor|certificado|impuesto|ivtm|\b303\b|\b130\b|aplazamiento/i.test(t)) return 'hacienda';
   if(d.flota_id || /mixta|cami[oó]n|iveco|audi|giratoria|niveladora|tac[oó]grafo|evoque|hyundai/i.test(t)) return 'flota';
   return 'otros'; }
@@ -13120,6 +13128,23 @@ document.addEventListener('click', ev => { const h = ev.target.closest && ev.tar
   const k = h.dataset.recSec, i = pleg.indexOf(k); if(i >= 0) pleg.splice(i, 1); else pleg.push(k);
   try{ localStorage.setItem('rec_plegados', JSON.stringify(pleg)); }catch(e){}
   const c = h.nextElementSibling; if(c) c.style.display = i >= 0 ? '' : 'none'; h.classList.toggle('plegado', i < 0); const f = h.querySelector('.rec-sec-fl'); if(f) f.textContent = i >= 0 ? '▾' : '▸'; });
+// V8.51: estados de los recordatorios (aprobados por Daniel): qué toca o por qué está parado, con quién o el motivo, y desde cuándo
+const REC_ESTADOS = {en_espera: ['En espera', '#2B5C8F'], por_pagar: ['Por pagar', '#B4471A'], por_cobrar: ['Por cobrar', '#3B6D11'], por_facturar: ['Por facturar', '#BA7517'], por_consultar: ['Por consultar', '#7B4FA0'], por_tramitar: ['Por tramitar', '#16706F'], bloqueado: ['Bloqueado', '#A32D2D'], programado: ['Programado', '#6b6860'], por_decidir: ['Por decidir', '#1c1f24'], mejora: ['Mejora', '#8a877f']};
+function recCambiarEstado(id){
+  const r = _recItems.find(x => String(x.id) === String(id)); if(!r) return; const d = r.data || {};
+  mostrarModalGenerico('Estado', `<div class="rec-est-lista">${Object.entries(REC_ESTADOS).map(([k, [l, c]]) => `<button type="button" class="${d.estado_rec === k ? 'act' : ''}" style="--e:${c}" data-rec-est="${k}">${l}</button>`).join('')}</div>
+    <label class="rec-est-con">Con quién o motivo<input id="rec-est-con" type="text" value="${escHtml(d.con || '')}" placeholder="Gestor, Mapfre, Falta de liquidez…"></label>
+    <button type="button" class="btn primary" style="width:100%;margin-top:10px;" id="rec-est-ok">Guardar</button>`);
+  let sel = d.estado_rec || '';
+  document.querySelectorAll('[data-rec-est]').forEach(b => b.onclick = () => { sel = b.dataset.recEst; document.querySelectorAll('[data-rec-est]').forEach(x => x.classList.toggle('act', x === b)); });
+  document.getElementById('rec-est-ok').onclick = async () => {
+    const con = document.getElementById('rec-est-con').value.trim(), cambia = sel !== (d.estado_rec || '');
+    const nd = {...d, estado_rec: sel || null, con: con || null, estado_desde: cambia ? new Date().toISOString().slice(0, 10) : (d.estado_desde || new Date().toISOString().slice(0, 10))};
+    const {error} = await sb.from('sistema').update({data: nd}).eq('id', id);
+    if(error){ mostrarToast('No se pudo guardar: ' + errText(error), 'err'); return; }
+    r.data = nd; cerrarModalGenerico(); recRender(); mostrarToast('Estado guardado', 'ok');
+  };
+}
 function recRender(){
   const cont = document.getElementById('alertas-list-bd'); if(!cont) return;
   const plazo0 = recPlazo(), enPlazo = _recItems.filter(r => recVisible(r.data || {}, plazo0));
@@ -13139,10 +13164,13 @@ function recRender(){
     // V8.48 (Daniel: «parece todo una lista igual»): cada recordatorio es una tarjeta con el color de su tipo y la fecha en una pastilla (roja si ya pasó, ámbar si es esta semana)
     const tema = recTema(r), dias = v ? Math.round((new Date(v + 'T12:00:00') - new Date(hoy + 'T12:00:00')) / 86400000) : null;
     const pild = v == null ? '' : d.anclado ? `<div class="rec-pil ${dias <= 3 ? 'roja' : 'ambar'}">${dias > 1 ? 'quedan ' + dias + ' días' : dias === 1 ? 'mañana' : dias === 0 ? 'hoy' : 'hace ' + (-dias) + ' días'}</div>` : `<div class="rec-pil ${dias < 0 ? 'roja' : dias <= 7 ? 'ambar' : ''}">${dias < 0 ? 'vencido · ' : dias === 0 ? 'hoy · ' : ''}${txtFecha}</div>`;
+    // V8.51 (Daniel): estado, con quién o motivo, y cuánto lleva así
+    const E = REC_ESTADOS[d.estado_rec], desde = d.estado_desde ? Math.max(0, Math.round((new Date(hoy + 'T12:00:00') - new Date(d.estado_desde + 'T12:00:00')) / 86400000)) : null;
+    const est = E ? `<span class="rec-est" style="--e:${E[1]}" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">${E[0]}${d.con ? ` <em>· ${escHtml(d.con)}</em>` : ''}${desde != null ? ` <em>· ${desde === 0 ? 'hoy' : desde === 1 ? '1 día' : desde + ' días'}</em>` : ''}</span>` : `<span class="rec-est sin" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">Poner estado</span>`;
     return `<details class="alert-det rec-card t-${tema}">
       <summary class="alert-sum">
         <div class="rec-ico">${icono}</div>
-        <div class="t">${escHtml(corto)}</div>
+        <div class="t">${escHtml(corto)}${est}</div>
         ${pild}
       </summary>
       <div class="alert-det-b">
