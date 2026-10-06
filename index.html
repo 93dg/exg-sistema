@@ -4359,7 +4359,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.51</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.52</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4450,7 +4450,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.51</div>
+        <div class="sub" id="version-badge">V8.52</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8621,7 +8621,7 @@ function c3MeterYMover(j, iso){
     else { const salto = []; let d = iso; for(let k = 0; k < n; k++){ salto.push(d); d = c3MoverLab(d, 1); } x.plan = {...x.plan, saltar: [...new Set([...(x.plan.saltar || []), ...salto])]}; }   // ya empezado: se para esos días y sigue después
     cambiados.push(x); });
   j.plan = {...(j.plan || {}), fecha: iso, extra: (j.plan && j.plan.extra) || 0}; _c3Colocar = null;
-  c2Guardar([j, ...cambiados]); c3Pintar(); c2Cerrar();
+  c2Guardar([j, ...cambiados]); if(document.getElementById('cal3-app')) c3Pintar(); try{ c2Cerrar(); }catch(e){} if(document.getElementById('tb-lista')?.offsetParent) tbRender();
   c2Aviso(`${escHtml(c3Nom(j))} desde el <b>${c2FechaTxt(iso)}</b>; ${cambiados.length} trabajo${cambiados.length === 1 ? '' : 's'} movido${cambiados.length === 1 ? '' : 's'} ${n} día${n === 1 ? '' : 's'} hacia delante.`);
 }
 function c3PonerDia(j, iso){
@@ -23216,7 +23216,8 @@ function tbDurIndice(txt){
   return h <= 2 ? 0 : h <= 6 ? 1 : h <= 8 ? 2 : h <= 24 ? 3 : h <= 40 ? 4 : h <= 80 ? 5 : h <= 160 ? 6 : 7;
 }
 function tbDatos(j){ const pr = tbPrioridades(j); return {prioridad: tbPrioPrincipal(pr), prioridades: pr, dificultad: tbDificultades(j)[0] || '', dificultades: tbDificultades(j), flota: tbFlota(j), alternativas: tbAlternativas(j), lugar: tbMay(j.lugar), duracion: tbMay(j.duracion), cliente: tbMay(j.cliente), trabajo: tbMay(j.trabajo), nota: tbMay(j.nota), estado: tbEstado(j.estado), orden: j.orden, terminado_at: j.terminado_at || null, plan: j.plan || null}; }   // plan = sitio en el calendario; V7.93: {fecha (día de inicio), extra (días de más)}
-function tbActivos(){ return _tbJobs.filter(j => j.estado !== 'Cobrado').sort((a, b) => a.orden - b.orden); }
+// V8.52 (Daniel): la Lista sigue el orden del calendario: primero lo que tiene fecha (lo más próximo arriba, lo más lejano abajo), después lo que no tiene día, en su orden
+function tbActivos(){ const f = j => (j.plan && j.plan.fecha) || ''; return _tbJobs.filter(j => j.estado !== 'Cobrado').sort((a, b) => { const fa = f(a), fb = f(b); if(fa && fb && fa !== fb) return fa < fb ? -1 : 1; if(fa && !fb) return -1; if(!fa && fb) return 1; return a.orden - b.orden; }); }
 function tbPendientes(){ return tbActivos().filter(j => TB_EST_PENDIENTES.includes(j.estado)); }
 function tbEnMarcha(){ return tbActivos().filter(j => TB_EST_ENMARCHA.includes(j.estado)); }
 function tbTramites(){ return tbActivos().filter(j => TB_EST_TRAMITES.includes(j.estado)); }
@@ -23275,7 +23276,7 @@ function tbRender(){
   cont.innerHTML = ['Alta', 'Media', 'Baja'].map(p => `<button type="button" data-f="${p}" class="cc cc-${TB_CLASE_PRIO[p]} ${_tbFiltro === p ? 'active' : ''}" title="Ver solo prioridad ${p}"><span>${p}</span> <b>${cuenta(p)}</b></button>`).join('');
   const ayuda = document.getElementById('tb-ayuda');
   ayuda.style.display = _tbVista === 'historial' ? 'none' : '';
-  ayuda.textContent = tbHayFiltros() ? 'Con filtros puestos no se pueden mover los trabajos. Quita los filtros para reordenarlos.' : _tbFiltro !== 'todos' ? 'Filtrando por ' + _tbFiltro + '. Toca el contador otra vez para ver todos y poder mover trabajos.' : _tbVista === 'tramites' ? 'Trabajos terminados a los que les falta el albarán, la factura o el cobro.' : _tbVista === 'enmarcha' ? 'Trabajos que ya están en marcha. Mantén pulsado uno y arrástralo para cambiarlo de sitio.' : 'Mantén pulsado un trabajo y arrástralo para cambiarlo de sitio.';
+  ayuda.textContent = tbHayFiltros() ? 'Con filtros puestos no se pueden mover los trabajos. Quita los filtros para reordenarlos.' : _tbFiltro !== 'todos' ? 'Filtrando por ' + _tbFiltro + '. Toca el contador otra vez para ver todos y poder mover trabajos.' : _tbVista === 'tramites' ? 'Trabajos terminados a los que les falta el albarán, la factura o el cobro.' : _tbVista === 'enmarcha' ? 'Trabajos que ya están en marcha. Mantén pulsado uno y arrástralo para cambiarlo de sitio.' : 'Ordenados por su día en el calendario. Si arrastras uno, se mueve también en el calendario.';
   const carta = (j, esHis) => tbCartaHtml(j, esHis);
   if(_tbVista === 'historial'){ tbRenderComputo(filtrados); lista.innerHTML = filtrados.length ? filtrados.map(j => carta(j, true)).join('') : '<div class="empty" style="padding:24px;">' + (his.length ? 'Ningún trabajo cumple los filtros.' : 'Aún no hay trabajos cobrados.') + '</div>'; return; }
   const ver = _tbFiltro === 'todos' ? filtrados : filtrados.filter(j => tbPrioridades(j).includes(_tbFiltro));
@@ -23433,6 +23434,14 @@ async function tbGuardarOrden(id){
   const ids = [...document.querySelectorAll('#tb-lista .tb-card')].map(e => e.dataset.id), i = ids.indexOf(id), j = _tbJobs.find(x => x.id === id);
   const prev = _tbJobs.find(x => x.id === ids[i - 1]), next = _tbJobs.find(x => x.id === ids[i + 1]);
   if(!j) return;
+  // V8.52: si los de alrededor tienen día en el calendario, el trabajo se mete ahí y los de después se corren (lo mismo que hacer «Meterlo aquí» en el calendario)
+  const fecha = x => x && x.plan && x.plan.fecha;
+  if(fecha(next) || fecha(prev)){
+    let iso = fecha(next) || null;
+    if(!iso){ const o = c3Ocupa(prev); iso = c3MoverLab(o[o.length - 1], 1); }
+    if(next && fecha(prev) && fecha(next) && !c3Ocupa(prev).some(d => d >= fecha(next))){ const o = c3Ocupa(prev); const tras = c3MoverLab(o[o.length - 1], 1); if(tras <= fecha(next)) iso = tras; }
+    c3MeterYMover(j, iso); tbRender(); return;
+  }
   let o; if(prev && next) o = (prev.orden + next.orden) / 2; else if(prev) o = prev.orden + 1000; else if(next) o = next.orden - 1000; else return;
   if(Math.abs(o - j.orden) < 1e-9) return;
   j.orden = o;
