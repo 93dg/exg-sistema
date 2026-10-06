@@ -1479,6 +1479,13 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .rec-est-lista button.act{background:var(--e);color:#fff;}
 .rec-est-con{display:flex;flex-direction:column;gap:4px;margin-top:12px;font-size:12px;font-weight:700;color:var(--ink-soft);} .rec-est-con input{font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;}
 #alertas-list-bd .rec-card .t .rec-est, #alertas-list-bd .rec-card .t .rec-est em{font-size:11.5px !important;font-weight:800;}
+.tb-ok.tb-eur{font-weight:900;color:#3B6D11;}
+.tb-cob{display:flex;flex-direction:column;gap:8px;} .tb-cob > button{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--paper);}
+.tb-cob > button b{font-size:15px;} .tb-cob > button span{font-size:12px;color:var(--ink-soft);}
+.tb-cob input{width:100%;box-sizing:border-box;font-size:16px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;}
+.tb-canc{display:flex;flex-wrap:wrap;gap:8px;} .tb-canc button{all:unset;cursor:pointer;font-size:14px;font-weight:800;padding:9px 14px;border-radius:99px;border:1.5px solid var(--line);color:var(--ink);}
+.tb-canc button.act{background:var(--ink);border-color:var(--ink);color:#fff;}
+.tb-canc-otro{width:100%;box-sizing:border-box;margin-top:10px;font-size:16px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;}
 /* V8.10 Economía rediseñada */
 .e2-hb{all:unset;cursor:pointer;display:block;width:100%;}
 .e2-hero .row button{all:unset;cursor:pointer;flex:1;}
@@ -4359,7 +4366,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.52</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.53</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4450,7 +4457,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.52</div>
+        <div class="sub" id="version-badge">V8.53</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -23001,7 +23008,8 @@ async function prRegistrarPendientes(id){
    El orden manual es un número (orden): al mover un trabajo solo se guarda ese y queda entre sus dos vecinos. */
 const TB_PRIO = ['Alta', 'Media', 'Baja'], TB_DIFICULTADES = ['Fácil', 'Medio', 'Difícil'];
 const TB_ESTADOS = ['Pendiente', 'Empezado', 'Activo', 'Albarán', 'Factura', 'Por cobrar', 'Cobrado'];
-const TB_ESTADO_CLASE = {'Pendiente': 'gray', 'Empezado': 'lblue', 'Activo': 'blue', 'Albarán': 'amber', 'Factura': 'coral', 'Por cobrar': 'red', 'Cobrado': 'green'};
+const TB_ESTADO_CLASE = {'Pendiente': 'gray', 'Empezado': 'lblue', 'Activo': 'blue', 'Albarán': 'amber', 'Factura': 'coral', 'Por cobrar': 'red', 'Cobrado': 'green', 'Cancelado': 'gray'};
+const TB_MOTIVOS_CANCELA = ['No está interesado', 'Lo hizo otra empresa', 'No podemos', 'No compensa', 'Mal pagador', 'Error', 'Otro'];   // V8.53 (Daniel): se pueden marcar varios
 const TB_ESTADO_AYUDA = {'Albarán': 'terminado, falta hacer el albarán', 'Factura': 'terminado, falta hacer la factura', 'Por cobrar': 'entregado el documento, falta que nos paguen'};
 const TB_DURACIONES = ['1-2H', '4-6H', '1D', '2-3D', '1S', '2S', '1M', '+1M'];
 const TB_DUR_HUE = [125, 105, 85, 62, 42, 26, 12, 0];   // de verde (corto) a rojo (largo)
@@ -23203,7 +23211,7 @@ function tbRenderComputo(lista){   // encima de Alta/Media/Baja: solo sale con a
 function tbPrioridades(j){ const l = (Array.isArray(j.prioridades) && j.prioridades.length ? j.prioridades : [j.prioridad || 'Media']).filter(x => TB_PRIO.includes(x)).slice(0, 2); return l.length ? l : ['Media']; }
 function tbPrioPrincipal(l){ return TB_PRIO.find(p => l.includes(p)) || 'Media'; }
 function tbDificultades(j){ const l = (Array.isArray(j.dificultades) ? j.dificultades : (j.dificultad ? [j.dificultad] : [])).filter(x => TB_DIFICULTADES.includes(x)); return TB_DIFICULTADES.filter(d => l.includes(d)).slice(0, 2); }
-function tbEstado(e){ return TB_ESTADOS.includes(e) ? e : (e === 'En curso' ? 'Activo' : e === 'Terminado' ? 'Cobrado' : 'Pendiente'); }
+function tbEstado(e){ if(e === 'Cancelado') return e; return TB_ESTADOS.includes(e) ? e : (e === 'En curso' ? 'Activo' : e === 'Terminado' ? 'Cobrado' : 'Pendiente'); }
 function tbFlota(j){ return (Array.isArray(j.flota) ? j.flota : []).filter(x => ['mixta', 'camion', 'giratoria', 'niveladora'].includes(x)); }
 // alternativas: grupos de 2 o más máquinas distintas de las que vale CUALQUIERA (flota son las que hacen falta todas). Mixta puede estar en las dos cosas (una fija y otra alternativa).
 function tbAlternativas(j){ const out = []; (Array.isArray(j.alternativas) ? j.alternativas : []).forEach(g => { const l = [...new Set((Array.isArray(g) ? g : []).filter(x => ['mixta', 'camion', 'giratoria', 'niveladora'].includes(x)))]; if(l.length >= 2) out.push(['mixta', 'camion', 'giratoria', 'niveladora'].filter(t => l.includes(t))); }); return out; }
@@ -23215,13 +23223,13 @@ function tbDurIndice(txt){
   const h = Number(m[1].replace(',', '.')) * ({H: 1, D: 8, S: 40, M: 160})[m[2]];
   return h <= 2 ? 0 : h <= 6 ? 1 : h <= 8 ? 2 : h <= 24 ? 3 : h <= 40 ? 4 : h <= 80 ? 5 : h <= 160 ? 6 : 7;
 }
-function tbDatos(j){ const pr = tbPrioridades(j); return {prioridad: tbPrioPrincipal(pr), prioridades: pr, dificultad: tbDificultades(j)[0] || '', dificultades: tbDificultades(j), flota: tbFlota(j), alternativas: tbAlternativas(j), lugar: tbMay(j.lugar), duracion: tbMay(j.duracion), cliente: tbMay(j.cliente), trabajo: tbMay(j.trabajo), nota: tbMay(j.nota), estado: tbEstado(j.estado), orden: j.orden, terminado_at: j.terminado_at || null, plan: j.plan || null}; }   // plan = sitio en el calendario; V7.93: {fecha (día de inicio), extra (días de más)}
+function tbDatos(j){ const pr = tbPrioridades(j); return {prioridad: tbPrioPrincipal(pr), prioridades: pr, dificultad: tbDificultades(j)[0] || '', dificultades: tbDificultades(j), flota: tbFlota(j), alternativas: tbAlternativas(j), lugar: tbMay(j.lugar), duracion: tbMay(j.duracion), cliente: tbMay(j.cliente), trabajo: tbMay(j.trabajo), nota: tbMay(j.nota), estado: tbEstado(j.estado), orden: j.orden, terminado_at: j.terminado_at || null, plan: j.plan || null, cobro: j.cobro || null, cancelado: j.cancelado || null}; }   // plan = sitio en el calendario; V7.93: {fecha (día de inicio), extra (días de más)}
 // V8.52 (Daniel): la Lista sigue el orden del calendario: primero lo que tiene fecha (lo más próximo arriba, lo más lejano abajo), después lo que no tiene día, en su orden
-function tbActivos(){ const f = j => (j.plan && j.plan.fecha) || ''; return _tbJobs.filter(j => j.estado !== 'Cobrado').sort((a, b) => { const fa = f(a), fb = f(b); if(fa && fb && fa !== fb) return fa < fb ? -1 : 1; if(fa && !fb) return -1; if(!fa && fb) return 1; return a.orden - b.orden; }); }
+function tbActivos(){ const f = j => (j.plan && j.plan.fecha) || ''; return _tbJobs.filter(j => j.estado !== 'Cobrado' && j.estado !== 'Cancelado').sort((a, b) => { const fa = f(a), fb = f(b); if(fa && fb && fa !== fb) return fa < fb ? -1 : 1; if(fa && !fb) return -1; if(!fa && fb) return 1; return a.orden - b.orden; }); }
 function tbPendientes(){ return tbActivos().filter(j => TB_EST_PENDIENTES.includes(j.estado)); }
 function tbEnMarcha(){ return tbActivos().filter(j => TB_EST_ENMARCHA.includes(j.estado)); }
 function tbTramites(){ return tbActivos().filter(j => TB_EST_TRAMITES.includes(j.estado)); }
-function tbHistorial(){ return _tbJobs.filter(j => j.estado === 'Cobrado').sort((a, b) => String(b.terminado_at || '').localeCompare(String(a.terminado_at || ''))); }
+function tbHistorial(){ return _tbJobs.filter(j => j.estado === 'Cobrado' || j.estado === 'Cancelado').sort((a, b) => String(b.terminado_at || '').localeCompare(String(a.terminado_at || ''))); }
 async function iniciarTrabajosPrueba(){ if(!_tbCargado){ document.getElementById('tb-lista').innerHTML = '<div class="empty" style="padding:24px;">Cargando…</div>'; await tbCargar(); } tbRender(); }
 async function tbCargar(){
   if(!sb) return;
@@ -23260,7 +23268,9 @@ function tbCartaHtml(j, esHis, botonesHtml, extraHtml){
       (nombresFlota.length ? `<span class="tb-chip cc cc-purple">${nombresFlota.join(' + ')}</span>` : '') +
       tbAlternativas(j).map(g => `<span class="tb-chip cc cc-purple tb-alt" style="background:${tbFondoFusion(g.length)}">${g.map(t => TB_MAQ_NOM[t]).join(' / ')}</span>`).join('') +
       (j.lugar ? `<span class="tb-chip">${escHtml(j.lugar)}</span>` : '');
-    const botones = botonesHtml != null ? botonesHtml : `<button type="button" class="tb-ok tb-x" data-a="borrar" title="Quitar este trabajo">✕</button>` + (esHis ? '<button type="button" class="tb-ok tb-reabrir" data-a="reabrir" title="Volver a pendientes">↩</button>' : `<button type="button" class="tb-ok" data-a="fin" title="Pasar al siguiente estado">✓</button>`);
+    const botones = botonesHtml != null ? botonesHtml : (esHis ? '<button type="button" class="tb-ok tb-reabrir" data-a="reabrir" title="Volver a pendientes">↩</button>' : `<button type="button" class="tb-ok tb-x" data-a="cancelar" title="Cancelar este trabajo">✕</button><button type="button" class="tb-ok tb-eur" data-a="cobrar" title="Cobro, albarán o factura">€</button><button type="button" class="tb-ok" data-a="fin" title="Terminado: a Trámites">✓</button>`);
+    const extraCancel = j.estado === 'Cancelado' && j.cancelado ? `<div class="tb-nota">Cancelado: ${escHtml((j.cancelado.motivos || []).join(' · '))}</div>` : j.cobro && j.cobro.forma ? `<div class="tb-nota">€ ${escHtml(j.cobro.importe != null ? Number(j.cobro.importe).toLocaleString('es-ES', {minimumFractionDigits: 2}) + ' € cobrados' : j.cobro.forma)}</div>` : '';
+    extraHtml = (extraHtml || '') + extraCancel;
     return `<div class="tb-card" data-id="${j.id}" style="--pc:${TB_COLOR_PRIO[tbPrioPrincipal(pr)]};--pcb:${tbHexAlfa(TB_COLOR_PRIO[tbPrioPrincipal(pr)], 0.4)}"><div class="tb-bp" style="background:${barra};"></div><div class="tb-cuerpo"><div class="tb-l1">${titulo}</div>${chips ? `<div class="tb-l2">${chips}</div>` : ''}${nota}${extraHtml || ''}</div>${botones}</div>`;
   }
 function tbRender(){
@@ -23418,11 +23428,51 @@ async function tbEliminar(id){
   if(error){ mostrarToast('No se pudo quitar: ' + errText(error), 'err'); return; }
   _tbJobs = _tbJobs.filter(x => x.id !== j.id); if(_tbEditando) tbCerrarEditor(); tbRender(); mostrarToast('Trabajo quitado', 'ok');
 }
+// V8.53 (Daniel): € en cada trabajo — ya cobrado (con importe), hacer albarán, hacer factura u otra forma
+function tbCobro(j){
+  mostrarModalGenerico('€ ' + (j.cliente || j.trabajo || 'Trabajo'), `<div class="tb-cob">
+    <button type="button" data-cob="cobrado"><b>Ya cobrado</b><span>Escribe cuánto</span></button>
+    <div id="tb-cob-imp" style="display:none;"><input type="text" inputmode="decimal" id="tb-cob-eur" placeholder="Importe en €"><button type="button" class="btn primary" id="tb-cob-ok">Guardar cobro</button></div>
+    <button type="button" data-cob="albaran"><b>Hacer albarán</b><span>Se abre ya rellenado</span></button>
+    <button type="button" data-cob="factura"><b>Hacer factura</b><span>Se abre ya rellenada</span></button>
+    <button type="button" data-cob="otra"><b>Otra forma</b><span>Escribe cómo</span></button>
+    <div id="tb-cob-otra" style="display:none;"><input type="text" id="tb-cob-txt" placeholder="Cómo se va a cobrar"><button type="button" class="btn primary" id="tb-cob-ok2">Guardar</button></div></div>`);
+  const ctx = {clientName: j.cliente || '', jobLabel: j.trabajo || ''};
+  document.querySelectorAll('[data-cob]').forEach(b => b.onclick = async () => {
+    const k = b.dataset.cob;
+    if(k === 'cobrado'){ document.getElementById('tb-cob-imp').style.display = ''; document.getElementById('tb-cob-eur').focus(); return; }
+    if(k === 'otra'){ document.getElementById('tb-cob-otra').style.display = ''; document.getElementById('tb-cob-txt').focus(); return; }
+    cerrarModalGenerico(); j.estado = k === 'albaran' ? 'Albarán' : 'Factura'; tbRender(); await tbPersistir(j);
+    openNewInvoiceModal({...ctx, tipo: k === 'albaran' ? 'albaran' : 'factura'});
+  });
+  document.getElementById('tb-cob-ok').onclick = async () => {
+    const v = parseFloat(String(document.getElementById('tb-cob-eur').value).replace(/\./g, '').replace(',', '.')); if(!(v > 0)){ mostrarToast('Pon el importe', 'err'); return; }
+    j.cobro = {forma: 'cobrado', importe: v, fecha: new Date().toISOString().slice(0, 10)}; j.estado = 'Cobrado'; j.terminado_at = new Date().toISOString();
+    cerrarModalGenerico(); tbRender(); if(await tbPersistir(j)) mostrarToast('Cobrado ✓ · está en el historial', 'ok');
+  };
+  document.getElementById('tb-cob-ok2').onclick = async () => {
+    const t = document.getElementById('tb-cob-txt').value.trim(); if(!t) return;
+    j.cobro = {forma: t, fecha: new Date().toISOString().slice(0, 10)}; cerrarModalGenerico(); tbRender(); if(await tbPersistir(j)) mostrarToast('Anotado', 'ok');
+  };
+}
+// V8.53 (Daniel): ✕ pregunta el motivo (se pueden marcar varios) y archiva el trabajo en el Historial como Cancelado
+function tbCancelar(j){
+  mostrarModalGenerico('Cancelar ' + (j.cliente || j.trabajo || 'trabajo'), `<div class="tb-canc">${TB_MOTIVOS_CANCELA.map(m => `<button type="button" data-mot="${escHtml(m)}">${escHtml(m)}</button>`).join('')}</div><input type="text" id="tb-canc-otro" class="tb-canc-otro" placeholder="Escribe el motivo" style="display:none;"><button type="button" class="btn primary" style="width:100%;margin-top:12px;" id="tb-canc-ok">Cancelar trabajo</button>`);
+  document.querySelectorAll('[data-mot]').forEach(b => b.onclick = () => { b.classList.toggle('act'); if(b.dataset.mot === 'Otro'){ const i = document.getElementById('tb-canc-otro'); i.style.display = b.classList.contains('act') ? '' : 'none'; if(b.classList.contains('act')) i.focus(); } });
+  document.getElementById('tb-canc-ok').onclick = async () => {
+    const otro = (document.getElementById('tb-canc-otro').value || '').trim();
+    const mot = [...document.querySelectorAll('[data-mot].act')].map(b => b.dataset.mot === 'Otro' ? (otro || 'Otro') : b.dataset.mot); if(!mot.length){ mostrarToast('Marca al menos un motivo', 'err'); return; }
+    j.cancelado = {motivos: mot, fecha: new Date().toISOString().slice(0, 10), estado_anterior: j.estado}; j.estado = 'Cancelado'; j.terminado_at = new Date().toISOString();
+    cerrarModalGenerico(); tbRender(); if(await tbPersistir(j)) mostrarToast('Cancelado · está en el historial', 'ok');
+  };
+}
 async function tbAccion(id, a){
   const j = _tbJobs.find(x => x.id === id); if(!j) return;
   if(a === 'borrar') return tbEliminar(id);
-  if(a === 'fin'){   // ✓ = pasar al siguiente estado; el último (Cobrado) lo manda al historial
-    const sig = TB_ESTADOS[Math.min(TB_ESTADOS.indexOf(j.estado) + 1, TB_ESTADOS.length - 1)];
+  if(a === 'cancelar') return tbCancelar(j);
+  if(a === 'cobrar') return tbCobro(j);
+  if(a === 'fin'){   // V8.53 (Daniel): ✓ = trabajo terminado, pasa a Trámites (falta el albarán); en Trámites sigue avanzando hasta Cobrado
+    const sig = TB_EST_TRAMITES.includes(j.estado) ? TB_ESTADOS[Math.min(TB_ESTADOS.indexOf(j.estado) + 1, TB_ESTADOS.length - 1)] : 'Albarán';
     if(sig === j.estado) return;
     j.estado = sig; if(sig === 'Cobrado') j.terminado_at = new Date().toISOString();
     tbRender(); if(await tbPersistir(j)) mostrarToast(sig === 'Cobrado' ? 'Cobrado ✓ · está en el historial' : 'Ahora: ' + sig, 'ok');
