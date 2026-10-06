@@ -1469,6 +1469,8 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .cc-tj .d{display:flex;flex-direction:column;align-items:flex-end;gap:3px;} .cc-tj .d i{font-style:normal;font-size:11px;font-weight:800;border-radius:99px;padding:2px 8px;background:var(--concrete);color:var(--ink-soft);white-space:nowrap;}
 .cc-tj .d i.urg{background:#fbeaea;color:#A32D2D;} .cc-tj .d i.est{background:var(--cf);color:var(--c);}
 .cc-tb .rec-sec b{color:var(--c);} .cc-tb .rec-sec i{background:var(--c);}
+.rec-sec[data-rec-sec]{cursor:pointer;user-select:none;-webkit-user-select:none;} .rec-sec-fl{margin-left:auto;color:var(--ink-soft);font-size:14px;}
+.rec-sec.plegado{opacity:.75;}
 /* V8.10 Economía rediseñada */
 .e2-hb{all:unset;cursor:pointer;display:block;width:100%;}
 .e2-hero .row button{all:unset;cursor:pointer;flex:1;}
@@ -4349,7 +4351,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.49</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.50</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4440,7 +4442,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.49</div>
+        <div class="sub" id="version-badge">V8.50</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13073,8 +13075,9 @@ function htmlAvisoItv(a){
   const cuando = d < 0 ? `vencida hace ${-d} día${-d===1?'':'s'}` : d === 0 ? 'vence hoy' : `vence en ${d} día${d===1?'':'s'}`;
   const color = d < 0 ? 'red' : 'orange';
   const ico = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:15px;height:15px;vertical-align:-2px;margin-right:2px;"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><circle cx="8" cy="17" r="1.6"/><circle cx="16" cy="17" r="1.6"/></svg>';
-  return `<details class="alert-det">
-      <summary class="alert-sum"><div class="alert-dot ${color}"></div><div class="t">${ico} ITV ${escHtml(v.nombre)} ${d < 0 ? 'vencida' : d === 0 ? 'vence hoy' : 'vence'} ${dd}/${m}/${String(y).slice(2)}</div></summary>
+  // V8.50 (Daniel: «dentro de cada grupo, unas tarjetas gordas y otras finas»): el aviso de ITV con la misma tarjeta que los demás recordatorios
+  return `<details class="alert-det rec-card t-itv">
+      <summary class="alert-sum"><div class="rec-ico">${ico}</div><div class="t">ITV ${escHtml(v.nombre)}</div><div class="rec-pil ${d < 0 ? 'roja' : 'ambar'}">${d < 0 ? 'vencida · ' : ''}${dd}/${m}/${String(y).slice(2)}</div></summary>
       <div class="alert-det-b"><div class="s" style="font-weight:600;color:var(--ink);">ITV ${escHtml(v.nombre)}${v.matricula ? ' (' + escHtml(v.matricula) + ')' : ''} — ${cuando}</div><div class="rec-fte">Fuente · ficha del vehículo (Flota)</div><div class="s" style="margin-top:6px;">Válida hasta ${dd}/${m}/${y}. Aviso automático: desaparece al actualizar la fecha de ITV en la ficha del vehículo.</div></div>
     </details>`;
 }
@@ -13112,6 +13115,11 @@ function recTema(r){ const d = r.data || {}, t = [d.titulo, d.titulo_corto, d.de
   if(/hacienda|aeat|gestor|certificado|impuesto|ivtm|\b303\b|\b130\b|aplazamiento/i.test(t)) return 'hacienda';
   if(d.flota_id || /mixta|cami[oó]n|iveco|audi|giratoria|niveladora|tac[oó]grafo|evoque|hyundai/i.test(t)) return 'flota';
   return 'otros'; }
+document.addEventListener('click', ev => { const h = ev.target.closest && ev.target.closest('[data-rec-sec]'); if(!h) return;
+  let pleg = []; try{ pleg = JSON.parse(localStorage.getItem('rec_plegados') || '[]'); }catch(e){}
+  const k = h.dataset.recSec, i = pleg.indexOf(k); if(i >= 0) pleg.splice(i, 1); else pleg.push(k);
+  try{ localStorage.setItem('rec_plegados', JSON.stringify(pleg)); }catch(e){}
+  const c = h.nextElementSibling; if(c) c.style.display = i >= 0 ? '' : 'none'; h.classList.toggle('plegado', i < 0); const f = h.querySelector('.rec-sec-fl'); if(f) f.textContent = i >= 0 ? '▾' : '▸'; });
 function recRender(){
   const cont = document.getElementById('alertas-list-bd'); if(!cont) return;
   const plazo0 = recPlazo(), enPlazo = _recItems.filter(r => recVisible(r.data || {}, plazo0));
@@ -13147,12 +13155,14 @@ function recRender(){
     </details>`;
   };
   // V8.48: apartados por tipo, cada uno con su color, su título y su número; los fijos (suscripciones) arriba
-  const sec = (k, titulo, lista, extra) => (lista.length || extra) ? `<div class="rec-sec t-${k}"><span class="rec-sec-bar"></span><b>${titulo}</b><i>${lista.length + (extra ? (String(extra).match(/class="alert-det/g) || []).length : 0)}</i></div>${extra || ''}${lista.map(pinta).join('')}` : '';
+  // V8.50 (Daniel): cada apartado se pliega tocando su título; se recuerda
+  let pleg = []; try{ pleg = JSON.parse(localStorage.getItem('rec_plegados') || '[]'); }catch(e){}
+  const sec = (k, titulo, lista, extra) => (lista.length || extra) ? `<div class="rec-sec t-${k}${pleg.includes(k) ? ' plegado' : ''}" data-rec-sec="${k}"><span class="rec-sec-bar"></span><b>${titulo}</b><i>${lista.length + (extra ? (String(extra).match(/<details /g) || []).length : 0)}</i><span class="rec-sec-fl">${pleg.includes(k) ? '▸' : '▾'}</span></div><div class="rec-sec-cuerpo"${pleg.includes(k) ? ' style="display:none;"' : ''}>${extra || ''}${lista.map(pinta).join('')}</div>` : '';
   const normales = items.filter(r => !(r.data||{}).anclado), fijos = items.filter(r => (r.data||{}).anclado);
   const ocultos = _recItems.length - items.length;
   cont.innerHTML = sec('fijos', 'Fijos', fijos) + REC_TEMAS.map(([k, l]) => sec(k, l, normales.filter(r => recTema(r) === k), k === 'itv' ? (_recItv || '') : '')).join('') + (ocultos ? `<div class="rec-mas">${ocultos} más adelante</div>` : '');
   actualizarVacioAlertas();
-  { const cnt = document.getElementById('alertas-count'); if(cnt){ const nItv = (String(_recItv || '').match(/class="alert-det/g) || []).length; cnt.textContent = items.length + nItv; cnt.style.display = ''; } }   // V7.61: contador junto al título
+  { const cnt = document.getElementById('alertas-count'); if(cnt){ const nItv = (String(_recItv || '').match(/<details /g) || []).length; cnt.textContent = items.length + nItv; cnt.style.display = ''; } }   // V7.61: contador junto al título
 }
 document.addEventListener('click', ev => { const ch = ev.target.closest('#rec-filtro-plazo-chips .chip-filter'); if(!ch) return; document.querySelectorAll('#rec-filtro-plazo-chips .chip-filter').forEach(c => c.classList.toggle('active', c === ch)); recRender(); try{ if(PLEG2.rec) pleg2Refrescar('rec'); }catch(e){} });
 function actualizarVacioAlertas(){
