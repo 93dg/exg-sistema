@@ -37,7 +37,12 @@ print('HTML actualizado a ${VERSION} (version-badge y version-float)')
 "
 # Commit y push — si algo falla aquí, 'set -e' corta el script y version_final NUNCA se marca
 git add -A
-git commit -m "${VERSION} — ${MSG}"
+# 06/10/2026: si la rama ya traía la versión puesta no hay nada que guardar; antes eso cortaba el script antes del push
+if git diff --cached --quiet; then
+  echo "Sin cambios nuevos que guardar (la versión ya venía puesta); se sube lo que hay"
+else
+  git commit -m "${VERSION} — ${MSG}"
+fi
 git push origin main
 
 # Solo si el push anterior terminó con éxito llegamos aquí: marcar version_final
