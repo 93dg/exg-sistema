@@ -4399,7 +4399,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.61</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.62</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4490,7 +4490,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.61</div>
+        <div class="sub" id="version-badge">V8.62</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13135,11 +13135,10 @@ async function cargarAlertasYRecordatorios(){
 let _recItems = [], _recItv = null, _recCargado = false;
 
 // V8.57 (reporte de Daniel: «los filtros no están actualizados como estaba la web»): Documentos pendientes usa las mismas píldoras que el resto. Sin ninguna elegida = todos. Antes los desplegables del móvil no filtraban nada: renderControlDocs solo leía los de escritorio
-const CC_DOC_TIPOS = [['factura', 'Factura'], ['albaran', 'Albarán'], ['presupuesto', 'Presupuesto'], ['proforma', 'Proforma']], CC_DOC_ESTADOS = [['pendiente_enviar', 'Listo p. enviar'], ['pendiente_cobrar', 'Pend. cobrar'], ['parcial', 'Cobro parcial'], ['borrador', 'Borrador']];
+const CC_DOC_TIPOS = [['factura', 'Factura'], ['albaran', 'Albarán'], ['presupuesto', 'Presupuesto'], ['proforma', 'Proforma']], CC_DOC_ESTADOS = [['pendiente_enviar', 'Listo p. enviar'], ['pendiente_cobrar', 'Pend. cobrar'], ['parcial', 'Cobro parcial'], ['borrador', 'Borrador'], ['revisar', 'Por revisar'], ['aceptado', 'Aceptado'], ['rectificativa', 'Rectificativa']];
 function ccDocsFiltroSync(){
-  const act = id => Array.from(document.querySelectorAll('#' + id + ' .chip-filter.active')).map(x => x.dataset.ccv), ta = act('cc-doc-tipo-chips'), ea = act('cc-doc-estado-chips');
-  document.querySelectorAll('#dd-tipo input[data-tipo]').forEach(i => { i.checked = !ta.length || ta.includes(i.dataset.tipo); });
-  document.querySelectorAll('#dd-estado input[data-estado]').forEach(i => { const vs = i.dataset.estado.split(','); i.checked = ea.length ? vs.some(v => ea.includes(v)) : !vs.includes('cobrado'); });
+  const act = id => Array.from(document.querySelectorAll('#' + id + ' .chip-filter.active')).map(x => x.dataset.ccv);
+  window._ccTiposSel = act('cc-doc-tipo-chips'); window._ccEstadosSel = act('cc-doc-estado-chips');   // sin ninguna elegida = todos los pendientes
   renderControlDocs();
 }
 function ccDocsMontarFiltro(){ try{
@@ -27695,6 +27694,8 @@ function toggleDDGenerico(id){
 document.addEventListener('click', (e)=>{
   document.querySelectorAll('.dd-filter.open').forEach(f=>{ if(!f.contains(e.target)) f.classList.remove('open'); });
 });
+const CC_ESTADOS_CERRADOS = new Set(['cobrado', 'cobrado_efectivo', 'rechazado', 'anulado']);
+const CC_ESTADOS_CAJA = () => new Set(Array.from(document.querySelectorAll('#dd-estado input[data-estado]')).flatMap(i => i.dataset.estado.split(',')));
 function controlDocsEstadoDe(d){
   return d.estado_cobro || 'pendiente_enviar';
 }
@@ -27703,9 +27704,9 @@ function controlDocsEstadoPill(d, ctx){
   const estadoClase = d.status==='Borrador'?'porconfirmar':d.status==='Pendiente'?'pendiente':d.status==='Validado'?'validado':'enviado';
   return `<span class="pill ${estadoClase}">${d.status}</span>`;
 }
-let controlDocsLimite = 15;
+let controlDocsLimite = 60;   // V8.62: Documentos pendientes enseña todos los pendientes (antes solo 15 y el resto detrás de «cargar más»)
 let controlDocsAniosPoblado = false;
-function controlDocsMostrarMas(){ controlDocsLimite += 15; renderControlDocs(); }
+function controlDocsMostrarMas(){ controlDocsLimite += 30; renderControlDocs(); }
 function ddChecked(sel){ return Array.from(document.querySelectorAll(sel+' input[type=checkbox]:checked')); }
 function ddSetBadge(name, count){
   const b = document.getElementById('dd-'+name+'-badge');
@@ -27742,8 +27743,11 @@ function renderControlDocs(){
   const trimsSel = new Set(trimChecks.map(c=>c.dataset.trim));
   const q = (document.getElementById('control-search')?.value||'').trim().toLowerCase();
   const filtrados = todos.filter(d=>{
-    if(!tiposSel.has(d.type)) return false;
-    if(estadosSel.size && !estadosSel.has(controlDocsEstadoDe(d))) return false;
+    // V8.62 (Daniel: «tienen que aparecer TODOS los documentos pendientes, y borrador es un pendiente»): sin elegir nada, sale todo lo que no está cobrado ni cerrado, también los estados que no tienen casilla (por revisar, aceptado, rectificativa…). Si se eligen píldoras, solo esas
+    const est = controlDocsEstadoDe(d), chipsT = window._ccTiposSel || [], chipsE = window._ccEstadosSel || [];
+    if(chipsT.length ? !chipsT.includes(d.type) : !tiposSel.has(d.type)) return false;
+    if(chipsE.length){ if(!chipsE.includes(est)) return false; }
+    else if(estadosSel.size){ if(CC_ESTADOS_CAJA().has(est)){ if(!estadosSel.has(est)) return false; } else if(CC_ESTADOS_CERRADOS.has(est)) return false; }
     if(q && ![(d.client||''),(d.numero||d.num||''),(d.job||'')].join(' ').toLowerCase().includes(q)) return false;
     if(aniosSel.size || trimsSel.size){
       const dt = d.dateRaw ? new Date(d.dateRaw) : null;
