@@ -4500,7 +4500,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.76</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.77</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4591,7 +4591,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.76</div>
+        <div class="sub" id="version-badge">V8.77</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7850,7 +7850,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     if(btn.dataset.view==='mapa' && typeof realMap!=='undefined' && realMap){
       setTimeout(()=>realMap.invalidateSize(), 50);
     }
-    if(HISTORICO_VISTAS.includes(btn.dataset.view)) asegurarHistorico();   // el histórico de filas antiguas se construye solo aquí, no al arrancar
+    // V8.77: Economía, Ayuntamiento y Archivos ya no construyen todo el histórico al abrirse (sus cifras salen de los datos en memoria o de la base); las filas antiguas solo se construyen por año, al elegirlo en Facturas, Albaranes o Presupuestos
     if(btn.dataset.view==='impuestos') iniciarImpuestos();
     if(btn.dataset.view==='sistema'){ const t = document.querySelector('#sistema-subtabs .client-tab.active')?.dataset.sub; if(!t || t === 'arranque'){ cargarPromptsSistema(); cargarArranqueSistema(); } }   // la pestaña que ya está abierta también carga sus datos
     if(btn.dataset.view==='trabajos') iniciarTrabajosPrueba();   // la nueva lista de trabajos (el nombre interno se queda)
@@ -11083,7 +11083,8 @@ function histAniosPendientes(tipo){ const s = new Set(); _historico.pendientes.f
 function histNecesarioAlElegir(contenedor){   // la selección de años puede incluir documentos que aún no están construidos: se cargan solos
   if(!_historico.pendientes.size) return;
   const act = Array.from(contenedor.querySelectorAll('.chip-filter.active')).map(c => c.dataset.anio).filter(Boolean), hoy = String(new Date().getFullYear());
-  if(!act.length || act.some(a => a < hoy)) asegurarHistorico();
+  if(!act.length) asegurarHistorico();   // V8.77: «Todos los años» sí carga todo; si se eligen años concretos, solo se construyen esos
+  else { const antiguos = act.filter(a => a < hoy); if(antiguos.length) asegurarHistorico(antiguos); }
 }
 function poblarFiltroAniosChips(tbodyId, contenedorId){
   const _pref = contenedorId.split('-')[0];
@@ -11287,7 +11288,7 @@ function renderEconDocs(prefijo){
 // La tabla de cada lista sigue teniendo TODAS las filas y sigue mandando en filtros, orden y totales.
 let _diferirTarjetas = false;
 let _docsListos = false;
-const _historico = {pendientes: new Map(), procesar: null, finalizar: null, enCurso: false};
+const _historico = {pendientes: new Map(), procesar: null, finalizar: null, enCurso: false, cola: null, etiqueta: ''};
 let _ultimoToque = 0; ['touchstart', 'touchmove', 'pointerdown', 'wheel', 'scroll', 'keydown'].forEach(ev => window.addEventListener(ev, () => { _ultimoToque = performance.now(); }, {passive: true, capture: true}));   // última vez que la persona tocó la pantalla
 const HISTORICO_VISTAS = ['economia', 'ayuntamiento', 'archivos'];   // secciones que construyen solas los documentos antiguos; Facturas, Albaranes y Presupuestos los cargan solo con el botón, y Clientes no los necesita (sus totales salen de los datos en memoria)
 // Construye, en trozos pequeños, las filas de los documentos antiguos que faltan. Solo la primera vez que hace falta.
@@ -11298,7 +11299,9 @@ function histAnioPorDefecto(){   // Facturas, Albaranes y Presupuestos arrancan 
   const hoy = String(new Date().getFullYear());
   [['fact', 'fact-filtro-anio-chips'], ['alb', 'alb-filtro-anio-chips'], ['pres', 'pres-filtro-anio-chips']].forEach(([p, id]) => {
     if(_anioTocado[p]) return; const cont = document.getElementById(id); if(!cont) return;
-    const chip = cont.querySelector('.chip-filter[data-anio="' + hoy + '"]'); if(!chip) return;
+    let chip = cont.querySelector('.chip-filter[data-anio="' + hoy + '"]');
+    if(!chip){ const anios = Array.from(cont.querySelectorAll('.chip-filter[data-anio]:not([data-anio=""])')).sort((a, b) => b.dataset.anio.localeCompare(a.dataset.anio)); chip = anios[0]; }   // V8.77: sin documentos de este año, arranca con el último año que los tiene, nunca con «Todos»
+    if(!chip) return;
     if(!cont.querySelector('.chip-filter.active[data-anio]:not([data-anio=""])')) chip.click();
   });
 }
@@ -11315,20 +11318,25 @@ function renderAvisoHistorico(){   // una línea con el número de documentos qu
     let visibles = 0, construidas = 0; Array.from(tbody.rows).forEach(tr => { if(vista === 'presupuestos' && tr.dataset.tipo !== presModo) return; construidas++; if(tr.style.display !== 'none') visibles++; });
     const pend = _historico.pendientes.size ? Array.from(_historico.pendientes.values()).filter(d => d.tipo === (vista === 'presupuestos' ? presModo : tipo)).length : 0;
     const fmt = n => n.toLocaleString('es-ES');
-    el.innerHTML = '<b style="color:var(--ink);">' + fmt(visibles) + '</b> ' + (visibles === 1 ? uno : varios) + (!_historico.enCurso && visibles < construidas + pend ? ' de ' + fmt(construidas + pend) : '') + (_historico.enCurso ? ' · cargando los anteriores… <b class="hist-prog">0 %</b>' : '');
+    el.innerHTML = '<b style="color:var(--ink);">' + fmt(visibles) + '</b> ' + (visibles === 1 ? uno : varios) + (!_historico.enCurso && visibles < construidas + pend ? ' de ' + fmt(construidas + pend) : '') + (_historico.enCurso ? ' · cargando ' + (_historico.etiqueta || 'los anteriores') + '… <b class="hist-prog">0 %</b>' : '');
   });
 }
-function asegurarHistorico(){
-  const H = _historico; if(H.enCurso || !H.pendientes.size || !H.procesar) return;
-  H.enCurso = true;
-  const lista = Array.from(H.pendientes.values()); H.pendientes.clear();
+// V8.77: sin argumentos construye todo el histórico («Todos los años»); con una lista de años (['2023']) solo construye las filas de esos años, y cada año una sola vez
+function asegurarHistorico(anios){
+  const H = _historico; if(!H.pendientes.size || !H.procesar) return;
+  if(H.enCurso){ if(H.cola === undefined || H.cola === null) H.cola = anios ? anios.slice() : 'todo'; else if(H.cola !== 'todo'){ if(anios) H.cola = H.cola.concat(anios); else H.cola = 'todo'; } return; }   // ya hay una carga en marcha: la petición espera su turno
+  const todos = Array.from(H.pendientes.values());
+  const lista = anios ? todos.filter(d => anios.includes(String(d.fecha_devengo || '').slice(0, 4))) : todos;
+  if(!lista.length) return;
+  lista.forEach(d => H.pendientes.delete(d.id));
+  H.enCurso = true; H.etiqueta = anios ? anios.slice().sort().join(', ') : 'todos los años';
   const t0 = performance.now(); let i = 0;
   document.body.classList.add('cargando-historico'); _diferirTarjetas = true; renderAvisoHistorico();
   const terminar = () => { _diferirTarjetas = false; document.body.classList.remove('cargando-historico'); H.enCurso = false;
     try{ if(window.__exgMed) window.__exgMed.pasos.push({n: 'histórico · TOTAL (' + lista.length + ' documentos)', ms: Math.round(performance.now() - t0)}); }catch(e){}
     try{ aiRegistrarEvento('carga_historico', aiVistaActual(), {docs: lista.length, ms: Math.round(performance.now() - t0), movil: /iPhone|Android/i.test(navigator.userAgent)}); }catch(e){}
     renderAvisoHistorico();
-    if(H.pendientes.size) asegurarHistorico(); };
+    const c = H.cola; H.cola = null; if(c) asegurarHistorico(c === 'todo' ? undefined : c); };
   const trozo = () => {
     try{
       if(performance.now() - _ultimoToque < 600){ setTimeout(trozo, 250); return; }   // mientras tocas o bajas, el histórico espera: la pantalla manda
