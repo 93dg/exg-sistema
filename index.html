@@ -4491,7 +4491,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.73</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.74</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4582,7 +4582,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.73</div>
+        <div class="sub" id="version-badge">V8.74</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -27960,15 +27960,15 @@ function renderControlDocs(){
   const unicos = filtrados.filter(d=> !d.expediente_id || porExp.get(d.expediente_id) === d);
   // dos bloques claros: pendiente de FACTURAR (albarán/proforma/factura sin emitir) y pendiente de COBRAR (proforma/factura emitida sin cobrar del todo)
   const bloqueDe = d=>{ if(d.type==='presupuesto') return 'presupuesto'; const est = controlDocsEstadoDe(d); return (d.type!=='albaran' && ['pendiente_cobrar','parcial'].includes(est)) ? 'cobrar' : 'facturar'; };
-  const BLOQUES = [['facturar','Pendiente de facturar'],['cobrar','Pendiente de cobrar'],['presupuesto','Presupuestos']];
-  const sumaImp = l => l.reduce((s,d)=> s + (Number(d.total||d.importe)||0), 0);
+  const BLOQUES = [['facturar','Por entregar'],['cobrar','Por cobrar'],['presupuesto','Presupuestos']];
+  const sumaImp = l => l.reduce((s,d)=> s + (Number(d.base != null ? d.base : (d.total||d.importe))||0), 0);   // V8.74: totales SIN IVA
   const fmtEur = n => n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
   document.getElementById('control-docs-count').textContent = unicos.length;
   // V8.72 (Daniel): en el cabecero, pendiente de facturar + pendiente de cobrar + total de ambos (los presupuestos no cuentan: no son dinero pendiente)
   const sumF = sumaImp(unicos.filter(d=>bloqueDe(d)==='facturar')), sumC = sumaImp(unicos.filter(d=>bloqueDe(d)==='cobrar'));
   const resEl = document.getElementById('control-docs-resumen'), resM = document.getElementById('control-docs-resumen-m');
-  if(resEl) resEl.innerHTML = `Facturar <b>${fmtEur(sumF)}</b> · Cobrar <b>${fmtEur(sumC)}</b> · Total <b>${fmtEur(sumF+sumC)}</b>`;
-  if(resM) resM.innerHTML = `Facturar ${fmtEur(sumF)} · Cobrar ${fmtEur(sumC)}<br>Total ${fmtEur(sumF+sumC)}`;
+  if(resEl) resEl.innerHTML = `Por entregar <b>${fmtEur(sumF)}</b> · Por cobrar <b>${fmtEur(sumC)}</b> · Total <b>${fmtEur(sumF+sumC)}</b> <span style="font-weight:400;">(sin IVA)</span>`;
+  if(resM) resM.innerHTML = `Por entregar ${fmtEur(sumF)} · Por cobrar ${fmtEur(sumC)}<br>Total ${fmtEur(sumF+sumC)} (sin IVA)`;
   const visibles = unicos.slice(0, controlDocsLimite);
   const gruposVis = BLOQUES.map(([k,t])=>[k,t,visibles.filter(d=>bloqueDe(d)===k)]).filter(g=>g[2].length);
   const filaDoc = d=>`<tr onclick="openDocumentViewer('${d.id}')" style="cursor:pointer;">
@@ -27976,7 +27976,7 @@ function renderControlDocs(){
       <td onclick="event.stopPropagation();">${calidadColumnaHtml(d)}</td>
       <td onclick="event.stopPropagation();">${controlDocsEstadoPill(d,'t')}</td>
     </tr>`;
-  tbody.innerHTML = visibles.length ? gruposVis.map(([k,t,l])=>`<tr><td colspan="7" style="background:var(--bg-soft,#f3f1ec);font-weight:700;padding:8px 10px;">${t} · ${l.length} · ${fmtEur(sumaImp(l))}</td></tr>` + l.map(filaDoc).join('')).join('') : '<tr><td colspan="7" class="empty">Sin documentos con estos filtros</td></tr>';
+  tbody.innerHTML = visibles.length ? gruposVis.map(([k,t,l])=>`<tr><td colspan="7" style="background:var(--bg-soft,#f3f1ec);font-weight:700;padding:8px 10px;">${t} · ${l.length} · ${fmtEur(sumaImp(l))} sin IVA</td></tr>` + l.map(filaDoc).join('')).join('') : '<tr><td colspan="7" class="empty">Sin documentos con estos filtros</td></tr>';
   const wrap = document.getElementById('control-docs-cargar-mas-wrap');
   if(wrap) wrap.style.display = unicos.length > controlDocsLimite ? '' : 'none';
 
@@ -27986,7 +27986,7 @@ function renderControlDocs(){
     if(!visibles.length){
       listaMovil.innerHTML = '<div style="padding:16px;color:var(--ink-soft);text-align:center;">Sin documentos con estos filtros</div>';
     } else {
-      const cabMovil = (k,t,l)=>`<div style="padding:10px 14px 6px;font-weight:700;font-size:13.5px;background:var(--bg-soft,#f3f1ec);">${t} · ${l.length} · ${fmtEur(sumaImp(l))}</div>`;
+      const cabMovil = (k,t,l)=>`<div style="padding:10px 14px 6px;font-weight:700;font-size:13.5px;background:var(--bg-soft,#f3f1ec);">${t} · ${l.length} · ${fmtEur(sumaImp(l))} sin IVA</div>`;
       listaMovil.innerHTML = gruposVis.map(([k,t,l])=> cabMovil(k,t,l) + l.map(d => {
         const fecha = formatFechaCorta(d.dateRaw);
         const cal = calidadCorta(d);
