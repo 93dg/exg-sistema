@@ -1796,6 +1796,15 @@ button.e2-fila{cursor:pointer;}
 .te-l span{font-size:11.5px;color:var(--ink-soft);}
 
 .pleg-cols .doc-cli-btn, .pleg-cols .doc-ord-btn{width:34px !important;height:34px !important;align-self:center;padding:0 !important;background:var(--paper) !important;border:1px solid var(--line) !important;color:var(--ink) !important;}
+.cc-fila-compacta{display:none;}
+.cc-compacto .factura-card-movil:not(.cc-abierta){display:block !important;padding:9px 12px !important;margin-bottom:6px !important;}
+.cc-compacto .factura-card-movil:not(.cc-abierta) > *:not(.cc-fila-compacta){display:none !important;}
+.cc-compacto .factura-card-movil:not(.cc-abierta) .cc-fila-compacta{display:flex;align-items:center;gap:8px;min-width:0;font-size:13.5px;}
+.cc-fila-compacta .fc-tipo-tag{margin:0 !important;font-size:10px;}
+.cc-fc-num{font-family:var(--mono, monospace);color:var(--ink-soft);flex:none;}
+.cc-fc-cli{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cc-fc-imp{flex:none;font-weight:800;}
+.pleg-cols .doc-cli-btn.doc-cli-on, .pleg-cols .doc-ord-btn.doc-cli-on{border-color:var(--orange) !important;color:var(--orange) !important;}
 .pleg-cols .doc-cli-btn.doc-cli-on{border-color:var(--orange) !important;color:var(--orange) !important;}
 
 @media(max-width:768px){#view-calcempleado .topbar .desc{display:none;} #view-calcempleado .topbar h1{font-size:20px;margin:0;}}
@@ -4491,7 +4500,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.75</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.76</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4582,7 +4591,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.75</div>
+        <div class="sub" id="version-badge">V8.76</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13237,6 +13246,18 @@ let _recItems = [], _recItv = null, _recCargado = false;
 
 // V8.57 (reporte de Daniel: «los filtros no están actualizados como estaba la web»): Documentos pendientes usa las mismas píldoras que el resto. Sin ninguna elegida = todos. Antes los desplegables del móvil no filtraban nada: renderControlDocs solo leía los de escritorio
 const CC_DOC_TIPOS = [['factura', 'Factura'], ['albaran', 'Albarán'], ['presupuesto', 'Presupuesto'], ['proforma', 'Proforma']], CC_DOC_ESTADOS = [['trabajo_activo', 'Trabajo activo'], ['pendiente_enviar', 'Listo p. entregar'], ['pendiente_cobrar', 'Pend. cobrar'], ['parcial', 'Cobrado parcial'], ['borrador', 'Borrador'], ['revisar', 'Por revisar'], ['aceptado', 'Aceptado'], ['rectificativa', 'Rectificativa']];
+// V8.76 (reporte de Daniel: «un botón a la derecha de los filtros para cambiar de vista: tarjetas plegadas para ver el máximo número; al darle a cada una se despliega la tarjeta normal»)
+const ICO_VISTA_PLEGADA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:18px;height:18px;"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/></svg>';
+function ccDocsVistaPlegada(){
+  window._ccCompacto = !window._ccCompacto;
+  const lista = document.getElementById('control-docs-lista-movil');
+  if(lista){ lista.classList.toggle('cc-compacto', window._ccCompacto); lista.querySelectorAll('.cc-abierta').forEach(c => c.classList.remove('cc-abierta')); }
+  document.getElementById('cc-docs-vista-btn')?.classList.toggle('doc-cli-on', window._ccCompacto);
+}
+document.addEventListener('click', ev => {   // en vista plegada, tocar una tarjeta la despliega (no abre el documento); ya desplegada, funciona como siempre
+  const card = ev.target.closest('#control-docs-lista-movil.cc-compacto .factura-card-movil');
+  if(card && !card.classList.contains('cc-abierta')){ ev.stopPropagation(); ev.preventDefault(); card.classList.add('cc-abierta'); }
+}, true);
 function ccDocsFiltroSync(){
   const act = id => Array.from(document.querySelectorAll('#' + id + ' .chip-filter.active')).map(x => x.dataset.ccv);
   window._ccTiposSel = act('cc-doc-tipo-chips'); window._ccEstadosSel = act('cc-doc-estado-chips');   // sin ninguna elegida = todos los pendientes
@@ -13245,7 +13266,7 @@ function ccDocsFiltroSync(){
 function ccDocsMontarFiltro(){ try{
   const pon = (id, lista) => { const f = document.getElementById(id); if(f && !f.children.length) f.innerHTML = lista.map(([v, l]) => `<div class="chip-filter" data-ccv="${v}" onclick="this.classList.toggle('active');ccDocsFiltroSync()">${l}</div>`).join(''); };
   pon('cc-doc-tipo-chips', CC_DOC_TIPOS); pon('cc-doc-estado-chips', CC_DOC_ESTADOS);
-  if(!PLEG2.ccdocs) pleg2Crear({id: 'ccdocs', despuesDe: '#cc-docs-ancla', plegados: ['tipo', 'estado'], grupos: [['tipo', 'Tipo', 'cc-doc-tipo-chips'], ['estado', 'Estado', 'cc-doc-estado-chips']]});
+  if(!PLEG2.ccdocs) pleg2Crear({id: 'ccdocs', despuesDe: '#cc-docs-ancla', plegados: ['tipo', 'estado'], grupos: [['tipo', 'Tipo', 'cc-doc-tipo-chips'], ['estado', 'Estado', 'cc-doc-estado-chips']], extra: {id: 'cc-docs-vista-btn', titulo: 'Vista plegada de tarjetas', html: ICO_VISTA_PLEGADA, fn: 'ccDocsVistaPlegada', activo: () => !!window._ccCompacto}});
 }catch(e){ console.warn(e); } }
 document.addEventListener('DOMContentLoaded', () => setTimeout(ccDocsMontarFiltro, 0));
 
@@ -20350,6 +20371,7 @@ function pleg2Render(id){
   // ARRIBA: todas las cabeceras, siempre en su sitio y sin moverse; la del filtro abierto se marca. ABAJO: su cabecera repetida a la izquierda de sus opciones
   cols.style.cssText = 'display:grid;gap:6px;margin-bottom:6px;grid-template-columns:repeat(auto-fit, minmax(118px, 1fr));';
   cols.innerHTML = cfg.grupos.map(g => { const ab = !pleg.includes(g[0]); return `<button type="button" class="tb-ftit tb-plegado ${tieneAct(g) ? 'con' : ''} ${ab ? 'abierto' : ''}" data-pl="${g[0]}" title="${ab ? 'Plegar' : 'Desplegar'} ${escHtml(g[1])}">${pleg2Texto(id, g)} <i>${ab ? '▾' : '▸'}</i></button>`; }).join('');
+  if(cfg.extra){ cols.style.gridTemplateColumns = 'repeat(' + cfg.grupos.length + ', minmax(0, 1fr)) auto'; const bx = document.createElement('button'); bx.type = 'button'; bx.id = cfg.extra.id; bx.className = 'cli-icon-btn doc-ord-btn ' + (cfg.extra.clase || ''); bx.title = cfg.extra.titulo; bx.setAttribute('aria-label', cfg.extra.titulo); bx.innerHTML = cfg.extra.html; bx.onclick = () => window[cfg.extra.fn](); if(cfg.extra.activo && cfg.extra.activo()) bx.classList.add('doc-cli-on'); cols.appendChild(bx); }   // V8.76: botón extra a la derecha de los filtros (vista plegada de tarjetas)
   cfg.grupos.forEach(g => { const f = document.getElementById(g[2]); if(f) guard.appendChild(f); });
   filas.innerHTML = '';
   abiertos.forEach(g => { const f = document.getElementById(g[2]); if(!f) return; const fila = document.createElement('div'); fila.className = 'tb-frow'; fila.innerHTML = `<button type="button" class="tb-ftit" data-pl="${g[0]}" title="Plegar ${escHtml(g[1])}">${escHtml(g[1])} <i>▾</i></button>`; fila.appendChild(f); filas.appendChild(fila); });
@@ -27998,6 +28020,7 @@ function renderControlDocs(){
         const tipoNum = `Nº ${d.numero||'—'}`;   // V8.64: el tipo va arriba, entre el estado y el icono de imprimir
         const cliente = d.client && d.client !== '—' ? d.client : 'Sin cliente';
         return `<div class="factura-card-movil fc-tipo-${d.type}" data-doc-id="${d.id}" onclick="openDocumentViewer('${d.id}')">
+          <div class="cc-fila-compacta"><span class="fc-tipo-tag tp-${d.type}">${TIPO_DOC_NOMBRE[d.type] || d.type}</span><span class="cc-fc-num">${svgEsc(d.numero||d.num||'—')}</span><span class="cc-fc-cli">${svgEsc(cliente)}</span><span class="cc-fc-imp">${d.amountLabel}</span></div>
           <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${d.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
           <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${d.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
           <input type="checkbox" class="fc-check ctrl-sel-chk" data-id="${d.id}" onclick="event.stopPropagation();" onchange="actualizarSeleccionDoc('ctrl-sel-chk','ctrl-borrar-sel-btn','ctrl-sel-count')">
