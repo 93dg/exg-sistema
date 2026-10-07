@@ -4500,7 +4500,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.77</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.78</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4521,6 +4521,52 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
   <button onclick="closeGlobalAddMenuAndRun(abrirIncidencia)"><span class="ma-ico"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5L2.5 20h19z"/><path d="M12 10v4.5M12 17.6v.2"/></svg></span> Incidencia de máquina</button>
 </div>
 <button id="asistente-ia-fab" onclick="abrirAsistenteIA()"><span id="ai-fab-orb"></span></button>
+<!-- V8.78 (Daniel: «un buscador general, tipo Spotlight, con resultados por secciones, colores y SVG, que vaya saliendo al escribir») -->
+<style>
+#busq-fab{position:fixed;bottom:94px;right:24px;z-index:5099;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 4px 14px rgba(0,0,0,.18);transition:transform .2s ease, opacity .2s ease;}
+#busq-fab:active{transform:scale(.94);}
+#busq-fab svg{width:21px;height:21px;}
+@media(max-width:768px){#busq-fab{bottom:calc(160px + env(safe-area-inset-bottom));right:22px;}}
+html.c2-hoja #busq-fab{visibility:hidden !important;}
+body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;pointer-events:none;}
+#busq-ov{position:fixed;inset:0;z-index:6200;background:rgba(20,20,20,.45);display:none;align-items:flex-start;justify-content:center;}
+#busq-ov.abierto{display:flex;}
+#busq-caja{width:min(640px,100vw);max-height:100dvh;height:100dvh;background:var(--paper);display:flex;flex-direction:column;}
+@media(min-width:769px){#busq-caja{height:auto;max-height:82vh;margin-top:8vh;border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.35);overflow:hidden;}}
+#busq-cab{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);}
+#busq-cab svg{flex:none;width:20px;height:20px;color:var(--orange);}
+#busq-in{flex:1;min-width:0;border:none;outline:none;background:transparent;color:var(--ink);font-size:17px;font-weight:600;}
+#busq-in::-webkit-search-cancel-button,#busq-in::-webkit-search-decoration{-webkit-appearance:none;display:none;}
+#busq-x{flex:none;border:none;background:var(--concrete);color:var(--ink-soft);width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;}
+#busq-res{overflow-y:auto;padding:6px 0 18px;flex:1;-webkit-overflow-scrolling:touch;}
+.busq-vacio{padding:26px 18px;color:var(--ink-soft);font-size:14px;text-align:center;line-height:1.5;}
+.busq-sec{margin-top:6px;}
+.busq-sec-t{display:flex;align-items:center;gap:8px;padding:9px 14px 5px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--sc);}
+.busq-sec-t .bi{width:24px;height:24px;border-radius:8px;background:var(--sc);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;}
+.busq-sec-t .bi svg{width:14px;height:14px;}
+.busq-sec-t .bn{margin-left:auto;font-weight:700;color:var(--ink-soft);letter-spacing:0;}
+.busq-r{display:flex;align-items:center;gap:10px;padding:9px 14px 9px 12px;margin:0 8px;border-radius:10px;border-left:4px solid var(--sc);cursor:pointer;}
+.busq-r:active,.busq-r.sel{background:var(--concrete);}
+.busq-r-t{flex:1;min-width:0;}
+.busq-r-1{font-weight:700;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.busq-r-2{font-size:12.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;}
+.busq-r-d{flex:none;text-align:right;font-weight:800;font-size:13.5px;}
+.busq-r-d small{display:block;font-weight:600;font-size:11px;color:var(--ink-soft);}
+.busq-r mark{background:rgba(255,138,61,.30);color:inherit;border-radius:3px;padding:0 1px;}
+.busq-mas{display:block;margin:2px 14px 0;padding:6px 10px;font-size:12.5px;font-weight:700;color:var(--sc);background:none;border:none;cursor:pointer;}
+</style>
+<button id="busq-fab" type="button" title="Buscar en todo" aria-label="Buscar en todo" onclick="busqAbrir()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg></button>
+<div id="busq-ov" onclick="if(event.target===this)busqCerrar()">
+  <div id="busq-caja" role="dialog" aria-label="Buscador general">
+    <div id="busq-cab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>
+      <input id="busq-in" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Busca clientes, documentos, trabajos…">
+      <button id="busq-x" type="button" aria-label="Cerrar" onclick="busqCerrar()">✕</button>
+    </div>
+    <div id="busq-res"></div>
+  </div>
+</div>
+
 <div id="repro-badge" style="display:none;position:fixed;bottom:90px;right:20px;z-index:9998;background:var(--asphalt,#232323);color:#fff;padding:7px 12px;border-radius:20px;font-size:12px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,.3);cursor:pointer;" onclick="document.querySelector('.nav button[data-view=\'reportes\']')?.click()">🔁 Reprocesando…</div>
 
 <div id="rb-marcar">
@@ -4591,7 +4637,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.77</div>
+        <div class="sub" id="version-badge">V8.78</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -29304,6 +29350,148 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
+<script>
+/* ============ BUSCADOR GENERAL (V8.78) ============
+   Busca sobre los datos que la web ya tiene en memoria (documentos de todos los años, clientes, trabajos) y,
+   al abrirse, trae una sola vez los recordatorios pendientes y la flota. Resultados agrupados por sección, al escribir. */
+(function(){
+  const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const fmtEur = n => (Number(n) || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  const fFecha = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; };
+  const SVG = d => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+  const ICO = {
+    cliente: SVG('<circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>'),
+    factura: SVG('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>'),
+    albaran: SVG('<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/>'),
+    proforma: SVG('<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>'),
+    presupuesto: SVG('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h2M13 12h2M9 16h2M13 16h2"/>'),
+    gasto: SVG('<path d="M12 3v18M16 7.5C16 6 14.2 5 12 5S8 6 8 7.5 9.8 10 12 10.5s4 1.3 4 3S14.2 16 12 16s-4-1-4-2.5"/>'),
+    trabajo: SVG('<path d="M3 20h18M5 20v-6l4-4 3 3 4-6 3 3v10"/>'),
+    recordatorio: SVG('<path d="M18 16v-5a6 6 0 0 0-12 0v5l-2 2h16z"/><path d="M10 21h4"/>'),
+    flota: SVG('<path d="M2 6.5h11V16H2zM13 9.5h4l4 3.5v3h-8"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>')
+  };
+  const SECC = [
+    {k: 'cliente', t: 'Clientes', c: '#2B6CB0'}, {k: 'factura', t: 'Facturas', c: '#2E7D5B'}, {k: 'albaran', t: 'Albaranes', c: '#B7791F'},
+    {k: 'proforma', t: 'Proformas', c: '#6B4FA0'}, {k: 'presupuesto', t: 'Presupuestos', c: '#2C7A9B'}, {k: 'gasto', t: 'Gastos', c: '#B83B3B'},
+    {k: 'trabajo', t: 'Trabajos', c: '#D8560F'}, {k: 'recordatorio', t: 'Recordatorios', c: '#A8851A'}, {k: 'flota', t: 'Flota', c: '#4A5568'}
+  ];
+  const POR_SECCION = 5;
+  const cache = {rec: null, flota: null}, bq = new WeakMap();
+  let abiertas = new Set(), items = [], sel = -1, deb = null;
+
+  function pajar(o, campos){ let h = bq.get(o); if(h === undefined){ h = norm(campos(o).filter(x => x != null && x !== '').join(' ')); bq.set(o, h); } return h; }
+  const importes = n => { const x = Number(n); return isFinite(x) && n !== '' && n != null ? [fmtEur(x).replace(' €', ''), String(x), x.toFixed(2)] : []; };
+  const campoDoc = d => [d.num || d.numero, d.client, d.job, d.obra_texto, d.concepto, d.categoria, d.amountLabel, ...importes(d.importe), fFecha(d.fecha_devengo), d.fecha_devengo, d.estado_cobro, TIPO_NOMBRE(d.type)];
+  const TIPO_NOMBRE = t => ({factura: 'factura', albaran: 'albaran', proforma: 'proforma', presupuesto: 'presupuesto', gasto: 'gasto'}[t] || t || '');
+
+  function resalta(texto, toks){
+    const t = String(texto == null ? '' : texto); if(!t) return '';
+    let n = ''; for(const ch of t){ n += (ch.normalize('NFD')[0] || ch).toLowerCase(); }
+    if(n.length !== t.length) return esc(t);
+    const marca = new Array(t.length).fill(false);
+    toks.forEach(k => { if(!k) return; let i = n.indexOf(k); while(i >= 0){ for(let j = i; j < i + k.length; j++) marca[j] = true; i = n.indexOf(k, i + k.length); } });
+    let out = '', dentro = false;
+    for(let i = 0; i < t.length; i++){ if(marca[i] && !dentro){ out += '<mark>'; dentro = true; } else if(!marca[i] && dentro){ out += '</mark>'; dentro = false; } out += esc(t[i]); }
+    return dentro ? out + '</mark>' : out;
+  }
+
+  function buscar(q){
+    const toks = norm(q).split(/\s+/).filter(Boolean), res = {}; SECC.forEach(s => res[s.k] = []);
+    if(!toks.length) return {res, toks};
+    const ok = h => toks.every(k => h.includes(k));
+    try{ (typeof clientes !== 'undefined' ? clientes : []).forEach(c => { if(ok(pajar(c, c => [c.name, c.nif, c.email, c.telefono, c.poblacion, c.direccion, c.provincia, c.clase_nombre]))) res.cliente.push({o: c, p: (c.name && /prov/i.test(c.type || '') ? 0 : 1)}); }); }catch(e){}
+    try{ Object.values(documentosRealesById || {}).forEach(d => { const k = res[d.type]; if(k && ok(pajar(d, campoDoc))) k.push({o: d, p: 1, f: d.fecha_devengo || ''}); }); }catch(e){}
+    try{ (typeof jobs !== 'undefined' ? jobs : []).forEach(j => { if(ok(pajar(j, j => [j.code, j.nombre, j.client, j.zone, (typeof stateLabels !== 'undefined' ? stateLabels[j.state] : j.state)]))) res.trabajo.push({o: j, p: 1, f: j.scheduledDate || ''}); }); }catch(e){}
+    (cache.rec || []).forEach(r => { const d = r.data || {}; if(ok(pajar(r, r => [d.titulo, d.titulo_corto, d.descripcion, d.con, d.vence, fFecha(d.vence)]))) res.recordatorio.push({o: r, p: 1, f: d.vence || '9999'}); });
+    (cache.flota || []).forEach(m => { if(ok(pajar(m, m => [m.nombre, m.matricula, m.tipo, m.estado]))) res.flota.push({o: m, p: 1}); });
+    ['factura', 'albaran', 'proforma', 'presupuesto', 'gasto', 'trabajo'].forEach(k => res[k].sort((a, b) => String(b.f || '').localeCompare(String(a.f || ''))));
+    res.cliente.sort((a, b) => a.p - b.p || String(a.o.name).localeCompare(String(b.o.name)));
+    res.recordatorio.sort((a, b) => String(a.f).localeCompare(String(b.f)));
+    return {res, toks};
+  }
+
+  function fila(k, it, toks){
+    const o = it.o, H = s => resalta(s, toks);
+    if(k === 'cliente') return {t: H(o.name), s: H([o.type, o.poblacion, o.telefono, o.nif].filter(Boolean).join(' · ')), d: ''};
+    if(k === 'trabajo') return {t: H((o.code || '') + ' · ' + (o.nombre || '')), s: H([o.client, o.zone].filter(x => x && x !== '—').join(' · ')), d: esc(stateLabels && stateLabels[o.state] || o.state || ''), dc: 1};
+    if(k === 'recordatorio'){ const d = o.data || {}; return {t: H(d.titulo_corto || d.titulo || ''), s: H(d.con || ''), d: d.vence ? fFecha(d.vence) : 'sin fecha', dc: 1}; }
+    if(k === 'flota') return {t: H(o.nombre || ''), s: H([o.matricula, o.tipo].filter(Boolean).join(' · ')), d: esc(o.estado || ''), dc: 1};
+    if(k === 'gasto') return {t: H(o.client && o.client !== '—' ? o.client : (o.concepto || 'Gasto')), s: H([o.categoria, fFecha(o.fecha_devengo)].filter(Boolean).join(' · ')), d: esc(fmtEur(o.importe))};
+    return {t: H((o.num || o.numero || 's/n') + ' · ' + (o.client || '—')), s: H([o.obra_texto || (o.job && o.job !== '—' ? o.job : ''), fFecha(o.fecha_devengo)].filter(Boolean).join(' · ')), d: esc(o.amountLabel || fmtEur(o.importe)) + (o.estado_cobro ? '<small>' + esc(({pendiente_cobrar: 'pend. cobrar', pendiente_enviar: 'listo p. entregar', cobrado: 'cobrado', cobrado_efectivo: 'cobrado', parcial: 'cobro parcial', trabajo_activo: 'trabajo activo', borrador: 'borrador', revisar: 'por revisar'})[o.estado_cobro] || o.estado_cobro) + '</small>' : '')};
+  }
+
+  function pinta(){
+    const q = document.getElementById('busq-in').value, cont = document.getElementById('busq-res');
+    const {res, toks} = buscar(q); items = []; sel = -1;
+    if(!toks.length){ cont.innerHTML = '<div class="busq-vacio">Escribe un nombre, un número de documento, un importe, una matrícula…<br>Los resultados salen agrupados por secciones.</div>'; return; }
+    let html = '', total = 0;
+    SECC.forEach(s => {
+      const lista = res[s.k]; if(!lista.length) return; total += lista.length;
+      const todas = abiertas.has(s.k), vis = todas ? lista : lista.slice(0, POR_SECCION);
+      html += '<div class="busq-sec" style="--sc:' + s.c + '"><div class="busq-sec-t"><span class="bi">' + ICO[s.k] + '</span>' + s.t + '<span class="bn">' + lista.length + '</span></div>';
+      vis.forEach(it => { const f = fila(s.k, it, toks), i = items.push({k: s.k, o: it.o}) - 1; html += '<div class="busq-r" data-i="' + i + '"><div class="busq-r-t"><div class="busq-r-1">' + f.t + '</div>' + (f.s ? '<div class="busq-r-2">' + f.s + '</div>' : '') + '</div>' + (f.d ? '<div class="busq-r-d">' + f.d + '</div>' : '') + '</div>'; });
+      if(!todas && lista.length > POR_SECCION) html += '<button type="button" class="busq-mas" data-mas="' + s.k + '">Ver los ' + lista.length + ' ' + s.t.toLowerCase() + ' →</button>';
+      html += '</div>';
+    });
+    cont.innerHTML = html || '<div class="busq-vacio">Nada encontrado para «' + esc(q) + '».</div>';
+    if(!cache.rec || !cache.flota) cont.insertAdjacentHTML('beforeend', '<div class="busq-vacio" style="padding:10px;font-size:12px;">Cargando también recordatorios y flota…</div>');
+  }
+
+  function abrirItem(i){
+    const it = items[i]; if(!it) return; const o = it.o;
+    busqCerrar();
+    setTimeout(() => {
+      try{
+        if(it.k === 'cliente') openClientDrawer(o.name);
+        else if(it.k === 'trabajo') openJobDrawer(o.code);
+        else if(it.k === 'gasto'){
+          const fila = (a, b) => b ? '<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);"><span style="color:var(--ink-soft);">' + a + '</span><b style="text-align:right;">' + esc(b) + '</b></div>' : '';
+          mostrarModalGenerico('Gasto · ' + (o.client && o.client !== '—' ? o.client : 'sin proveedor'), fila('Fecha', fFecha(o.fecha_devengo)) + fila('Importe', fmtEur(o.importe)) + fila('Categoría', o.categoria) + fila('Nº', o.num || o.numero) + fila('Concepto', o.concepto) + '<button class="btn primary" style="width:100%;margin-top:12px;" onclick="cerrarModalGenerico();document.querySelector(\'[data-view=gastospro]\')?.click()">Ir a Gastos</button>');
+        }
+        else if(it.k === 'recordatorio'){ const d = o.data || {}; document.querySelector('[data-view="control"]')?.click(); mostrarModalGenerico(d.titulo_corto || 'Recordatorio', '<div style="font-weight:700;margin-bottom:8px;">' + esc(d.titulo || '') + '</div>' + (d.descripcion ? '<div style="color:var(--ink-soft);line-height:1.5;margin-bottom:8px;">' + esc(d.descripcion) + '</div>' : '') + '<div>' + (d.con ? 'Con: <b>' + esc(d.con) + '</b><br>' : '') + (d.vence ? 'Vence: <b>' + fFecha(d.vence) + '</b>' : 'Sin fecha') + '</div>'); }
+        else if(it.k === 'flota'){ document.querySelector('[data-view="flota"]')?.click(); setTimeout(() => { try{ abrirFichaMaquina(o.id); }catch(e){} }, 250); }
+        else openDocumentViewer(o.id);
+      }catch(e){ console.warn('buscador', e); }
+    }, 60);
+  }
+
+  async function traerExtras(){
+    if(typeof sb === 'undefined' || !sb) return;
+    try{
+      if(!cache.rec){ const {data} = await sb.from('sistema').select('id, data').eq('tipo', 'recordatorio').eq('data->>estado', 'pendiente').limit(1000); cache.rec = data || []; }
+      if(!cache.flota){ const {data} = await sb.from('flota').select('id, nombre, tipo, matricula, estado').limit(500); cache.flota = data || []; }
+    }catch(e){ cache.rec = cache.rec || []; cache.flota = cache.flota || []; }
+    if(document.getElementById('busq-ov').classList.contains('abierto')) pinta();
+  }
+
+  window.busqAbrir = function(){
+    const ov = document.getElementById('busq-ov'); ov.classList.add('abierto'); abiertas = new Set();
+    const inp = document.getElementById('busq-in'); inp.value = ''; pinta();
+    setTimeout(() => inp.focus(), 60);
+    if(!cache.rec || !cache.flota){ traerExtras(); }
+    else { cache.rec = null; cache.flota = null; traerExtras(); }   // se refrescan cada vez que se abre: pueden haber cambiado
+    try{ aiRegistrarEvento('buscador_abierto', typeof aiVistaActual === 'function' ? aiVistaActual() : ''); }catch(e){}
+  };
+  window.busqCerrar = function(){ document.getElementById('busq-ov').classList.remove('abierto'); document.getElementById('busq-in').blur(); };
+  document.addEventListener('DOMContentLoaded', () => {
+    const inp = document.getElementById('busq-in'), cont = document.getElementById('busq-res'); if(!inp) return;
+    inp.addEventListener('input', () => { clearTimeout(deb); deb = setTimeout(pinta, 70); });
+    inp.addEventListener('keydown', e => {
+      if(e.key === 'Escape'){ busqCerrar(); return; }
+      const filas = Array.from(cont.querySelectorAll('.busq-r'));
+      if(e.key === 'Enter'){ e.preventDefault(); const i = sel >= 0 ? Number(filas[sel]?.dataset.i) : (filas[0] ? Number(filas[0].dataset.i) : -1); if(i >= 0) abrirItem(i); return; }
+      if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); if(!filas.length) return; sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + filas.length) % filas.length; filas.forEach((f, j) => f.classList.toggle('sel', j === sel)); filas[sel].scrollIntoView({block: 'nearest'}); }
+    });
+    cont.addEventListener('click', e => {
+      const mas = e.target.closest('[data-mas]'); if(mas){ abiertas.add(mas.dataset.mas); pinta(); return; }
+      const r = e.target.closest('.busq-r'); if(r) abrirItem(Number(r.dataset.i));
+    });
+    cont.addEventListener('touchstart', () => { if(document.activeElement === inp) inp.blur(); }, {passive: true});   // al bajar por los resultados se esconde el teclado
+  });
+})();
+</script>
+
 </body>
 </html>
 
