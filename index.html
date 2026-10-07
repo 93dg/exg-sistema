@@ -4491,7 +4491,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.71</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.72</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4582,7 +4582,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.71</div>
+        <div class="sub" id="version-badge">V8.72</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4720,11 +4720,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
             <span class="dt-ico">📑</span>
             <h3>Documentos pendientes</h3>
             <span class="dt-count" id="control-docs-count">0</span>
+            <span id="control-docs-resumen" style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-left:10px;"></span>
             <span id="documentos-chevron" style="color:var(--ink-soft);font-size:16px;margin-left:auto;">▾</span>
           </div>
         </div>
         <div class="lista-movil-solo" style="padding:10px 14px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;justify-content:space-between;">
-          <div style="font-weight:700;font-size:15px;">📑 Documentos pendientes <span id="control-docs-count-m" style="font-size:12px;color:var(--ink-soft);font-weight:400;"></span></div>
+          <div style="font-weight:700;font-size:15px;">📑 Documentos pendientes <span id="control-docs-count-m" style="font-size:12px;color:var(--ink-soft);font-weight:400;"></span><div id="control-docs-resumen-m" style="font-size:12px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:2px;"></div></div>
           <div style="display:flex;gap:6px;align-items:center;">
             <button type="button" class="cli-icon-btn" onclick="toggleCCDocBuscador()" title="Buscar"><svg width="15" height="15" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="4.5" stroke="currentColor" stroke-width="1.7"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
           </div>
@@ -27961,6 +27962,11 @@ function renderControlDocs(){
   const sumaImp = l => l.reduce((s,d)=> s + (Number(d.total||d.importe)||0), 0);
   const fmtEur = n => n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
   document.getElementById('control-docs-count').textContent = unicos.length;
+  // V8.72 (Daniel): en el cabecero, pendiente de facturar + pendiente de cobrar + total de ambos (los presupuestos no cuentan: no son dinero pendiente)
+  const sumF = sumaImp(unicos.filter(d=>bloqueDe(d)==='facturar')), sumC = sumaImp(unicos.filter(d=>bloqueDe(d)==='cobrar'));
+  const resEl = document.getElementById('control-docs-resumen'), resM = document.getElementById('control-docs-resumen-m');
+  if(resEl) resEl.innerHTML = `Facturar <b>${fmtEur(sumF)}</b> · Cobrar <b>${fmtEur(sumC)}</b> · Total <b>${fmtEur(sumF+sumC)}</b>`;
+  if(resM) resM.innerHTML = `Facturar ${fmtEur(sumF)} · Cobrar ${fmtEur(sumC)}<br>Total ${fmtEur(sumF+sumC)}`;
   const visibles = unicos.slice(0, controlDocsLimite);
   const gruposVis = BLOQUES.map(([k,t])=>[k,t,visibles.filter(d=>bloqueDe(d)===k)]).filter(g=>g[2].length);
   const filaDoc = d=>`<tr onclick="openDocumentViewer('${d.id}')" style="cursor:pointer;">
