@@ -4491,7 +4491,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.70</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.71</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4582,7 +4582,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.70</div>
+        <div class="sub" id="version-badge">V8.71</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4741,7 +4741,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
             <div class="dd-filter-panel">
               <label><input type="checkbox" checked data-tipo="factura" onchange="renderControlDocs()"> Factura</label>
               <label><input type="checkbox" checked data-tipo="albaran" onchange="renderControlDocs()"> Albarán</label>
-              <label><input type="checkbox" checked data-tipo="presupuesto" onchange="renderControlDocs()"> Presupuesto</label>
+              <label><input type="checkbox" data-tipo="presupuesto" onchange="renderControlDocs()"> Presupuesto</label>
               <label><input type="checkbox" checked data-tipo="proforma" onchange="renderControlDocs()"> Proforma</label>
             </div>
           </div>
@@ -11684,11 +11684,13 @@ function transicionesDocumento(doc){
   // "volver a la fase anterior" solo si de verdad existe en este expediente, y nunca en una
   // factura ya emitida (pendiente de cobro / parcial / cobrada)
   const puedeVolver = doc.documento_anterior_id && !(doc.type==='factura' && doc.status!=='Borrador');
+  const anteriorDoc = doc.documento_anterior_id ? documentosRealesById[doc.documento_anterior_id] : null;
+  // V8.71 (Daniel: «es el mismo trabajo, no tiene que crear otro albarán»): si la fase anterior ya es de ese tipo, NO se ofrece "Pasar a…" (crearía un documento nuevo del mismo tipo): solo "Volver a…", que reactiva el que ya existe
+  const resultado = out.filter(t => !(anteriorDoc && anteriorDoc.type === t.tipo));
   if(puedeVolver){
-    const anterior = documentosRealesById[doc.documento_anterior_id];
-    if(anterior) out.push({tipo: anterior.type, principal:false, volver:true, idDestino: doc.documento_anterior_id});
+    if(anteriorDoc) resultado.push({tipo: anteriorDoc.type, principal:false, volver:true, idDestino: doc.documento_anterior_id});
   }
-  return out;
+  return resultado;
 }
 function etiquetaTransicion(t){
   return t.volver ? '← Volver a '+tipoDocEtiqueta(t.tipo, false) : 'Pasar a '+tipoDocEtiqueta(t.tipo, false).toUpperCase();
@@ -11752,6 +11754,9 @@ function abrirMenuAccionesMovil(docId, event){
 async function avanzarFaseDocumento(id, tipoDestino){
   if(!exigirNivelTipo(tipoDestino,'editar') || !exigirNivelDoc(id,'editar')) return;
   if(!sb) return;
+  // V8.71: seguro extra — si la fase anterior ya es de ese tipo, se vuelve a ella en vez de crear otro documento
+  const origenDoc = documentosRealesById[id], previoDoc = origenDoc?.documento_anterior_id ? documentosRealesById[origenDoc.documento_anterior_id] : null;
+  if(previoDoc && previoDoc.type === tipoDestino){ await volverAFaseAnterior(id); return; }
   const {data: nuevoId, error} = await sb.rpc('avanzar_fase', {p_documento_origen_id: id, p_tipo_destino: tipoDestino, p_campos_extra: {}});
   if(error){ mostrarToast('Error: '+errText(error)); return; }
   // el número lo asigna la app, no el motor — avanzar_fase deja el campo vacío a propósito
@@ -27913,7 +27918,7 @@ function renderControlDocs(){
   const estadoChecks = ddChecked('#dd-estado');
   const anioChecks = ddChecked('#dd-anio');
   const trimChecks = ddChecked('#dd-trim');
-  ddSetBadge('tipo', tipoChecks.length===3 ? 0 : tipoChecks.length);
+  ddSetBadge('tipo', (tipoChecks.length===3 && !tipoChecks.some(c=>c.dataset.tipo==='presupuesto')) ? 0 : tipoChecks.length);
   ddSetBadge('estado', estadoChecks.length);
   ddSetBadge('anio', anioChecks.length);
   ddSetBadge('trim', trimChecks.length);
@@ -27945,17 +27950,27 @@ function renderControlDocs(){
     if(campo==='cliente') return asc*String(a.client||'').localeCompare(String(b.client||''));
     return asc*(new Date(b.dateRaw||b.created_at||0) - new Date(a.dateRaw||a.created_at||0));
   });
-  document.getElementById('control-docs-count').textContent = filtrados.length;
-  const visibles = filtrados.slice(0, controlDocsLimite);
-  tbody.innerHTML = visibles.length ? visibles.map(d=>{
-    return `<tr onclick="openDocumentViewer('${d.id}')" style="cursor:pointer;">
+  // V8.71 (Daniel: «un mismo trabajo no puede salir como albarán, proforma y factura; solo la última fase»): una sola fila por trabajo (expediente), la fase más avanzada
+  const ORDEN_FASE = {presupuesto:0, albaran:1, proforma:2, factura:3};
+  const porExp = new Map();
+  filtrados.forEach(d=>{ if(!d.expediente_id) return; const p = porExp.get(d.expediente_id); if(!p || (ORDEN_FASE[d.type]||0) > (ORDEN_FASE[p.type]||0)) porExp.set(d.expediente_id, d); });
+  const unicos = filtrados.filter(d=> !d.expediente_id || porExp.get(d.expediente_id) === d);
+  // dos bloques claros: pendiente de FACTURAR (albarán/proforma/factura sin emitir) y pendiente de COBRAR (proforma/factura emitida sin cobrar del todo)
+  const bloqueDe = d=>{ if(d.type==='presupuesto') return 'presupuesto'; const est = controlDocsEstadoDe(d); return (d.type!=='albaran' && ['pendiente_cobrar','parcial'].includes(est)) ? 'cobrar' : 'facturar'; };
+  const BLOQUES = [['facturar','Pendiente de facturar'],['cobrar','Pendiente de cobrar'],['presupuesto','Presupuestos']];
+  const sumaImp = l => l.reduce((s,d)=> s + (Number(d.total||d.importe)||0), 0);
+  const fmtEur = n => n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
+  document.getElementById('control-docs-count').textContent = unicos.length;
+  const visibles = unicos.slice(0, controlDocsLimite);
+  const gruposVis = BLOQUES.map(([k,t])=>[k,t,visibles.filter(d=>bloqueDe(d)===k)]).filter(g=>g[2].length);
+  const filaDoc = d=>`<tr onclick="openDocumentViewer('${d.id}')" style="cursor:pointer;">
       <td>${tipoDocEtiqueta(d.type)}</td><td class="mono">${d.numero||d.num||'—'}</td><td><span onclick="event.stopPropagation();openClientDrawer('${(d.client||'').replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline dotted;">${d.client}</span></td><td class="mono">${formatFechaCorta(d.dateRaw)}</td><td class="num">${d.amountLabel}</td>
       <td onclick="event.stopPropagation();">${calidadColumnaHtml(d)}</td>
       <td onclick="event.stopPropagation();">${controlDocsEstadoPill(d,'t')}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="6" class="empty">Sin documentos con estos filtros</td></tr>';
+  tbody.innerHTML = visibles.length ? gruposVis.map(([k,t,l])=>`<tr><td colspan="7" style="background:var(--bg-soft,#f3f1ec);font-weight:700;padding:8px 10px;">${t} · ${l.length} · ${fmtEur(sumaImp(l))}</td></tr>` + l.map(filaDoc).join('')).join('') : '<tr><td colspan="7" class="empty">Sin documentos con estos filtros</td></tr>';
   const wrap = document.getElementById('control-docs-cargar-mas-wrap');
-  if(wrap) wrap.style.display = filtrados.length > controlDocsLimite ? '' : 'none';
+  if(wrap) wrap.style.display = unicos.length > controlDocsLimite ? '' : 'none';
 
   // ── Lista móvil ──
   const listaMovil = document.getElementById('control-docs-lista-movil');
@@ -27963,7 +27978,8 @@ function renderControlDocs(){
     if(!visibles.length){
       listaMovil.innerHTML = '<div style="padding:16px;color:var(--ink-soft);text-align:center;">Sin documentos con estos filtros</div>';
     } else {
-      listaMovil.innerHTML = visibles.map(d => {
+      const cabMovil = (k,t,l)=>`<div style="padding:10px 14px 6px;font-weight:700;font-size:13.5px;background:var(--bg-soft,#f3f1ec);">${t} · ${l.length} · ${fmtEur(sumaImp(l))}</div>`;
+      listaMovil.innerHTML = gruposVis.map(([k,t,l])=> cabMovil(k,t,l) + l.map(d => {
         const fecha = formatFechaCorta(d.dateRaw);
         const cal = calidadCorta(d);
         const fallosHtml = cal.texto==='OK' ? '' : `<span class="fc-fallos" onclick="event.stopPropagation();abrirCalidadDetalle('${d.id}')">${ICO_WARN} ${cal.texto.slice(0,14)}</span>`;
@@ -27988,10 +28004,10 @@ function renderControlDocs(){
           ${extraHtml}
           <div class="fc-total-block">${totalBlockHtml(d)}</div>
         </div>`;
-      }).join('');
+      }).join('')).join('');
     }
     const wrapMovil = document.getElementById('control-docs-cargar-mas-movil-wrap');
-    if(wrapMovil) wrapMovil.style.display = filtrados.length > controlDocsLimite ? '' : 'none';
+    if(wrapMovil) wrapMovil.style.display = unicos.length > controlDocsLimite ? '' : 'none';
   }
 }
 /* ============ ESTADO DE DOCUMENTO — componente único compartido ============
