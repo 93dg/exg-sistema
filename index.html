@@ -4535,7 +4535,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.87</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.88</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4592,6 +4592,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
   html.kb-on #mobile-tabbar, html.kb-on #mobile-add-menu{visibility:hidden !important;}
   html.kb-on #busq-caja{bottom:calc(var(--busq-kb,0px) + 12px);}
   #busq-cab{height:48px;box-sizing:border-box;padding:0 8px 0 14px;background:var(--paper);border:1px solid var(--line);border-radius:24px;box-shadow:0 6px 22px rgba(0,0,0,.22);}
+  #busq-cab{will-change:clip-path;}
   #busq-ov.abierto #busq-cab{animation:busq-pastilla .38s cubic-bezier(.2,.8,.2,1);}
   @keyframes busq-pastilla{from{clip-path:inset(0 calc(100% - 48px) 0 0 round 24px);}to{clip-path:inset(-20px -20px -20px -20px round 24px);}}
   #busq-res{background:var(--paper);border:1px solid var(--line);border-radius:20px;box-shadow:0 6px 22px rgba(0,0,0,.22);flex:0 1 auto;max-height:min(50vh,calc(100dvh - 240px));padding:6px 0 8px;}
@@ -4681,7 +4682,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.87</div>
+        <div class="sub" id="version-badge">V8.88</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -29431,7 +29432,7 @@ if('serviceWorker' in navigator){
   const POR_SECCION = 5;
   const cache = {rec: null, flota: null}, bq = new WeakMap();
   let abiertas = new Set(), items = [], sel = -1, deb = null;
-  function kbAjusta(){ try{ const v = window.visualViewport; if(!v) return; const rt = document.documentElement.classList; if(!(rt.contains('busq-abierta') || rt.contains('ai-abierto'))){ rt.remove('kb-on'); return; } const kb = Math.round(window.innerHeight - v.height - v.offsetTop); document.documentElement.style.setProperty('--busq-kb', kb + 'px'); document.documentElement.style.setProperty('--busq-vh', Math.round(v.height) + 'px'); const ae = document.activeElement; rt.toggle('kb-on', !!(ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && v.height < screen.height * 0.72)); }catch(e){} }   // la barra sube con el teclado
+  function kbAjusta(){ try{ const v = window.visualViewport; if(!v) return; const rt = document.documentElement.classList; if(!(rt.contains('busq-abierta') || rt.contains('ai-abierto'))){ rt.remove('kb-on'); return; } const kb = Math.round(window.innerHeight - v.height - v.offsetTop); if(kbAjusta._k !== kb){ kbAjusta._k = kb; document.documentElement.style.setProperty('--busq-kb', kb + 'px'); document.documentElement.style.setProperty('--busq-vh', Math.round(v.height) + 'px'); } const ae = document.activeElement; rt.toggle('kb-on', !!(ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && v.height < screen.height * 0.72)); }catch(e){} }   // la barra sube con el teclado
   setInterval(() => { const rt = document.documentElement.classList; if(rt.contains('busq-abierta') || rt.contains('ai-abierto')) kbAjusta(); }, 120);
   document.addEventListener('focusin', () => { [50, 250, 600].forEach(t => setTimeout(kbAjusta, t)); });
   try{ if(window.visualViewport){ window.visualViewport.addEventListener('resize', kbAjusta); window.visualViewport.addEventListener('scroll', kbAjusta); } }catch(e){}
@@ -29524,13 +29525,11 @@ if('serviceWorker' in navigator){
   window.busqAbrir = function(){
     const ov = document.getElementById('busq-ov'); ov.classList.add('abierto'); document.documentElement.classList.add('busq-abierta'); abiertas = new Set(); kbAjusta(); requestAnimationFrame(() => requestAnimationFrame(() => ov.classList.add('anim')));
     const inp = document.getElementById('busq-in'); inp.value = ''; pinta();
-    setTimeout(() => inp.focus(), 60);
-    if(!cache.rec || !cache.flota){ traerExtras(); }
-    else { cache.rec = null; cache.flota = null; traerExtras(); }   // se refrescan cada vez que se abre: pueden haber cambiado
+    setTimeout(() => { if(document.documentElement.classList.contains('busq-abierta')){ inp.focus(); cache.rec = null; cache.flota = null; traerExtras(); } }, 400);   // el teclado y la carga esperan a que acabe la animación (si no, trabones); se refrescan cada vez que se abre
     try{ aiRegistrarEvento('buscador_abierto', typeof aiVistaActual === 'function' ? aiVistaActual() : ''); }catch(e){}
   };
   document.addEventListener('pointerdown', e => { if(document.documentElement.classList.contains('busq-abierta') && !e.target.closest('#busq-caja') && !e.target.closest('#asistente-ia-fab')) busqCerrar(); }, true);
-  window.busqCerrar = function(){ const ov = document.getElementById('busq-ov'); ov.classList.remove('anim'); document.documentElement.classList.remove('busq-abierta'); clearTimeout(busqCerrar._t); busqCerrar._t = setTimeout(() => { if(!document.documentElement.classList.contains('busq-abierta')) ov.classList.remove('abierto'); }, 320); document.documentElement.style.removeProperty('--busq-kb'); document.documentElement.classList.remove('kb-on'); const i = document.getElementById('busq-in'); i.blur(); i.value = ''; document.getElementById('busq-res').innerHTML = ''; };
+  window.busqCerrar = function(){ const ov = document.getElementById('busq-ov'); ov.classList.remove('anim'); document.documentElement.classList.remove('busq-abierta'); clearTimeout(busqCerrar._t); busqCerrar._t = setTimeout(() => { if(!document.documentElement.classList.contains('busq-abierta')) ov.classList.remove('abierto'); }, 320); document.documentElement.style.removeProperty('--busq-kb'); kbAjusta._k = null; document.documentElement.classList.remove('kb-on'); const i = document.getElementById('busq-in'); i.blur(); i.value = ''; document.getElementById('busq-res').innerHTML = ''; };
   document.addEventListener('DOMContentLoaded', () => {
     const inp = document.getElementById('busq-in'), cont = document.getElementById('busq-res'); if(!inp) return;
     inp.addEventListener('input', () => { clearTimeout(deb); deb = setTimeout(pinta, 70); });
