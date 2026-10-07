@@ -4465,6 +4465,10 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .chip-filter.active:not([class*="tp-"]),.docs-tab.active,.chip-orden.active,.ai-chip.sel,.rb-c.act,.emp-pest button.act,.dir-pest button.act,.eq-plus button.act,.visor-hojas button.on{color:var(--ink) !important;}
 .pleg .chip-filter.active[data-n]:not([data-n=""])::after{color:var(--orange);opacity:1;}
 .chip-filter.active .tp-albaran,.chip-filter.active .tp-factura,.chip-filter.active .tp-proforma,.chip-filter.active .tp-presupuesto{filter:none;}
+
+/* V8.70 — botón Duplicar de las líneas del editor, a la altura de Quitar línea; plegada la línea, se esconden los dos */
+.ie-items tbody tr.colapsada .dup-row{display:none !important;}
+.ie-items .dup-row:active{border-color:var(--orange) !important;color:var(--orange) !important;}
 </style>
 </head>
 <body>
@@ -4487,7 +4491,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.69</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.70</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4578,7 +4582,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.69</div>
+        <div class="sub" id="version-badge">V8.70</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13345,7 +13349,7 @@ function recRender(){
   const sec = (k, titulo, lista, extra) => (lista.length || extra) ? `<div class="rec-sec t-${k}${pleg.includes(k) ? ' plegado' : ''}" data-rec-sec="${k}"><span class="rec-sec-bar"></span><b>${titulo}</b><i>${lista.length + (extra ? (String(extra).match(/<details /g) || []).length : 0)}</i><span class="rec-sec-fl">${pleg.includes(k) ? '▸' : '▾'}</span></div><div class="rec-sec-cuerpo"${pleg.includes(k) ? ' style="display:none;"' : ''}>${extra || ''}${lista.map(pinta).join('')}</div>` : '';
   const normales = items.filter(r => !(r.data||{}).anclado), fijos = items.filter(r => (r.data||{}).anclado);
   const ocultos = _recItems.length - items.length;
-  cont.innerHTML = sec('fijos', 'Fijos', fijos) + REC_TEMAS.map(([k, l]) => sec(k, l, normales.filter(r => recTema(r) === k), k === 'itv' ? (_recItv || '') : '')).join('') + (ocultos ? `<div class="rec-mas">${ocultos} más adelante</div>` : '');
+  cont.innerHTML = sec('fijos', 'Anclados', fijos) + REC_TEMAS.map(([k, l]) => sec(k, l, normales.filter(r => recTema(r) === k), k === 'itv' ? (_recItv || '') : '')).join('') + (ocultos ? `<div class="rec-mas">${ocultos} más adelante</div>` : '');
   actualizarVacioAlertas();
   { const cnt = document.getElementById('alertas-count'); if(cnt){ const nItv = (String(_recItv || '').match(/<details /g) || []).length; cnt.textContent = items.length + nItv; cnt.style.display = ''; } }   // V7.61: contador junto al título
 }
@@ -22425,6 +22429,18 @@ function añadirLineaArriba(){
   const tbody = document.getElementById('ie-items-body');
   if(tbody && tbody.lastElementChild) tbody.prepend(tbody.lastElementChild);
 }
+// Duplicar línea (Daniel 07/10/2026): copia la línea entera, tal cual, justo debajo; no hereda el enlace a la entrada de origen
+function duplicarLinea(id){
+  const tr = document.getElementById(id);
+  if(!tr) return;
+  const v = sel => tr.querySelector(sel)?.value;
+  addItemRow(Number(v('.ie-qty')) || 0, v('.ie-concept') || '', v('.ie-price') ?? '', undefined, v('.ie-unidad') || undefined, v('.ie-linea-fecha') || undefined, true);
+  const tbody = document.getElementById('ie-items-body');
+  const nueva = tbody && tbody.lastElementChild;
+  if(nueva && nueva !== tr) tr.after(nueva);
+  recalcTotals();
+  if(nueva){ actualizarResumenLinea(nueva.id); nueva.scrollIntoView({block:'nearest', behavior:'smooth'}); }
+}
 function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva, origenEntradaId, origenEntradaIds){
   const id = 'item'+(itemSeq++);
   const tbody = document.getElementById('ie-items-body');
@@ -22451,6 +22467,7 @@ function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva, origen
     <td class="ie-fila-del" style="padding:4px 0;">
       <div style="display:flex;gap:6px;align-items:stretch;flex-wrap:nowrap;">
         ${(origenEntradaIds||origenEntradaId) ? `<button type="button" class="btn sm" style="flex-shrink:0;padding:6px 10px;font-size:13px;color:var(--ink-soft);border:1px solid var(--line);border-radius:6px;background:transparent;" title="Ver entradas originales" onclick="verEntradaOriginal(${JSON.stringify(origenEntradaIds||[origenEntradaId])})">📋</button>` : ''}
+        <button type="button" class="dup-row" style="flex:1;margin:0;padding:6px 10px;display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;border:1px solid var(--line);border-radius:6px;font-size:13px;color:var(--ink-soft);background:transparent;cursor:pointer;" onclick="duplicarLinea('${id}')">⧉ Duplicar</button>
         <button type="button" class="del-row" style="flex:1;margin:0;padding:6px 10px;display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;border:1px solid var(--line);border-radius:6px;font-size:13px;color:var(--ink-soft);background:transparent;cursor:pointer;" onclick="document.getElementById('${id}').remove(); recalcTotals();">✕ Quitar línea</button>
       </div>
     </td>
