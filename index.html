@@ -4580,7 +4580,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.12</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.13</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4727,7 +4727,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.12</div>
+        <div class="sub" id="version-badge">V9.13</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9189,6 +9189,9 @@ async function econ2Cargar(){
       }
       return {id: d.id, tipo: d.tipo, numero: d.numero, fecha: f, cli: E[d.entidad_id] || '—', an, tr, legal, sinF, gasto: d.tipo === 'gasto' ? imp : 0, pend, sinFact}; });
     try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').order('data->>ts', {ascending: false}).limit(12); _e2.avisos = (data || []).map(r => r.data); }catch(e){ _e2.avisos = []; }
+    try{ const rt = []; let d2 = 0;   // V9.13: retiradas en efectivo del cajero = la manera de cobrar de Rafa y Manolo; van aparte, no son gasto
+      while(true){ const {data, error} = await sb.from('movimientos_banco').select('id, fecha, importe, nota').eq('categoria', 'efectivo').lt('importe', 0).range(d2, d2 + 999); if(error || !data || !data.length) break; rt.push(...data); if(data.length < 1000) break; d2 += 1000; }
+      _e2.ret = rt.filter(m => m.fecha).map(m => ({id: m.id, fecha: m.fecha, an: Number(m.fecha.slice(0, 4)), tr: Math.floor((Number(m.fecha.slice(5, 7)) - 1) / 3) + 1, imp: -Number(m.importe), nota: m.nota || ''})); }catch(e){ _e2.ret = []; }
     try{ _e2.vivo = await dirVivo(); }catch(e){ _e2.vivo = {}; }
     try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').not('data->>saldo', 'is', null).order('data->>ts', {ascending: false}).limit(1); _e2.alerta = data && data[0] ? data[0].data : null; }catch(e){}
     try{ if(!_valFlotaRaw) await valFlotaCargar(); }catch(e){}
@@ -9209,6 +9212,8 @@ function econ2Detalle(k, {sel, e}){   // V8.13: el detalle que se despliega al t
   if(k === 'adm') return lista(_e2.filter(r => r.sinFact > 0), r => r.sinFact, r => dias(r.fecha) + ' días');
   if(k === 'ing'){ const imp = r => (_e2cf !== 'sin' ? r.legal : 0) + (_e2cf !== 'oficial' ? r.sinF : 0); return '<div class="e2-sub">Por cliente</div>' + porCli(sel, imp); }
   if(k === 'gas') return '<div class="e2-sub">Por proveedor</div>' + porCli(sel, r => r.gasto);
+  if(k === 'ret'){ const rs = (_e2.ret || []).filter(r => r.an === _e2anio && (_e2per === 'año' || r.tr === Number(_e2per[0]))).sort((a, b) => b.fecha.localeCompare(a.fecha));
+    return rs.length ? rs.map(r => `<div class="e2-fila"><div><b>${fch(r.fecha)}</b><span>${escHtml(!r.nota || /PERSONAL/i.test(r.nota) ? 'Retirada de socios' : r.nota.slice(0, 80))}</span></div><strong>${e(r.imp)}</strong></div>`).join('') : '<div class="e2-mas">Sin retiradas en este periodo.</div>'; }   // V9.13
   if(k === 'res'){ const imp = r => (_e2cf !== 'sin' ? r.legal : 0) + (_e2cf !== 'oficial' ? r.sinF : 0);
     return [1, 2, 3, 4].map(t => { const rs = _e2.filter(r => r.an === _e2anio && r.tr === t), i = rs.reduce((a, r) => a + imp(r), 0), g = rs.reduce((a, r) => a + r.gasto, 0); if(!i && !g) return '';
       return `<div class="e2-fila"><div><b>${t}T ${_e2anio}</b><span>ingresos ${e(i)} · gastos ${e(g)}</span></div><strong class="${i - g >= 0 ? 'pos' : 'neg'}">${i - g >= 0 ? '+' : '−'}${e(Math.abs(i - g))}</strong></div>`; }).join(''); }
@@ -9234,6 +9239,7 @@ function econ2Pintar(){
   const ing = r => (_e2cf !== 'sin' ? r.legal : 0) + (_e2cf !== 'oficial' ? r.sinF : 0);
   const enPer = r => r.an === _e2anio && (_e2per === 'año' || r.tr === Number(_e2per[0]));
   const sel = _e2.filter(enPer), L = sel.reduce((a, r) => a + r.legal, 0), B = sel.reduce((a, r) => a + r.sinF, 0), G = sel.reduce((a, r) => a + r.gasto, 0), I = sel.reduce((a, r) => a + ing(r), 0), R = I - G;
+  const RT = (_e2.ret || []).filter(enPer);   // V9.13: retiradas del periodo elegido
   const v = _e2.vivo || {}, al = _e2.alerta, saldo = al ? al.saldo : v.saldo;
   const flota = _valFlotaRaw ? (_valFlotaRaw.items || []).filter(x => x.maquina && x.estimado).reduce((a, x) => a + x.estimado, 0) : null;
   const cuando = iso => { const d = new Date(iso); return DIAS_SEMANA_CORTOS[(d.getDay() + 6) % 7].toLowerCase() + ' ' + d.getDate() + ' ' + MESES_CORTOS[d.getMonth()] + ' · ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
@@ -9256,7 +9262,9 @@ function econ2Pintar(){
       ${['ing', 'gas'].includes(_e2det) ? `<div class="e2-det">${econ2Detalle(_e2det, {sel, e})}</div>` : ''}
       <div class="e2-t ${R >= 0 ? 'v' : 'r'}${_e2det === 'res' ? ' abierto' : ''}" data-e2-det="res"><span>Resultado</span><b>${R >= 0 ? '+' : '−'}${e(Math.abs(R))}</b><i>ingresos − gastos</i></div>
       <div class="e2-t ${v.facturar > 0 ? 'r' : 'v'}${_e2det === 'adm' ? ' abierto' : ''}" data-e2-det="adm"><span>Sin facturar (Admón.)</span><b>${e(v.facturar || 0)}</b><i>${v.facturarDias ? 'el más antiguo: ' + v.facturarDias + ' días' : 'todo facturado'}</i></div>
-      ${['res', 'adm'].includes(_e2det) ? `<div class="e2-det">${econ2Detalle(_e2det, {sel, e})}</div>` : ''}</div>
+      ${['res', 'adm'].includes(_e2det) ? `<div class="e2-det">${econ2Detalle(_e2det, {sel, e})}</div>` : ''}
+      <div class="e2-t${_e2det === 'ret' ? ' abierto' : ''}" data-e2-det="ret" style="grid-column:1/-1;"><span>Retiradas de socios ${etq}</span><b>${e(RT.reduce((a, r) => a + r.imp, 0))}</b><i>${RT.length} retirada${RT.length === 1 ? '' : 's'} en efectivo · es como cobran Rafa y Manolo · no cuentan como gasto</i></div>
+      ${_e2det === 'ret' ? `<div class="e2-det">${econ2Detalle('ret', {sel, e})}</div>` : ''}</div>
     <div class="e2-card"><h3>Ingresos por año</h3>${barras}<div class="e2-ley"><span><i style="background:#C0392B"></i>Gastos</span>${_e2cf !== 'sin' ? '<span><i style="background:#2B5C8F"></i>Con factura</span>' : ''}${_e2cf !== 'oficial' ? '<span><i style="background:#BA7517"></i>Sin factura</span>' : ''}</div></div>
     <div class="e2-card"><h3>${_e2anio} por trimestre${_e2cf === 'oficial' ? ' · con factura' : _e2cf === 'sin' ? ' · sin factura' : ''}</h3><div class="e2-q">${trs.map((t, i) => `<button type="button" class="${_e2per === (i + 1) + 'T' ? 'act' : ''}" data-e2-tr="${i + 1}"><b>${k(t)}</b><i style="height:${Math.max(2, t / mt * 90).toFixed(0)}px"></i>${i + 1}T</button>`).join('')}</div></div>
     ${econ2AnalisisHtml()}`;
@@ -20102,7 +20110,7 @@ async function borrarUnDocumento(id){
   try{ renderFacturasKPIs(); renderAlbaranesKPIs(); renderPresupuestosKPIs(); }catch(e){}
   try{ ['fact', 'alb', 'pres'].forEach(renderEconDocs); }catch(e){}
   renderControlDocs();
-  try{ if(typeof _e2 !== 'undefined' && _e2){ _e2 = _e2.filter ? Object.assign(_e2.filter(r => String(r.id) !== String(id)), {avisos: _e2.avisos, vivo: _e2.vivo, alerta: _e2.alerta}) : _e2; if(document.getElementById('econ2')?.offsetParent) econ2Pintar(); } }catch(e){}
+  try{ if(typeof _e2 !== 'undefined' && _e2){ _e2 = _e2.filter ? Object.assign(_e2.filter(r => String(r.id) !== String(id)), {avisos: _e2.avisos, vivo: _e2.vivo, alerta: _e2.alerta, ret: _e2.ret}) : _e2; if(document.getElementById('econ2')?.offsetParent) econ2Pintar(); } }catch(e){}
 }
 async function borrarDocumentosSeleccionados(claseChk){
   const marcados = Array.from(document.querySelectorAll('.'+claseChk+':checked'));
