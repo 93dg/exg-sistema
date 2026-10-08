@@ -462,6 +462,17 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .pill.parcial_otra{background:var(--blue-soft);color:var(--blue);}
 .cob-otra{display:inline-flex;flex-wrap:wrap;gap:4px 6px;margin-left:6px;vertical-align:middle;}
 .cob-otra a{color:var(--orange);font-weight:800;font-size:12px;text-decoration:underline;cursor:pointer;white-space:nowrap;}
+.cu-res{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0 10px;}
+.cu-res>div{background:var(--concrete-2);border-radius:10px;padding:8px 10px;}
+.cu-res .k{font-size:10.5px;text-transform:uppercase;font-weight:700;color:var(--ink-soft);}
+.cu-res .v{font-size:16px;font-weight:800;}
+.cu-res .v.pend{color:var(--orange);}
+.cu-tit{font-size:11px;text-transform:uppercase;font-weight:700;color:var(--ink-soft);margin:14px 0 4px;}
+.cu-fila{padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;}
+.cu-fila .r1{display:flex;justify-content:space-between;gap:8px;}
+.cu-fila .r1>b{white-space:nowrap;}
+.cu-fila .sub{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+.cu-opc{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0;font-size:12.5px;}
 .fac-incl{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:6px;font-size:12px;}
 .fac-incl:empty{display:none;}
 .fac-incl .fi-tit{font-weight:700;color:var(--ink-soft);text-transform:uppercase;font-size:10.5px;}
@@ -4568,7 +4579,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.100</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.101</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4715,7 +4726,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.100</div>
+        <div class="sub" id="version-badge">V8.101</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6813,6 +6824,10 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
           </div>
         </div>
         <div class="field"><div class="l">Tiempo medio de pago</div><div class="v" id="c-pago">—</div></div>
+      </div>
+      <div class="block" id="c-cuenta-block">
+        <h4>Cuenta con el cliente</h4>
+        <div id="c-cuenta-wrap"></div>
       </div>
       <div class="block">
         <h4>Resumen económico</h4>
@@ -21719,7 +21734,7 @@ function openClientDrawer(name){
   document.getElementById('c-provincia').value = c.provincia || '';
   const cpEl=document.getElementById('c-cp'); if(cpEl) cpEl.value=c.cp||'';
   document.getElementById('c-contacto-status').textContent = '';
-  clientDrawerAbiertoId = c.id;
+  clientDrawerAbiertoId = c.id; _cuentaSoloPend = null;
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   const cDocs = Object.values(documentosRealesById).filter(d=>d.entidad_id === c.id);
 
@@ -21731,8 +21746,9 @@ function openClientDrawer(name){
   document.getElementById('c-total-global').innerHTML = '<b>'+euro(totalOficial+totalEnB)+'</b>';
 
   // pendiente de cobro real (facturas no cobradas)
-  const totalPendiente = cDocs.filter(d=>d.type==='factura' && d.estado_cobro && d.estado_cobro!=='cobrado').reduce((s,d)=>s+(d.total||d.importe||0),0);
+  const totalPendiente = clienteCuentaCalcular(c).pendienteTotal;   // V8.101: facturas sin cobrar + entregado sin factura, sin contar dos veces lo que va en otra factura
   document.getElementById('c-pend').textContent = euro(totalPendiente);
+  clienteCuentaPintar();
 
   // actividad por a\u00f1o
   const porAnio = {};
@@ -28506,6 +28522,56 @@ async function confirmarMeterEnFactura(facId){
     refrescarChipsOtraEnPantalla(id);
   }
   if(ok){ mostrarToast(ok + (ok === 1 ? ' documento metido' : ' documentos metidos') + ' en la factura ' + (f.numero || '') + ' ✓', 'ok'); facHojaCerrar(); refrescarIncluidosTodas(); renderControlDocs(); }
+}
+// ===== V8.101 · Cuenta con el cliente (ficha del cliente + PDF para enseñar) =====
+let _cuentaSoloPend = null;   // null = automático (la administración empieza en «solo lo pendiente»)
+function clienteCuentaCalcular(c){
+  const docs = Object.values(documentosRealesById).filter(d => d.entidad_id === c.id && d.type !== 'gasto' && !d.deleted_at && !['historico', 'revertido'].includes(d.fase_estado));
+  const facs = docs.filter(d => d.type === 'factura' && d.estado_cobro !== 'nula' && d.estado_cobro !== 'borrador' && d.estado !== 'anulado' && d.status !== 'Borrador');
+  const enl = new Set(); facs.forEach(f => { if(f.documento_anterior_id) enl.add(f.documento_anterior_id); (f.origen_albaran_ids || []).forEach(x => enl.add(x)); });
+  const tot = d => Number(d.total != null ? d.total : d.importe) || 0;
+  const facFalta = f => ['pendiente_cobrar', 'parcial'].includes(f.estado_cobro) ? Math.max(0, _o2(tot(f) - Number(f.cobrado_importe || 0))) : 0;
+  const sueltos = docs.filter(d => ['proforma', 'albaran'].includes(d.type) && !d.documento_siguiente_id && !enl.has(d.id) && !['nula', 'rectificativa', 'borrador', 'cobrado_otra'].includes(d.estado_cobro));
+  const cobradosSinFactura = sueltos.filter(d => d.estado_cobro === 'cobrado');
+  const entregados = sueltos.filter(d => ['entregado', 'parcial_otra', 'pendiente_cobrar', 'parcial'].includes(d.estado_cobro));
+  const falta = d => Math.max(0, _o2(tot(d) - Number(d.cobrado_importe || 0) - (d.estado_cobro === 'parcial_otra' ? enOtraSuma(d) : 0)));
+  const porEntregar = sueltos.filter(d => ['pendiente_enviar', 'trabajo_activo'].includes(d.estado_cobro));
+  const porRevisar = sueltos.filter(d => d.estado_cobro === 'revisar');
+  const sum = (l, f) => _o2(l.reduce((s, x) => s + f(x), 0));
+  const facturado = sum(facs, tot), cobrado = _o2(sum(facs, f => Number(f.cobrado_importe || 0)) + sum(cobradosSinFactura, tot));
+  const pendFacturas = sum(facs, facFalta), pendEntregado = sum(entregados, falta);
+  return {facs, entregados, porEntregar, porRevisar, cobradosSinFactura, facFalta, falta, tot, facturado, cobrado, pendFacturas, pendEntregado, pendienteTotal: _o2(pendFacturas + pendEntregado), sinEntregar: sum(porEntregar, falta)};
+}
+function clienteCuentaHtml(c, soloPend, pdf){
+  const k = clienteCuentaCalcular(c), eur = _eurO;
+  const incl = f => { const l = facturaIncluye(f); return l.length ? `<div class="sub">${pdf ? 'Incluye: ' + l.map(o => _ho(etiquetaDocCorta(o.d)) + ' (' + eur(o.x.importe) + ')').join(' · ') : `<span class="fac-incl" style="margin-top:2px;"><span class="fi-tit">Incluye</span>${l.map(o => `<a onclick="event.stopPropagation();verFacturaHoja('${o.d.id}','')">${_ho(etiquetaDocCorta(o.d))}<small>${eur(o.x.importe)}</small></a>`).join('')}</span>`}</div>` : ''; };
+  const facFilas = k.facs.filter(f => !soloPend || k.facFalta(f) > 0).sort((a, b) => new Date(b.dateRaw || 0) - new Date(a.dateRaw || 0));
+  let h = `<div class="cu-res"><div><div class="k">Facturado</div><div class="v">${eur(k.facturado)}</div></div><div><div class="k">Cobrado</div><div class="v">${eur(k.cobrado)}</div></div><div><div class="k">Pendiente de cobro</div><div class="v pend">${eur(k.pendienteTotal)}</div></div><div><div class="k">Sin entregar</div><div class="v">${eur(k.sinEntregar)}</div></div></div>`;
+  h += `<div class="sub" style="font-size:11px;color:var(--ink-soft);">Importes con IVA. Pendiente = facturas sin cobrar ${eur(k.pendFacturas)} + entregado sin factura ${eur(k.pendEntregado)}. Lo que ya va dentro de otra factura no se cuenta dos veces.</div>`;
+  if(facFilas.length){
+    h += `<div class="cu-tit">${soloPend ? 'Facturas pendientes' : 'Facturas'}</div>` + facFilas.map(f => `<div class="cu-fila"><div class="r1"><span><b>Factura ${_ho(f.numero) || 's/n'}</b> · ${formatFechaCorta(f.dateRaw)}${f.obra_texto ? ' · ' + _ho(f.obra_texto) : ''}</span><b>${eur(k.tot(f))}</b></div><div class="sub">Cobrado ${eur(f.cobrado_importe || 0)}${k.facFalta(f) > 0 ? ' · <b>Falta ' + eur(k.facFalta(f)) + '</b>' : ' · Cobrada'}</div>${incl(f)}</div>`).join('');
+  }
+  const doc = d => `<div class="cu-fila"><div class="r1"><span>${pdf ? _ho(etiquetaDocCorta(d)) : `<a style="color:var(--orange);font-weight:800;text-decoration:underline;cursor:pointer;" onclick="verFacturaHoja('${d.id}','')">${_ho(etiquetaDocCorta(d))}</a>`}${d.obra_texto ? ' · ' + _ho(d.obra_texto) : ''}</span><b>${eur(k.falta(d))}</b></div>${d.estado_cobro === 'parcial_otra' ? '<div class="sub">De ' + eur(k.tot(d)) + ' · parte ya va en otra factura</div>' : ''}</div>`;
+  if(k.entregados.length) h += `<div class="cu-tit">Entregado, sin factura que lo cobre</div>` + k.entregados.sort((a, b) => new Date(b.dateRaw || 0) - new Date(a.dateRaw || 0)).map(doc).join('');
+  if(k.porEntregar.length) h += `<div class="cu-tit">Sin entregar todavía</div>` + k.porEntregar.sort((a, b) => new Date(b.dateRaw || 0) - new Date(a.dateRaw || 0)).map(doc).join('');
+  if(!pdf && k.porRevisar.length) h += `<div class="cu-tit">Por revisar (no cuentan)</div>` + k.porRevisar.map(doc).join('');
+  if(!facFilas.length && !k.entregados.length && !k.porEntregar.length) h += `<div class="sub" style="margin-top:10px;">Nada pendiente.</div>`;
+  return h;
+}
+function clienteCuentaPintar(){
+  const c = clientes.find(x => x.id === clientDrawerAbiertoId), w = document.getElementById('c-cuenta-wrap'); if(!c || !w) return;
+  const solo = _cuentaSoloPend == null ? esAdministracion(c.name) : _cuentaSoloPend;
+  w.innerHTML = `<div class="cu-opc"><label><input type="checkbox" ${solo ? 'checked' : ''} onchange="_cuentaSoloPend=this.checked;clienteCuentaPintar()"> Solo lo pendiente</label><button type="button" class="btn sm" onclick="clienteCuentaPdf()">PDF para enseñar</button></div>` + clienteCuentaHtml(c, solo, false);
+}
+function clienteCuentaPdf(){
+  const c = clientes.find(x => x.id === clientDrawerAbiertoId); if(!c) return;
+  const solo = _cuentaSoloPend == null ? esAdministracion(c.name) : _cuentaSoloPend;
+  const hoy = new Date().toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric'});
+  const css = 'body{font-family:Helvetica,Arial,sans-serif;color:#1c1a17;margin:28px;font-size:13px}h1{font-size:20px;margin:0}h2{font-size:13px;color:#555;margin:2px 0 14px;font-weight:400}.cu-res{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.cu-res>div{border:1px solid #ccc;border-radius:8px;padding:8px 10px}.k{font-size:10px;text-transform:uppercase;font-weight:700;color:#666}.v{font-size:16px;font-weight:800}.v.pend{color:#c4500c}.cu-tit{font-size:11px;text-transform:uppercase;font-weight:700;color:#666;margin:16px 0 4px}.cu-fila{padding:6px 0;border-bottom:1px solid #ddd}.r1{display:flex;justify-content:space-between;gap:8px}.sub{font-size:11.5px;color:#555;margin-top:2px}.pie{margin-top:24px;font-size:11px;color:#777}';
+  const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Estado de cuentas — ' + _ho(c.name) + '</title><style>' + css + '</style></head><body><h1>Excavaciones Gómez</h1><h2>Estado de cuentas de ' + _ho(c.name) + ' · a ' + hoy + (solo ? ' · solo lo pendiente' : '') + '</h2>' + clienteCuentaHtml(c, solo, true) + '<div class="pie">Importes con IVA incluido. Documento informativo, a ' + hoy + '.</div><script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>';
+  const url = URL.createObjectURL(new Blob([html], {type: 'text/html;charset=utf-8'}));
+  const w = window.open(url, '_blank');
+  if(!w){ mostrarToast('Permite las ventanas emergentes para ver el PDF.', 'err'); }
 }
 async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   if(!exigirNivelDoc(id,'editar')) return;
