@@ -410,6 +410,13 @@ table{border-collapse:collapse;width:100%;}
 /* Bloquear scroll del fondo cuando hay overlay abierto */
 body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 /* ======= LÍNEAS NUEVAS (motor de entradas, pendiente verificar) ======= */
+.ie-portada-chk{display:inline-flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;}
+.ie-portada-chk input{width:20px;height:20px;}
+#ie-sel-barra{display:none;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--concrete);}
+.ie-modo-sel #ie-sel-barra{display:flex !important;}
+#ie-sel-texto{flex:1 1 100%;font-size:14px;font-weight:600;}
+.ie-sel-chk{width:24px;height:24px;flex-shrink:0;margin:0 4px 0 0;}
+.ie-items tr.linea-sel{background:rgba(255,160,0,.18);}
 .linea-nueva { background: rgba(255,160,0,.18) !important; outline: 2px solid var(--orange); outline-offset: -1px; }
 /* ======= NOTIFICACIONES DE CAMBIOS ======= */
 .notif-card {
@@ -4580,7 +4587,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.19</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.20</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4727,7 +4734,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.19</div>
+        <div class="sub" id="version-badge">V9.20</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7558,6 +7565,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
     <div class="ie-estado-modo ie-edit-only" id="ni-estado-modo-wrap" style="display:none;">
       <div class="tb-frow"><span class="tb-ftit" style="cursor:default;">Estado</span><div class="pillsel" id="ni-estado-cobro"></div></div>
       <div class="tb-frow"><span class="tb-ftit" style="cursor:default;">PDF</span><div class="pillsel" id="ni-modo-pdf"></div></div>
+      <div class="tb-frow"><span class="tb-ftit" style="cursor:default;">Portada</span><label class="ie-portada-chk"><input type="checkbox" id="ni-portada"> Imprimir con portada</label></div>
     </div>
 
     <!-- PASAR A… — desplegable único, mismo criterio para presupuesto/albarán/proforma/factura.
@@ -7697,6 +7705,13 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
         <div class="ie-items-toolbar" style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
           <button type="button" class="btn sm" onclick="ordenarLineasPorFecha()">📅 Ordenar por fecha</button>
           <button type="button" class="btn sm" id="ie-toggle-colapsar-btn" onclick="toggleColapsarTodasLasLineas()">▾ Plegar todas</button>
+          <button type="button" class="btn sm" id="ie-sel-btn" style="display:none;" onclick="selLineasToggleModo()">☑ Seleccionar líneas</button>
+        </div>
+        <div id="ie-sel-barra" style="display:none;">
+          <span id="ie-sel-texto"></span>
+          <button type="button" class="btn sm" onclick="selLineasTodas(true)">Todas</button>
+          <button type="button" class="btn sm" onclick="selLineasTodas(false)">Ninguna</button>
+          <button type="button" class="btn primary sm" id="ie-sel-pasar" onclick="selLineasPasarAFactura()">Pasar a factura</button>
         </div>
         <div class="ie-totals" style="margin-bottom:10px;">
           <div class="econ-line"><span>Base imponible</span><span class="v mono" id="ie-base">0,00 €</span></div>
@@ -22810,7 +22825,8 @@ function actualizarResumenLinea(id){
   const total = tr.querySelector('.line-total')?.textContent || '';
   const resumenTd = tr.querySelector('.ie-linea-resumen-td');
   if(resumenTd){
-    resumenTd.innerHTML = `<span class="ie-resumen-fecha">${fecha ? formatFechaCorta(fecha) : '—'}</span><span class="ie-resumen-cant">${cantidad ?? ''}${unidad}</span><span class="ie-resumen-concepto">${concepto}</span><span class="ie-resumen-precio">${precio ? precio+'€' : ''}</span><span class="ie-resumen-total">${total}</span><span class="ie-resumen-chevron">▾</span>`;
+    const chk = (typeof _selLineasModo !== 'undefined' && _selLineasModo) ? `<input type="checkbox" class="ie-sel-chk" ${tr.dataset.sel ? 'checked' : ''} onclick="event.stopPropagation(); selLineaToggle('${id}', this.checked)">` : '';
+    resumenTd.innerHTML = `${chk}<span class="ie-resumen-fecha">${fecha ? formatFechaCorta(fecha) : '—'}</span><span class="ie-resumen-cant">${cantidad ?? ''}${unidad}</span><span class="ie-resumen-concepto">${concepto}</span><span class="ie-resumen-precio">${precio ? precio+'€' : ''}</span><span class="ie-resumen-total">${total}</span><span class="ie-resumen-chevron">▾</span>`;
   }
 }
 // tamaño del input de CONCEPTO desplegado, por longitud — misma técnica de clases CSS
@@ -23093,12 +23109,14 @@ function abrirMenuPdfMovil(){
     </div>
   `);
 }
-function generarPDFDocumento(accion, modoForzado){
+function generarPDFDocumento(accion, modoForzado, portadaForzada){
   if(!window.jspdf){ exgLibLocal('jspdf'); mostrarToast('Preparando el PDF… vuelve a pulsar en un momento.'); throw new Error('jsPDF aún cargando'); }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'mm', format:'a4'});
   const type = document.getElementById('ni-doctype').value;
   const modoPdf = modoForzado || document.getElementById('ni-modo-pdf')?.value || 'completo';
+  // V9.20 — portada (logo, cliente y obra, sin importes): solo si se marca «Con portada» al descargar o imprimir; el PDF que va al gestor ('blob') nunca la lleva
+  const conPortada = portadaForzada !== undefined ? !!portadaForzada : (accion !== 'blob' && !!document.getElementById('ni-portada')?.checked);
   const cfg = modoPdf==='simplificado' ? {...DOC_TYPES[type], hasPrecios:false} : DOC_TYPES[type];
   const client = MAY(document.getElementById('ni-client').value || '—');
   const nif = document.getElementById('ni-client-nif').value;
@@ -23202,6 +23220,32 @@ function generarPDFDocumento(accion, modoForzado){
   // cortos (ej. "40,00 €" y "300,00 €"). Ahora el hueco es el que necesita el número más
   // ancho previsto, y el resto del ancho libre se lo queda Concepto en vez de perderse.
   const xPrecio = cfg.hasPrecios ? 172 : 195;
+  if(conPortada){
+    let yp = 75;
+    if(logoSrc){
+      try{
+        const lw = 70, ratio = (logoEl.naturalWidth && logoEl.naturalHeight) ? (logoEl.naturalHeight/logoEl.naturalWidth) : 1;
+        doc.addImage(logoSrc, 'PNG', (210 - lw)/2, yp, lw, lw*ratio);
+        yp += lw*ratio + 22;
+      }catch(e){ yp += 20; }
+    }
+    doc.setDrawColor(27,31,36); doc.setLineWidth(0.5); doc.line(60, yp, 150, yp); yp += 16;
+    doc.setTextColor(120,120,120); doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.text('CLIENTE', 105, yp, {align:'center'}); yp += 9;
+    doc.setTextColor(0,0,0); doc.setFont('helvetica','bold'); doc.setFontSize(20);
+    const lineasCliente = doc.splitTextToSize(client, 160);
+    lineasCliente.forEach((l, i) => doc.text(l, 105, yp + i*9, {align:'center'}));
+    yp += lineasCliente.length*9 + 10;
+    if(job && job !== '—'){
+      doc.setTextColor(120,120,120); doc.setFont('helvetica','normal'); doc.setFontSize(10);
+      doc.text('OBRA', 105, yp, {align:'center'}); yp += 8;
+      doc.setTextColor(0,0,0); doc.setFont('helvetica','bold'); doc.setFontSize(14);
+      const lineasObra = doc.splitTextToSize(MAY(job.split(' — ').pop()), 150);
+      lineasObra.forEach((l, i) => doc.text(l, 105, yp + i*7, {align:'center'}));
+    }
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(0,0,0);
+    doc.addPage();
+  }
   const yInicio = dibujarCabeceraPDF();
   y = yInicio;
   // reparto equilibrado entre páginas: primero se calcula cuánto ocupa cada línea y el
@@ -23294,10 +23338,11 @@ function generarPDFDocumento(accion, modoForzado){
   // numeración real de página, en todas las páginas del documento — se añade al final,
   // cuando ya se sabe cuántas páginas tiene en total
   const totalPaginas = doc.internal.getNumberOfPages();
-  for(let p=1; p<=totalPaginas; p++){
+  for(let p = conPortada ? 2 : 1; p<=totalPaginas; p++){
     doc.setPage(p);
     doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
-    doc.text(`Página ${p}/${totalPaginas}`, 195, 290, {align:'right'});
+    const pNum = conPortada ? p-1 : p, pTot = conPortada ? totalPaginas-1 : totalPaginas;
+    doc.text(`Página ${pNum}/${pTot}`, 195, 290, {align:'right'});
     doc.setTextColor(0,0,0);
   }
   if(accion==='imprimir'){
@@ -27479,7 +27524,7 @@ async function guardarGasto(){
     cerrarRegistrarGasto();
   }catch(err){ statusEl.textContent = 'Error de red: '+errText(err); statusEl.style.color = 'var(--red)'; }
 }
-function closeNewInvoiceModal(){ { const w = document.getElementById('ni-estado-modo-wrap'); if(w) w.style.display = 'none'; } document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); document.getElementById('ie-dictado').classList.remove('open'); document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview'); window.__newInvoiceDirty = false; }
+function closeNewInvoiceModal(){ { const w = document.getElementById('ni-estado-modo-wrap'); if(w) w.style.display = 'none'; } document.getElementById('newinvoice-overlay').classList.remove('active'); document.getElementById('newinvoice-form').reset(); document.getElementById('ie-dictado').classList.remove('open'); document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview'); window.__newInvoiceDirty = false; try{ selLineasReset(); }catch(e){} }
 // aviso de cambios sin guardar — solo se llama desde los cierres iniciados por el usuario
 // (botón ✕ y clic fuera), nunca desde el cierre automático tras guardar con éxito
 function ieUrlOriginal(){   // el archivo original (foto, PDF o Excel) del documento abierto en el editor, si lo tiene
@@ -27735,6 +27780,87 @@ async function wizGuardar(isDraft){
 
 let convirtiendoDesde = null; // {origenId, origenTipo} — para encadenar presupuesto→albarán→factura sin repetir datos
 
+// ===== V9.20 · Seleccionar líneas de un albarán y pasarlas a una factura =====
+let _selLineasModo = false;
+function selLineasToggleModo(){
+  _selLineasModo = !_selLineasModo;
+  document.querySelector('.invoice-editor')?.classList.toggle('ie-modo-sel', _selLineasModo);
+  document.querySelectorAll('#ie-items-body tr').forEach(tr => { delete tr.dataset.sel; tr.classList.remove('linea-sel'); if(_selLineasModo) tr.classList.add('colapsada'); actualizarResumenLinea(tr.id); });
+  const b = document.getElementById('ie-sel-btn'); if(b) b.textContent = _selLineasModo ? '✕ Dejar de seleccionar' : '☑ Seleccionar líneas';
+  if(_selLineasModo) abrirPanelLineasPorDefecto();
+  selLineasActualizarBarra();
+}
+function selLineaToggle(id, v){
+  const tr = document.getElementById(id); if(!tr) return;
+  if(v) tr.dataset.sel = '1'; else delete tr.dataset.sel;
+  tr.classList.toggle('linea-sel', !!v);
+  selLineasActualizarBarra();
+}
+function selLineasTodas(v){
+  document.querySelectorAll('#ie-items-body tr').forEach(tr => { if(v) tr.dataset.sel = '1'; else delete tr.dataset.sel; tr.classList.toggle('linea-sel', !!v); actualizarResumenLinea(tr.id); });
+  selLineasActualizarBarra();
+}
+function selLineasActualizarBarra(){
+  const filas = [...document.querySelectorAll('#ie-items-body tr')], sel = filas.filter(tr => tr.dataset.sel);
+  const imp = tr => (Number(tr.querySelector('.ie-qty')?.value) || 0) * (Number(tr.querySelector('.ie-price')?.value) || 0);
+  const suma = sel.reduce((s, tr) => s + imp(tr), 0);
+  const t = document.getElementById('ie-sel-texto'), b = document.getElementById('ie-sel-pasar');
+  if(t) t.textContent = sel.length ? `${sel.length} de ${filas.length} líneas · ${formatMoneda(suma)}` : 'Marca las líneas que quieres pasar a factura';
+  if(b) b.disabled = !sel.length;
+}
+function selLineasReset(){ if(_selLineasModo){ _selLineasModo = false; document.querySelector('.invoice-editor')?.classList.remove('ie-modo-sel'); const b = document.getElementById('ie-sel-btn'); if(b){ b.textContent = '☑ Seleccionar líneas'; b.style.display = 'none'; } } }
+// Abre una factura nueva con SOLO las líneas marcadas (de la más antigua a la más nueva). El albarán no se toca hasta que esa factura se guarda;
+// entonces pierde esas líneas y sigue abierto con el resto (ver selLineasCerrarAlbaran).
+function selLineasPasarAFactura(){
+  const id = editingDocId, origen = documentosRealesById[id];
+  if(!origen || origen.type !== 'albaran') return;
+  const filas = [...document.querySelectorAll('#ie-items-body tr')];
+  const sel = filas.filter(tr => tr.dataset.sel), resto = filas.filter(tr => !tr.dataset.sel);
+  if(!sel.length){ mostrarToast('Marca alguna línea.'); return; }
+  const leer = tr => ({fecha: tr.querySelector('.ie-linea-fecha')?.value || '', qty: Number(tr.querySelector('.ie-qty')?.value) || 0, unidad: tr.querySelector('.ie-unidad')?.value || 'ud', concept: tr.querySelector('.ie-concept')?.value || '', price: Number(tr.querySelector('.ie-price')?.value) || 0});
+  const items = sel.map(leer).sort((a, b) => (a.fecha || '9999').localeCompare(b.fecha || '9999'));
+  const restantes = resto.map(leer);
+  convirtiendoDesde = {origenId: origen.id, origenTipo: 'albaran', parcial: true, restantes};
+  selLineasReset();
+  closeNewInvoiceModal();
+  editingDocId = null;
+  document.getElementById('ni-doctype').value = 'factura';
+  document.getElementById('ni-doctype').disabled = false;
+  document.getElementById('ie-items-body').innerHTML = '';
+  document.getElementById('ie-iva-pct').value = origen.ivaPct ?? 21;
+  document.getElementById('ie-tratamiento-iva').value = origen.tratamientoIva || 'normal';
+  cambiarTratamientoIva();
+  setClientPickerValue('ni', origen.client);
+  document.getElementById('ni-job').value = origen.obra_texto || (origen.job === '—' ? '' : origen.job);
+  document.getElementById('ni-date').value = new Date().toISOString().slice(0, 10);
+  fijarFormaPago(origen.payment || 'Transferencia');
+  document.getElementById('ni-iban').value = origen.iban || EMPRESA_BANCO.iban;
+  document.getElementById('ni-titular').value = origen.titular || EMPRESA_BANCO.titular;
+  onClientChange();
+  items.forEach(i => addItemRow(i.qty, i.concept, i.price, undefined, i.unidad, i.fecha || undefined));
+  abrirPanelLineasPorDefecto();
+  document.getElementById('ni-docnum').value = DOC_TYPES.factura.prefix + DOC_TYPES.factura.seqRef();
+  document.getElementById('ie-preview-pane').style.display = 'none';
+  document.getElementById('ie-paper-edit').style.display = 'block';
+  document.getElementById('ni-convert-btn').style.display = 'none';
+  onDocTypeChange();
+  document.getElementById('newinvoice-overlay').classList.add('active');
+  setTimeout(sincronizarFechaTexto, 20);
+  mostrarToast(`Factura con ${items.length} líneas. Revisa y pulsa Guardar o Emitir; el albarán se queda con las otras ${restantes.length}.`);
+}
+async function selLineasCerrarAlbaran(conv, facturaId){
+  const o = documentosRealesById[conv.origenId]; if(!o || !sb) return;
+  const conceptos = conv.restantes.map(it => ({descripcion: it.concept, cantidad: Number(it.qty) || 1, unidad: it.unidad || 'ud', precio_unitario: it.price, importe: (Number(it.qty) || 1) * it.price, maquina: null, fecha: it.fecha || null}));
+  const base = conceptos.reduce((s, c) => s + c.importe, 0);
+  const importe = o.tratamientoIva === 'isp' ? base : base * (1 + (Number(o.ivaPct) || 0) / 100);
+  const {error} = await sb.from('documentos_economicos').update({conceptos, importe, concepto: conceptos.map(c => c.descripcion).filter(Boolean).join('; ').slice(0, 500), documento_relacionado_id: facturaId}).eq('id', conv.origenId);
+  if(error){ mostrarToast('La factura se guardó, pero no se pudo actualizar el albarán: ' + errText(error), 'err'); return; }
+  o.items = conv.restantes.map(it => ({...it, nuevo: false}));
+  o.importe = importe; o.total = importe; o.base = base;
+  try{ o.amountLabel = formatMoneda(importe); }catch(e){}
+  try{ renderControlDocs(); }catch(e){}
+}
+
 function convertirDocumento(){
   const origen = documentosRealesById[editingDocId];
   if(!origen) return;
@@ -27755,7 +27881,8 @@ function convertirDocumento(){
   document.getElementById('ni-doctype').value = siguienteTipo;
   document.getElementById('ni-doctype').disabled = false;
   document.getElementById('ie-items-body').innerHTML = '';
-  document.getElementById('ie-iva-pct').value = origen.ivaPct || 21;
+  document.getElementById('ie-iva-pct').value = origen.ivaPct ?? 21;
+  document.getElementById('ie-tratamiento-iva').value = origen.tratamientoIva || 'normal'; cambiarTratamientoIva();
   setClientPickerValue('ni', origen.client);
   document.getElementById('ni-job').value = origen.job==='—' ? '' : origen.job;
   document.getElementById('ni-date').value = new Date().toISOString().slice(0,10);
@@ -28142,7 +28269,7 @@ async function submitNewInvoice(ev, isDraft){
     payload.estado_cobro = 'pendiente_enviar';
   }
   if(convirtiendoDesde){
-    if(convirtiendoDesde.origenTipo==='albaran') payload.origen_albaran_ids = [convirtiendoDesde.origenId];
+    if(convirtiendoDesde.origenTipo==='albaran' && !convirtiendoDesde.parcial) payload.origen_albaran_ids = [convirtiendoDesde.origenId];
     else payload.documento_relacionado_id = convirtiendoDesde.origenId;
   }
 
@@ -28231,6 +28358,7 @@ async function submitNewInvoice(ev, isDraft){
       }
     }).catch(()=>{});
   }
+  if(convirtiendoDesde?.parcial && !editingDocId && savedId) await selLineasCerrarAlbaran(convirtiendoDesde, savedId);
   editingDocId = null;
   convirtiendoDesde = null;
   closeNewInvoiceModal();
@@ -28764,6 +28892,8 @@ function actualizarControlesEditor(doc){
   sel.dataset.permitidos = estadosDeTipo(doc.tipo || doc.type, doc).map(o => o[0]).join(',');   // el menú solo enseña los estados de su tipo
   sel.value = doc.estado_cobro || 'pendiente_enviar';
   document.getElementById('ni-modo-pdf').value = doc.modo_pdf || 'completo';
+  { const pc = document.getElementById('ni-portada'); if(pc) pc.checked = false; }   // V9.20: la portada se elige cada vez que se imprime
+  { if(typeof _selLineasModo !== 'undefined' && _selLineasModo) selLineasToggleModo(); const b = document.getElementById('ie-sel-btn'); if(b) b.style.display = (doc.tipo || doc.type) === 'albaran' ? '' : 'none'; }
   wrap.style.display = 'flex';
 }
 async function cambiarEstadoDesdeEditor(valor){
