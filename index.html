@@ -4542,7 +4542,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.93</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.94</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4689,7 +4689,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.93</div>
+        <div class="sub" id="version-badge">V8.94</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6725,6 +6725,11 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
       <div class="block" id="d-tasks-wrap" style="display:none;">
         <h4>Tareas de este trabajo</h4>
         <div id="d-tasks" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
+      <div class="block" id="d-costes-wrap">
+        <h4>Costes y neto</h4>
+        <div id="d-costes"></div>
       </div>
 
       <div class="block">
@@ -19281,7 +19286,7 @@ async function cargarDatosReales(){
         const dRaw = t.fecha_inicio ? new Date(t.fecha_inicio) : null;
         const dateLabel = dRaw && !isNaN(dRaw) ? dRaw.getDate()+' '+MESES_CORTOS[dRaw.getMonth()] : 'sin fecha';
         jobs.push({
-          id: t.id, code: t.codigo || ('T-'+t.id.slice(0,4)), nombre: t.nombre || 'Sin nombre', client: t.entidades?.nombre || '—', type:'Particular',
+          id: t.id, entidadId: t.entidad_id || null, fechaFin: t.fecha_fin || '', code: t.codigo || ('T-'+t.id.slice(0,4)), nombre: t.nombre || 'Sin nombre', client: t.entidades?.nombre || '—', type:'Particular',
           zone: t.zona || '—', machine: '— sin especificar —', machines: [], date: dateLabel, scheduledDate: t.fecha_inicio || '', horaInicio: t.hora_inicio ? t.hora_inicio.slice(0,5) : null, worker: t.operario || '',
           state: t.estado || 'pendiente', price: t.presupuesto ? Number(t.presupuesto).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €' : '— est.',
           urgent: t.prioridad === 'Alta'
@@ -29185,9 +29190,72 @@ async function changeJobState(code, newState){
   openJobDrawer(code);
   renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
 }
+
+// ===== COSTES Y NETO POR TRABAJO (V8.94, Daniel 08/10/2026) =====
+// Ingresos = albaranes del trabajo (por trabajo_id, o del mismo cliente desde su fecha de inicio). Ventana = primer a último albarán.
+// Combustible = el de esas fechas, repartido por horas de máquina entre todos los albaranes de la ventana. Sueldos = horas por tipo de máquina × lo que cobra cada uno por hora.
+const COSTE_CLASES = [['mixta', 'Retro / mixta', /retro|mixta|bobcat|pala/i], ['giratoria', 'Giratoria', /giratoria|excavadora/i], ['camion', 'Camión', /cami[oó]n|volquete/i], ['martillo', 'Martillo', /martillo|picando|picar/i], ['niveladora', 'Niveladora', /nivelad/i], ['otros', 'Otros', /./]];
+let _costeHora = null;
+async function costeHoraCargar(){
+  if(_costeHora) return _costeHora; _costeHora = {};
+  try{ const {data} = await sb.from('sistema').select('id, data').eq('tipo', 'coste_hora').limit(1); if(data && data[0]){ _costeHora = {...(data[0].data || {}), _id: data[0].id}; } }catch(e){}
+  return _costeHora;
+}
+async function costeHoraGuardar(clase, v){
+  const t = await costeHoraCargar(); t[clase] = Math.max(0, Number(String(v).replace(',', '.')) || 0);
+  const datos = {...t}; delete datos._id;
+  try{ if(t._id){ await sb.from('sistema').update({data: datos}).eq('id', t._id); } else { const {data} = await sb.from('sistema').insert({tipo: 'coste_hora', data: datos}).select('id').single(); if(data) t._id = data.id; } }catch(e){ mostrarToast('No se pudo guardar el precio por hora'); }
+  const code = document.getElementById('d-code')?.textContent; const j = jobs.find(x => x.code === code); if(j) costesTrabajoPintar(j);
+}
+function costesTrabajoCalcular(j, tarifas){
+  const docs = Object.values(documentosRealesById);
+  const neto = d => { const b = d.base != null && !isNaN(Number(d.base)) ? Number(d.base) : Number(d.importe || d.total || 0) / (1 + (d.iva_pct != null ? Number(d.iva_pct) : 21) / 100); return b || 0; };
+  const fec = d => String(d.fecha_devengo || d.dateRaw || '').slice(0, 10);
+  const horasDe = d => { const h = {}; (Array.isArray(d.conceptos) ? d.conceptos : []).forEach(c => { const n = Number(c.horas != null ? c.horas : 0); if(!n) return; const cl = (COSTE_CLASES.find(x => x[2].test(c.descripcion || '')) || COSTE_CLASES[5])[0]; h[cl] = (h[cl] || 0) + n; }); return h; };
+  const todosAlb = docs.filter(d => (d.tipo || d.type) === 'albaran' && !d.deleted_at && fec(d));
+  const ini = j.scheduledDate || '', fin = j.fechaFin || '';
+  const mios = todosAlb.filter(d => d.trabajo_id ? d.trabajo_id === j.id : (j.entidadId && d.entidad_id === j.entidadId && fec(d) >= ini && (!fin || fec(d) <= fin)));
+  if(!mios.length) return {vacio: true};
+  const fechas = mios.map(fec).sort(), desde = fechas[0], hasta = fechas[fechas.length - 1];
+  const sumH = ds => ds.reduce((s, d) => s + Object.values(horasDe(d)).reduce((a, b) => a + b, 0), 0);
+  const horasPorClase = {}; mios.forEach(d => { const h = horasDe(d); Object.keys(h).forEach(k => horasPorClase[k] = (horasPorClase[k] || 0) + h[k]); });
+  const hMias = sumH(mios), hTodas = sumH(todosAlb.filter(d => fec(d) >= desde && fec(d) <= hasta));
+  const reparto = hTodas > 0 ? Math.min(1, hMias / hTodas) : 1;
+  const gastos = docs.filter(d => (d.tipo || d.type) === 'gasto' && !d.deleted_at && (d.relacion_actividad == null || d.relacion_actividad === 'relacionada'));
+  const comb = gastos.filter(d => /combust/i.test(d.categoria || '') && fec(d) >= desde && fec(d) <= hasta);
+  const combTot = comb.reduce((s, d) => s + neto(d), 0);
+  const asoc = gastos.filter(d => d.trabajo_id === j.id && !/combust/i.test(d.categoria || ''));
+  const asocTot = asoc.reduce((s, d) => s + neto(d), 0);
+  const ingresos = mios.reduce((s, d) => s + neto(d), 0);
+  const sueldos = Object.keys(horasPorClase).reduce((s, k) => s + horasPorClase[k] * (Number(tarifas[k]) || 0), 0);
+  return {vacio: false, n: mios.length, desde, hasta, ingresos, combTot, combMio: combTot * reparto, reparto, asocTot, asocN: asoc.length, horasPorClase, hMias, hTodas, sueldos};
+}
+async function costesTrabajoPintar(j){
+  const el = document.getElementById('d-costes'); if(!el) return;
+  if(!j){ el.innerHTML = ''; return; }
+  const tarifas = await costeHoraCargar(); const r = costesTrabajoCalcular(j, tarifas);
+  const eur = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  if(r.vacio){ el.innerHTML = '<div style="font-size:12.5px;color:var(--ink-soft);">Este trabajo aún no tiene albaranes. Los albaranes de su cliente desde la fecha de inicio entran solos.</div>'; return; }
+  const fila = (t, v, extra, fuerte, col) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;${fuerte ? 'font-weight:800;border-top:1px solid var(--line);margin-top:4px;padding-top:8px;' : ''}"><span>${t}${extra ? `<span style="display:block;font-size:11px;color:var(--ink-soft);font-weight:400;">${extra}</span>` : ''}</span><span style="white-space:nowrap;${col ? 'color:' + col + ';' : ''}">${v}</span></div>`;
+  const netoSin = r.ingresos - r.combMio - r.asocTot, netoCon = netoSin - r.sueldos;
+  const fmt = iso => iso.split('-').reverse().join('/');
+  const clases = COSTE_CLASES.filter(c => r.horasPorClase[c[0]]);
+  const hf = n => (Math.round(n * 10) / 10).toLocaleString('es-ES');
+  el.innerHTML = `<div style="font-size:11.5px;color:var(--ink-soft);margin-bottom:6px;">${r.n} albarán${r.n === 1 ? '' : 'es'} · del ${fmt(r.desde)} al ${fmt(r.hasta)} · ${hf(r.hMias)} h de máquina (sin IVA)</div>
+    ${fila('Ingresos', eur(r.ingresos))}
+    ${fila('Combustible', '− ' + eur(r.combMio), 'el de esas fechas ' + eur(r.combTot) + ' × ' + Math.round(r.reparto * 100) + ' % de las horas', false, 'var(--red)')}
+    ${r.asocN ? fila('Otros gastos asociados', '− ' + eur(r.asocTot), r.asocN + ' gasto' + (r.asocN === 1 ? '' : 's'), false, 'var(--red)') : ''}
+    ${fila('Neto sin sueldos', eur(netoSin), r.ingresos ? Math.round(netoSin / r.ingresos * 100) + ' % de lo facturado' : '', true, netoSin < 0 ? 'var(--red)' : 'var(--green)')}
+    <div style="margin:10px 0 4px;font-weight:700;font-size:12.5px;">Sueldos · lo que cobra cada uno por hora</div>
+    ${clases.map(c => `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;font-size:12.5px;"><span>${c[1]} <span style="color:var(--ink-soft);">${hf(r.horasPorClase[c[0]])} h</span></span><span><input type="text" inputmode="decimal" value="${tarifas[c[0]] ? String(tarifas[c[0]]).replace('.', ',') : ''}" placeholder="12" onchange="costeHoraGuardar('${c[0]}', this.value)" style="width:64px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:8px;"> €/h</span></div>`).join('')}
+    ${fila('Sueldos', '− ' + eur(r.sueldos), r.sueldos ? '' : 'pon el precio por hora arriba', false, 'var(--red)')}
+    ${fila('Neto con sueldos', eur(netoCon), r.ingresos ? Math.round(netoCon / r.ingresos * 100) + ' % de lo facturado' : '', true, netoCon < 0 ? 'var(--red)' : 'var(--green)')}`;
+}
+
 function openJobDrawer(code){
   document.getElementById('d-code').textContent = code;
   const j = jobs.find(x=>x.code===code);
+  try{ costesTrabajoPintar(j); }catch(e){ console.warn('costes', e); }
   document.getElementById('d-client').textContent = j ? (j.client&&j.client!=='—' ? j.client : '') : '—';
   const nombreEl = document.getElementById('d-nombre-obra');
   if(nombreEl) nombreEl.textContent = j ? (j.nombre||j.client||'—') : '—';
