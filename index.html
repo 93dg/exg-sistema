@@ -4542,7 +4542,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.92</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.93</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4689,7 +4689,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.92</div>
+        <div class="sub" id="version-badge">V8.93</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5697,6 +5697,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
 
       <div class="docs-tabs" id="gpro-subtabs">
         <button type="button" class="docs-tab active" data-sub="lista">Lista</button>
+        <button type="button" class="docs-tab" data-sub="proveedores">Proveedores</button>
         <button type="button" class="docs-tab" data-sub="resumen">Resumen</button>
         <button type="button" class="docs-tab" data-sub="control">Control</button>
         <button type="button" class="docs-tab" data-sub="combustible">Combustible</button>
@@ -5747,6 +5748,13 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
             <div class="lista-movil-solo"><div id="gpro-proximos-movil" style="padding:10px;"></div></div>
           </div>
         </div>
+      </div>
+
+      <!-- PROVEEDORES (V8.93: los proveedores viven en Gastos, no en Clientes) -->
+      <div class="sub-view" id="gpro-proveedores" style="display:none;">
+        <div class="panel-head" style="padding:10px 14px;"><input class="search-box" type="text" id="gpro-prov-buscar" placeholder="Buscar proveedor" oninput="deb(renderGastosProProveedores)" style="width:100%;"></div>
+        <div id="gpro-prov-cuenta" class="gm-count"></div>
+        <div id="gpro-prov-lista" style="display:flex;flex-direction:column;gap:8px;padding:0 0 12px;"></div>
       </div>
 
       <!-- LISTA DE GASTOS -->
@@ -9562,7 +9570,7 @@ function setupSubtabs(navId, prefix, mapping, opts){
 }
 setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',asistencia:'flota-asistencia',mantenimiento:'flota-mantenimiento',averias:'flota-averias',repuestos:'flota-repuestos',historial:'flota-historial',particulares:'flota-particulares'});
 setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad'});
-setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',control:'gpro-control',combustible:'gpro-comb',prestamos:'gpro-prestamos',revisar:'gpro-revisar'},{onSwitch:{revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible(), control:()=>renderGastosProControl(), prestamos:()=>iniciarPrestamos()}});
+setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',proveedores:'gpro-proveedores',control:'gpro-control',combustible:'gpro-comb',prestamos:'gpro-prestamos',revisar:'gpro-revisar'},{onSwitch:{proveedores:()=>renderGastosProProveedores(), revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible(), control:()=>renderGastosProControl(), prestamos:()=>iniciarPrestamos()}});
 document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filters .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     chip.parentElement.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
@@ -10360,7 +10368,7 @@ async function resolverProveedorRevisor(prov){
   const id = await buscarOCrearClienteApp(prov.nombre, {nif: prov.nif || null, tipo: prov.tipo || 'proveedor', nif_valido: !!prov.nif});
   if(id){
     _revisor.provCache[clave] = id;
-    if(!clientes.some(c => c.id === id)) clientes.push({id, name: MAY(prov.nombre), type: 'Proveedor', zone: '—', tarifa: '—', fact: '0,00 €', pend: '—', prio: 'media', nif: prov.nif || ''});
+    if(!clientes.some(c => c.id === id)) clientes.push({id, name: MAY(prov.nombre), type: 'Proveedor', esCli: false, esProv: true, zone: '—', tarifa: '—', fact: '0,00 €', pend: '—', prio: 'media', nif: prov.nif || ''});
   }
   return id;
 }
@@ -10951,6 +10959,17 @@ function gproChipClick(k, ev){
   else GPF[k] = v;
   gproGuardarFiltros(); _gpAnios = ''; renderGastosProLista();
 }
+function renderGastosProProveedores(){
+  const el = document.getElementById('gpro-prov-lista'); if(!el) return;
+  const q = (document.getElementById('gpro-prov-buscar')?.value || '').trim().toLowerCase();
+  const tot = {}, num = {};
+  gastosProDocs().forEach(d => { if(!d.entidad_id) return; tot[d.entidad_id] = (tot[d.entidad_id] || 0) + (d.importe || d.total || 0); num[d.entidad_id] = (num[d.entidad_id] || 0) + 1; });
+  const lista = clientes.filter(c => c.esProv && (!q || [c.name, c.nif, c.poblacion, c.telefono].join(' ').toLowerCase().includes(q))).sort((a, b) => (tot[b.id] || 0) - (tot[a.id] || 0));
+  const cu = document.getElementById('gpro-prov-cuenta'); if(cu) cu.innerHTML = '<b>' + lista.length + '</b> proveedor' + (lista.length === 1 ? '' : 'es');
+  const euro = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  el.innerHTML = lista.length ? lista.map(c => `<button type="button" class="gr-fila" onclick="gproVerDeProveedor('${c.id}')"><div class="c"><b>${escHtml(c.name)}</b><div style="font-size:12px;color:var(--ink-soft);">${[c.nif, c.poblacion, c.telefono].filter(Boolean).map(escHtml).join(' · ') || 'Sin datos de contacto'}${c.esCli ? ' · también cliente' : ''}</div></div><div style="text-align:right;flex:none;"><b>${euro(tot[c.id])}</b><div style="font-size:11.5px;color:var(--ink-soft);">${num[c.id] || 0} gasto${(num[c.id] || 0) === 1 ? '' : 's'}</div></div></button>`).join('') : '<div class="empty" style="padding:16px;">Sin proveedores.</div>';
+}
+function gproVerDeProveedor(id){ const c = clientes.find(x => x.id === id); if(!c) return; const t = document.querySelector('#gpro-subtabs .docs-tab[data-sub="lista"]'); if(t) t.click(); const q = document.getElementById('gpro-lista-buscar'); if(q){ q.value = c.name; const b = document.getElementById('gpro-bar-buscar'); if(b) b.style.display = 'block'; } if(typeof GPF !== 'undefined'){ GPF.anio = new Set(); GPF.trim = new Set(); _gpAnios = ''; } renderGastosProLista(); }
 function gproToggleBuscar(){ const b = document.getElementById('gpro-bar-buscar'); if(!b) return; const ver = b.style.display === 'none'; b.style.display = ver ? 'block' : 'none'; if(ver) document.getElementById('gpro-lista-buscar')?.focus(); }
 function gproRestablecer(){ GPF.anio = new Set([String(new Date().getFullYear())]); GPF.trim = new Set(); GPF.tipo = ''; GPF.cont = ''; GPF.just = ''; GPF.orden = 'fecha'; GPF.dir = 'desc'; const q = document.getElementById('gpro-lista-buscar'); if(q) q.value = ''; gproGuardarFiltros(); _gpAnios = ''; renderGastosProLista(); }
 function pleg2IniciarGastos(){
@@ -21406,7 +21425,7 @@ function cliExtraOk(c, f){
   return true;
 }
 function cliPasa(c, S, q, salvo){   // S = {tipo: Set, prio: Set, extra: Set}; "salvo" deja fuera un grupo (para contar sus pastillas)
-  if(c.type === 'Proveedor') return false;   // los proveedores no son clientes (Daniel 02/10/2026): no salen en Clientes
+  if(c.esCli === false || (c.esCli === undefined && c.type === 'Proveedor')) return false;   // clientes y proveedores no son lo mismo (Daniel 02/10 y 08/10/2026): un proveedor solo sale en Clientes si consta también como cliente
   if(q){ const campo = [c.name, c.nif, c.telefono, c.email, c.poblacion, c.direccion].join(' ').toLowerCase(); if(!campo.includes(q)) return false; }
   if(salvo !== 'tipo' && S.tipo.size && !S.tipo.has((c.type || '').toLowerCase())) return false;
   if(salvo !== 'prio' && S.prio.size && !S.prio.has(c.prio || 'media')) return false;
@@ -21585,12 +21604,14 @@ async function cargarEntidadesReales(){
       const tipoMap = {proveedor:'Proveedor', ayuntamiento:'Ayuntamiento', empresa:'Empresa', particular:'Particular', cliente:'Particular'};
       const claseMap = {'persona':'Particular','empresa':'Empresa','organismo':'Entidad','obra':'Particular','nombre_parcial':'Particular','dudoso_con_nif':'Particular','direccion':'Particular'};
       // V8.26 (reporte de Daniel: «filtros desfasados»): el tipo sale de la clase de la ficha; un organismo de la Administración es «Administración», el resto de organismos «Entidad»
-      const tipoDe = e => (e.tipo || '').toLowerCase() === 'proveedor' ? 'Proveedor' : (e.es_administracion || (e.clase_nombre === 'organismo' && esAdministracion(e.nombre))) ? 'Administración' : (claseMap[e.clase_nombre] || tipoMap[(e.tipo||'').toLowerCase()] || 'Particular');
+      const rolesDe = e => (Array.isArray(e.roles) && e.roles.length) ? e.roles : [(e.tipo || '').toLowerCase() === 'proveedor' ? 'proveedor' : 'cliente'];
+      const tipoDe = e => ((e.tipo || '').toLowerCase() === 'proveedor' && !rolesDe(e).includes('cliente')) ? 'Proveedor' : (e.es_administracion || (e.clase_nombre === 'organismo' && esAdministracion(e.nombre))) ? 'Administración' : (claseMap[e.clase_nombre] || tipoMap[(e.tipo||'').toLowerCase()] || 'Particular');
       const existente = clientes.find(c=>c.name===e.nombre);
       if(existente){
         existente.id = e.id;
         existente.name = MAY(e.nombre) || existente.name;
         existente.type = tipoDe(e) || existente.type;
+        existente.esCli = rolesDe(e).includes('cliente'); existente.esProv = rolesDe(e).includes('proveedor');
         existente.nif = e.nif || existente.nif || '';
         existente.email = e.email || existente.email || '';
         existente.telefono = e.telefono || existente.telefono || '';
@@ -21599,7 +21620,7 @@ async function cargarEntidadesReales(){
         existente.cp = e.cp || existente.cp || '';
         existente.provincia = MAY(e.provincia) || existente.provincia || '';
       } else {
-        clientes.push({id: e.id, name: MAY(e.nombre), type: tipoDe(e), zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio: e.prioridad||'media', prioManual: !!e.prioridad_manual, prioRazon: e.prioridad_razon||'', nif: e.nif||'', email: e.email||'', telefono: e.telefono||'', direccion: MAY(e.direccion), poblacion: MAY(e.poblacion), provincia: MAY(e.provincia), cp: e.cp||'', clase_nombre: e.clase_nombre||''});
+        clientes.push({id: e.id, name: MAY(e.nombre), type: tipoDe(e), esCli: rolesDe(e).includes('cliente'), esProv: rolesDe(e).includes('proveedor'), zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio: e.prioridad||'media', prioManual: !!e.prioridad_manual, prioRazon: e.prioridad_razon||'', nif: e.nif||'', email: e.email||'', telefono: e.telefono||'', direccion: MAY(e.direccion), poblacion: MAY(e.poblacion), provincia: MAY(e.provincia), cp: e.cp||'', clase_nombre: e.clase_nombre||''});
       }
     });
     renderClientesTable();
@@ -22054,7 +22075,7 @@ async function actualizarClienteDesdeEditor(){
     const idNuevo = await buscarOCrearClienteApp(nombre, {nif: nuevo.nif||null, direccion: nuevo.direccion||null});
     if(!idNuevo){ mostrarToast('No se pudo crear la ficha del cliente.'); return; }
     if(entidad) entidad.id = idNuevo;
-    else { entidad = {id: idNuevo, name: nombre, type:'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'}; clientes.push(entidad); }
+    else { entidad = {id: idNuevo, name: nombre, esCli: true, type:'Particular', zone:'—', tarifa:'—', fact:'0,00 €', pend:'—', prio:'Media'}; clientes.push(entidad); }
     await sb.from('entidades').update(nuevo).eq('id', idNuevo);
     Object.assign(entidad, nuevo);
     window.__valoresClienteOriginales = leerCamposClienteActuales();
