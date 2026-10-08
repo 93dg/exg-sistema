@@ -4542,7 +4542,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.94</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.95</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4689,7 +4689,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.94</div>
+        <div class="sub" id="version-badge">V8.95</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -29228,7 +29228,15 @@ function costesTrabajoCalcular(j, tarifas){
   const asocTot = asoc.reduce((s, d) => s + neto(d), 0);
   const ingresos = mios.reduce((s, d) => s + neto(d), 0);
   const sueldos = Object.keys(horasPorClase).reduce((s, k) => s + horasPorClase[k] * (Number(tarifas[k]) || 0), 0);
-  return {vacio: false, n: mios.length, desde, hasta, ingresos, combTot, combMio: combTot * reparto, reparto, asocTot, asocN: asoc.length, horasPorClase, hMias, hTodas, sueldos};
+  // a 8 h diarias: cada tipo de máquina trabaja jornadas completas; la obra dura lo que tarde el tipo con más horas
+  const dias = {}; mios.forEach(d => { const f = fec(d), h = horasDe(d); Object.keys(h).forEach(k => { (dias[k] = dias[k] || new Set()).add(f); }); });
+  const clasesUsadas = Object.keys(horasPorClase), maxH = Math.max(0, ...clasesUsadas.map(k => horasPorClase[k]));
+  const diasIdeal = maxH ? Math.max(1, Math.ceil(maxH / 8)) : 0;
+  let diasLab = 0; { const a = new Date(desde + 'T12:00:00'), z = new Date(hasta + 'T12:00:00'); for(let x = new Date(a); x <= z; x.setDate(x.getDate() + 1)){ const w = x.getDay(); if(w >= 1 && w <= 5) diasLab++; } }
+  const diasLibres = Math.max(0, diasLab - diasIdeal), tarifaH = hMias ? ingresos / hMias : 0;
+  const valorDia = tarifaH * 8 * Math.max(1, clasesUsadas.length), perdido = diasLibres * valorDia;
+  const mediaHDia = clasesUsadas.length ? clasesUsadas.reduce((s, k) => s + horasPorClase[k] / dias[k].size, 0) / clasesUsadas.length : 0;
+  return {vacio: false, ideal: {diasIdeal, diasLab, diasLibres, valorDia, perdido, mediaHDia, nClases: clasesUsadas.length}, n: mios.length, desde, hasta, ingresos, combTot, combMio: combTot * reparto, reparto, asocTot, asocN: asoc.length, horasPorClase, hMias, hTodas, sueldos};
 }
 async function costesTrabajoPintar(j){
   const el = document.getElementById('d-costes'); if(!el) return;
@@ -29249,7 +29257,14 @@ async function costesTrabajoPintar(j){
     <div style="margin:10px 0 4px;font-weight:700;font-size:12.5px;">Sueldos · lo que cobra cada uno por hora</div>
     ${clases.map(c => `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;font-size:12.5px;"><span>${c[1]} <span style="color:var(--ink-soft);">${hf(r.horasPorClase[c[0]])} h</span></span><span><input type="text" inputmode="decimal" value="${tarifas[c[0]] ? String(tarifas[c[0]]).replace('.', ',') : ''}" placeholder="12" onchange="costeHoraGuardar('${c[0]}', this.value)" style="width:64px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:8px;"> €/h</span></div>`).join('')}
     ${fila('Sueldos', '− ' + eur(r.sueldos), r.sueldos ? '' : 'pon el precio por hora arriba', false, 'var(--red)')}
-    ${fila('Neto con sueldos', eur(netoCon), r.ingresos ? Math.round(netoCon / r.ingresos * 100) + ' % de lo facturado' : '', true, netoCon < 0 ? 'var(--red)' : 'var(--green)')}`;
+    ${fila('Neto con sueldos', eur(netoCon), r.ingresos ? Math.round(netoCon / r.ingresos * 100) + ' % de lo facturado' : '', true, netoCon < 0 ? 'var(--red)' : 'var(--green)')}
+    ${r.hMias ? `<div style="margin:12px 0 4px;font-weight:700;font-size:12.5px;">Si se hubiera hecho como se debe: 8 h al día</div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:4px;">Cada tipo de máquina trabajando jornadas completas de 8 h, de lunes a viernes.</div>
+    ${fila('Horas reales por día', hf(r.ideal.mediaHDia) + ' h', 'de media por máquina, en los días que trabajó')}
+    ${fila('Duración real', r.ideal.diasLab + ' días laborables', 'del ' + fmt(r.desde) + ' al ' + fmt(r.hasta))}
+    ${fila('Duración a 8 h/día', r.ideal.diasIdeal + ' día' + (r.ideal.diasIdeal === 1 ? '' : 's'), hf(r.hMias) + ' h de máquina, ' + r.ideal.nClases + ' tipo' + (r.ideal.nClases === 1 ? '' : 's') + ' de máquina a la vez')}
+    ${fila('Días que se podían haber usado en otro trabajo', r.ideal.diasLibres + ' día' + (r.ideal.diasLibres === 1 ? '' : 's'), 'a ' + eur(r.ideal.valorDia) + ' por día (lo que facturó este trabajo por hora × 8 h × máquinas)', false)}
+    ${fila('Dinero dejado de ganar', eur(r.ideal.perdido), 'estimación: supone que había otro trabajo igual de bien pagado', true, r.ideal.perdido > 0 ? 'var(--red)' : 'var(--green)')}` : '<div style="margin-top:10px;font-size:12px;color:var(--ink-soft);">Para calcular cómo habría salido a 8 h diarias, los albaranes tienen que traer las horas de cada máquina.</div>'}`;
 }
 
 function openJobDrawer(code){
