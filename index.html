@@ -4580,7 +4580,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.102</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.103</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4727,7 +4727,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.102</div>
+        <div class="sub" id="version-badge">V8.103</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -22457,6 +22457,23 @@ function proximoNumero(tipoDoc){
   return String(existentes + 1);
 }
 
+/* V8.103 · Numeración nueva de aquí en adelante: albarán A1, A2… · proforma P1, P2… · presupuesto PR1…
+   Solo cuentan los números con ese formato de documentos creados desde el CORTE; los anteriores no se tocan
+   (P206, PF143, A19… quedan como están y nunca se renumeran). Facturas: sin cambios. */
+const NUM_NUEVA_CORTE = '2026-10-08';
+const NUM_NUEVA_PREFIJO = {albaran:'A', proforma:'P', presupuesto:'PR'};
+function esDocAntiguoNumeracion(d){ return !!(d && d.created_at && String(d.created_at).slice(0,10) < NUM_NUEVA_CORTE); }
+function siguienteNumeroNuevo(tipoDoc){
+  const pre = NUM_NUEVA_PREFIJO[tipoDoc]; if(!pre) return null;
+  const re = new RegExp('^'+pre+'(\\d+)$');
+  let max = 0;
+  Object.values(documentosRealesById).forEach(d=>{
+    if(d.type!==tipoDoc || esDocAntiguoNumeracion(d)) return;
+    const m = re.exec(String(d.numero||d.num||'').trim()); if(m) max = Math.max(max, Number(m[1]));
+  });
+  return String(max+1);
+}
+
 const DOC_TYPES = {
   factura: {
     title:'FACTURA', button:'Emitir factura', numera:true, prefix:'F', seqRef:()=>proximoNumero('factura'), hasIva:true,
@@ -22464,17 +22481,17 @@ const DOC_TYPES = {
     explain:'Documento fiscal definitivo. Genera obligación de cobro y de declarar IVA.',
   },
   proforma: {
-    title:'PROFORMA', button:'Emitir proforma', numera:true, prefix:'PF', seqRef:()=>proximoNumero('proforma'), hasIva:true,
+    title:'PROFORMA', button:'Emitir proforma', numera:true, prefix:'P', seqRef:()=>siguienteNumeroNuevo('proforma'), hasIva:true,
     hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasBaseIva:true, hasPayment:true, hasBank:true,
     explain:'Anticipo informativo sin validez fiscal, antes de que el cliente se comprometa.',
   },
   presupuesto: {
-    title:'PRESUPUESTO', button:'Emitir presupuesto', numera:true, prefix:'P', seqRef:()=>proximoNumero('presupuesto'), hasIva:true,
+    title:'PRESUPUESTO', button:'Emitir presupuesto', numera:true, prefix:'PR', seqRef:()=>siguienteNumeroNuevo('presupuesto'), hasIva:true,
     hasFiscalHeader:true, hasPrecios:true, hasTotales:true, hasBaseIva:true, hasPayment:true, hasBank:false,
     explain:'Propuesta de precio. No obliga a nada — si se acepta, se convierte en trabajo.',
   },
   albaran: {
-    title:'ALBARÁN', button:'Crear albarán', numera:false, prefix:'A', seqRef:()=>proximoNumero('albaran'), hasIva:false,
+    title:'ALBARÁN', button:'Crear albarán', numera:false, prefix:'A', seqRef:()=>siguienteNumeroNuevo('albaran'), hasIva:false,
     hasFiscalHeader:false, hasPrecios:true, hasTotales:true, hasBaseIva:false, hasPayment:false, hasBank:false,
     explain:'Justificante de entrega/trabajo realizado. No es un documento fiscal, así que no lleva IVA ni desglose.',
   },
@@ -22665,14 +22682,8 @@ function onDocTypeChange(){
   // distinción Guardar/Emitir
   document.getElementById('ni-draft').style.display = cfg.numera ? '' : 'none';
   document.getElementById('ni-explain').textContent = cfg.explain;
-  if(t === 'albaran'){
-    document.getElementById('ni-docnum').value = '';
-    document.getElementById('ni-suggest').textContent = '(los albaranes no se numeran — son borradores de trabajo)';
-  } else {
-    document.getElementById('ni-docnum').value = cfg.prefix + cfg.seqRef();
-    const existentes = Object.values(documentosRealesById).filter(d=>d.type===t).length;
-    document.getElementById('ni-suggest').textContent = existentes ? ('(último usado: '+cfg.prefix+String(existentes).padStart(3,'0')+')') : '';
-  }
+  document.getElementById('ni-docnum').value = cfg.prefix + cfg.seqRef();
+  document.getElementById('ni-suggest').textContent = '';
   document.getElementById('ie-iva-row').style.display = cfg.hasIva ? 'flex' : 'none';
   document.getElementById('ie-payment-fields').style.display = cfg.hasPayment ? '' : 'none';
   document.getElementById('ie-paper-edit').classList.toggle('hide-fiscal', !cfg.hasFiscalHeader);
@@ -27679,7 +27690,7 @@ async function wizGuardar(isDraft){
   const __pawWiz = document.getElementById('ni-pasar-a-wrap'); if(__pawWiz) __pawWiz.style.display = 'none';
   const __otrasWiz = document.getElementById('ni-otras-acciones'); if(__otrasWiz) __otrasWiz.innerHTML = '';
   const cfg = DOC_TYPES[wiz.tipo];
-  document.getElementById('ni-docnum').value = wiz.tipo==='albaran' ? '' : cfg.prefix + cfg.seqRef();
+  document.getElementById('ni-docnum').value = cfg.prefix + cfg.seqRef();
   updateConceptoTransferencia();
   recalcTotals();
 
@@ -27721,7 +27732,7 @@ function convertirDocumento(){
   items.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine));
   abrirPanelLineasPorDefecto();
   const cfg = DOC_TYPES[siguienteTipo];
-  document.getElementById('ni-docnum').value = siguienteTipo==='albaran' ? '' : cfg.prefix + cfg.seqRef();
+  document.getElementById('ni-docnum').value = cfg.prefix + cfg.seqRef();
   document.getElementById('ie-preview-pane').style.display = 'none';
   document.getElementById('ie-paper-edit').style.display = 'block';
   document.getElementById('ni-convert-btn').style.display = 'none';
@@ -27951,7 +27962,9 @@ async function submitNewInvoice(ev, isDraft){
   const ivaPct = Number(document.getElementById('ie-iva-pct').value)||0;
   const tratamientoIva = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
 
-  const num = document.getElementById('ni-docnum').value || (cfg.prefix + cfg.seqRef());
+  const _docPrevio = editingDocId ? documentosRealesById[editingDocId] : null;
+  // un documento antiguo sin número (albarán/proforma) NO se numera solo al editarlo (V8.103)
+  const num = document.getElementById('ni-docnum').value || ((type!=='factura' && esDocAntiguoNumeracion(_docPrevio)) ? null : (cfg.prefix + cfg.seqRef()));
   // CONCEPTO = F + NÚMERO DE FACTURA — siempre recalculado a partir del número final que se
   // guarda en este mismo guardado (así una factura que se numera en firme ahora queda al día)
   const concepto = type==='factura' ? conceptoDeFactura(num) : document.getElementById('ni-concepto-transf').value;
@@ -28123,7 +28136,7 @@ async function submitNewInvoice(ev, isDraft){
     renderizarFilaYCardFactura(documentosRealesById[savedId], entidadGuardada, trabajoGuardado, true);
     renderControlDocs();
     poblarFiltroAniosChips('econ-facturas-tbody','fact-filtro-anio-chips');
-    document.querySelector('[data-view="facturas"]').click();
+    if(!_docPrevio) document.querySelector('[data-view="facturas"]').click();   // V8.103: editar no te cambia de sección
 
   } else if(type==='proforma' || type==='presupuesto'){
     const rowHtml = `<td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td>${dateLabel}</td><td class="num" data-num="${total}">${amountLabel}</td><td>${estadoPill}</td>`;
@@ -28132,7 +28145,7 @@ async function submitNewInvoice(ev, isDraft){
     const row2 = document.createElement('tr'); row2.onclick = () => openDocumentViewer(savedId); row2.innerHTML = rowHtml; row2.dataset.tipo = type;
     document.getElementById('presupuestos-tbody-standalone').prepend(row2);
     actualizarContadorPresupuestosStandalone();
-    document.querySelector(`[data-view="${type==='proforma'?'proformas':'presupuestos'}"]`).click();
+    if(!_docPrevio) document.querySelector(`[data-view="${type==='proforma'?'proformas':'presupuestos'}"]`).click();
 
   } else if(type==='albaran'){
     const row = document.createElement('div');
@@ -28142,7 +28155,7 @@ async function submitNewInvoice(ev, isDraft){
     row.innerHTML = `<div class="inbox-src">📋 Albarán</div><div><div class="main-t">${num} — ${client}</div></div><div class="sub-t">${dateLabel} · ${amountLabel}</div><div class="sub-t">${job!=='—'?job:'Sin trabajo asociado'}</div><div>${estadoPill}</div>`;
     document.getElementById('inbox-list').prepend(row);
     renderControlDocs();
-    document.querySelector('[data-view="control"]').click();
+    if(!_docPrevio) document.querySelector('[data-view="control"]').click();
   }
 
   aiRegistrarEvento('documento_creado', 'documentos', {type, client});
