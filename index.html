@@ -410,6 +410,8 @@ table{border-collapse:collapse;width:100%;}
 /* Bloquear scroll del fondo cuando hay overlay abierto */
 body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 /* ======= LÍNEAS NUEVAS (motor de entradas, pendiente verificar) ======= */
+.ie-faltan{margin:0 0 10px;padding:10px 12px;border:1.5px solid var(--red,#B3261E);border-radius:8px;background:rgba(179,38,30,.08);color:var(--red,#B3261E);font-size:14px;line-height:1.45;font-weight:600;}
+.ie-faltan span{font-weight:500;color:var(--ink);}
 .ie-portada-chk{display:inline-flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;}
 .ie-portada-chk input{width:20px;height:20px;}
 #ie-sel-barra{display:none;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--concrete);}
@@ -4587,7 +4589,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.21</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.22</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4734,7 +4736,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.21</div>
+        <div class="sub" id="version-badge">V9.22</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7560,6 +7562,8 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
       <span class="ie-doc-explain ie-edit-only" id="ni-explain" style="display:none;"></span>
       <button class="close-x" onclick="intentarCerrarNewInvoiceModal()">✕</button>
     </div>
+    <!-- V9.22 · aviso de los datos obligatorios que le faltan a una factura (se actualiza solo) -->
+    <div id="ie-faltan-datos" class="ie-faltan" style="display:none;"></div>
 
     <!-- ESTADO y CÓMO MOSTRAR EL PDF — pequeños, arriba; solo con el documento ya guardado. Cambian y guardan al instante. -->
     <div class="ie-estado-modo ie-edit-only" id="ni-estado-modo-wrap" style="display:none;">
@@ -23093,10 +23097,55 @@ function abrirPanelLineasPorDefecto(){
   resumen.style.display = 'none';
 }
 
-function descargarPDF(){
+// ===== V9.22 · Datos obligatorios de una factura: aviso permanente en el editor + pregunta antes de emitir, descargar o imprimir =====
+function nifLetraCuadra(nif){
+  const n = String(nif || '').toUpperCase().replace(/[\s.-]/g, '');
+  const m = n.match(/^([XYZ]?)(\d{7,8})([A-Z])$/);
+  if(!m) return true;   // formatos que no son DNI/NIE (CIF, extranjeros…): no se juzga
+  const num = Number((m[1] ? {X:'0', Y:'1', Z:'2'}[m[1]] : '') + m[2]);
+  return 'TRWAGMYFPDXBNJZSQVHLCKE'[num % 23] === m[3];
+}
+function facturaDatosObligatorios(){
+  if((document.getElementById('ni-doctype')?.value) !== 'factura') return [];
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const f = [];
+  if(!v('ni-client')) f.push('cliente');
+  if(!v('ni-client-nif')) f.push('NIF del cliente'); else if(!nifLetraCuadra(v('ni-client-nif'))) f.push('NIF del cliente (la letra no cuadra)');
+  if(!v('ni-client-addr')) f.push('dirección del cliente');
+  if(!v('ni-client-cp')) f.push('código postal del cliente');
+  if(!v('ni-client-poblacion')) f.push('población del cliente');
+  if(!v('ni-docnum')) f.push('número de factura');
+  if(!v('ni-date')) f.push('fecha');
+  const filas = [...document.querySelectorAll('#ie-items-body tr')];
+  if(!filas.length) f.push('líneas con su concepto');
+  else if(filas.some(tr => !(tr.querySelector('.ie-concept')?.value || '').trim())) f.push('hay líneas sin concepto');
+  if(filas.length && filas.every(tr => !(Number(tr.querySelector('.ie-price')?.value) > 0))) f.push('precios');
+  const trat = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
+  if(trat === 'normal' && !(Number(document.getElementById('ie-iva-pct')?.value) > 0)) f.push('IVA (está a 0 % y no es inversión del sujeto pasivo)');
+  if((v('ni-payment') || '').toUpperCase() === 'TRANSFERENCIA' && !v('ni-iban')) f.push('IBAN');
+  return f;
+}
+function actualizarAvisoFactura(){
+  const el = document.getElementById('ie-faltan-datos'); if(!el) return;
+  const f = facturaDatosObligatorios();
+  if(!f.length){ el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.innerHTML = '⚠ Faltan datos obligatorios en la factura: <span>' + f.map(escHtml).join(' · ') + '</span>';
+  el.style.display = '';
+}
+let _avisoFacturaT = null;
+function programarAvisoFactura(){ clearTimeout(_avisoFacturaT); _avisoFacturaT = setTimeout(actualizarAvisoFactura, 60); }
+// pregunta antes de sacar la factura del sistema; devuelve true si se puede seguir
+async function confirmarFacturaCompleta(accion){
+  const f = facturaDatosObligatorios();
+  if(!f.length) return true;
+  return await confirmarAccion('⚠ A esta factura le faltan datos obligatorios: ' + f.join(', ') + '. ¿' + accion + ' igualmente?');
+}
+async function descargarPDF(){
+  if(!(await confirmarFacturaCompleta('Descargarla'))) return;
   generarPDFDocumento('descargar');
 }
-function imprimirPDF(){
+async function imprimirPDF(){
+  if(!(await confirmarFacturaCompleta('Imprimirla'))) return;
   generarPDFDocumento('imprimir');
 }
 // Menú compacto móvil: las MISMAS dos funciones reales (descargarPDF/imprimirPDF), solo
@@ -27778,6 +27827,9 @@ async function wizGuardar(isDraft){
 
 let convirtiendoDesde = null; // {origenId, origenTipo} — para encadenar presupuesto→albarán→factura sin repetir datos
 
+['openDocumentViewer','onClientChange','onDocTypeChange','recalcTotals','selLineasPasarAFactura','convertirDocumento','addItemRow'].forEach(n => { const o = window[n]; if(typeof o === 'function') window[n] = function(){ const r = o.apply(this, arguments); programarAvisoFactura(); return r; }; });
+document.getElementById('newinvoice-overlay')?.addEventListener('input', programarAvisoFactura);
+document.getElementById('newinvoice-overlay')?.addEventListener('change', programarAvisoFactura);
 // ===== V9.20 · Seleccionar líneas de un albarán y pasarlas a una factura =====
 let _selLineasModo = false;
 function selLineasToggleModo(){
@@ -28126,6 +28178,7 @@ async function submitNewInvoice(ev, isDraft){
   const cfg = DOC_TYPES[type];
   const client = document.getElementById('ni-client').value;
   if(!client){ mostrarToast('Elige un cliente.'); return false; }
+  if(type === 'factura' && !isDraft && !(await confirmarFacturaCompleta('Emitirla'))) return false;
   const job = document.getElementById('ni-job').value || '—';
   const dateRaw = document.getElementById('ni-date').value;
   const {base, iva, total} = recalcTotals();
@@ -29252,7 +29305,7 @@ async function imprimirDocumento(id){
   const conPortada = yaAbierto && !!document.getElementById('ni-portada')?.checked;   // V9.20: reabrir el documento desmarcaba la casilla y la portada nunca salía al imprimir
   openDocumentViewer(id);
   await new Promise(r => setTimeout(r, 300));
-  try{ await generarPDFDocumento('imprimir', undefined, conPortada); }
+  try{ if(await confirmarFacturaCompleta('Imprimirla')) await generarPDFDocumento('imprimir', undefined, conPortada); }
   finally{
     if(!yaAbierto){ try{ closeNewInvoiceModal(); }catch(e){} if(ov) ov.classList.remove('imp-oculto'); }
   }
