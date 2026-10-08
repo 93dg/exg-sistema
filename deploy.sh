@@ -14,6 +14,12 @@ if [ -z "$VERSION" ] || [ -z "$MSG" ] || [ -z "$CASO_ID" ]; then
   exit 1
 fi
 
+# 08/10/2026: regla de versión — tras X.99 va (X+1).00, NUNCA X.100 (se coló en V8.100–V8.103 → eran V9.00–V9.03)
+if ! echo "$VERSION" | grep -qE '^V[0-9]+\.[0-9]{2}$'; then
+  echo "❌ Versión inválida '$VERSION': el formato es Vmayor.NN con dos dígitos (tras X.99 va (X+1).00, no X.100)"
+  exit 1
+fi
+
 # EXG — FASE 3: no se toca ni un byte de index.html sin que el caso lo respalde
 CHECK=$(curl -s -X POST "${SUPABASE_URL}/rest/v1/rpc/exg_verificar_deploy" \
   -H "apikey: ${SUPABASE_ANON_KEY}" -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
