@@ -458,6 +458,20 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .pill.cancelado, .pill.descartado, .pill.urgente, .pill.averiada, .pill.noadjudicado{background:var(--red-soft);color:var(--red);}
 .pill.posible{background:var(--concrete-2);color:var(--ink-soft);border:1px dashed var(--ink-soft);}
 .pill.pendiente_enviar{background:#2B5C7A;color:#fff;}
+.pill.cobrado_otra{background:var(--green-soft);color:var(--green);}
+.pill.parcial_otra{background:var(--blue-soft);color:var(--blue);}
+.cob-otra{display:inline-flex;flex-wrap:wrap;gap:4px 6px;margin-left:6px;vertical-align:middle;}
+.cob-otra a{color:var(--orange);font-weight:800;font-size:12px;text-decoration:underline;cursor:pointer;white-space:nowrap;}
+.cob-otra a small{font-weight:600;color:var(--ink-soft);text-decoration:none;margin-left:3px;}
+#fac-hoja{position:fixed;inset:0;z-index:5300;display:none;background:rgba(20,18,15,.45);}
+#fac-hoja.active{display:block;}
+#fac-hoja .fh-panel{position:absolute;left:0;right:0;bottom:0;max-height:82vh;overflow:auto;background:#fff;border-radius:18px 18px 0 0;padding:10px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.25);transform:translateY(100%);transition:transform .25s ease;}
+#fac-hoja.active .fh-panel{transform:none;}
+#fac-hoja .fh-asa{width:44px;height:5px;border-radius:3px;background:var(--concrete-2);margin:0 auto 12px;}
+#fac-hoja .fh-cab{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+#fac-hoja .fh-linea>span:last-child{white-space:nowrap;flex:0 0 auto;}
+#fac-hoja .fh-linea{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;}
+@media(min-width:700px){#fac-hoja .fh-panel{left:50%;right:auto;width:520px;margin-left:-260px;}}
 .pill.trabajo_activo{background:#DFF1F6;color:#0E6A82;}
 
 .estado-cobro-dd{position:relative;display:inline-block;}
@@ -1944,6 +1958,9 @@ details.ce-pleg[open] > summary{margin-bottom:10px;}
 #view-presupuestos[data-modo="proforma"] #pres-filtro-estado-chips .solo-presupuesto{display:none;}
 #view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="pendiente_cobrar"],
 #view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="parcial"],
+#view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="entregado"],
+#view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="parcial_otra"],
+#view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="cobrado_otra"],
 #view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="cobrado"]{display:none;}
 
 /* V7.49 Correo compacto en el móvil (Daniel: «muy grande todo») */
@@ -4545,7 +4562,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.98</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V8.99</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4692,7 +4709,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V8.98</div>
+        <div class="sub" id="version-badge">V8.99</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5538,8 +5555,11 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
                   <div class="chip-filter" data-estado="trabajo_activo">Trabajo activo</div>
                   <div class="chip-filter" data-estado="revisar">Revisar</div>
                   <div class="chip-filter" data-estado="pendiente_enviar">Listo para entregar</div>
+                  <div class="chip-filter" data-estado="entregado">Entregada</div>
                   <div class="chip-filter" data-estado="pendiente_cobrar">Pendiente de cobrar</div>
                   <div class="chip-filter" data-estado="parcial">Cobrado parcial</div>
+                  <div class="chip-filter" data-estado="parcial_otra">Parcial en otra</div>
+                  <div class="chip-filter" data-estado="cobrado_otra">Cobrada en otra</div>
                   <div class="chip-filter" data-estado="cobrado">Cobrado</div>
                 </div>
               </div>
@@ -5636,8 +5656,11 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
                   <div class="chip-filter" data-estado="borrador">Borrador</div>
                   <div class="chip-filter" data-estado="revisar">Revisar</div>
                   <div class="chip-filter" data-estado="pendiente_enviar">Listo para entregar</div>
+                  <div class="chip-filter" data-estado="entregado">Entregada</div>
                   <div class="chip-filter" data-estado="pendiente_cobrar">Pendiente de cobrar</div>
                   <div class="chip-filter" data-estado="parcial">Cobrado parcial</div>
+                  <div class="chip-filter" data-estado="parcial_otra">Parcial en otra</div>
+                  <div class="chip-filter" data-estado="cobrado_otra">Cobrada en otra</div>
                   <div class="chip-filter" data-estado="cobrado">Cobrado</div>
                 </div>
               </div>
@@ -9122,7 +9145,7 @@ async function econ2Cargar(){
   e2DeudaCargar();
   if(!_e2){ box.innerHTML = '<div class="dir-cargando">Cargando…</div>';
     const docs = []; let desde = 0;
-    while(true){ const {data, error} = await sb.from('documentos_economicos').select('id, tipo, numero, importe, cobrado_importe, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'proforma', 'albaran', 'gasto']).range(desde, desde + 999);
+    while(true){ const {data, error} = await sb.from('documentos_economicos').select('id, tipo, numero, importe, cobrado_importe, cobrado_en, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'proforma', 'albaran', 'gasto']).range(desde, desde + 999);
       if(error || !data || !data.length) break; docs.push(...data); if(data.length < 1000) break; desde += 1000; }
     const {data: ents} = await sb.from('entidades').select('id, nombre'); const E = {}; (ents || []).forEach(x => { E[x.id] = x.nombre; });
     const enl = new Set(); docs.forEach(d => { if(d.tipo !== 'factura') return; if(d.documento_anterior_id) enl.add(d.documento_anterior_id); (d.origen_albaran_ids || []).forEach(x => enl.add(x)); });
@@ -9130,11 +9153,11 @@ async function econ2Cargar(){
       const legal = d.tipo === 'factura' && !['nula', 'rectificativa'].includes(d.estado_cobro) ? imp : 0;
       const sinF = econImporteSinFactura({type: d.tipo === 'albaran' ? 'albaran' : d.tipo, id: d.id, documento_siguiente_id: d.documento_siguiente_id, client: E[d.entidad_id] || '', estado_cobro: d.estado_cobro, total: imp, cobrado_importe: d.cobrado_importe}, enl);
       // V8.13: cada fila guarda lo necesario para enseñar el detalle al tocar un dato
-      const est = d.estado_cobro || '', admin = esAdministracion(E[d.entidad_id] || ''), falta = Math.max(0, imp - Number(d.cobrado_importe || 0));
+      const est = d.estado_cobro || '', admin = esAdministracion(E[d.entidad_id] || ''), falta = Math.max(0, imp - Number(d.cobrado_importe || 0) - (est === 'parcial_otra' ? enOtraSuma(d) : 0));
       let pend = 0, sinFact = 0;
-      if(!['cobrado', 'nula', 'rectificativa'].includes(est)){
+      if(!['cobrado', 'nula', 'rectificativa', 'cobrado_otra'].includes(est)){
         if(d.tipo === 'factura'){ if(['pendiente_cobrar', 'parcial'].includes(est)) pend = falta; }
-        else if(d.tipo !== 'gasto' && !d.documento_siguiente_id && !enl.has(d.id) && falta){ if(admin) sinFact = falta; else if(['pendiente_cobrar', 'pendiente_enviar', 'parcial', 'borrador'].includes(est)) pend = falta; }
+        else if(d.tipo !== 'gasto' && !d.documento_siguiente_id && !enl.has(d.id) && falta){ if(admin) sinFact = falta; else if(['pendiente_cobrar', 'pendiente_enviar', 'parcial', 'borrador', 'entregado', 'parcial_otra'].includes(est)) pend = falta; }
       }
       return {id: d.id, tipo: d.tipo, numero: d.numero, fecha: f, cli: E[d.entidad_id] || '—', an, tr, legal, sinF, gasto: d.tipo === 'gasto' ? imp : 0, pend, sinFact}; });
     try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').order('data->>ts', {ascending: false}).limit(12); _e2.avisos = (data || []).map(r => r.data); }catch(e){ _e2.avisos = []; }
@@ -9320,18 +9343,18 @@ async function dirVivo(){
   }catch(e){}
   try{
     const [{data: docs}, {data: ents}] = await Promise.all([
-      sb.from('documentos_economicos').select('id, tipo, importe, cobrado_importe, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'albaran', 'proforma']).gte('anio', new Date().getFullYear() - 2),
+      sb.from('documentos_economicos').select('id, tipo, importe, cobrado_importe, cobrado_en, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'albaran', 'proforma']).gte('anio', new Date().getFullYear() - 2),
       sb.from('entidades').select('id, nombre, es_administracion')]);
     const E = {}; (ents || []).forEach(x => { E[x.id] = x; });
     const enl = new Set(); (docs || []).forEach(d => { if(d.tipo === 'factura'){ if(d.documento_anterior_id) enl.add(d.documento_anterior_id); (d.origen_albaran_ids || []).forEach(x => enl.add(x)); } });
-    const hoy = Date.now(), falta = d => Math.max(0, Number(d.importe || 0) - Number(d.cobrado_importe || 0));
+    const hoy = Date.now(), falta = d => Math.max(0, Number(d.importe || 0) - Number(d.cobrado_importe || 0) - (d.estado_cobro === 'parcial_otra' ? enOtraSuma(d) : 0));
     (docs || []).forEach(d => {
       const est = d.estado_cobro || '', ent = E[d.entidad_id] || {}, admin = ent.es_administracion || esAdministracion(ent.nombre);
-      if(['cobrado', 'nula', 'rectificativa'].includes(est)) return;
+      if(['cobrado', 'nula', 'rectificativa', 'cobrado_otra'].includes(est)) return;
       if(d.tipo === 'factura'){ if(['pendiente_cobrar', 'parcial'].includes(est)){ v.cobrar += falta(d); v.nCobrar++; } return; }
       if(d.documento_siguiente_id || enl.has(d.id) || !falta(d)) return;
       if(admin){ v.facturar += falta(d); v.nFacturar++; v.cobrar += falta(d); v.nCobrar++; if(d.fecha_devengo) v.facturarDias = Math.max(v.facturarDias, Math.round((hoy - new Date(d.fecha_devengo)) / 864e5)); }   // V8.36 (Daniel): lo de la Administración sin facturar también está pendiente de cobrar
-      else if(['pendiente_cobrar', 'pendiente_enviar', 'parcial', 'borrador'].includes(est)){ v.cobrar += falta(d); v.nCobrar++; }
+      else if(['pendiente_cobrar', 'pendiente_enviar', 'parcial', 'borrador', 'entregado', 'parcial_otra'].includes(est)){ v.cobrar += falta(d); v.nCobrar++; }
     });
   }catch(e){}
   try{
@@ -11932,6 +11955,7 @@ function accionesDocumento(doc){
       // bloquea retroceder_fase en el propio motor, y transicionesDocumento tampoco la ofrece)
       a.push(editar, duplicar, ...transiciones, eliminar);
     }
+    if(!['nula','rectificativa'].includes(doc.estado_cobro)) a.push({t:'Meter proformas/albaranes', fn:`abrirMeterEnFactura('${doc.id}')`});
     a.push(enviarCliente, imprimir);
   } else if(['presupuesto','proforma','albaran'].includes(doc.type)){
     a.push(editar, duplicar, eliminar, ...transiciones, enviarCliente, imprimir);
@@ -13440,7 +13464,7 @@ async function cargarAlertasYRecordatorios(){
 let _recItems = [], _recItv = null, _recCargado = false;
 
 // V8.57 (reporte de Daniel: «los filtros no están actualizados como estaba la web»): Documentos pendientes usa las mismas píldoras que el resto. Sin ninguna elegida = todos. Antes los desplegables del móvil no filtraban nada: renderControlDocs solo leía los de escritorio
-const CC_DOC_TIPOS = [['factura', 'Factura'], ['albaran', 'Albarán'], ['presupuesto', 'Presupuesto'], ['proforma', 'Proforma']], CC_DOC_ESTADOS = [['trabajo_activo', 'Trabajo activo'], ['pendiente_enviar', 'Listo p. entregar'], ['pendiente_cobrar', 'Pend. cobrar'], ['parcial', 'Cobrado parcial'], ['borrador', 'Borrador'], ['revisar', 'Por revisar'], ['aceptado', 'Aceptado'], ['rectificativa', 'Rectificativa']];
+const CC_DOC_TIPOS = [['factura', 'Factura'], ['albaran', 'Albarán'], ['presupuesto', 'Presupuesto'], ['proforma', 'Proforma']], CC_DOC_ESTADOS = [['trabajo_activo', 'Trabajo activo'], ['pendiente_enviar', 'Listo p. entregar'], ['entregado', 'Entregada'], ['pendiente_cobrar', 'Pend. cobrar'], ['parcial', 'Cobrado parcial'], ['parcial_otra', 'Parcial en otra'], ['cobrado_otra', 'Cobrada en otra'], ['borrador', 'Borrador'], ['revisar', 'Por revisar'], ['aceptado', 'Aceptado'], ['rectificativa', 'Rectificativa']];
 // V8.76 (reporte de Daniel: «un botón a la derecha de los filtros para cambiar de vista: tarjetas plegadas para ver el máximo número; al darle a cada una se despliega la tarjeta normal»)
 const ICO_VISTA_PLEGADA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:18px;height:18px;"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/></svg>';
 function ccDocsVistaPlegada(){
@@ -28132,7 +28156,7 @@ function toggleDDGenerico(id){
 document.addEventListener('click', (e)=>{
   document.querySelectorAll('.dd-filter.open').forEach(f=>{ if(!f.contains(e.target)) f.classList.remove('open'); });
 });
-const CC_ESTADOS_CERRADOS = new Set(['cobrado', 'cobrado_efectivo', 'rechazado', 'anulado']);
+const CC_ESTADOS_CERRADOS = new Set(['cobrado', 'cobrado_efectivo', 'rechazado', 'anulado', 'cobrado_otra']);
 const CC_ESTADOS_CAJA = () => new Set(Array.from(document.querySelectorAll('#dd-estado input[data-estado]')).flatMap(i => i.dataset.estado.split(',')));
 function controlDocsEstadoDe(d){
   return d.estado_cobro || 'pendiente_enviar';
@@ -28210,9 +28234,9 @@ function renderControlDocs(){
   filtrados.forEach(d=>{ if(!d.expediente_id) return; const p = porExp.get(d.expediente_id); if(!p || (ORDEN_FASE[d.type]||0) > (ORDEN_FASE[p.type]||0)) porExp.set(d.expediente_id, d); });
   const unicos = filtrados.filter(d=> !d.expediente_id || porExp.get(d.expediente_id) === d);
   // dos bloques claros: pendiente de FACTURAR (albarán/proforma/factura sin emitir) y pendiente de COBRAR (proforma/factura emitida sin cobrar del todo)
-  const bloqueDe = d=>{ if(d.type==='presupuesto') return 'presupuesto'; const est = controlDocsEstadoDe(d); return (d.type!=='albaran' && ['pendiente_cobrar','parcial'].includes(est)) ? 'cobrar' : 'facturar'; };
+  const bloqueDe = d=>{ if(d.type==='presupuesto') return 'presupuesto'; const est = controlDocsEstadoDe(d); return (['entregado','parcial_otra'].includes(est) || (d.type!=='albaran' && ['pendiente_cobrar','parcial'].includes(est))) ? 'cobrar' : 'facturar'; };
   const BLOQUES = [['facturar','Por entregar'],['cobrar','Por cobrar'],['presupuesto','Presupuestos']];
-  const sumaImp = l => l.reduce((s,d)=> s + (Number(d.base != null ? d.base : (d.total||d.importe))||0), 0);   // V8.74: totales SIN IVA
+  const sumaImp = l => l.reduce((s,d)=> s + (Number(d.base != null ? d.base : (d.total||d.importe))||0) * (d.estado_cobro==='parcial_otra' && Number(d.total||d.importe) ? Math.max(0, 1 - enOtraSuma(d)/Number(d.total||d.importe)) : 1), 0);   // V8.74: totales SIN IVA
   const fmtEur = n => n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
   document.getElementById('control-docs-count').textContent = unicos.length;
   // V8.72 (Daniel): en el cabecero, pendiente de facturar + pendiente de cobrar + total de ambos (los presupuestos no cuentan: no son dinero pendiente)
@@ -28294,10 +28318,11 @@ function econImporteSinFactura(d, enlazados){
   return 0;
 }
 const esAdministracion = nombre => /(AYUNTAMIENTO|AYTO\.|DIPUTACI|JUNTA DE ANDALUC|CONSEJER|MINISTERIO|MANCOMUNIDAD|CONFEDERACI)/i.test(String(nombre || ''));
+const SOLO_PROF_ALB = ['entregado','parcial_otra','cobrado_otra'];   // V8.99: estados de proformas y albaranes (no de facturas)
 const estadosDeTipo = (tipo, doc) => tipo === 'presupuesto' ? ESTADOS_PRESUPUESTO
   : ((tipo === 'proforma' || tipo === 'albaran') && doc && esAdministracion(doc.client || doc.cliente)) ? ESTADOS_DOCUMENTO.filter(o => !['pendiente_cobrar','parcial','cobrado'].includes(o[0]) && (tipo === 'albaran' || o[0] !== 'trabajo_activo'))
-  : tipo === 'albaran' ? ESTADOS_DOCUMENTO : ESTADOS_DOCUMENTO.filter(o => o[0] !== 'trabajo_activo');   // V8.68 (Daniel): «Trabajo activo» es una fase del albarán abierto
-const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['trabajo_activo','Trabajo activo'],['pendiente_enviar','Listo para entregar'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Cobrado parcial'],['cobrado','Cobrado'],['rectificativa','Rectificativa'],['revisar','Revisar'],['nula','Nula']];
+  : tipo === 'albaran' ? ESTADOS_DOCUMENTO : tipo === 'proforma' ? ESTADOS_DOCUMENTO.filter(o => o[0] !== 'trabajo_activo') : ESTADOS_DOCUMENTO.filter(o => o[0] !== 'trabajo_activo' && !SOLO_PROF_ALB.includes(o[0]));   // V8.68 (Daniel): «Trabajo activo» es una fase del albarán abierto
+const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['trabajo_activo','Trabajo activo'],['pendiente_enviar','Listo para entregar'],['entregado','Entregada'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Cobrado parcial'],['parcial_otra','Parcial en otra'],['cobrado_otra','Cobrada en otra'],['cobrado','Cobrado'],['rectificativa','Rectificativa'],['revisar','Revisar'],['nula','Nula']];
 function estadoDocumentoSelect(tipo, id, actual, contexto){
   const act = actual || 'pendiente_enviar';
   const label = estadosDeTipo(tipo, documentosRealesById?.[id]).concat(ESTADOS_DOCUMENTO).find(o=>o[0]===act)?.[1] || stateLabels[act] || act;
@@ -28311,7 +28336,7 @@ function estadoDocumentoSelect(tipo, id, actual, contexto){
     <div class="estado-cobro-menu">
       ${estadosDeTipo(tipo, documentosRealesById?.[id]).map(([v,l])=>`<span class="pill ${v}" onclick="event.stopPropagation();cambiarEstadoDocumento('${tipo}','${id}','${v}','${ddId}')">${l}</span>`).join('')}
     </div>
-  </div>`;
+  </div>${enOtraChipsHtml(documentosRealesById?.[id])}`;
 }
 function toggleEstadoCobroDropdown(ddId){
   const dd = document.getElementById(ddId);
@@ -28327,6 +28352,126 @@ document.addEventListener('click', (ev)=>{
     if(!dd.contains(ev.target)){ dd.classList.remove('open'); const k = dd.closest('.factura-card-movil'); if(k) k.classList.remove('fc-menu-abierto'); }
   });
 });
+// ===== V8.99 · Documentos entregados, cobrados dentro de otra factura (total o en parte) =====
+// Daniel 08/10/2026: a la administración muchas veces no se le cobra la proforma/albarán tal cual, se mete en una factura posterior (entera o una parte).
+// Estados: «Entregada» (la tiene el cliente, sin cobrar), «Parcial en otra» y «Cobrada en otra». El enlace a la factura va en documentos_economicos.cobrado_en = [{factura_id, numero, importe}].
+const _o2 = n => Math.round(Number(n || 0) * 100) / 100;
+const _ho = t => String(t == null ? '' : t).replace(/[<>&"']/g, '');
+const _eurO = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+function enOtraLista(d){ return Array.isArray(d && d.cobrado_en) ? d.cobrado_en : []; }
+function enOtraAnadir(d, facId, numero, imp){   // suma al enlace que ya exista con esa misma factura, o lo crea
+  const l = enOtraLista(d).map(x => ({...x})), k = l.find(x => (facId && x.factura_id === facId) || (!facId && _nF(x.numero) && _nF(x.numero) === _nF(numero)));
+  if(k) k.importe = _o2(Number(k.importe || 0) + imp); else l.push({factura_id: facId || null, numero: numero || '', importe: imp});
+  return l;
+}
+function enOtraSuma(d){ return enOtraLista(d).reduce((s, x) => s + Number(x.importe || 0), 0); }
+function enOtraChipsHtml(d){
+  if(!d || !['cobrado_otra', 'parcial_otra'].includes(d.estado_cobro)) return '';
+  const l = enOtraLista(d); if(!l.length) return '';
+  return `<span class="cob-otra" data-doc-id="${d.id}">${l.map(x => `<a onclick="event.stopPropagation();verFacturaHoja('${_ho(x.factura_id)}','${_ho(x.numero)}')">${_ho(x.numero) || 'factura'}${d.estado_cobro === 'parcial_otra' ? `<small>${_eurO(x.importe)}</small>` : ''}</a>`).join('')}</span>`;
+}
+function refrescarChipsOtraEnPantalla(id){
+  const d = documentosRealesById[id];
+  document.querySelectorAll(`.estado-cobro-dd[data-doc-id="${id}"]`).forEach(dd => {
+    const nx = dd.nextElementSibling; if(nx && nx.classList && nx.classList.contains('cob-otra')) nx.remove();
+    const h = enOtraChipsHtml(d); if(h) dd.insertAdjacentHTML('afterend', h);
+  });
+}
+const _nF = t => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^f(?=\d)/, '');
+function facturasDeCliente(doc){
+  return Object.values(documentosRealesById).filter(f => f.type === 'factura' && f.entidad_id && f.entidad_id === doc.entidad_id && !['nula', 'rectificativa'].includes(f.estado_cobro) && f.estado !== 'anulado')
+    .sort((a, b) => new Date(b.dateRaw || 0) - new Date(a.dateRaw || 0));
+}
+function buscarFacturaPorNumero(num, entidadId){
+  const n = _nF(num); if(!n) return null;
+  const todas = Object.values(documentosRealesById).filter(f => f.type === 'factura' && _nF(f.numero) === n);
+  return todas.find(f => f.entidad_id === entidadId) || todas[0] || null;
+}
+// Pregunta en qué factura se ha cobrado (lista de las del cliente o número escrito) y, si es en parte, cuánto. Devuelve {estado, lista} o null
+async function pedirFacturaOtra(doc, estado){
+  if(!doc) return null;
+  const total = _o2(doc.total != null ? doc.total : doc.importe), ya = _o2(enOtraSuma(doc)), resta = Math.max(0, _o2(total - ya));
+  const facs = facturasDeCliente(doc), campos = [];
+  if(facs.length) campos.push({id: 'fid', label: '¿En qué factura se ha cobrado?', tipo: 'select', opciones: facs.map(f => [f.id, 'Nº ' + (f.numero || 's/n') + ' · ' + formatFechaCorta(f.dateRaw) + ' · ' + _eurO(f.total)])});
+  campos.push({id: 'num', label: facs.length ? 'O escribe el número de factura si no sale en la lista (ej.: F32)' : 'Número de la factura (ej.: F32)', tipo: 'text', placeholder: 'F32'});
+  campos.push({id: 'imp', label: estado === 'parcial_otra' ? '¿Cuánto de este documento va en esa factura? (quedan ' + _eurO(resta) + ' por colocar, IVA incluido)' : 'Importe que va en esa factura (lo que queda: ' + _eurO(resta) + ')', tipo: 'number', valor: estado === 'parcial_otra' ? '' : resta, placeholder: 'Importe en euros', requerido: true});
+  const r = await pedirCampos((estado === 'parcial_otra' ? 'Parte cobrada en otra factura' : 'Cobrada en otra factura') + ' · ' + (doc.client || 'documento'), campos);
+  if(!r) return null;
+  let fac = r.fid ? documentosRealesById[r.fid] : null, numero = fac ? fac.numero : String(r.num || '').trim();
+  if(!fac && numero) fac = buscarFacturaPorNumero(numero, doc.entidad_id);
+  if(!numero && !fac){ mostrarToast('Dime en qué factura: elígela o escribe su número.', 'err'); return null; }
+  if(fac && !numero) numero = fac.numero || '';
+  const imp = _o2(String(r.imp).replace(',', '.'));
+  if(!(imp > 0)){ mostrarToast('Escribe el importe, más de 0 €.', 'err'); return null; }
+  if(imp > resta + 0.01){ mostrarToast('Eso es más de lo que queda por colocar (' + _eurO(resta) + ').', 'err'); return null; }
+  const lista = enOtraAnadir(doc, fac ? fac.id : null, numero, imp);
+  return {lista, estado: (ya + imp) >= total - 0.01 ? 'cobrado_otra' : 'parcial_otra'};
+}
+// ── Hoja deslizante con la factura (se abre al tocar el número en naranja)
+function _facHojaEl(){
+  let h = document.getElementById('fac-hoja');
+  if(!h){
+    h = document.createElement('div'); h.id = 'fac-hoja';
+    h.innerHTML = '<div class="fh-panel"><div class="fh-asa"></div><div id="fac-hoja-c"></div></div>';
+    h.addEventListener('click', ev => { if(ev.target === h) facHojaCerrar(); });
+    let y0 = null; const pn = h.querySelector('.fh-panel');
+    pn.addEventListener('touchstart', ev => { if(pn.scrollTop <= 0) y0 = ev.touches[0].clientY; else y0 = null; }, {passive: true});
+    pn.addEventListener('touchmove', ev => { if(y0 == null) return; const dy = ev.touches[0].clientY - y0; if(dy > 0){ pn.style.transition = 'none'; pn.style.transform = 'translateY(' + dy + 'px)'; } }, {passive: true});
+    pn.addEventListener('touchend', ev => { if(y0 == null) return; const dy = (ev.changedTouches[0].clientY - y0); pn.style.transition = ''; pn.style.transform = ''; y0 = null; if(dy > 90) facHojaCerrar(); });
+    document.body.appendChild(h);
+  }
+  return h;
+}
+function facHojaCerrar(){ const h = document.getElementById('fac-hoja'); if(h) h.classList.remove('active'); }
+function verFacturaHoja(id, numero){
+  const h = _facHojaEl(), c = document.getElementById('fac-hoja-c');
+  const f = (id && documentosRealesById[id]) || buscarFacturaPorNumero(numero, null);
+  if(!f){
+    c.innerHTML = `<h3 style="margin:0 0 6px;">Factura ${_ho(numero) || ''}</h3><p class="sub-t">Esta factura todavía no está en el sistema. Cuando se dé de alta con ese número, aquí se verá entera.</p><div style="margin-top:12px;"><button class="btn" onclick="facHojaCerrar()">Cerrar</button></div>`;
+    requestAnimationFrame(() => h.classList.add('active')); return;
+  }
+  const incl = Object.values(documentosRealesById).filter(d => ['proforma', 'albaran'].includes(d.type) && enOtraLista(d).some(x => (x.factura_id && x.factura_id === f.id) || (!x.factura_id && _nF(x.numero) && _nF(x.numero) === _nF(f.numero))));
+  const lineas = (f.conceptos || []).map(k => `<div class="fh-linea"><span>${_ho(k.descripcion) || '—'}</span><span class="mono">${k.importe != null ? _eurO(k.importe) : ''}</span></div>`).join('') || '<div class="sub-t">Sin líneas guardadas</div>';
+  const inclHtml = incl.length ? `<div style="margin-top:12px;font-size:11px;text-transform:uppercase;font-weight:700;color:var(--ink-soft);">Lleva dentro</div>` + incl.map(d => { const x = enOtraLista(d).find(z => (z.factura_id && z.factura_id === f.id) || _nF(z.numero) === _nF(f.numero)); return `<div class="fh-linea"><span>${tipoDocEtiqueta(d.type, false)} · ${formatFechaCorta(d.dateRaw)} · ${_ho(d.obra_texto || d.client || '')}</span><span class="mono">${_eurO(x ? x.importe : 0)}</span></div>`; }).join('') : '';
+  const est = ESTADOS_DOCUMENTO.find(o => o[0] === f.estado_cobro);
+  c.innerHTML = `<div class="fh-cab"><div><h3 style="margin:0;">Factura ${_ho(f.numero) || 's/n'}</h3><div class="sub-t">${_ho(f.client)} · ${formatFechaCorta(f.dateRaw)}</div></div><div style="text-align:right;"><b class="mono">${_eurO(f.total)}</b><div><span class="pill ${f.estado_cobro}">${est ? est[1] : _ho(f.estado_cobro)}</span></div></div></div>
+    <div style="margin-top:10px;">${lineas}</div>${inclHtml}
+    <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn primary" style="flex:1;" onclick="facHojaCerrar();openDocumentViewer('${f.id}')">Ver completa</button><button class="btn" onclick="facHojaCerrar()">Cerrar</button></div>`;
+  requestAnimationFrame(() => h.classList.add('active'));
+}
+// ── Desde la factura: «Meter proformas/albaranes» — los marca solos como cobrados (o en parte) en esta factura
+async function abrirMeterEnFactura(facId){
+  const f = documentosRealesById[facId]; if(!f) return;
+  if(!f.entidad_id){ mostrarToast('Esta factura no tiene cliente.', 'err'); return; }
+  const cand = Object.values(documentosRealesById).filter(d => ['proforma', 'albaran'].includes(d.type) && d.entidad_id === f.entidad_id && d.fase_estado !== 'historico' && !d.documento_siguiente_id && !['cobrado', 'cobrado_otra', 'nula', 'rectificativa', 'borrador'].includes(d.estado_cobro) )
+    .sort((a, b) => new Date(b.dateRaw || 0) - new Date(a.dateRaw || 0));
+  const h = _facHojaEl(), c = document.getElementById('fac-hoja-c');
+  if(!cand.length){ c.innerHTML = `<h3 style="margin:0 0 6px;">Meter en la factura ${_ho(f.numero) || ''}</h3><p class="sub-t">No hay proformas ni albaranes de ${_ho(f.client)} pendientes de meter.</p><div style="margin-top:12px;"><button class="btn" onclick="facHojaCerrar()">Cerrar</button></div>`; requestAnimationFrame(() => h.classList.add('active')); return; }
+  c.innerHTML = `<h3 style="margin:0;">Meter en la factura ${_ho(f.numero) || 's/n'}</h3><div class="sub-t" style="margin-bottom:8px;">Marca los que van dentro. Si solo va una parte, cambia el importe (IVA incluido).</div>` +
+    cand.map(d => { const resta = Math.max(0, _o2(Number(d.total != null ? d.total : d.importe) - enOtraSuma(d))); return `<div class="fh-linea" style="align-items:center;"><label style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;"><input type="checkbox" class="mf-chk" data-id="${d.id}"><span style="min-width:0;">${tipoDocEtiqueta(d.type, false)} · ${formatFechaCorta(d.dateRaw)}<br><span class="sub-t">${_ho(d.obra_texto || '')}</span></span></label><input class="search-box mf-imp" data-id="${d.id}" type="number" step="0.01" value="${resta}" style="width:100px;text-align:right;"></div>`; }).join('') +
+    `<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn primary" style="flex:1;" onclick="confirmarMeterEnFactura('${f.id}')">Meter en la factura</button><button class="btn" onclick="facHojaCerrar()">Cancelar</button></div><div id="mf-status" class="sub-t" style="margin-top:6px;"></div>`;
+  requestAnimationFrame(() => h.classList.add('active'));
+}
+async function confirmarMeterEnFactura(facId){
+  const f = documentosRealesById[facId]; if(!f || !sb) return;
+  const sel = [...document.querySelectorAll('#fac-hoja .mf-chk:checked')]; const st = document.getElementById('mf-status');
+  if(!sel.length){ if(st){ st.textContent = 'Marca al menos uno.'; st.style.color = 'var(--red)'; } return; }
+  let ok = 0;
+  for(const chk of sel){
+    const id = chk.dataset.id, d = documentosRealesById[id]; if(!d) continue;
+    if(!exigirNivelDoc(id, 'editar')) continue;
+    const imp = _o2(document.querySelector(`#fac-hoja .mf-imp[data-id="${id}"]`).value), total = _o2(d.total != null ? d.total : d.importe), ya = _o2(enOtraSuma(d));
+    if(!(imp > 0) || imp > total - ya + 0.01){ mostrarToast('Importe no válido para ' + tipoDocEtiqueta(d.type, false) + ' (quedan ' + _eurO(total - ya) + ').', 'err'); continue; }
+    const lista = enOtraAnadir(d, f.id, f.numero || '', imp), estado = (ya + imp) >= total - 0.01 ? 'cobrado_otra' : 'parcial_otra';
+    const {error} = await sb.from('documentos_economicos').update({cobrado_en: lista, estado_cobro: estado}).eq('id', id);
+    if(error){ mostrarToast('Error: ' + errText(error), 'err'); continue; }
+    d.cobrado_en = lista; d.estado_cobro = estado; ok++;
+    const lab = ESTADOS_DOCUMENTO.find(o => o[0] === estado)[1];
+    document.querySelectorAll(`.estado-cobro-dd[data-doc-id="${id}"] .pill`).forEach(p => { p.className = 'pill ' + estado; p.textContent = lab; });
+    refrescarChipsOtraEnPantalla(id);
+  }
+  if(ok){ mostrarToast(ok + (ok === 1 ? ' documento metido' : ' documentos metidos') + ' en la factura ' + (f.numero || '') + ' ✓', 'ok'); facHojaCerrar(); renderControlDocs(); }
+}
 async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   if(!exigirNivelDoc(id,'editar')) return;
   if(!sb) return;
@@ -28336,7 +28481,12 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   const cerrarMenus = () => document.querySelectorAll(`.estado-cobro-dd[data-doc-id="${id}"]`).forEach(dd => dd.classList.remove('open'));
   const payload = {estado_cobro: valor};
   // COBRADO = cobrado entero, en TODOS los tipos de documento (no solo facturas)
-  if(valor==='cobrado'){
+  if(valor==='cobrado_otra' || valor==='parcial_otra'){
+    cerrarMenus();
+    const r = await pedirFacturaOtra(docAct, valor);
+    if(!r){ renderControlDocs(); return; }
+    payload.cobrado_en = r.lista; valor = payload.estado_cobro = r.estado;
+  } else if(valor==='cobrado'){
     payload.cobrado_importe = docAct?.total || 0;
   } else if(valor==='parcial'){
     // Cobro parcial: hay que decir cuánto se ha cobrado. Sin importe la base de datos lo devuelve a Pendiente de cobrar.
@@ -28374,6 +28524,7 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
     if(pillEl){ pillEl.className = 'pill '+valor; pillEl.textContent = label; }
     dd.classList.remove('open');
   });
+  refrescarChipsOtraEnPantalla(id);
   if(pedido !== valor){ const nom = ESTADOS_DOCUMENTO.find(o=>o[0]===valor)?.[1] || valor; mostrarToast('Quedó como ' + nom + ' porque hay ' + eur(payload.cobrado_importe) + ' cobrados de ' + eur(totalDoc) + '.', 'ok'); }
   else if(valor==='parcial'){ mostrarToast('Cobrado parcial guardado: ' + eur(payload.cobrado_importe) + ' cobrados, faltan ' + eur(Math.max(0, totalDoc - payload.cobrado_importe)) + ' ✓', 'ok'); }
   else mostrarToast('Estado actualizado ✓', 'ok');
