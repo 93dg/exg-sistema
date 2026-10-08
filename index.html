@@ -4580,7 +4580,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.08</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.09</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4727,7 +4727,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.08</div>
+        <div class="sub" id="version-badge">V9.09</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -27765,6 +27765,28 @@ function sincronizarFechaTexto(){
   if(!input || !texto) return;
   texto.textContent = formatFechaCorta(input.value);
 }
+// V9.09 — qué documentos están enlazados con este (en cualquier dirección y por cualquier campo) y si los importes cuadran
+function enlacesDocumento(doc){
+  const por = documentosRealesById, ids = new Set();
+  [doc.documento_anterior_id, doc.documento_siguiente_id, doc.documento_relacionado_id].forEach(x => { if(x) ids.add(x); });
+  (doc.origen_albaran_ids || []).forEach(x => ids.add(x));
+  Object.values(por).forEach(d => { if(d.id === doc.id) return; if(d.documento_anterior_id === doc.id || d.documento_siguiente_id === doc.id || d.documento_relacionado_id === doc.id || (d.origen_albaran_ids || []).includes(doc.id)) ids.add(d.id); });
+  ids.delete(doc.id);
+  const lista = [...ids].map(id => por[id]).filter(Boolean);
+  const base = d => Number(d.base) || 0;
+  const alb = lista.filter(x => x.type === 'albaran');
+  const avisos = [];
+  if(doc.type === 'factura' && alb.length > 1){
+    const suma = alb.reduce((a, x) => a + base(x), 0);
+    if(Math.abs(suma - base(doc)) > Math.max(1, base(doc) * 0.005)) avisos.push('albaranes ' + costeEur(suma) + ' · factura ' + costeEur(base(doc)) + ' (sin IVA): no cuadran, ' + costeEur(Math.abs(suma - base(doc))) + ' de diferencia');
+  }
+  const detalle = lista.map(x => {
+    let aviso = '';
+    if(!(doc.type === 'factura' && alb.length > 1) && Math.abs(base(x) - base(doc)) > Math.max(1, base(doc) * 0.005)) aviso = base(x) > base(doc) ? ' · no cuadra: +' + costeEur(base(x) - base(doc)) : ' · no cuadra: −' + costeEur(base(doc) - base(x));
+    return {id: x.id, texto: tipoDocEtiqueta(x.type) + ' ' + (x.num || x.numero || '') + ' · ' + costeEur(base(x)) + ' sin IVA' + aviso, avisa: !!aviso};
+  });
+  return {detalle, avisos};
+}
 function openDocumentViewer(id){
   const doc = documentosRealesById[id];
   if(!doc){ mostrarToast('No se encuentra este documento.'); return; }
@@ -27790,6 +27812,8 @@ function openDocumentViewer(id){
   else { btnOriginal.style.display = 'none'; }
   { let fu = document.getElementById('ni-fuente'); if(!fu){ fu = document.createElement('div'); fu.id = 'ni-fuente'; fu.style.cssText = 'font-size:12px;color:var(--ink-soft);margin:4px 0 8px;line-height:1.4;'; btnOriginal.insertAdjacentElement('afterend', fu); }
     try{ const o = impOrigenGasto(doc); fu.textContent = o === 'A mano' ? '' : 'Fuente · ' + o; fu.style.display = o === 'A mano' ? 'none' : ''; }catch(e){ fu.textContent = ''; } }   // «A mano» sin archivo no se pone (regla de Daniel)
+  { let en = document.getElementById('ni-enlaces'); if(!en){ en = document.createElement('div'); en.id = 'ni-enlaces'; en.style.cssText = 'font-size:12px;color:var(--ink-soft);margin:4px 0 8px;line-height:1.5;'; btnOriginal.insertAdjacentElement('afterend', en); }
+    try{ const e = enlacesDocumento(doc); en.innerHTML = e.detalle.length ? 'Enlazado con · ' + e.detalle.map(x => '<span class="link-btn" style="' + (x.avisa ? 'color:var(--red,#B3261E);' : '') + '" onclick="openDocumentViewer(\'' + x.id + '\')">' + escHtml(x.texto) + '</span>').join(' · ') + e.avisos.map(a => '<br><span style="color:var(--red,#B3261E);">' + escHtml(a) + '</span>').join('') : ''; en.style.display = e.detalle.length ? '' : 'none'; }catch(err){ en.innerHTML = ''; } }
   ieHistorial(doc);
   document.getElementById('ni-otras-acciones').innerHTML = accionesDocumento(doc).filter(x=>x.t!=='Editar' && x.t!=='Imprimir' && !x.t.startsWith('Pasar a') && !x.t.startsWith('← Volver a')).map(x=>`<button type="button" class="btn sm" onclick="${x.fn}">${x.t}</button>`).join('');
   // PASAR A… — desplegable único con la transición principal preseleccionada

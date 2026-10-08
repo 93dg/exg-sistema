@@ -294,7 +294,7 @@ function numeroDesdeRejilla(filas: any[][], limiteFila: number) {
 /* ---------------- LÍNEAS, IVA Y TOTALES (hoja) ---------------- */
 export function esLineaResumen(t: any) { return /^(SUBTOTAL|TOTAL|I\.?V\.?A\.?|BASE IMPONIBLE|IMPUESTO)/i.test(String(t || "").trim()); }
 export function lineasYTotales(filas: any[][], wb?: any) {
-  let filaCab = -1, colHoras = -1, colConcepto = -1, colPrecio = -1, colTotal = -1, colCantidad = -1;
+  let filaCab = -1, colHoras = -1, colConcepto = -1, colPrecio = -1, colTotal = -1, colCantidad = -1, colFecha = -1;
   for (let r = 0; r < filas.length && filaCab < 0; r++) {
     const fila = filas[r] || [];
     const esCab = fila.some((v: any) => typeof v === "string" && (/^Concepto\b/i.test(v.trim()) || /Descripci[óo]n/i.test(v) || /^Lote\s*\d*$/i.test(v.trim())));
@@ -302,7 +302,8 @@ export function lineasYTotales(filas: any[][], wb?: any) {
     filaCab = r;
     fila.forEach((v: any, c: number) => {
       if (typeof v !== "string") return; const t = v.trim();
-      if (/^Horas?$/i.test(t)) colHoras = c;
+      if (/^Fecha$/i.test(t)) colFecha = c;
+      else if (/^Horas?$/i.test(t)) colHoras = c;
       else if (/^(Cant\.?(idad)?|m[²³23]?|ml|ud\.?|uds\.?|unidades)$/i.test(t) && colCantidad < 0) colCantidad = c;
       else if (/^Concepto\b/i.test(t) || /Descripci[óo]n/i.test(t) || /^Lote\s*\d*$/i.test(t)) colConcepto = c;
       else if (/^Precio(\s*unitario)?$/i.test(t)) colPrecio = c;
@@ -323,6 +324,7 @@ export function lineasYTotales(filas: any[][], wb?: any) {
       blancos = 0;
       if (typeof horas === "number" || typeof cant === "number" || typeof tot === "number") {
         const o: any = { descripcion: texto || null, horas: typeof horas === "number" ? horas : null, precio_unitario: typeof precio === "number" ? precio : null, importe: typeof tot === "number" ? tot : null };
+        if (colFecha >= 0) { const fl = valorFecha(f[colFecha]); if (fl) o.fecha = fl; else if (typeof f[colFecha] === "string" && f[colFecha].trim()) o.fecha_texto = f[colFecha].trim(); }
         if (typeof cant === "number") o.cantidad = cant; else if (typeof horas === "number") o.cantidad = horas;
         else if (o.precio_unitario != null && o.importe != null && Math.abs(o.precio_unitario - o.importe) < 0.01) o.cantidad = 1;
         conceptos.push(o);
@@ -611,6 +613,8 @@ export function lineasParaGuardar(conceptos: any[]) {
     if (c.cantidad != null) o.cantidad = Number(c.cantidad);
     if (c.horas != null) o.horas = Number(c.horas);
     if (c.precio_unitario != null) o.precio_unitario = Number(c.precio_unitario);
+    if (c.fecha) o.fecha = String(c.fecha);
+    if (!c.fecha && c.fecha_texto) o.fecha_texto = String(c.fecha_texto);
     if (o.cantidad == null && o.precio_unitario != null && Math.abs(o.precio_unitario - o.importe) < 0.01) o.cantidad = 1;
     return o;
   });
