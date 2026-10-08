@@ -23154,7 +23154,7 @@ function generarPDFDocumento(accion, modoForzado, portadaForzada){
       try{
         const logoW = 18;
         const ratio = (logoEl.naturalWidth && logoEl.naturalHeight) ? (logoEl.naturalHeight/logoEl.naturalWidth) : 1;
-        doc.addImage(logoSrc, 'PNG', 15, 14, logoW, logoW*ratio);
+        doc.addImage(logoSrc, 'PNG', 15, 14, logoW, logoW*ratio, 'exglogo', 'FAST');
       }catch(e){}
     }
     const xTexto = logoSrc ? 38 : 15;
@@ -23221,17 +23221,15 @@ function generarPDFDocumento(accion, modoForzado, portadaForzada){
   // ancho previsto, y el resto del ancho libre se lo queda Concepto en vez de perderse.
   const xPrecio = cfg.hasPrecios ? 172 : 195;
   if(conPortada){
-    let yp = 75;
+    let yp = 42;
     if(logoSrc){
       try{
-        const lw = 70, ratio = (logoEl.naturalWidth && logoEl.naturalHeight) ? (logoEl.naturalHeight/logoEl.naturalWidth) : 1;
-        doc.addImage(logoSrc, 'PNG', (210 - lw)/2, yp, lw, lw*ratio);
-        yp += lw*ratio + 22;
+        const lw = 110, ratio = (logoEl.naturalWidth && logoEl.naturalHeight) ? (logoEl.naturalHeight/logoEl.naturalWidth) : 1;
+        doc.addImage(logoSrc, 'PNG', (210 - lw)/2, yp, lw, lw*ratio, 'exglogo', 'FAST');
+        yp += lw*ratio + 16;
       }catch(e){ yp += 20; }
     }
-    doc.setDrawColor(27,31,36); doc.setLineWidth(0.5); doc.line(60, yp, 150, yp); yp += 16;
-    doc.setTextColor(120,120,120); doc.setFont('helvetica','normal'); doc.setFontSize(10);
-    doc.text('CLIENTE', 105, yp, {align:'center'}); yp += 9;
+    doc.setDrawColor(240,165,0); doc.setLineWidth(1.2); doc.line(85, yp, 125, yp); yp += 20;
     doc.setTextColor(0,0,0); doc.setFont('helvetica','bold'); doc.setFontSize(20);
     const lineasCliente = doc.splitTextToSize(client, 160);
     lineasCliente.forEach((l, i) => doc.text(l, 105, yp + i*9, {align:'center'}));
@@ -29251,9 +29249,10 @@ async function imprimirDocumento(id){
   const ov = document.getElementById('newinvoice-overlay');
   const yaAbierto = ov && ov.classList.contains('active') && editingDocId === id;
   if(!yaAbierto && ov) ov.classList.add('imp-oculto');
+  const conPortada = yaAbierto && !!document.getElementById('ni-portada')?.checked;   // V9.20: reabrir el documento desmarcaba la casilla y la portada nunca salía al imprimir
   openDocumentViewer(id);
   await new Promise(r => setTimeout(r, 300));
-  try{ await generarPDFDocumento('imprimir'); }
+  try{ await generarPDFDocumento('imprimir', undefined, conPortada); }
   finally{
     if(!yaAbierto){ try{ closeNewInvoiceModal(); }catch(e){} if(ov) ov.classList.remove('imp-oculto'); }
   }
