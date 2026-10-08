@@ -4580,7 +4580,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.07</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.08</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4727,7 +4727,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.07</div>
+        <div class="sub" id="version-badge">V9.08</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -23829,21 +23829,22 @@ function tbJobParaCostes(j){
   const nc = tbNorm(j.cliente); const ent = nc ? clientes.find(c => c.esCli !== false && tbNorm(c.name) === nc) : null;
   return {id: j.id, nombre: j.trabajo || '', entidadId: ent ? ent.id : null, scheduledDate: (j.plan && j.plan.fecha) || '', fechaFin: j.terminado_at ? String(j.terminado_at).slice(0, 10) : ''};
 }
+function costeEur(n, dec){ n = Number(n) || 0; const neg = n < 0 && Math.abs(n) >= (dec ? 0.005 : 0.5); const [e, d] = Math.abs(n).toFixed(dec || 0).split('.'); return (neg ? '−' : '') + e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (d ? ',' + d : '') + ' €'; }
 async function tbRenderCostes(){
   const lista = document.getElementById('te-costes'); if(!lista) return;
   const tarifas = await costeHoraCargar();
-  const eur = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  const eur = n => costeEur(n);
   const errores = [], filas = [];
-  _tbJobs.filter(j => j.estado !== 'Cancelado').forEach(j => { try{ const jc = tbJobParaCostes(j); filas.push({j, jc, r: costesTrabajoCalcular(jc, tarifas)}); }catch(e){ errores.push((j.trabajo || 'Trabajo') + ': ' + (e && e.message)); console.error('Costes: fallo en un trabajo', j, e); } });   // V9.07: un trabajo con datos raros ya no tumba la lista entera
-  const con = filas.filter(f => !f.r.vacio), sin = filas.filter(f => f.r.vacio);
+  _tbJobs.filter(j => j.estado !== 'Cancelado').forEach(j => { try{ const jc = tbJobParaCostes(j); filas.push({j, jc, r: costesTrabajoCalcular(jc, tarifas)}); }catch(e){ errores.push((j.trabajo || 'Trabajo') + ': ' + (e && e.message)); console.error('Costes: fallo en un trabajo', j, e); } });
+  const con = filas.filter(f => !f.r.vacio);   // solo lo calculado: lo que no tiene albaranes no se enseña
   const tot = con.reduce((a, f) => ({sin: a.sin + f.r.netoSin, con: a.con + f.r.netoCon}), {sin: 0, con: 0});
   const nombre = j => escHtml((j.trabajo || 'Trabajo') + (j.cliente ? ' · ' + j.cliente : ''));
   const col = n => n < 0 ? 'var(--red)' : 'var(--green)';
-  const carta = f => { const r = f.r; return `<details class="tb-cos"><summary><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div style="font-weight:700;font-size:14px;line-height:1.3;min-width:0;">${nombre(f.j)}</div><div style="text-align:right;flex:none;font-weight:800;color:${col(r.netoCon)};">${eur(r.netoCon)}<div style="font-size:10.5px;font-weight:500;color:var(--ink-soft);">neto con sueldos</div></div></div><div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">Ingresos ${eur(r.ingresos)} · neto sin sueldos <b style="color:${col(r.netoSin)};">${eur(r.netoSin)}</b></div></summary><div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;">${costesTrabajoHtml(f.jc, tarifas)}</div></details>`; };
-  lista.innerHTML = `<div class="panel te-panel"><div style="font-weight:800;font-size:15px;margin-bottom:4px;">Costes y neto por trabajo</div>
-    <div style="font-size:12.5px;color:var(--ink-soft);margin:0 0 10px;">Lo que deja cada trabajo, al momento: sus albaranes, el combustible repostado esos mismos días y los sueldos. Toca uno para ver el detalle y los escenarios con 3, 2 y 1 persona.</div>
-    ${(() => { const m = convenioSueldoInfo('maquinista'), c = convenioSueldoInfo('conductor2'), f = n => Math.round(n).toLocaleString('es-ES') + ' €'; const fila = (t, x) => `<div style="padding:6px 0;border-top:1px solid var(--line);"><div style="font-weight:700;">${t}</div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:2px;">Bruto ${f(x.brutoMes)}/mes (${f(x.bruto)} al año) · <b style="color:var(--ink);">neto ${f(x.neto14)}/mes</b> en 14 pagas (${f(x.neto12)} si se reparte en 12) · a la empresa le cuesta ${f(x.costeMes)}/mes = <b style="color:var(--ink);">${x.costeHora.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €/h</b></div></div>`; return `<div class="tb-cos" style="margin-bottom:10px;"><div style="font-weight:800;font-size:13px;">Sueldo mínimo de convenio (Córdoba 2026)</div><div style="font-size:11.5px;color:var(--ink-soft);margin:2px 0 4px;">Lo que se usa para los sueldos de cada trabajo. Neto con retención estimada de soltero sin hijos; la nómina real puede variar.</div>${fila('Maquinista y camionero (nivel VIII)', m)}${fila('Si fuera conductor de 2.ª (nivel IX)', c)}<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;padding-top:8px;border-top:1px solid var(--line);font-size:12.5px;"><span>Usar otro coste por hora <span style="display:block;font-size:11px;color:var(--ink-soft);">vacío = el del convenio</span></span><span><input type="text" inputmode="decimal" value="${tarifas.persona ? String(tarifas.persona).replace('.', ',') : ''}" placeholder="${m.costeHora.toFixed(2).replace('.', ',')}" onchange="costeHoraGuardar(this.value)" style="width:70px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:8px;"> €/h</span></div></div>`; })()}
-    ${con.length ? `<div class="tb-cos" style="background:var(--concrete-2);"><div style="font-size:12px;color:var(--ink-soft);">Total de ${con.length} trabajo${con.length === 1 ? '' : 's'} con albaranes</div><div style="display:flex;justify-content:space-between;font-weight:800;margin-top:2px;"><span>Neto sin sueldos</span><span style="color:${col(tot.sin)};">${eur(tot.sin)}</span></div><div style="display:flex;justify-content:space-between;font-weight:800;"><span>Neto con sueldos</span><span style="color:${col(tot.con)};">${eur(tot.con)}</span></div></div>` : ''}
+  const carta = f => { const r = f.r; return `<details class="tb-cos"><summary><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div style="font-weight:700;font-size:14px;line-height:1.3;min-width:0;">${nombre(f.j)}</div><div style="text-align:right;flex:none;font-weight:800;color:${col(r.netoCon)};">${eur(r.netoCon)}<div style="font-size:10.5px;font-weight:500;color:var(--ink-soft);">te queda</div></div></div><div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">Ingresos ${eur(r.ingresos)}</div></summary><div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;">${costesTrabajoHtml(f.jc, tarifas)}</div></details>`; };
+  const m = convenioSueldoInfo('maquinista');
+  lista.innerHTML = `<div class="panel te-panel"><div style="font-weight:800;font-size:15px;margin-bottom:8px;">Costes por trabajo</div>
+    <div class="tb-cos" style="margin-bottom:10px;"><div style="font-weight:700;font-size:13px;">Maquinista y camionero · convenio Córdoba 2026</div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:3px;">Neto <b style="color:var(--ink);">${eur(m.neto14)}/mes</b> (14 pagas) · a la empresa <b style="color:var(--ink);">${eur(m.costeMes)}/mes</b> = <b style="color:var(--ink);">${costeEur(m.costeHora, 2)}/h</b></div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:12px;color:var(--ink-soft);"><span>Otro coste por hora (vacío = convenio)</span><span><input type="text" inputmode="decimal" value="${tarifas.persona ? String(tarifas.persona).replace('.', ',') : ''}" placeholder="${m.costeHora.toFixed(2).replace('.', ',')}" onchange="costeHoraGuardar(this.value)" style="width:64px;text-align:right;padding:5px 7px;border:1px solid var(--line);border-radius:8px;"> €/h</span></div></div>
+    ${con.length ? `<div class="tb-cos" style="background:var(--concrete-2);"><div style="display:flex;justify-content:space-between;font-weight:800;"><span>Te queda en total</span><span style="color:${col(tot.con)};">${eur(tot.con)}</span></div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">${con.length} trabajo${con.length === 1 ? '' : 's'} · ${eur(tot.sin)} sin contar sueldos</div></div>` : ''}
     ${con.map(carta).join('')}
     ${con.length ? '' : `<div style="font-size:12.5px;color:var(--ink-soft);">Todavía no hay ningún trabajo con albaranes que calcular.<div style="font-size:11px;margin-top:4px;">(${Object.values(documentosRealesById).filter(d => (d.tipo || d.type) === 'albaran').length} albaranes y ${clientes.length} clientes cargados · ${_tbJobs.length} trabajos${errores.length ? ' · fallos: ' + escHtml(errores.join(' | ')) : ''})</div></div>`}
     ${errores.length && con.length ? `<div style="font-size:11px;color:var(--orange);margin-top:8px;">No se pudo calcular: ${escHtml(errores.join(' | '))}</div>` : ''}</div>`;
@@ -29528,12 +29529,13 @@ function costesTrabajoCalcular(j, tarifas){
   const neto = d => { const b = d.base != null && !isNaN(Number(d.base)) ? Number(d.base) : Number(d.importe || d.total || 0) / (1 + (d.iva_pct != null ? Number(d.iva_pct) : 21) / 100); return b || 0; };
   const lineas = d => (Array.isArray(d.conceptos) ? d.conceptos : []).map(c => ({f: dia(c.fecha) || dia(d.fecha_devengo || d.dateRaw), h: (c.unidad === 'h' || c.horas != null) ? (Number(c.horas != null ? c.horas : c.cantidad) || 0) : 0})).filter(l => l.f);
   const albs = docs.filter(d => (d.tipo || d.type) === 'albaran');
+  const conHoras = docs.filter(d => ['albaran', 'proforma', 'factura'].includes(d.tipo || d.type) && d.estado_cobro !== 'nula');   // V9.08: las horas de los demás trabajos (aunque ya sean proforma o factura) también reparten el combustible
   const ini = j.scheduledDate || '', fin = j.fechaFin || '';
   const mios = albs.filter(d => { if(d.trabajo_id) return d.trabajo_id === j.id; const nj = tbNorm(j.nombre || ''), porTexto = nj.length >= 4 && d.obra_texto && tbNorm(d.obra_texto).includes(nj);   // V9.07: también por el nombre de la obra
     if(!porTexto && (!j.entidadId || d.entidad_id !== j.entidadId)) return false; const fs = lineas(d).map(l => l.f).sort(); if(!fs.length) return false; return fs[fs.length - 1] >= ini && (!fin || fs[0] <= fin); });
   if(!mios.length) return {vacio: true};
   const hMio = {}, hTodos = {};
-  albs.forEach(d => lineas(d).forEach(l => { hTodos[l.f] = (hTodos[l.f] || 0) + l.h; }));
+  conHoras.forEach(d => lineas(d).forEach(l => { hTodos[l.f] = (hTodos[l.f] || 0) + l.h; }));
   mios.forEach(d => lineas(d).forEach(l => { hMio[l.f] = (hMio[l.f] || 0) + l.h; }));
   const fechas = Object.keys(hMio).sort(), desde = fechas[0], hasta = fechas[fechas.length - 1];
   const H = Object.values(hMio).reduce((a, b) => a + b, 0), ingresos = mios.reduce((s, d) => s + neto(d), 0);
@@ -29554,26 +29556,23 @@ function costesTrabajoCalcular(j, tarifas){
   return {vacio: false, nAlb: mios.length, desde, hasta, ingresos, combMio, litros, asocTot, asocN: asoc.length, sinDesglose, H, diasTrab: fechas.length, diasReal, netoSin, rate, sueldosReal: H * rate, netoCon: netoSin - H * rate, esc, netoHora};
 }
 function costesTrabajoHtml(j, tarifas){
-  const r = costesTrabajoCalcular(j, tarifas);
-  const eur = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
-  if(r.vacio) return '<div style="font-size:12.5px;color:var(--ink-soft);">' + (j.entidadId ? 'Sin albaranes de este cliente desde la fecha de inicio.' : 'No encuentro el cliente de este trabajo entre los clientes.') + ' Entran solos en cuanto haya un albarán.</div>';
+  const r = costesTrabajoCalcular(j, tarifas), eur = n => costeEur(n);
+  if(r.vacio) return '';
   const fila = (t, v, extra, fuerte, col) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;${fuerte ? 'font-weight:800;border-top:1px solid var(--line);margin-top:4px;padding-top:8px;' : ''}"><span>${t}${extra ? `<span style="display:block;font-size:11px;color:var(--ink-soft);font-weight:400;">${extra}</span>` : ''}</span><span style="white-space:nowrap;${col ? 'color:' + col + ';' : ''}">${v}</span></div>`;
   const fmt = iso => iso.split('-').reverse().join('/'), hf = n => (Math.round(n * 10) / 10).toLocaleString('es-ES');
   const col = n => n < 0 ? 'var(--red)' : 'var(--green)';
   const sem = d => d >= 5 ? ' (' + hf(d / 5) + ' sem.)' : '';
-  const mejor = r.esc.reduce((a, b) => b.resultado > a.resultado ? b : a, r.esc[0]);
-  return `<div style="font-size:11.5px;color:var(--ink-soft);margin-bottom:6px;">${r.nAlb} albarán${r.nAlb === 1 ? '' : 'es'} · del ${fmt(r.desde)} al ${fmt(r.hasta)} · ${hf(r.H)} h de máquina en ${r.diasTrab} día${r.diasTrab === 1 ? '' : 's'} (sin IVA)</div>
+  const dif = e => e.resultado - r.netoCon, mejor = r.esc.reduce((a, b) => dif(b) > dif(a) ? b : a, r.esc[0]);
+  return `<div style="font-size:11.5px;color:var(--ink-soft);margin-bottom:4px;">${hf(r.H)} h · ${r.diasTrab} día${r.diasTrab === 1 ? '' : 's'} · ${fmt(r.desde)} – ${fmt(r.hasta)}</div>
     ${fila('Ingresos', eur(r.ingresos))}
-    ${fila('Combustible', '− ' + eur(r.combMio), hf(r.litros) + ' l repostados esos mismos días, según las líneas de las facturas', false, 'var(--red)')}
-    ${r.sinDesglose.length ? `<div style="font-size:11.5px;color:var(--orange);margin:2px 0 4px;">Falta el desglose por fecha de: ${r.sinDesglose.map(escHtml).join(', ')}. Ese combustible aún no cuenta.</div>` : ''}
-    ${r.asocN ? fila('Otros gastos asociados', '− ' + eur(r.asocTot), r.asocN + ' gasto' + (r.asocN === 1 ? '' : 's'), false, 'var(--red)') : ''}
-    ${fila('Neto sin sueldos', eur(r.netoSin), r.ingresos ? Math.round(r.netoSin / r.ingresos * 100) + ' % de lo facturado' : '', true, col(r.netoSin))}
-    ${fila('Sueldos como se hizo', '− ' + eur(r.sueldosReal), hf(r.H) + ' h × ' + eur(r.rate) + '/h (convenio)', false, 'var(--red)')}
-    ${fila('Neto con sueldos', eur(r.netoCon), '', true, col(r.netoCon))}
-    <div style="margin:14px 0 4px;font-weight:700;font-size:12.5px;">Y si se hubiera hecho con gente dada de alta, 8 h al día</div>
-    <div style="font-size:11.5px;color:var(--ink-soft);margin-bottom:6px;">Real: ${r.diasReal} día${r.diasReal === 1 ? '' : 's'} laborable${r.diasReal === 1 ? '' : 's'}${sem(r.diasReal)} del primero al último albarán, con ${hf(r.H / r.diasTrab)} h de máquina por día de trabajo. Los días que sobran los podrían haber aprovechado en otro trabajo (coste de oportunidad, con el mismo neto por hora que dejó este).</div>
-    ${r.esc.map(e => `<div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:0 0 6px;${e === mejor && r.rate ? 'border-color:var(--green);' : ''}"><div style="display:flex;justify-content:space-between;font-weight:800;"><span>${e.n} persona${e.n === 1 ? '' : 's'}</span><span>${e.dias} día${e.dias === 1 ? '' : 's'}${sem(e.dias)}</span></div><div style="font-size:12px;color:var(--ink-soft);margin-top:3px;">Sueldos ${eur(e.sueldos)} · ${e.liberados} día${e.liberados === 1 ? '' : 's'} libre${e.liberados === 1 ? '' : 's'} → oportunidad ${r.rate ? eur(e.oportunidad) : '—'}</div><div style="display:flex;justify-content:space-between;margin-top:4px;font-weight:700;"><span>Resultado</span><span style="color:${col(e.resultado)};">${r.rate ? eur(e.resultado) : '—'}</span></div></div>`).join('')}
-    ${r.rate ? `<div style="font-size:12px;margin-top:4px;"><b>Con ${mejor.n} persona${mejor.n === 1 ? '' : 's'}</b> sale mejor: ${eur(mejor.resultado)} frente a ${eur(r.netoCon)} como se hizo.</div>` : '<div style="font-size:12px;color:var(--orange);">Pon lo que cuesta por hora un trabajador (sueldo + Seguridad Social) para ver el resultado.</div>'}`;
+    ${fila('Combustible', '− ' + eur(r.combMio), hf(r.litros) + ' l', false, 'var(--red)')}
+    ${r.sinDesglose.length ? `<div style="font-size:11.5px;color:var(--orange);margin:0 0 4px;">Falta el combustible de ${r.sinDesglose.map(escHtml).join(', ')}</div>` : ''}
+    ${r.asocN ? fila('Otros gastos', '− ' + eur(r.asocTot), '', false, 'var(--red)') : ''}
+    ${fila('Sueldos', '− ' + eur(r.sueldosReal), hf(r.H) + ' h × ' + costeEur(r.rate, 2) + '/h', false, 'var(--red)')}
+    ${fila('Te queda', eur(r.netoCon), r.ingresos ? Math.round(r.netoCon / r.ingresos * 100) + ' % de lo facturado' : '', true, col(r.netoCon))}
+    <div style="margin:14px 0 6px;font-weight:700;font-size:12.5px;">Con gente de alta, 8 h al día</div>
+    ${r.esc.map(e => `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;border:1px solid ${e === mejor && dif(e) > 0 ? 'var(--green)' : 'var(--line)'};border-radius:10px;padding:8px 10px;margin:0 0 6px;"><span><b>${e.n} persona${e.n === 1 ? '' : 's'}</b><span style="display:block;font-size:11px;color:var(--ink-soft);">${e.dias} día${e.dias === 1 ? '' : 's'}${sem(e.dias)}</span></span><b style="color:${col(dif(e))};white-space:nowrap;">${dif(e) >= 0 ? '+' : ''}${eur(dif(e))}</b></div>`).join('')}
+    <div style="font-size:11px;color:var(--ink-soft);">Lo que ganarías de más o de menos frente a cómo se hizo, usando los días libres en otro trabajo igual de rentable.</div>`;
 }
 
 function openJobDrawer(code){
