@@ -4580,7 +4580,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.09</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.10</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4727,7 +4727,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.09</div>
+        <div class="sub" id="version-badge">V9.10</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6598,6 +6598,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
           </div>
           <div class="emp-datos" id="empresa-datos"></div>
           <div class="emp-cats" id="empresa-cats"></div>
+          <div id="empresa-nave-resumen"></div>
           <div id="empresa-docs-cards"></div>
         </div>
 
@@ -14465,9 +14466,23 @@ function perPintarFicha(){
   ov.innerHTML = `<div class="fl-cab"><div class="fl-cab-top"><div class="fl-ico per-av-ico">${escHtml((p.nombre || '?').charAt(0))}</div><div class="fl-cab-tit"><div class="fl-nombre">${flE(p.nombre)}</div><div class="fl-fila" style="margin-top:4px;"><span style="font-size:12px;color:var(--ink-soft);">${flE(p.rol || '')}</span></div></div><button type="button" class="fl-ib" title="Cerrar" aria-label="Cerrar" onclick="perCerrarFicha()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div><div class="fl-tabs">${tabs.map(([t, l]) => `<button type="button" class="fl-tab ${t === _perTab ? 'act' : ''}" onclick="perTabFicha('${t}')">${l}${cnt[t] ? `<b>${cnt[t]}</b>` : ''}</button>`).join('')}</div></div><div class="fl-cuerpo">${h}</div>`;
 }
 window.abrirFichaPersona = abrirFichaPersona;
+// V9.10 — pestaña Nave (Empresa): resumen del contrato, plazos, pagos y lo que permite el contrato. Solo datos del contrato y de las cartas de pago.
+function naveResumenHtml(){
+  const eur = n => costeEur(n, 2), dh = f => diasHastaCaducidad(f);
+  const plazo = (t, f, extra) => { const d = dh(f); return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line);"><span>${t}${extra ? ' <span style="color:var(--ink-soft);">· ' + extra + '</span>' : ''}</span><b style="${d != null && d <= 10 ? 'color:var(--red,#B3261E);' : ''}">${d == null ? '' : d < 0 ? 'vencido' : d === 0 ? 'hoy' : d + (d === 1 ? ' día' : ' días')}</b></div>`; };
+  const pagos = [['2023', 1949.62, '11/12/2023'], ['2024', 1949.72, '11/12/2024'], ['2025', 1949.72, '29/12/2025'], ['Ene–jun 2026', 974.88, '29/06/2026']];
+  const total = pagos.reduce((a, x) => a + x[1], 0);
+  const fila = (a, b, c) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--line);"><span>${a}${c ? ' <span style="color:var(--ink-soft);">· ' + c + '</span>' : ''}</span><b>${b}</b></div>`;
+  const caja = (t, h) => `<div style="background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;font-size:13px;"><div style="font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">${t}</div>${h}</div>`;
+  return caja('Nave 7 · manzana 5 · P.I. El Blanquillo', `<div>Contrato con el Ayuntamiento de Fuente Obejuna, 4 años desde el 26/07/2022. <b>Terminó el 26/07/2026.</b></div>${fila('Renta', eur(162.48) + '/mes', '134,28 + 28,20 de IVA')}${fila('Nave', '294 m²', 'parcela 378 m²')}${fila('Precio por m² de nave', eur(134.28 / 294) + '/mes', 'sin IVA')}${fila('Fianza depositada', eur(1611.34))}`)
+    + caja('Plazos de los requerimientos del 07/10', plazo('Pagar 649,92 € (julio–octubre)', '2026-10-17') + plazo('Entregar llaves y desalojar', '2026-11-07'))
+    + caja('Pagado según las cartas de pago', pagos.map(x => fila(x[0], eur(x[1]), x[2])).join('') + fila('Total de estas cartas', eur(total)))
+    + caja('Lo que dice el contrato', fila('Opción de compra', 'no figura') + fila('Prórroga o renovación', 'no figura') + fila('Subarrendar o ceder', 'prohibido', 'cláusula 14') + fila('Obras o mejoras', 'solo con permiso', 'compensables hasta el valor del contrato; se quedan en la nave') + fila('Al terminar', 'vacía y pintada', 'acta de inventario; la fianza responde de lo que falte') + fila('IBI', 'lo paga el Ayuntamiento'));
+}
 function renderDocsEmpresa(){
   const cont = document.getElementById('empresa-docs-cards');
   if(!cont) return;
+  { const nv = document.getElementById('empresa-nave-resumen'); if(nv){ try{ nv.innerHTML = _empCat === 'Nave' ? naveResumenHtml() : ''; }catch(e){ nv.innerHTML = ''; } } }
   // pestañas por tipo de documento (con cuántos hay) y buscador: la lista deja de ser un solo montón
   const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const cats = {}; EMPRESA_DOCS.forEach(d => { const k = (d.categoria || 'Sin tipo').trim(); cats[k] = (cats[k] || 0) + 1; });
