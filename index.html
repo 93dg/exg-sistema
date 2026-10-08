@@ -4580,7 +4580,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.06</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.07</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4727,7 +4727,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.06</div>
+        <div class="sub" id="version-badge">V9.07</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -23824,15 +23824,17 @@ function tbCartaHtml(j, esHis, botonesHtml, extraHtml){
   }
 
 // Pestaña Costes de Trabajos (V8.96): cada trabajo con lo que ha dejado, en tiempo real
+document.addEventListener('exg-docs-listos', () => { if(document.getElementById('te-costes')) tbRenderCostes(); });   // V9.07: si la lista se pintó antes de cargar los documentos, se repinta sola
 function tbJobParaCostes(j){
   const nc = tbNorm(j.cliente); const ent = nc ? clientes.find(c => c.esCli !== false && tbNorm(c.name) === nc) : null;
-  return {id: j.id, entidadId: ent ? ent.id : null, scheduledDate: (j.plan && j.plan.fecha) || '', fechaFin: j.terminado_at ? String(j.terminado_at).slice(0, 10) : ''};
+  return {id: j.id, nombre: j.trabajo || '', entidadId: ent ? ent.id : null, scheduledDate: (j.plan && j.plan.fecha) || '', fechaFin: j.terminado_at ? String(j.terminado_at).slice(0, 10) : ''};
 }
 async function tbRenderCostes(){
   const lista = document.getElementById('te-costes'); if(!lista) return;
   const tarifas = await costeHoraCargar();
   const eur = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
-  const filas = _tbJobs.filter(j => j.estado !== 'Cancelado').map(j => { const jc = tbJobParaCostes(j); const r = costesTrabajoCalcular(jc, tarifas); return {j, jc, r}; });
+  const errores = [], filas = [];
+  _tbJobs.filter(j => j.estado !== 'Cancelado').forEach(j => { try{ const jc = tbJobParaCostes(j); filas.push({j, jc, r: costesTrabajoCalcular(jc, tarifas)}); }catch(e){ errores.push((j.trabajo || 'Trabajo') + ': ' + (e && e.message)); console.error('Costes: fallo en un trabajo', j, e); } });   // V9.07: un trabajo con datos raros ya no tumba la lista entera
   const con = filas.filter(f => !f.r.vacio), sin = filas.filter(f => f.r.vacio);
   const tot = con.reduce((a, f) => ({sin: a.sin + f.r.netoSin, con: a.con + f.r.netoCon}), {sin: 0, con: 0});
   const nombre = j => escHtml((j.trabajo || 'Trabajo') + (j.cliente ? ' · ' + j.cliente : ''));
@@ -23843,7 +23845,8 @@ async function tbRenderCostes(){
     ${(() => { const m = convenioSueldoInfo('maquinista'), c = convenioSueldoInfo('conductor2'), f = n => Math.round(n).toLocaleString('es-ES') + ' €'; const fila = (t, x) => `<div style="padding:6px 0;border-top:1px solid var(--line);"><div style="font-weight:700;">${t}</div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:2px;">Bruto ${f(x.brutoMes)}/mes (${f(x.bruto)} al año) · <b style="color:var(--ink);">neto ${f(x.neto14)}/mes</b> en 14 pagas (${f(x.neto12)} si se reparte en 12) · a la empresa le cuesta ${f(x.costeMes)}/mes = <b style="color:var(--ink);">${x.costeHora.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €/h</b></div></div>`; return `<div class="tb-cos" style="margin-bottom:10px;"><div style="font-weight:800;font-size:13px;">Sueldo mínimo de convenio (Córdoba 2026)</div><div style="font-size:11.5px;color:var(--ink-soft);margin:2px 0 4px;">Lo que se usa para los sueldos de cada trabajo. Neto con retención estimada de soltero sin hijos; la nómina real puede variar.</div>${fila('Maquinista y camionero (nivel VIII)', m)}${fila('Si fuera conductor de 2.ª (nivel IX)', c)}<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;padding-top:8px;border-top:1px solid var(--line);font-size:12.5px;"><span>Usar otro coste por hora <span style="display:block;font-size:11px;color:var(--ink-soft);">vacío = el del convenio</span></span><span><input type="text" inputmode="decimal" value="${tarifas.persona ? String(tarifas.persona).replace('.', ',') : ''}" placeholder="${m.costeHora.toFixed(2).replace('.', ',')}" onchange="costeHoraGuardar(this.value)" style="width:70px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:8px;"> €/h</span></div></div>`; })()}
     ${con.length ? `<div class="tb-cos" style="background:var(--concrete-2);"><div style="font-size:12px;color:var(--ink-soft);">Total de ${con.length} trabajo${con.length === 1 ? '' : 's'} con albaranes</div><div style="display:flex;justify-content:space-between;font-weight:800;margin-top:2px;"><span>Neto sin sueldos</span><span style="color:${col(tot.sin)};">${eur(tot.sin)}</span></div><div style="display:flex;justify-content:space-between;font-weight:800;"><span>Neto con sueldos</span><span style="color:${col(tot.con)};">${eur(tot.con)}</span></div></div>` : ''}
     ${con.map(carta).join('')}
-    ${con.length ? '' : '<div style="font-size:12.5px;color:var(--ink-soft);">Todavía no hay ningún trabajo con albaranes que calcular.</div>'}</div>`;
+    ${con.length ? '' : `<div style="font-size:12.5px;color:var(--ink-soft);">Todavía no hay ningún trabajo con albaranes que calcular.<div style="font-size:11px;margin-top:4px;">(${Object.values(documentosRealesById).filter(d => (d.tipo || d.type) === 'albaran').length} albaranes y ${clientes.length} clientes cargados · ${_tbJobs.length} trabajos${errores.length ? ' · fallos: ' + escHtml(errores.join(' | ')) : ''})</div></div>`}
+    ${errores.length && con.length ? `<div style="font-size:11px;color:var(--orange);margin-top:8px;">No se pudo calcular: ${escHtml(errores.join(' | '))}</div>` : ''}</div>`;
 }
 function tbRender(){
   const lista = document.getElementById('tb-lista'); if(!lista) return;
@@ -29526,7 +29529,8 @@ function costesTrabajoCalcular(j, tarifas){
   const lineas = d => (Array.isArray(d.conceptos) ? d.conceptos : []).map(c => ({f: dia(c.fecha) || dia(d.fecha_devengo || d.dateRaw), h: (c.unidad === 'h' || c.horas != null) ? (Number(c.horas != null ? c.horas : c.cantidad) || 0) : 0})).filter(l => l.f);
   const albs = docs.filter(d => (d.tipo || d.type) === 'albaran');
   const ini = j.scheduledDate || '', fin = j.fechaFin || '';
-  const mios = albs.filter(d => { if(d.trabajo_id) return d.trabajo_id === j.id; if(!j.entidadId || d.entidad_id !== j.entidadId) return false; const fs = lineas(d).map(l => l.f).sort(); if(!fs.length) return false; return fs[fs.length - 1] >= ini && (!fin || fs[0] <= fin); });
+  const mios = albs.filter(d => { if(d.trabajo_id) return d.trabajo_id === j.id; const nj = tbNorm(j.nombre || ''), porTexto = nj.length >= 4 && d.obra_texto && tbNorm(d.obra_texto).includes(nj);   // V9.07: también por el nombre de la obra
+    if(!porTexto && (!j.entidadId || d.entidad_id !== j.entidadId)) return false; const fs = lineas(d).map(l => l.f).sort(); if(!fs.length) return false; return fs[fs.length - 1] >= ini && (!fin || fs[0] <= fin); });
   if(!mios.length) return {vacio: true};
   const hMio = {}, hTodos = {};
   albs.forEach(d => lineas(d).forEach(l => { hTodos[l.f] = (hTodos[l.f] || 0) + l.h; }));
