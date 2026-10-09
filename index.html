@@ -4591,7 +4591,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.25</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.26</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4738,7 +4738,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.25</div>
+        <div class="sub" id="version-badge">V9.26</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -28043,7 +28043,15 @@ function enlacesDocumento(doc){
   ids.delete(doc.id);
   const lista = [...ids].map(id => por[id]).filter(Boolean);
   const base = d => Number(d.base) || 0;
-  const alb = lista.filter(x => x.type === 'albaran');
+  // V9.26 — conversión PARCIAL: la factura se sacó de una parte del albarán (V9.19) y el albarán sigue abierto con el resto.
+  // Se enlazan solo por documento_relacionado_id (sin anterior/siguiente/origen, que son los de la conversión completa),
+  // y por eso sus importes NO tienen que coincidir: no es un descuadre.
+  const esParcial = x => {
+    if(!((doc.type === 'factura' && x.type === 'albaran') || (doc.type === 'albaran' && x.type === 'factura'))) return false;
+    const completa = doc.documento_anterior_id === x.id || doc.documento_siguiente_id === x.id || x.documento_anterior_id === doc.id || x.documento_siguiente_id === doc.id || (doc.origen_albaran_ids || []).includes(x.id) || (x.origen_albaran_ids || []).includes(doc.id);
+    return !completa && (doc.documento_relacionado_id === x.id || x.documento_relacionado_id === doc.id);
+  };
+  const alb = lista.filter(x => x.type === 'albaran' && !esParcial(x));
   const avisos = [];
   if(doc.type === 'factura' && alb.length > 1){
     const suma = alb.reduce((a, x) => a + base(x), 0);
@@ -28051,8 +28059,10 @@ function enlacesDocumento(doc){
   }
   const detalle = lista.map(x => {
     let aviso = '';
-    if(!(doc.type === 'factura' && alb.length > 1) && Math.abs(base(x) - base(doc)) > Math.max(1, base(doc) * 0.005)) aviso = base(x) > base(doc) ? ' · no cuadra: +' + costeEur(base(x) - base(doc)) : ' · no cuadra: −' + costeEur(base(doc) - base(x));
-    return {id: x.id, texto: tipoDocEtiqueta(x.type) + ' ' + (x.num || x.numero || '') + ' · ' + costeEur(base(x)) + ' sin IVA' + aviso, avisa: !!aviso};
+    if(esParcial(x)){
+      aviso = doc.type === 'albaran' ? ' · parcial: se facturó una parte de este albarán (sigue abierto con ' + costeEur(base(doc)) + ')' : ' · parcial: factura sacada de una parte de este albarán, que sigue abierto';
+    } else if(!(doc.type === 'factura' && alb.length > 1) && Math.abs(base(x) - base(doc)) > Math.max(1, base(doc) * 0.005)) aviso = base(x) > base(doc) ? ' · no cuadra: +' + costeEur(base(x) - base(doc)) : ' · no cuadra: −' + costeEur(base(doc) - base(x));
+    return {id: x.id, texto: tipoDocEtiqueta(x.type) + ' ' + (x.num || x.numero || '') + ' · ' + costeEur(base(x)) + ' sin IVA' + aviso, avisa: !!aviso && !esParcial(x)};
   });
   return {detalle, avisos};
 }
