@@ -59,6 +59,21 @@ R.cargar = async function(forzar){
 };
 R.invalidar = () => { R.P = null; };
 
+
+// ---------- documentos que cuentan como ingreso: una factura sustituye a los albaranes con los que está enlazada (no se suma dos veces) ----------
+R.efectivos = function(P){
+  if(P._ef) return P._ef;
+  const docs = (P.docs || []).filter(d => d.estado_cobro !== 'nula' && ['albaran', 'factura', 'proforma'].includes(d.tipo)), byId = new Map(docs.map(d => [d.id, d])), ady = new Map();
+  const une = (a, b) => { if(!a || !b || !byId.has(a) || !byId.has(b) || a === b) return; (ady.get(a) || ady.set(a, new Set()).get(a)).add(b); (ady.get(b) || ady.set(b, new Set()).get(b)).add(a); };
+  docs.forEach(d => { une(d.id, d.documento_relacionado_id); une(d.id, d.documento_anterior_id); une(d.id, d.documento_siguiente_id); });
+  const tieneLin = d => R.lineas(d).length > 0, cubiertos = new Set(), cubrePor = {};
+  docs.filter(d => d.tipo !== 'albaran' && tieneLin(d)).forEach(f => { (ady.get(f.id) || []).forEach(x => { const a = byId.get(x); if(a && a.tipo === 'albaran'){ cubiertos.add(a.id); (cubrePor[f.id] = cubrePor[f.id] || []).push(a); } }); });
+  // proformas enlazadas con una factura: cuenta solo la factura
+  const prof = new Set(); docs.filter(d => d.tipo === 'proforma').forEach(pf => { if([...(ady.get(pf.id) || [])].some(x => byId.get(x).tipo === 'factura' && tieneLin(byId.get(x)))) prof.add(pf.id); });
+  const lista = docs.filter(d => !cubiertos.has(d.id) && !prof.has(d.id));
+  return P._ef = {lista, cubiertos, cubrePor};
+};
+
 // ---------- asignación de albaranes a obras (sin mezclar obras del mismo cliente) ----------
 R.entidadCasa = (job, ent) => { const nj = norm(job.cliente), ne = norm(ent && ent.nombre); if(!nj || !ne) return false; if(nj === ne) return true; if(nj.length >= 5 && (ne.includes(nj) || nj.includes(ne))) return true; const tj = nj.split(' ').filter(t => t.length >= 3), te = ne.split(' '); return tj.length >= 2 && tj.every(t => te.includes(t)); };
 R.fechaRef = d => { const f = R.lineas(d).map(l => l.f).sort(); return f.length ? f[f.length - 1] : dia(d.fecha_devengo); };
@@ -67,7 +82,7 @@ R.asignar = function(P){
   const porJob = {}, ambiguos = [], sinAsignar = [], origen = {};
   jobs.forEach(j => { porJob[j.id] = []; });
   const vincDoc = new Map(); (P.vinculos || []).filter(v => v.rol === 'albaran').forEach(v => { if(!vincDoc.has(v.documento_id)) vincDoc.set(v.documento_id, []); vincDoc.get(v.documento_id).push(v); });
-  (P.docs || []).filter(d => d.tipo === 'albaran' && d.estado_cobro !== 'nula').forEach(d => {
+  R.efectivos(P).lista.forEach(d => {
     const vs = vincDoc.get(d.id) || [], inc = vs.find(v => v.accion === 'incluir');
     if(inc && porJob[inc.job_id]){ porJob[inc.job_id].push(d); origen[d.id] = {job: inc.job_id, como: 'manual'}; return; }
     const excl = new Set(vs.filter(v => v.accion === 'excluir').map(v => v.job_id));
@@ -85,8 +100,8 @@ R.asignar = function(P){
 // ---------- ventana de empresa (12 meses hasta una fecha): horas, días trabajados, ingresos, combustible ----------
 R.empresaVentana = function(P, hasta){
   const k = hasta; P._ev = P._ev || {}; if(P._ev[k]) return P._ev[k];
-  const W0 = addDays(hasta, -364), sig = new Set((P.docs || []).filter(d => d.tipo === 'albaran' && d.documento_siguiente_id).map(d => d.documento_siguiente_id));
-  const indep = (P.docs || []).filter(d => d.estado_cobro !== 'nula' && (d.tipo === 'albaran' || ((d.tipo === 'proforma' || d.tipo === 'factura') && !sig.has(d.id) && !d.documento_anterior_id)));
+  const W0 = addDays(hasta, -364);
+  const indep = R.efectivos(P).lista;
   const horasDia = {}, horasClase = {}, dias = new Set(); let ingresos = 0, horas = 0;
   indep.forEach(d => { const ls = R.lineas(d).filter(l => l.f >= W0 && l.f <= hasta); if(!ls.length) return; ingresos += sum(ls, l => l.imp) * (d.iva_pct != null && num(d.iva_pct) > 0 ? 1 / (1 + num(d.iva_pct) / 100) : 1);
     ls.forEach(l => { horasDia[l.f] = (horasDia[l.f] || 0) + l.h; horasClase[l.clase] = (horasClase[l.clase] || 0) + l.h; horas += l.h; if(l.h > 0 || l.imp > 0) dias.add(l.f); }); });
@@ -114,11 +129,12 @@ R.calcular = function(job, P, asig){
   const ev = R.empresaVentana(P, hasta), usados = new Set(), avisos = [], lineasD = [], lineasI = [];
   // ---- ingresos: ejecutado / facturado / cobrado ----
   const ejecutado = sum(albs, R.baseIngreso), docById = new Map((P.docs || []).map(d => [d.id, d]));
-  const conFact = albs.filter(a => a.documento_siguiente_id && docById.get(a.documento_siguiente_id) && ['factura', 'proforma'].includes(docById.get(a.documento_siguiente_id).tipo));
+  const conFact = albs.filter(a => a.tipo !== 'albaran' || a.documento_siguiente_id && docById.get(a.documento_siguiente_id) && ['factura', 'proforma'].includes(docById.get(a.documento_siguiente_id).tipo));
   const facturado = sum(conFact, R.baseIngreso), cobrado = sum(albs, a => { const imp = num(a.importe); return imp ? Math.min(1, num(a.cobrado_importe) / imp) * R.baseIngreso(a) : 0; });
   const ing = {ejecutado, facturado, cobrado, nAlb: albs.length, nFact: conFact.length, sinImporte: albs.filter(a => !num(a.importe)).length};
-  if(ing.sinImporte) avisos.push(ing.sinImporte + ' albarán(es) sin importe: el ingreso puede estar incompleto.');
-  if(cobrado > facturado + 1) avisos.push('Hay ' + eur(cobrado - facturado) + ' cobrados sin factura enlazada al albarán.');
+  albs.filter(a => a.tipo !== 'albaran').forEach(f => { const cub = R.efectivos(P).cubrePor[f.id] || [], sc = sum(cub, R.baseIngreso), bf = R.baseIngreso(f); if(Math.abs(bf - sc) > 1) avisos.push('La factura ' + (f.numero || '') + ' suma ' + eur(bf) + ' y sus ' + cub.length + ' albarán(es) enlazados ' + eur(sc) + (bf > sc ? ': la diferencia es trabajo sin albarán en el sistema (se cuenta, vale la factura).' : ': la factura es menor que los albaranes (se cuenta la factura).')); });
+  if(ing.sinImporte) avisos.push(ing.sinImporte + ' documento(s) sin importe: el ingreso puede estar incompleto.');
+  if(cobrado > facturado + 1) avisos.push('Hay ' + eur(cobrado - facturado) + ' cobrados sin factura enlazada.');
   // ---- máquinas usadas (por lo que dicen las líneas de los albaranes) ----
   const maq = new Map();   // id -> {m, horas, dias}
   Object.keys(hClase).forEach(c => { const ms = R.maquinasDeClase(P, c); ms.forEach(m => { const x = maq.get(m.id) || {m, horas: 0, dias: new Set(), clases: new Set()}; x.horas += hClase[c] / ms.length; (diasClase[c] || new Set()).forEach(f => x.dias.add(f)); x.clases.add(c); maq.set(m.id, x); }); });
@@ -273,7 +289,7 @@ R.lineaHtml = (r, x, bloque) => fila(esc(x.label) + ' ' + badge(x.nivel) + (x.ma
 
 R.secDirecto = r => {
   const i = r.ing, f = (t, v, n) => fila(t, '<b>' + eur(v) + '</b>', n);
-  return card('Ingresos sin IVA', f('Ejecutado (albaranes)', i.ejecutado, i.nAlb + ' albarán(es). Trabajo hecho, no dinero cobrado.') + f('Facturado', i.facturado, i.nFact + ' con factura enlazada' + (i.facturado < i.ejecutado ? ' · pendiente de facturar ' + eur(i.ejecutado - i.facturado) : '')) + f('Cobrado', i.cobrado, i.cobrado < i.ejecutado ? 'pendiente de cobrar ' + eur(i.ejecutado - i.cobrado) : 'todo cobrado') + '<div style="margin-top:4px;">' + badge('real') + '</div>')
+  return card('Ingresos sin IVA', f('Ejecutado (trabajo hecho)', i.ejecutado, i.nAlb + ' documento(s): ' + i.nFact + ' factura(s) y ' + (i.nAlb - i.nFact) + ' albarán(es) sin facturar. Trabajo hecho, no dinero cobrado.') + f('Facturado', i.facturado, i.nFact + ' con factura enlazada' + (i.facturado < i.ejecutado ? ' · pendiente de facturar ' + eur(i.ejecutado - i.facturado) : '')) + f('Cobrado', i.cobrado, i.cobrado < i.ejecutado ? 'pendiente de cobrar ' + eur(i.ejecutado - i.cobrado) : 'todo cobrado') + '<div style="margin-top:4px;">' + badge('real') + '</div>')
     + card('Gastos directos de la obra', r.lineasD.map(x => R.lineaHtml(r, x, 'directo')).join('') + fila('<b>Total directos</b>', '<b>' + eur(r.directo) + '</b>') + '<div style="margin-top:6px;"><a href="#" onclick="RENT.anadir(\'' + r.job.id + '\',\'directo\');return false" style="font-size:12px;">+ añadir gasto directo</a></div>')
     + card('', '<div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;"><span>Resultado directo</span><span style="color:' + col(r.resultadoDirecto) + ';">' + eur(r.resultadoDirecto) + '</span></div><div style="font-size:11.5px;color:var(--ink-soft);">Ejecutado − directos. Aún sin repartir seguros, amortización, gestoría ni la retribución de los socios.</div>', 'background:var(--concrete-2);');
 };
@@ -329,7 +345,7 @@ R.vista = function(P){
   if(R.tab === 4) cuerpo = R.secSim(P, b);
   else if(!con.length) cuerpo = card('', '<div style="font-size:12.5px;">Todavía no hay obras con albaranes asignados. ' + (asig.sinAsignar.length ? asig.sinAsignar.length + ' albaranes sin obra reconocible.' : '') + '</div>') + amb;
   else cuerpo = selector + (r.vacio ? '' : (r.avisos.length ? '<div style="font-size:11.5px;color:var(--orange);margin-bottom:8px;">' + r.avisos.map(a => '• ' + esc(a)).join('<br>') + '</div>' : '') + R.sinHorasAviso(r)) + (r.vacio ? '' : (R.tab === 1 ? R.secDirecto(r) : R.tab === 2 ? R.secReal(r) : R.tab === 3 ? R.secOport(r) : R.secComp(r, P, b))) + (R.tab <= 2 ? amb : '');
-  const albs = !r.vacio && R.tab === 1 ? card('Albaranes incluidos', r.albs.map(d => fila(esc((d.numero || 'albarán') + ' · ' + R.fechaRef(d)) + ' <i style="font-size:11px;">(' + ((asig.origen[d.id] || {}).como || '?') + ')</i>', eur(R.baseIngreso(d)) + ' <a href="#" onclick="RENT.excluirAlb(\'' + d.id + '\',\'' + r.job.id + '\');return false" style="font-size:11px;">quitar</a>')).join('')) : '';
+  const albs = !r.vacio && R.tab === 1 ? card('Documentos incluidos (una factura sustituye a sus albaranes)', r.albs.map(d => fila(esc((d.tipo === 'albaran' ? 'Albarán ' : d.tipo === 'proforma' ? 'Proforma ' : 'Factura ') + (d.numero || '') + ' · ' + R.fechaRef(d)) + ' <i style="font-size:11px;">(' + ((asig.origen[d.id] || {}).como || '?') + ')</i>', eur(R.baseIngreso(d)) + ' <a href="#" onclick="RENT.excluirAlb(\'' + d.id + '\',\'' + r.job.id + '\');return false" style="font-size:11px;">quitar</a>')).join('')) : '';
   const hist = !r.vacio && R.tab === 2 && R.hist ? card('Histórico de cálculos', (R.hist.length ? R.hist.map(h => fila(new Date(h.created_at).toLocaleDateString('es-ES'), eur(h.resultado && h.resultado.beneficioReal))).join('') : '<div style="font-size:12px;">Primer cálculo guardado hoy.</div>')) : '';
   const manual = !r.vacio && R.tab <= 2 ? (() => { const m = (P.imput || []).filter(i => i.job_id === r.job.id); return m.length ? card('Correcciones manuales', m.map(i => fila(esc(i.concepto) + ' <span style="font-size:11px;">(' + i.modo + ', ' + i.origen + ', ' + new Date(i.created_at).toLocaleDateString('es-ES') + ')</span>', eur(i.importe) + ' <a href="#" onclick="RENT.quitarImp(\'' + i.id + '\');return false" style="font-size:11px;">deshacer</a>', esc(i.nota || ''))).join('')) : ''; })() : '';
   return '<div class="panel te-panel"><div style="font-weight:800;font-size:15px;margin-bottom:6px;">Rentabilidad de trabajos</div><div class="docs-tabs" style="margin:0 0 10px;display:flex;flex-wrap:wrap;gap:4px;">' + tabs + '</div>' + cuerpo + albs + manual + hist + '<div style="font-size:11px;color:var(--ink-soft);margin-top:6px;"><a href="#" onclick="RENT.recargar();return false">Actualizar datos</a> · ' + dep + ' obras sin albaranes asignados no se calculan.' + (R.errores && R.errores.length ? ' Fallos al leer: ' + esc(R.errores.join(', ')) : '') + '</div></div>';
