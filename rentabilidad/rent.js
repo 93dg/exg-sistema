@@ -431,17 +431,17 @@ R.simular2 = function(b, e){
 .rt-n b{font-size:13.5px}.rt-n small{display:block;font-size:11px;color:var(--ink-soft)}
 .rt-n .v{text-align:right}.rt-n .v b{font-size:17px;font-weight:900;display:block;white-space:nowrap}
 .rt-n .v small{white-space:nowrap}
-.rt-n .v em{display:inline-block;font-style:normal;font-size:11.5px;font-weight:800;border-radius:8px;padding:1px 7px;margin-top:3px;white-space:nowrap}
-.rt-n .v em.g{background:var(--green-soft);color:var(--green)}.rt-n .v em.r{background:var(--red-soft);color:var(--red)}
+.rt-n .x{grid-column:2/4;font-size:12.5px;display:flex;flex-direction:column;gap:4px;align-items:flex-start}.rt-n .x em{display:block;font-style:normal;font-size:12px;font-weight:800;border-radius:8px;padding:3px 9px}
+.rt-n .x em.g{background:var(--green-soft);color:var(--green)}.rt-n .x em.r{background:var(--red-soft);color:var(--red)}
 .rt-ch{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;font-size:12px}
 .rt-ch button,.rt-seg button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:5px 9px;font-size:12.5px;font-weight:700;color:inherit}
 .rt-ch button.on,.rt-seg button.on{background:var(--orange);border-color:var(--orange);color:#fff}
-.rt-tb{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:auto}
+.rt-tb{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}.rt-tb th:first-child,.rt-tb td:first-child{width:34%}
 .rt-tb th{font-size:10.5px;font-weight:800;text-align:right;padding:3px 4px;text-transform:uppercase}
 .rt-tb th:first-child,.rt-tb td:first-child{text-align:left}
-.rt-tb td{padding:7px 4px;text-align:right;border-top:1px solid var(--line);white-space:nowrap}
+.rt-tb td{padding:7px 3px;text-align:right;border-top:1px solid var(--line);white-space:nowrap;font-size:12.5px}
 .rt-tb td:first-child{white-space:normal}
-.rt-d{border-radius:14px;border:1.5px solid var(--line);padding:0 12px;background:transparent}
+.rt-d{border-radius:14px;border:1.5px solid var(--line);padding:0 12px;background:var(--paper)}
 .rt-d>summary{padding:11px 0;font-weight:800;font-size:13px;color:var(--orange);cursor:pointer}
 .rt-d[open]>summary{margin-bottom:6px}
 .rt-d .tb-cos{margin-left:0;margin-right:0}
@@ -463,26 +463,27 @@ const G = 'var(--green)', RJ = 'var(--red)', cs = (v, t) => '<span style="color:
 const cG = t => '<span style="color:' + G + ';">' + t + '</span>', cR = t => '<span style="color:' + RJ + ';">' + t + '</span>';
 const kg = '<span class="rt-k g">ingreso</span>', kr = '<span class="rt-k r">coste</span>';
 const dEur = (v, dec) => (v >= 0 ? '+' : '−') + eur(Math.abs(v), dec);
+const n0 = v => isFinite(v) ? eur(v).replace(' €', '') : '—';
 const det = (t, inner) => '<details class="rt-d"><summary>' + t + '</summary>' + inner + '</details>';
 
 R.vistaObra = function(r, P, b){
-  const nv = R.niveles4(r), cl = R.porClase(r), tar = r.niv.tarifa, hOk = r.H > 0;
-  const pill = (h) => { if(!isFinite(h) || !isFinite(tar)) return ''; const d = tar - h; return '<em class="' + (d >= 0 ? 'g' : 'r') + '">' + (d >= 0 ? 'Se cubre +' + eur(d, 2) : 'Faltan ' + eur(-d, 2)) + '/h</em>'; };
-  const fila = (cls, titulo, sub, tot, color, esCoste) => { const h = hOk ? tot / r.H : NaN, c = esCoste ? RJ : 'var(--ink)'; return '<div class="rt-n ' + cls + '"><i style="background:' + color + ';"></i><div><b>' + titulo + '</b><small>' + sub + '</small></div><div class="v"><b style="color:' + c + ';">' + (isFinite(tot) ? eur(tot) : 'sin dato') + '</b><small>' + (isFinite(h) ? eur(h, 2) + '/h' : 'sin horas') + '</small>' + pill(h) + '</div></div>'; };
+  const nv = R.niveles4(r), cl = R.porClase(r), tar = r.niv.tarifa, hOk = r.H > 0, n2 = v => isFinite(v) ? v.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '—';
+  const ok4 = isFinite(nv.n4) && hOk && isFinite(tar) ? tar >= nv.n4 / r.H : null, c4 = ok4 == null ? 'var(--ink)' : ok4 ? G : RJ;
+  const fila = (cls, titulo, sub, tot, color, c) => '<div class="rt-n ' + cls + '"><i style="background:' + color + ';"></i><div><b>' + titulo + '</b><small>' + sub + '</small></div><div class="v"><b style="color:' + c + ';">' + (isFinite(tot) ? eur(tot) : 'sin dato') + '</b><small style="color:' + c + ';font-weight:700;">' + (hOk && isFinite(tot) ? eur(tot / r.H, 2) + ' por hora' : 'sin horas') + '</small></div></div>';
   const margenChips = [5, 10, 15, 20, 25].map(v => '<button type="button" class="' + (num(R.param.margen) === v ? 'on' : '') + '" onclick="RENT.setParam(\'margen\',' + v + ')">' + v + ' %</button>').join('');
-  const benT = r.beneficioReal >= 0 ? 'g' : 'r';
-  const sg = v => v >= 0 ? G : RJ, tile = (cl, t, v, sm, c) => '<div class="rt-t ' + cl + '"><span style="color:' + c + ';">' + t + '</span><b style="color:' + c + ';">' + v + '</b><small>' + sm + '</small></div>';
-  const resumen = '<div class="rt-sum">' + tile('g', 'Ingreso', eur(r.ejecutado), 'trabajo hecho · ' + (hOk ? h1(r.H) + ' h' : 'sin horas'), G)
-    + tile(r.beneficioReal >= 0 ? 'g' : 'r', 'Beneficio', eur(r.beneficioReal), 'antes de impuestos · ' + pct(r.m.pctIngresos), sg(r.beneficioReal))
-    + tile(r.neto >= 0 ? 'g' : 'r', 'Beneficio neto', eur(r.neto), 'tras ' + eur(r.impuestos) + ' de impuestos', sg(r.neto)) + '</div>';
-  const niveles = '<div class="rt-c"><h3>¿Cuánto cuesta y a cuánto hay que cobrar?</h3><div style="font-size:13px;margin-bottom:2px;">' + kg + ' Cobráis <b style="color:' + G + ';">' + (isFinite(tar) ? eur(tar, 2) : '—') + '/h</b> · ' + kr + ' lo que gastáis, por hora y en total</div>'
-    + fila('p1', '1 · Directo', 'combustible, averías, ayudantes', nv.n1, '#2f8f5b', true) + fila('', '2 · Para poder hacerla', 'máquina fija, coches, autónomos, gestoría, Rafa y Manolo', nv.n2, '#2f6fb0', true)
-    + fila('', '3 · Coste completo', 'más el resto de la empresa', nv.n3, '#c58a1b', true) + fila('', '4 · Precio objetivo', 'coste + impuestos + vuestro margen', nv.n4, '#c0392b', false)
+  const sg = v => v >= 0 ? G : RJ, tile = (cl2, t, v, sm, c) => '<div class="rt-t ' + cl2 + '"><span style="color:' + c + ';">' + t + '</span><b style="color:' + c + ';">' + v + '</b><small>' + sm + '</small></div>';
+  const resumen = '<div class="rt-sum">' + tile('g', 'Ingreso', eur(r.ejecutado), (hOk ? h1(r.H) + ' h' : 'sin horas'), G)
+    + tile(r.beneficioReal >= 0 ? 'g' : 'r', 'Beneficio', eur(r.beneficioReal), 'antes de impuestos', sg(r.beneficioReal))
+    + tile(r.neto >= 0 ? 'g' : 'r', 'Beneficio neto', eur(r.neto), 'tras impuestos', sg(r.neto)) + '</div>';
+  const niveles = '<div class="rt-c"><h3>Costes</h3>'
+    + fila('p1', '1 · Directo', 'combustible, averías, ayudantes', nv.n1, '#2f8f5b', RJ) + fila('', '2 · Para poder hacerla', 'máquina, coches, autónomos, gestoría, Rafa y Manolo', nv.n2, '#2f6fb0', RJ)
+    + fila('', '3 · Completo', 'más el resto de la empresa', nv.n3, '#c58a1b', RJ) + fila('', '4 · Precio objetivo', 'más impuestos y margen · verde si ya cobráis eso', nv.n4, '#c0392b', c4)
     + '<div class="rt-ch"><span>Margen:</span>' + margenChips + '</div></div>';
-  const maq = cl ? '<div class="rt-c"><h3>Por máquina, por hora</h3><table class="rt-tb"><tr><th>Máquina</th><th style="color:' + G + ';">Ingreso</th><th style="color:' + RJ + ';">Coste</th><th>Objetivo</th></tr>' + cl.map(x => { const ob = isFinite(x.n4) ? x.n4 / x.h : NaN, ok = isFinite(ob) && isFinite(x.tarifa) ? x.tarifa >= ob : null; return '<tr><td><b>' + esc(x.nombre) + '</b><small style="display:block;color:var(--ink-soft);font-size:11px;">' + h1(x.h) + ' h</small></td><td style="color:' + G + ';font-weight:800;">' + (isFinite(x.tarifa) ? eur(x.tarifa, 2) : '—') + '</td><td style="color:' + RJ + ';font-weight:800;">' + eur(x.n3 / x.h, 2) + '</td><td style="font-weight:800;color:' + (ok == null ? 'inherit' : ok ? G : RJ) + ';">' + (isFinite(ob) ? eur(ob, 2) : '—') + '</td></tr>'; }).join('') + '</table></div>' : '';
-  const detNiv = '<div style="padding-bottom:8px;">' + (cl ? '<table class="rt-tb"><tr><th>Máquina</th><th style="color:' + RJ + ';">Directo</th><th style="color:' + RJ + ';">Hacerla</th><th style="color:' + RJ + ';">Completo</th><th>Objetivo</th></tr>' + cl.map(x => '<tr><td>' + esc(x.nombre) + '</td><td style="color:' + RJ + ';">' + eur(x.n1) + '</td><td style="color:' + RJ + ';">' + eur(x.n2) + '</td><td style="color:' + RJ + ';">' + eur(x.n3) + '</td><td>' + (isFinite(x.n4) ? eur(x.n4) : '—') + '</td></tr>').join('') + '<tr style="font-weight:800;"><td>Total</td><td style="color:' + RJ + ';">' + eur(nv.n1) + '</td><td style="color:' + RJ + ';">' + eur(nv.n2) + '</td><td style="color:' + RJ + ';">' + eur(nv.n3) + '</td><td>' + (isFinite(nv.n4) ? eur(nv.n4) : '—') + '</td></tr></table>' : '')
-    + (isFinite(nv.n4) ? '<div class="rt-sim-r"><span>Precio objetivo = coste + impuestos + margen</span><b>' + cR(eur(nv.n3)) + ' + ' + cR(eur(nv.imp)) + ' + ' + cG(eur(nv.mar)) + '</b></div>' : '<div class="rt-an">Con ese margen e impuestos no hay precio posible: baja el margen.</div>')
-    + '<div style="font-size:11.5px;color:var(--ink-soft);margin-top:6px;">Los gastos generales se reparten una sola vez por horas de máquina: si dos máquinas trabajan el mismo día, ese día no se cuenta dos veces. Los costes fijos de cada máquina van solo a ella. Impuestos: ' + R.param.impuesto + ' % sobre el beneficio, sin contar lo que se llevan Rafa y Manolo, que no desgrava. El margen es lo que queda limpio tras impuestos, como % del precio. Falta la reposición real de las máquinas sin precio de compra.</div></div>';
+  const col4 = (x) => { const ob = isFinite(x.n4) ? x.n4 / x.h : NaN, ok = isFinite(ob) && isFinite(x.tarifa) ? x.tarifa >= ob : null; return ok == null ? 'var(--ink)' : ok ? G : RJ; };
+  const maq = cl ? '<div class="rt-c"><h3>Por máquina · € por hora</h3><div style="font-size:11px;color:var(--ink-soft);margin:-4px 0 4px;">1 Directo · 2 Hacerla · 3 Completo · 4 Objetivo</div><table class="rt-tb"><tr><th>Máquina</th><th>1</th><th>2</th><th>3</th><th>4</th></tr>' + cl.map(x => '<tr><td><b>' + esc(x.nombre) + '</b><small style="display:block;color:var(--ink-soft);font-size:11px;">' + h1(x.h) + ' h</small></td><td style="color:' + RJ + ';">' + n2(x.n1 / x.h) + '</td><td style="color:' + RJ + ';">' + n2(x.n2 / x.h) + '</td><td style="color:' + RJ + ';">' + n2(x.n3 / x.h) + '</td><td style="font-weight:800;color:' + col4(x) + ';">' + n2(x.n4 / x.h) + '</td></tr>').join('') + '</table></div>' : '';
+  const detNiv = '<div style="padding-bottom:8px;">' + (cl ? '<div style="font-weight:800;font-size:13px;margin:4px 0;">Por máquina · € en total</div><div style="font-size:11px;color:var(--ink-soft);margin:-4px 0 4px;">1 Directo · 2 Hacerla · 3 Completo · 4 Objetivo</div><table class="rt-tb"><tr><th>Máquina</th><th>1</th><th>2</th><th>3</th><th>4</th></tr>' + cl.map(x => '<tr><td>' + esc(x.nombre) + '</td><td style="color:' + RJ + ';">' + n0(x.n1) + '</td><td style="color:' + RJ + ';">' + n0(x.n2) + '</td><td style="color:' + RJ + ';">' + n0(x.n3) + '</td><td style="font-weight:800;color:' + col4(x) + ';">' + n0(x.n4) + '</td></tr>').join('') + '<tr style="font-weight:800;"><td>Total</td><td style="color:' + RJ + ';">' + n0(nv.n1) + '</td><td style="color:' + RJ + ';">' + n0(nv.n2) + '</td><td style="color:' + RJ + ';">' + n0(nv.n3) + '</td><td style="color:' + c4 + ';">' + n0(nv.n4) + '</td></tr></table>' : '')
+    + (isFinite(nv.n4) ? '<div class="rt-sim-r"><span>Nivel 4: coste completo</span><b>' + cR(eur(nv.n3)) + '</b></div><div class="rt-sim-r"><span>+ impuestos</span><b>' + cR(eur(nv.imp)) + '</b></div><div class="rt-sim-r"><span>+ margen (' + R.param.margen + ' %)</span><b>' + cG(eur(nv.mar)) + '</b></div>' : '<div class="rt-an">Con ese margen e impuestos no hay precio posible: baja el margen.</div>')
+    + '<div style="font-size:11.5px;color:var(--ink-soft);margin-top:6px;">Los gastos generales se reparten una sola vez por horas de máquina: si dos máquinas trabajan el mismo día, ese día no se cuenta dos veces. Los costes fijos de cada máquina van solo a ella. Impuestos: ' + R.param.impuesto + ' % sobre el beneficio, sin contar lo que se llevan Rafa y Manolo, que no desgrava. El margen es lo que queda limpio tras impuestos, como % del precio. Falta la reposición real de las máquinas sin precio de compra. Verde en el nivel 4: lo que ya cobráis cubre ese precio; rojo: no.</div></div>';
   const avisos = (r.avisos.length ? '<div class="rt-an">' + r.avisos.map(a => '• ' + esc(a)).join('<br>') + '</div>' : '') + R.sinHorasAviso(r);
   const detalle = det('Ver detalle', avisos + detNiv + R.secDirecto(r) + R.secReal(r) + R.secOport(r) + R.secComp(r, P, b));
   return resumen + niveles + maq + detalle;
