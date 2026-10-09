@@ -454,7 +454,7 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .pill-sm{font-size:9px!important;padding:2px 6px!important;}
 /* Tonos de estado — fuente única de verdad. Los nombres de clase siguen siendo el vocabulario de cada sección (facturas, licitaciones, máquinas...), pero el color de cada tono se define una sola vez aquí. */
 .pill.pendiente, .pill.recibido, .pill.borrador{background:var(--concrete-2);color:var(--ink-soft);}
-.pill.porconfirmar, .pill.encurso, .pill.mantenimiento, .pill.revisar, .pill.pendiente_cobrar, .pill.en_proceso{background:var(--yellow-soft);color:#8A6100;}
+.pill.porconfirmar, .pill.encurso, .pill.mantenimiento, .pill.revisar, .pill.pendiente_cobrar, .pill.por_cobrar_otra, .pill.en_proceso{background:var(--yellow-soft);color:#8A6100;}
 .pill.planificado, .pill.confirmado, .pill.presentado, .pill.enviado, .pill.trabajando, .pill.parcial, .pill.entregado{background:var(--blue-soft);color:var(--blue);}
 .pill.terminado, .pill.cobrado, .pill.disponible, .pill.validado, .pill.adjudicado{background:var(--green-soft);color:var(--green);}
 .pill.taller{background:var(--yellow-soft);color:#6F4E00;}
@@ -1989,6 +1989,7 @@ details.ce-pleg[open] > summary{margin-bottom:10px;}
 #view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="parcial"],
 #view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="entregado"],
 #view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="parcial_otra"],
+#view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="por_cobrar_otra"],
 #view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="cobrado_otra"],
 #view-presupuestos[data-modo="presupuesto"] #pres-filtro-estado-chips [data-estado="cobrado"]{display:none;}
 
@@ -4590,10 +4591,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.47" defer></script>
-<script src="costes/norm.js?v=V9.47" defer></script>
+<script src="rentabilidad/rent.js?v=V9.48" defer></script>
+<script src="costes/norm.js?v=V9.48" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.47</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.48</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4740,7 +4741,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.47</div>
+        <div class="sub" id="version-badge">V9.48</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4908,7 +4909,8 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
             <button type="button" class="dd-filter-btn" onclick="toggleDocDD('estado')">Estado<span class="dd-badge" id="dd-estado-badge"></span><span class="dd-caret">▾</span></button>
             <div class="dd-filter-panel">
               <label><input type="checkbox" checked data-estado="pendiente_enviar" onchange="renderControlDocs()"> Listo p. entregar</label>
-              <label><input type="checkbox" checked data-estado="pendiente_cobrar" onchange="renderControlDocs()"> Pend. cobrar</label>
+              <label><input type="checkbox" checked data-estado="pendiente_cobrar" onchange="renderControlDocs()"> Por cobrar</label>
+              <label><input type="checkbox" checked data-estado="por_cobrar_otra" onchange="renderControlDocs()"> Por cobrar en otra</label>
               <label><input type="checkbox" checked data-estado="parcial" onchange="renderControlDocs()"> Cobrado parcial</label>
               <label><input type="checkbox" checked data-estado="borrador" onchange="renderControlDocs()"> Borrador</label>
               <label><input type="checkbox" checked data-estado="trabajo_activo" onchange="renderControlDocs()"> Trabajo activo</label>
@@ -5468,7 +5470,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
                 <div class="filters" id="fact-filtro-estado-chips" style="margin:0;">
                   <div class="chip-filter" data-estado="borrador">Borrador</div>
                   <div class="chip-filter" data-estado="pendiente_enviar">Listo para entregar</div>
-                  <div class="chip-filter" data-estado="pendiente_cobrar">Pendiente de cobrar</div>
+                  <div class="chip-filter" data-estado="pendiente_cobrar">Por cobrar</div><div class="chip-filter" data-estado="por_cobrar_otra">Por cobrar en otra</div>
                   <div class="chip-filter" data-estado="parcial">Cobrado parcial</div>
                   <div class="chip-filter" data-estado="cobrado">Cobrado</div>
                 </div>
@@ -5587,7 +5589,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
                   <div class="chip-filter" data-estado="revisar">Revisar</div>
                   <div class="chip-filter" data-estado="pendiente_enviar">Listo para entregar</div>
                   <div class="chip-filter" data-estado="entregado">Entregada</div>
-                  <div class="chip-filter" data-estado="pendiente_cobrar">Pendiente de cobrar</div>
+                  <div class="chip-filter" data-estado="pendiente_cobrar">Por cobrar</div><div class="chip-filter" data-estado="por_cobrar_otra">Por cobrar en otra</div>
                   <div class="chip-filter" data-estado="parcial">Cobrado parcial</div>
                   <div class="chip-filter" data-estado="parcial_otra">Parcial en otra</div>
                   <div class="chip-filter" data-estado="cobrado_otra">Cobrada en otra</div>
@@ -5688,7 +5690,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
                   <div class="chip-filter" data-estado="revisar">Revisar</div>
                   <div class="chip-filter" data-estado="pendiente_enviar">Listo para entregar</div>
                   <div class="chip-filter" data-estado="entregado">Entregada</div>
-                  <div class="chip-filter" data-estado="pendiente_cobrar">Pendiente de cobrar</div>
+                  <div class="chip-filter" data-estado="pendiente_cobrar">Por cobrar</div><div class="chip-filter" data-estado="por_cobrar_otra">Por cobrar en otra</div>
                   <div class="chip-filter" data-estado="parcial">Cobrado parcial</div>
                   <div class="chip-filter" data-estado="parcial_otra">Parcial en otra</div>
                   <div class="chip-filter" data-estado="cobrado_otra">Cobrada en otra</div>
@@ -9144,7 +9146,7 @@ new MutationObserver(() => { const v = document.getElementById('flota-asistencia
 // Se guardan en Sistema (tipo=alerta_banco) y el saldo es el del último aviso; si no hay avisos más nuevos, el último de Fintable
 let _saldoSync = false;
 const saldoNum = t => Number(String(t).replace(/\./g, '').replace(',', '.'));
-function saldoParsear(asunto, texto){   // V9.47: NUNCA descarta un aviso del banco; si no lo entiende lo guarda como «otro» con el texto, para revisarlo
+function saldoParsear(asunto, texto){   // V9.48: NUNCA descarta un aviso del banco; si no lo entiende lo guarda como «otro» con el texto, para revisarlo
   const t = String(texto || '').replace(/\s+/g, ' '), a = String(asunto || '').toLowerCase();
   const tipo = /reintegro/.test(a) || /disposici[oó]n de [\d.]+,\d{2}|en cajero/i.test(t) ? 'reintegro' : /abono/.test(a) ? 'abono' : /pr[eé]stamo/.test(a) ? 'prestamo' : /recibo/.test(a) ? 'recibo' : /tarjeta/.test(a) ? 'tarjeta' : /cargo/.test(a) ? 'cargo' : 'otro';
   const f = t.match(/(\d{2})-(\d{2})-(\d{4})/), imp = t.match(/(?:importe de|compra de|disposici[oó]n de) (-?[\d.]+,\d{2}) ?EUR/i) || t.match(/(-?[\d.]+,\d{2}) ?EUR/i), sal = t.match(/saldo actual es(?: de)? (-?[\d.]+,\d{2}) ?EUR/i);
@@ -9228,7 +9230,7 @@ async function econ2Cargar(){
       let pend = 0, sinFact = 0;
       if(!['cobrado', 'nula', 'rectificativa', 'cobrado_otra'].includes(est)){
         if(d.tipo === 'factura'){ if(['pendiente_cobrar', 'parcial'].includes(est)) pend = falta; }
-        else if(d.tipo !== 'gasto' && !d.documento_siguiente_id && !enl.has(d.id) && falta){ if(admin) sinFact = falta; else if(['pendiente_cobrar', 'pendiente_enviar', 'parcial', 'borrador', 'entregado', 'parcial_otra'].includes(est)) pend = falta; }
+        else if(d.tipo !== 'gasto' && !d.documento_siguiente_id && !enl.has(d.id) && falta){ if(admin) sinFact = falta; else if(['pendiente_cobrar', 'pendiente_enviar', 'parcial', 'borrador', 'entregado', 'por_cobrar_otra', 'parcial_otra'].includes(est)) pend = falta; }
       }
       return {id: d.id, tipo: d.tipo, numero: d.numero, fecha: f, cli: E[d.entidad_id] || '—', an, tr, legal, sinF, gasto: d.tipo === 'gasto' ? imp : 0, pend, sinFact}; });
     try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').order('data->>ts', {ascending: false}).limit(12); _e2.avisos = (data || []).map(r => r.data); }catch(e){ _e2.avisos = []; }
@@ -9297,7 +9299,7 @@ function econ2Pintar(){
   const gastoNota = _e2anio < 2025 ? 'casi sin registrar ese año' : _e2anio === 2026 ? 'fiables desde julio' : 'incompletos';
   box.innerHTML = `<div class="e2-fil">${pill('cf', nomCf)}${pill('an', _e2anio)}${pill('per', perTxt)}</div>
     <div class="e2-hero"><button type="button" class="e2-hb" data-e2-det="saldo"><span>Dinero en cuenta</span><div class="big">${saldo != null ? fmt(saldo, 2) + ' €' : '—'}</div><i>${al ? 'Aviso del banco · ' + cuando(al.ts) : 'Último dato del banco'}</i></button>
-      <div class="row"><button type="button" data-e2-det="flota"><i>Valor flota · máquinas</i><b>${flota ? '≈ ' + e(flota) : '—'}</b></button><button type="button" data-e2-det="cobrar"><i>Pendiente de cobrar</i><b>${e(v.cobrar || 0)}</b></button></div>
+      <div class="row"><button type="button" data-e2-det="flota"><i>Valor flota · máquinas</i><b>${flota ? '≈ ' + e(flota) : '—'}</b></button><button type="button" data-e2-det="cobrar"><i>Por cobrar</i><b>${e(v.cobrar || 0)}</b></button></div>
       <div class="row"><button type="button" data-e2-det="deuda"><i>Deuda</i><b>${_e2Deuda ? e(_e2Deuda.reduce((a, x) => a + (x.imp || 0), 0)) + (_e2Deuda.some(x => x.imp == null) ? ' <small>+ lo que falta</small>' : '') : '…'}</b></button></div>
       ${['saldo', 'flota', 'cobrar', 'deuda'].includes(_e2det) ? `<div class="e2-det oscuro">${econ2Detalle(_e2det, {sel, e})}</div>` : ''}</div>
     <div class="e2-tiles">
@@ -9434,7 +9436,7 @@ async function dirVivo(){
       if(d.tipo === 'factura'){ if(['pendiente_cobrar', 'parcial'].includes(est)){ v.cobrar += falta(d); v.nCobrar++; } return; }
       if(d.documento_siguiente_id || enl.has(d.id) || !falta(d)) return;
       if(admin){ v.facturar += falta(d); v.nFacturar++; v.cobrar += falta(d); v.nCobrar++; if(d.fecha_devengo) v.facturarDias = Math.max(v.facturarDias, Math.round((hoy - new Date(d.fecha_devengo)) / 864e5)); }   // V8.36 (Daniel): lo de la Administración sin facturar también está pendiente de cobrar
-      else if(['pendiente_cobrar', 'pendiente_enviar', 'parcial', 'borrador', 'entregado', 'parcial_otra'].includes(est)){ v.cobrar += falta(d); v.nCobrar++; }
+      else if(['pendiente_cobrar', 'pendiente_enviar', 'parcial', 'borrador', 'entregado', 'por_cobrar_otra', 'parcial_otra'].includes(est)){ v.cobrar += falta(d); v.nCobrar++; }
     });
   }catch(e){}
   try{
@@ -13554,7 +13556,7 @@ async function cargarAlertasYRecordatorios(){
 let _recItems = [], _recItv = null, _recCargado = false;
 
 // V8.57 (reporte de Daniel: «los filtros no están actualizados como estaba la web»): Documentos pendientes usa las mismas píldoras que el resto. Sin ninguna elegida = todos. Antes los desplegables del móvil no filtraban nada: renderControlDocs solo leía los de escritorio
-const CC_DOC_TIPOS = [['factura', 'Factura'], ['albaran', 'Albarán'], ['presupuesto', 'Presupuesto'], ['proforma', 'Proforma']], CC_DOC_ESTADOS = [['trabajo_activo', 'Trabajo activo'], ['pendiente_enviar', 'Listo p. entregar'], ['entregado', 'Entregada'], ['pendiente_cobrar', 'Pend. cobrar'], ['parcial', 'Cobrado parcial'], ['parcial_otra', 'Parcial en otra'], ['cobrado_otra', 'Cobrada en otra'], ['borrador', 'Borrador'], ['revisar', 'Por revisar'], ['aceptado', 'Aceptado'], ['rectificativa', 'Rectificativa']];
+const CC_DOC_TIPOS = [['factura', 'Factura'], ['albaran', 'Albarán'], ['presupuesto', 'Presupuesto'], ['proforma', 'Proforma']], CC_DOC_ESTADOS = [['trabajo_activo', 'Trabajo activo'], ['pendiente_enviar', 'Listo p. entregar'], ['entregado', 'Entregada'], ['pendiente_cobrar', 'Por cobrar'], ['por_cobrar_otra', 'Por cobrar en otra'], ['parcial', 'Cobrado parcial'], ['parcial_otra', 'Parcial en otra'], ['cobrado_otra', 'Cobrada en otra'], ['borrador', 'Borrador'], ['revisar', 'Por revisar'], ['aceptado', 'Aceptado'], ['rectificativa', 'Rectificativa']];
 // V8.76 (reporte de Daniel: «un botón a la derecha de los filtros para cambiar de vista: tarjetas plegadas para ver el máximo número; al darle a cada una se despliega la tarjeta normal»)
 const ICO_VISTA_PLEGADA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:18px;height:18px;"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/></svg>';
 function ccDocsVistaPlegada(){
@@ -28606,7 +28608,7 @@ function renderControlDocs(){
   filtrados.forEach(d=>{ if(!d.expediente_id) return; const p = porExp.get(d.expediente_id); if(!p || (ORDEN_FASE[d.type]||0) > (ORDEN_FASE[p.type]||0)) porExp.set(d.expediente_id, d); });
   const unicos = filtrados.filter(d=> !d.expediente_id || porExp.get(d.expediente_id) === d);
   // dos bloques claros: pendiente de FACTURAR (albarán/proforma/factura sin emitir) y pendiente de COBRAR (proforma/factura emitida sin cobrar del todo)
-  const bloqueDe = d=>{ if(d.type==='presupuesto') return 'presupuesto'; const est = controlDocsEstadoDe(d); return (['entregado','parcial_otra'].includes(est) || (d.type!=='albaran' && ['pendiente_cobrar','parcial'].includes(est))) ? 'cobrar' : 'facturar'; };
+  const bloqueDe = d=>{ if(d.type==='presupuesto') return 'presupuesto'; const est = controlDocsEstadoDe(d); return (['entregado','por_cobrar_otra','parcial_otra'].includes(est) || (d.type!=='albaran' && ['pendiente_cobrar','parcial'].includes(est))) ? 'cobrar' : 'facturar'; };
   const BLOQUES = [['facturar','Por entregar'],['cobrar','Por cobrar'],['presupuesto','Presupuestos']];
   const sumaImp = l => l.reduce((s,d)=> s + (Number(d.base != null ? d.base : (d.total||d.importe))||0) * (d.estado_cobro==='parcial_otra' && Number(d.total||d.importe) ? Math.max(0, 1 - enOtraSuma(d)/Number(d.total||d.importe)) : 1), 0);   // V8.74: totales SIN IVA
   const fmtEur = n => n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
@@ -28690,11 +28692,11 @@ function econImporteSinFactura(d, enlazados){
   return 0;
 }
 const esAdministracion = nombre => /(AYUNTAMIENTO|AYTO\.|DIPUTACI|JUNTA DE ANDALUC|CONSEJER|MINISTERIO|MANCOMUNIDAD|CONFEDERACI)/i.test(String(nombre || ''));
-const SOLO_PROF_ALB = ['entregado','parcial_otra','cobrado_otra'];   // V8.99: estados de proformas y albaranes (no de facturas)
+const SOLO_PROF_ALB = [];   // V9.48: Entregada, Por cobrar en otra y las «en otra» valen también para facturas (Daniel 09/10/2026)   // V8.99: estados de proformas y albaranes (no de facturas)
 const estadosDeTipo = (tipo, doc) => tipo === 'presupuesto' ? ESTADOS_PRESUPUESTO
   : ((tipo === 'proforma' || tipo === 'albaran') && doc && esAdministracion(doc.client || doc.cliente)) ? ESTADOS_DOCUMENTO.filter(o => !['pendiente_cobrar','parcial','cobrado'].includes(o[0]) && (tipo === 'albaran' || o[0] !== 'trabajo_activo'))
   : tipo === 'albaran' ? ESTADOS_DOCUMENTO : tipo === 'proforma' ? ESTADOS_DOCUMENTO.filter(o => o[0] !== 'trabajo_activo') : ESTADOS_DOCUMENTO.filter(o => o[0] !== 'trabajo_activo' && !SOLO_PROF_ALB.includes(o[0]));   // V8.68 (Daniel): «Trabajo activo» es una fase del albarán abierto
-const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['trabajo_activo','Trabajo activo'],['pendiente_enviar','Listo para entregar'],['entregado','Entregada'],['pendiente_cobrar','Pendiente de cobrar'],['parcial','Cobrado parcial'],['parcial_otra','Parcial en otra'],['cobrado_otra','Cobrada en otra'],['cobrado','Cobrado'],['rectificativa','Rectificativa'],['revisar','Revisar'],['nula','Nula']];
+const ESTADOS_DOCUMENTO = [['borrador','Borrador'],['trabajo_activo','Trabajo activo'],['pendiente_enviar','Listo para entregar'],['entregado','Entregada'],['pendiente_cobrar','Por cobrar'],['por_cobrar_otra','Por cobrar en otra'],['parcial','Cobrado parcial'],['parcial_otra','Parcial en otra'],['cobrado_otra','Cobrada en otra'],['cobrado','Cobrado'],['rectificativa','Rectificativa'],['revisar','Revisar'],['nula','Nula']];
 function estadoDocumentoSelect(tipo, id, actual, contexto){
   const act = actual || 'pendiente_enviar';
   const label = estadosDeTipo(tipo, documentosRealesById?.[id]).concat(ESTADOS_DOCUMENTO).find(o=>o[0]===act)?.[1] || stateLabels[act] || act;
@@ -28887,7 +28889,7 @@ function clienteCuentaCalcular(c){
   const facFalta = f => ['pendiente_cobrar', 'parcial'].includes(f.estado_cobro) ? Math.max(0, _o2(tot(f) - Number(f.cobrado_importe || 0))) : 0;
   const sueltos = docs.filter(d => ['proforma', 'albaran'].includes(d.type) && !d.documento_siguiente_id && !enl.has(d.id) && !['nula', 'rectificativa', 'borrador', 'cobrado_otra'].includes(d.estado_cobro));
   const cobradosSinFactura = sueltos.filter(d => d.estado_cobro === 'cobrado');
-  const entregados = sueltos.filter(d => ['entregado', 'parcial_otra', 'pendiente_cobrar', 'parcial'].includes(d.estado_cobro));
+  const entregados = sueltos.filter(d => ['entregado', 'por_cobrar_otra', 'parcial_otra', 'pendiente_cobrar', 'parcial'].includes(d.estado_cobro));
   const falta = d => Math.max(0, _o2(tot(d) - Number(d.cobrado_importe || 0) - (d.estado_cobro === 'parcial_otra' ? enOtraSuma(d) : 0)));
   const porEntregar = sueltos.filter(d => ['pendiente_enviar', 'trabajo_activo'].includes(d.estado_cobro));
   const porRevisar = sueltos.filter(d => d.estado_cobro === 'revisar');
@@ -28944,7 +28946,7 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   } else if(valor==='cobrado'){
     payload.cobrado_importe = docAct?.total || 0;
   } else if(valor==='parcial'){
-    // Cobro parcial: hay que decir cuánto se ha cobrado. Sin importe la base de datos lo devuelve a Pendiente de cobrar.
+    // Cobro parcial: hay que decir cuánto se ha cobrado. Sin importe la base de datos lo devuelve a Por cobrar.
     cerrarMenus();
     const r = await pedirCampos('Cobrado parcial · ' + (docAct?.client || 'documento'), [{id: 'importe', label: '¿Cuánto te ha pagado en total? (el documento es de ' + eur(totalDoc) + ')', tipo: 'number', valor: yaCobrado > 0 ? yaCobrado : '', placeholder: 'Importe en euros', requerido: true}]);
     if(!r){ renderControlDocs(); return; }
@@ -28952,9 +28954,9 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
     if(!(n > 0)){ mostrarToast('Escribe lo que te ha pagado, más de 0 €.', 'err'); renderControlDocs(); return; }
     payload.cobrado_importe = n;
   } else if(valor==='pendiente_cobrar' && yaCobrado > 0 && docAct && ['parcial','cobrado'].includes(docAct.estado_cobro)){
-    // Con algo cobrado la base de datos no deja Pendiente de cobrar: hay que poner lo cobrado a 0
+    // Con algo cobrado la base de datos no deja Por cobrar: hay que poner lo cobrado a 0
     cerrarMenus();
-    const ok = await confirmarAccion('Ya hay ' + eur(yaCobrado) + ' cobrados. Para dejarlo en Pendiente de cobrar se pone lo cobrado a 0 €. ¿Seguro?');
+    const ok = await confirmarAccion('Ya hay ' + eur(yaCobrado) + ' cobrados. Para dejarlo en Por cobrar se pone lo cobrado a 0 €. ¿Seguro?');
     if(!ok){ renderControlDocs(); return; }
     payload.cobrado_importe = 0;
   }
