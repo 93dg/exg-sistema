@@ -158,16 +158,29 @@ R.calcular = function(job, P, asig){
   Object.keys(hClase).forEach(c => { const ms = R.maquinasDeClase(P, c); ms.forEach(m => { const x = maq.get(m.id) || {m, horas: 0, dias: new Set(), clases: new Set()}; x.horas += hClase[c] / ms.length; (diasClase[c] || new Set()).forEach(f => x.dias.add(f)); x.clases.add(c); maq.set(m.id, x); }); });
   const sinFlota = Object.keys(hClase).filter(c => !PAT_MAQ[c] && hClase[c] > 0);
   if(sinFlota.length) avisos.push('Horas de ' + sinFlota.map(c => R.NOMBRE_CLASE[c]).join(', ') + ' sin máquina en la flota: no llevan coste de máquina.');
-  // ---- DIRECTO: coste de las máquinas por hora productiva (Gastos → Normalización: combustible, seguros, impuestos, taller y repuestos de la flota, repartidos por las horas de utilización de cada máquina) ----
-  const CO = P.costes; let combReal = 0;
-  Object.keys(hClase).forEach(c => { if(!(hClase[c] > 0)) return; const k = CO && CO.clases.find(x => x.clase === c), nom = R.NOMBRE_CLASE[c] || c;
-    if(k && k.horaProd != null) lineasD.push(L('maq:' + c, 'Coste de máquina: ' + nom, k.horaProd * hClase[c], k.manual ? 'estimada' : 'calculada', eur(k.horaProd, 2) + ' por hora productiva × ' + h1(hClase[c]) + ' h', 'Combustible, seguros, impuestos, taller y repuestos de la flota repartidos por horas de utilización (Gastos → Normalización). Si faltan horas en los albaranes antiguos, el coste por hora sale más alto.'));
-    else lineasD.push(L('maq:' + c, 'Coste de máquina: ' + nom, 0, 'falta', '', 'No hay coste por hora para esta clase en Normalización (sin gastos ni horas suficientes).')); });
+  // ---- DIRECTO: combustible ----
+  const horasIndep = ev.horasDia, CO = P.costes;
+  const fuel = (P.gastos || []).filter(g => /combust/i.test(g.categoria || '') && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada'));
+  let combReal = 0, litros = 0, sinDesg = 0, nSin = 0;
+  fuel.forEach(g => { if(Array.isArray(g.lineas_fechadas)){ const tot = Math.abs(num(g.importe)), ratio = tot ? R.baseGasto(g) / tot : 1; let usadoDoc = false; g.lineas_fechadas.forEach(l => { const f = '20' + l[0], hm = lin.filter(x => x.f === f).reduce((s, x) => s + x.h, 0); if(!hm) return; const rep = horasIndep[f] > 0 ? Math.min(1, hm / horasIndep[f]) : 1; combReal += num(l[3]) * ratio * rep; litros += num(l[2]) * rep; usadoDoc = true; }); if(usadoDoc) usados.add(g.id); }
+    else if(g.fecha_devengo && g.fecha_devengo.slice(0, 7) >= desde.slice(0, 7) && g.fecha_devengo.slice(0, 7) <= hasta.slice(0, 7)){ sinDesg += R.baseGasto(g); nSin++; } });
+  lineasD.push(L('combustible', 'Combustible de esos días', combReal, combReal ? 'calculada' : 'falta', 'facturas con líneas por día, repartido por horas trabajadas ese día', combReal ? h1(litros) + ' litros' : 'No hay facturas de combustible desglosadas por día en estas fechas.'));
+  const consumoH = ev.horas > 0 ? ev.comb / ev.horas : 0, combEst = Math.max(0, consumoH * H - combReal);
+  if(combEst > 1) lineasD.push(L('combustible_est', 'Combustible sin desglose por día', combEst, 'estimada', 'consumo medio de la empresa (12 meses) × horas de esta obra − lo ya comprobado', 'Consumo medio ' + eur(consumoH, 2) + ' por hora facturada. ' + (nSin ? nSin + ' factura(s) de combustible de esos meses no traen el detalle por día.' : '')));
+  const idsMaqX = null;
   // ---- DIRECTO: gastos vinculados, ayudantes, reparaciones ----
   const vinG = (P.vinculos || []).filter(v => v.job_id === job.id && v.rol === 'gasto' && v.accion === 'incluir');
   const porCat = {}; vinG.forEach(v => { const g = (P.gastos || []).find(x => x.id === v.documento_id); if(!g) return; usados.add(g.id); const c = g.categoria || 'Otros'; porCat[c] = (porCat[c] || 0) + R.baseGasto(g); });
   Object.keys(porCat).forEach(c => lineasD.push(L('vinc:' + c, c + ' (asignado a la obra)', porCat[c], 'real', 'facturas asignadas a mano a esta obra', '')));
   const ayu = num(P.ayudantes[job.id]); if(ayu) lineasD.push(L('ayudantes', 'Ayudantes y subcontratados', ayu, 'real', 'apuntado a mano', ''));
+  const idsMaq = new Set([...maq.keys()]);
+  const rep = (P.gastos || []).filter(g => g.vehiculo_id && idsMaq.has(g.vehiculo_id) && CAT_MANT.test(g.categoria || '') && g.fecha_devengo >= desde && g.fecha_devengo <= hasta && !usados.has(g.id) && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada'));
+  rep.forEach(g => usados.add(g.id)); const repTot = sum(rep, R.baseGasto);
+  lineasD.push(L('reparaciones', 'Reparaciones de las máquinas usadas', repTot, repTot ? 'real' : 'falta', 'facturas anotadas a la máquina entre las fechas de la obra', repTot ? rep.length + ' factura(s)' : 'No hay ninguna factura anotada a las máquinas usadas en esas fechas (puede que no haya habido o que no estén asignadas).'));
+  // ---- INDIRECTO: parte fija de las máquinas (seguros, impuestos…) de los 12 meses, repartida por horas de utilización ----
+  Object.keys(hClase).forEach(c => { if(!(hClase[c] > 0)) return; const k = CO && CO.clases.find(x => x.clase === c), nom = R.NOMBRE_CLASE[c] || c;
+    if(k && k.horaFija != null) lineasI.push(L('maq:' + c, 'Costes fijos de máquina: ' + nom, k.horaFija * hClase[c], k.manual ? 'estimada' : 'calculada', eur(k.horaFija, 2) + ' por hora productiva × ' + h1(hClase[c]) + ' h', 'Seguros, impuestos y demás costes fijos de la flota (12 meses) repartidos por horas de utilización (Gastos → Normalización).'));
+    else lineasI.push(L('maq:' + c, 'Costes fijos de máquina: ' + nom, 0, 'falta', '', 'No hay coste por hora para esta clase en Normalización.')); });
   // ---- INDIRECTO: amortización (provisión; solo con precio de compra) ----
   const W0 = ev.W0, W1 = hasta, jorn = num(window.COSTES && COSTES.cfg.diasLab) || num(prm.jornadas) || 250;
   maq.forEach(x => { const m = x.m, d = x.dias.size, compra = num(m.coste_compra);
