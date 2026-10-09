@@ -30,9 +30,9 @@
     img.onerror = () => { URL.revokeObjectURL(url); opc.aviso && opc.aviso("No se pudo abrir la foto para marcarla."); };
     img.onload = () => {
       const MAX = 2400, k = Math.min(1, MAX/Math.max(img.naturalWidth, img.naturalHeight));
-      let W = Math.round(img.naturalWidth*k), H = Math.round(img.naturalHeight*k), base = img, hist = [], rec = null, drag = null;
+      let zoom = 1, tx = 0, ty = 0, ptrs = new Map(), pinch = null, ignorar = false, W = Math.round(img.naturalWidth*k), H = Math.round(img.naturalHeight*k), base = img, hist = [], rec = null, drag = null;
       const ov = document.createElement("div"); ov.id = "marcar-ov";
-      ov.innerHTML = '<div class="mk-top"><button type="button" data-a="x">Cancelar</button><button type="button" data-a="u" aria-label="Deshacer">'+ico("deshacer")+'</button><button type="button" class="mk-ok" data-a="ok">Listo</button><button type="button" class="mk-ok" data-a="ap" style="display:none">Aplicar</button></div><div class="mk-lienzo"></div><div class="mk-bot"></div>';
+      ov.innerHTML = '<div class="mk-top"><button type="button" data-a="x">Cancelar</button><button type="button" data-a="z" aria-label="Zoom 1x">1×</button><button type="button" data-a="u" aria-label="Deshacer">'+ico("deshacer")+'</button><button type="button" class="mk-ok" data-a="ok">Listo</button><button type="button" class="mk-ok" data-a="ap" style="display:none">Aplicar</button></div><div class="mk-lienzo"></div><div class="mk-bot"></div>';
       const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
       ov.querySelector(".mk-lienzo").appendChild(cv);
       const bot = ov.querySelector(".mk-bot");
@@ -62,26 +62,40 @@
         pintar(); rec = null; pintar();
         const nb = document.createElement("canvas"); nb.width = Math.round(r.w); nb.height = Math.round(r.h); nb.getContext("2d").drawImage(cv, Math.round(r.x), Math.round(r.y), nb.width, nb.height, 0, 0, nb.width, nb.height);
         hist.push({ crop:true, base, W, H, trazos }); base = nb; W = nb.width; H = nb.height; trazos = []; cv.width = W; cv.height = H; modoRecorte(false); ajustar(); }
+      function aplicarZoom(){ cv.style.transform = "translate("+tx+"px,"+ty+"px) scale("+zoom+")"; }
+      const lzc = () => { const r = ov.querySelector(".mk-lienzo").getBoundingClientRect(); return { x:r.left+r.width/2, y:r.top+r.height/2 }; };
+      function ptsPinch(){ const a = Array.from(ptrs.values()); return { m:{ x:(a[0].x+a[1].x)/2, y:(a[0].y+a[1].y)/2 }, d:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1 }; }
       const pos = e => { const r = cv.getBoundingClientRect(); return { x:(e.clientX-r.left)*W/r.width, y:(e.clientY-r.top)*H/r.height }; };
       cv.addEventListener("pointerdown", e => { e.preventDefault(); try{cv.setPointerCapture(e.pointerId);}catch(_){}
+        ptrs.set(e.pointerId, { x:e.clientX, y:e.clientY });
+        if (ptrs.size >= 2){ actual = null; drag = null; ignorar = true; const q = ptsPinch(), C = lzc(); pinch = { z:zoom, tx, ty, d:q.d, m:q.m, ux:(q.m.x-C.x-tx)/zoom, uy:(q.m.y-C.y-ty)/zoom }; pintar(); return; }
+        if (ignorar) return;
+        if (!herr && !rec){ pinch = { pan:true, x:e.clientX, y:e.clientY, tx, ty }; return; }
+        if (!herr) return;
         if (rec){ const p = pos(e), t = Math.max(30, W/18), cx = [rec.x, rec.x+rec.w], cy = [rec.y, rec.y+rec.h]; let mx = null, my = null;
           cx.forEach((x,i) => { if (Math.abs(p.x-x)<t) mx = i; }); cy.forEach((y,i) => { if (Math.abs(p.y-y)<t) my = i; });
           if (mx!==null || my!==null) drag = { m:"borde", mx, my }; else if (p.x>rec.x && p.x<rec.x+rec.w && p.y>rec.y && p.y<rec.y+rec.h) drag = { m:"mover", dx:p.x-rec.x, dy:p.y-rec.y }; else drag = null; return; }
         actual = { h:herr, color, g:grosor(), pts:[pos(e)] }; pintar(); });
-      cv.addEventListener("pointermove", e => { if (rec){ if (!drag) return; e.preventDefault(); const p = pos(e), c = (v,a,b) => Math.max(a,Math.min(b,v)), mn = 40;
+      cv.addEventListener("pointermove", e => { if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x:e.clientX, y:e.clientY });
+        if (pinch){ e.preventDefault();
+          if (pinch.pan){ if (ptrs.size===1){ tx = pinch.tx + e.clientX - pinch.x; ty = pinch.ty + e.clientY - pinch.y; aplicarZoom(); } return; }
+          if (ptrs.size>=2){ const q = ptsPinch(), C = lzc(); zoom = Math.max(1, Math.min(8, pinch.z*q.d/pinch.d)); tx = q.m.x-C.x-zoom*pinch.ux; ty = q.m.y-C.y-zoom*pinch.uy; if (zoom===1){ tx = 0; ty = 0; } aplicarZoom(); } return; }
+        if (ignorar) return;
+        if (rec){ if (!drag) return; e.preventDefault(); const p = pos(e), c = (v,a,b) => Math.max(a,Math.min(b,v)), mn = 40;
           if (drag.m==="mover"){ rec.x = c(p.x-drag.dx,0,W-rec.w); rec.y = c(p.y-drag.dy,0,H-rec.h); }
           else { if (drag.mx===0){ const r = rec.x+rec.w; rec.x = c(p.x,0,r-mn); rec.w = r-rec.x; } else if (drag.mx===1){ rec.w = c(p.x,rec.x+mn,W)-rec.x; }
                  if (drag.my===0){ const b = rec.y+rec.h; rec.y = c(p.y,0,b-mn); rec.h = b-rec.y; } else if (drag.my===1){ rec.h = c(p.y,rec.y+mn,H)-rec.y; } }
           pintar(); return; }
         if (!actual) return; e.preventDefault(); const p = pos(e); if (actual.h==="lapiz") actual.pts.push(p); else actual.pts[1]=p; pintar(); });
-      const fin = e => { if (rec){ drag = null; return; } if (!actual) return; trazos.push(actual); hist.push({});  actual = null; pintar(); };
+      const fin = e => { ptrs.delete(e.pointerId); if (ptrs.size<2 && pinch && !pinch.pan) pinch = null; if (pinch && pinch.pan) pinch = null; if (ptrs.size===0) ignorar = false; if (rec){ drag = null; return; } if (!actual) return; trazos.push(actual); hist.push({});  actual = null; pintar(); };
       cv.addEventListener("pointerup", fin); cv.addEventListener("pointercancel", fin);
       let cerrar = function(){ ov.remove(); URL.revokeObjectURL(url); };
       ov.addEventListener("click", e => {
         const b = e.target.closest("button"); if (!b) return;
         if (b.dataset.h==='recorte'){ modoRecorte(!rec); bot.querySelector('[data-h=recorte]').classList.toggle('on', !!rec); }
-        else if (b.dataset.h){ if (rec) modoRecorte(false); bot.querySelector('[data-h=recorte]').classList.remove('on'); herr = b.dataset.h; marca(); }
-        else if (b.dataset.c){ color = b.dataset.c; marca(); }
+        else if (b.dataset.h){ if (rec) modoRecorte(false); bot.querySelector('[data-h=recorte]').classList.remove('on'); herr = (herr === b.dataset.h) ? null : b.dataset.h; marca(); }
+        else if (b.dataset.c){ color = b.dataset.c; if (!herr) herr = "lapiz"; marca(); }
+        else if (b.dataset.a==="z"){ zoom = 1; tx = 0; ty = 0; aplicarZoom(); }
         else if (b.dataset.a==="ap"){ aplicarRecorte(); bot.querySelector('[data-h=recorte]').classList.remove('on'); }
         else if (b.dataset.a==="u"){ if (rec){ modoRecorte(false); bot.querySelector('[data-h=recorte]').classList.remove('on'); return; } const h = hist.pop(); if (!h) return; if (h.crop){ base = h.base; W = h.W; H = h.H; trazos = h.trazos; cv.width = W; cv.height = H; ajustar(); } else trazos.pop(); pintar(); }
         else if (b.dataset.a==="x"){ cerrar(); }
@@ -95,6 +109,7 @@
           }, "image/jpeg", 0.92);
         }
       });
+      ov.addEventListener("wheel", e => { e.preventDefault(); const C = lzc(), z2 = Math.max(1, Math.min(8, zoom*(e.deltaY<0?1.15:1/1.15))), ux = (e.clientX-C.x-tx)/zoom, uy = (e.clientY-C.y-ty)/zoom; zoom = z2; tx = e.clientX-C.x-zoom*ux; ty = e.clientY-C.y-zoom*uy; if (zoom===1){ tx = 0; ty = 0; } aplicarZoom(); }, { passive:false });
       document.body.appendChild(ov); marca(); pintar();
       const lz = ov.querySelector(".mk-lienzo");
       function ajustar(){ const k2 = Math.min(lz.clientWidth/W, lz.clientHeight/H); cv.style.width = Math.floor(W*k2)+"px"; cv.style.height = Math.floor(H*k2)+"px"; }
