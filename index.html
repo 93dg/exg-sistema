@@ -4591,7 +4591,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.31</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.32</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4738,7 +4738,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.31</div>
+        <div class="sub" id="version-badge">V9.32</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -24010,12 +24010,12 @@ function tbCartaHtml(j, esHis, botonesHtml, extraHtml){
 document.addEventListener('exg-docs-listos', () => { if(document.getElementById('te-costes')) tbRenderCostes(); });   // V9.07: si la lista se pintó antes de cargar los documentos, se repinta sola
 function tbJobParaCostes(j){
   const nc = tbNorm(j.cliente); const ent = nc ? clientes.find(c => c.esCli !== false && tbNorm(c.name) === nc) : null;
-  return {id: j.id, nombre: j.trabajo || '', entidadId: ent ? ent.id : null, scheduledDate: (j.plan && j.plan.fecha) || '', fechaFin: j.terminado_at ? String(j.terminado_at).slice(0, 10) : ''};
+  return {id: j.id, nombre: j.trabajo || '', entidadId: ent ? ent.id : null, scheduledDate: (j.plan && j.plan.fecha) || '', fechaFin: j.terminado_at ? String(j.terminado_at).slice(0, 10) : '', flota: j.flota, alternativas: j.alternativas};
 }
 function costeEur(n, dec){ n = Number(n) || 0; const neg = n < 0 && Math.abs(n) >= (dec ? 0.005 : 0.5); const [e, d] = Math.abs(n).toFixed(dec || 0).split('.'); return (neg ? '−' : '') + e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (d ? ',' + d : '') + ' €'; }
 async function tbRenderCostes(){
   const lista = document.getElementById('te-costes'); if(!lista) return;
-  const tarifas = {...(await costeHoraCargar()), socios: await costeSociosCargar()};
+  const tarifas = {...(await costeHoraCargar()), socios: await costeSociosCargar(), base: await costeBaseCargar()};
   const eur = n => costeEur(n);
   const errores = [], filas = [];
   _tbJobs.filter(j => j.estado !== 'Cancelado').forEach(j => { try{ const jc = tbJobParaCostes(j); filas.push({j, jc, r: costesTrabajoCalcular(jc, tarifas)}); }catch(e){ errores.push((j.trabajo || 'Trabajo') + ': ' + (e && e.message)); console.error('Costes: fallo en un trabajo', j, e); } });
@@ -24024,7 +24024,7 @@ async function tbRenderCostes(){
   const media = (() => { const d = con.reduce((a, f) => a + f.r.diasTrab, 0); return {n: con.length, netoDia: d ? tot.con / d : 0}; })();   // V9.15: neto medio por día trabajado de todos los trabajos calculados
   const nombre = j => escHtml((j.trabajo || 'Trabajo') + (j.cliente ? ' · ' + j.cliente : ''));
   const col = n => n < 0 ? 'var(--red)' : 'var(--green)';
-  const carta = f => { const r = f.r; return `<details class="tb-cos"><summary><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div style="font-weight:700;font-size:14px;line-height:1.3;min-width:0;">${nombre(f.j)}</div><div style="text-align:right;flex:none;font-weight:800;color:${col(r.netoCon)};">${eur(r.netoCon)}<div style="font-size:10.5px;font-weight:500;color:var(--ink-soft);">queda antes de lo que sacan los socios</div></div></div><div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">Cobrado ${eur(r.ingresos)}</div></summary><div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;">${costesTrabajoHtml(f.jc, tarifas, media)}</div></details>`; };
+  const carta = f => { const r = f.r; return `<details class="tb-cos"><summary><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div style="font-weight:700;font-size:14px;line-height:1.3;min-width:0;">${nombre(f.j)}</div><div style="text-align:right;flex:none;font-weight:800;color:${col(r.real ? r.real.limpioReal : r.netoCon)};">${eur(r.real ? r.real.limpioReal : r.netoCon)}<div style="font-size:10.5px;font-weight:500;color:var(--ink-soft);">${r.real ? 'limpio real, con todo' : 'queda antes de lo que sacan los socios'}</div></div></div><div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">Cobrado ${eur(r.ingresos)}</div></summary><div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;">${costesTrabajoHtml(f.jc, tarifas, media)}</div></details>`; };
   const m = convenioSueldoInfo('maquinista');
   lista.innerHTML = `<div class="panel te-panel"><div style="font-weight:800;font-size:15px;margin-bottom:8px;">Costes por trabajo</div>
     <div class="tb-cos" style="margin-bottom:10px;"><div style="font-weight:700;font-size:13px;">Cómo se calcula</div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:3px;">Queda = lo cobrado al cliente (albaranes, sin IVA) − combustible de esos días − otros gastos de la obra − lo pagado a Dani. Después se resta lo que sacaron Rafa y Manolo (retiradas en efectivo y gastos personales) entre las fechas de la obra.</div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:6px;">Para comparar: maquinista o camionero · convenio Córdoba 2026 · neto <b style="color:var(--ink);">${eur(m.neto14)}/mes</b> (14 pagas) · a la empresa <b style="color:var(--ink);">${eur(m.costeMes)}/mes</b> = <b style="color:var(--ink);">${costeEur(m.costeHora, 2)}/h</b></div></div>
@@ -29856,6 +29856,46 @@ async function costeAyudanteGuardar(jobId, v){
   try{ if(t._id){ await sb.from('sistema').update({data: datos}).eq('id', t._id); } else { const {data} = await sb.from('sistema').insert({tipo: 'coste_hora', data: datos}).select('id').single(); if(data) t._id = data.id; } }catch(e){ mostrarToast('No se pudo guardar lo pagado a ayudantes'); }
   tbRenderCostes();
 }
+// ===== V9.32 (Daniel 09/10/2026): DIRECTO, INDIRECTO REPARTIDO POR DÍAS y LIMPIO REAL de cada obra =====
+// Indirecto = lo que cuesta tener las máquinas usadas (seguro, impuestos, ITV: último año) + autónomos, nave, gestoría, préstamos, etc. + lo que sacan Rafa y Manolo,
+// todo del último año, entre 365 y por los días que duró la obra. Directo = combustible, otros gastos de la obra, lo pagado a ayudantes y piezas/taller de las máquinas usadas esos días.
+let _costeBase = null;
+const COSTE_CAT_AVERIA = /repuesto|recambio|taller|neum[aá]tico|lubricante/i, COSTE_CAT_FIJO_MAQ = /seguro|impuesto|tasa|itv|circulaci/i;
+const COSTE_GENERALES = [['Autónomos y Seguridad Social', /aut[oó]nomo|seguridad social/i], ['Alquiler de la nave', /alquiler de nave/i], ['Gestoría y asesoría', /gestor/i], ['Préstamos, intereses y banco', /financiero|pr[eé]stamo|comisiones banco/i], ['Prevención de riesgos', /prevenci/i], ['Seguros generales e impuestos', /seguro|impuesto|tasa/i], ['Luz, programas y otros', /electricidad|software|tecnolog/i]];
+async function costeBaseCargar(){
+  if(_costeBase) return _costeBase;
+  const hace = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10), gastos = [];
+  try{ let o = 0; while(true){ const {data, error} = await sb.from('documentos_economicos').select('categoria, importe, base, fecha_devengo, vehiculo_id, relacion_actividad').is('deleted_at', null).eq('tipo', 'gasto').gte('fecha_devengo', hace).range(o, o + 999); if(error || !data || !data.length) break; gastos.push(...data); if(data.length < 1000) break; o += 1000; } }catch(e){ console.error('Costes base: gastos', e); }
+  let flota = [], polizas = [];
+  try{ const {data} = await sb.from('flota').select('id, nombre, clase, matricula, estado').in('estado', ['activo', 'averiada', 'averia']); flota = data || []; }catch(e){}
+  try{ const {data} = await sb.from('polizas_seguro').select('flota_id, coste_anual, activa'); polizas = (data || []).filter(p => p.activa !== false); }catch(e){}
+  _costeBase = {gastos, flota, polizas, hace};
+  return _costeBase;
+}
+function costeNetoDoc(d){ const b = d.base != null && !isNaN(Number(d.base)) ? Number(d.base) : Number(d.importe || 0) / 1.21; return Math.abs(b) || 0; }
+function costeMaquinasDeTrabajo(j, base){   // las pastillas del trabajo (mixta, camión, giratoria, niveladora) -> máquinas reales de la flota
+  const cats = [...new Set(tbMaquinas(j))], out = [];
+  const pat = {mixta: /mixta/i, camion: /cami[oó]n|iveco|multilift/i, giratoria: /giratoria/i, niveladora: /niveladora/i};
+  cats.forEach(c => { (base.flota || []).filter(f => pat[c] && (pat[c].test(f.clase || '') || pat[c].test(f.nombre || '')) && !/todoterreno|turismo|coche/i.test(f.clase || '')).forEach(f => { if(!out.find(x => x.id === f.id)) out.push(f); }); });
+  return out;
+}
+function costeRealCalcular(j, r, tarifas){
+  const base = tarifas.base; if(!base) return null;
+  const dia = s => String(s || '').slice(0, 10), dCal = Math.max(1, Math.round((new Date(r.hasta + 'T12:00:00') - new Date(r.desde + 'T12:00:00')) / 86400000) + 1), frac = dCal / 365;
+  const maqs = costeMaquinasDeTrabajo(j, base), ids = new Set(maqs.map(m => m.id));
+  const maqLineas = maqs.map(m => { const docs = base.gastos.filter(d => d.vehiculo_id === m.id && COSTE_CAT_FIJO_MAQ.test(d.categoria || '')), anualDocs = docs.reduce((a, d) => a + costeNetoDoc(d), 0);
+    const pol = base.polizas.filter(p => p.flota_id === m.id).reduce((a, p) => a + (Number(p.coste_anual) || 0), 0), haySeguroDoc = docs.some(d => /seguro/i.test(d.categoria || ''));
+    const anual = anualDocs + (haySeguroDoc ? 0 : pol); return {nombre: m.nombre, anual, parte: anual * frac}; });
+  const gen = COSTE_GENERALES.map(([t]) => ({nombre: t, anual: 0, parte: 0}));
+  base.gastos.forEach(d => { if(d.vehiculo_id || !(d.relacion_actividad == null || d.relacion_actividad === 'relacionada') || /^gasto personal|n[oó]mina|compra de veh/i.test(d.categoria || '')) return;   // cada gasto cuenta una sola vez, en el primer grupo que le encaja
+    const g = COSTE_GENERALES.findIndex(([, re]) => re.test(d.categoria || '')); if(g >= 0) gen[g].anual += costeNetoDoc(d); });
+  gen.forEach(x => { x.parte = x.anual * frac; });
+  const generales = gen.filter(x => x.anual > 0);
+  const hace = base.hace, sociosAnual = (tarifas.socios || []).filter(x => x.f >= hace).reduce((a, x) => a + x.imp, 0), sociosParte = sociosAnual * frac;
+  const aver = base.gastos.filter(d => d.vehiculo_id && ids.has(d.vehiculo_id) && COSTE_CAT_AVERIA.test(d.categoria || '') && dia(d.fecha_devengo) >= r.desde && dia(d.fecha_devengo) <= r.hasta).reduce((a, d) => a + costeNetoDoc(d), 0);
+  const directo = r.combMio + r.asocTot + r.sueldosReal + aver, indMaq = maqLineas.reduce((a, x) => a + x.parte, 0), indGen = generales.reduce((a, x) => a + x.parte, 0), indirecto = indMaq + indGen + sociosParte;
+  return {dCal, maqs, maqLineas, generales, sociosAnual, sociosParte, aver, directo, indirecto, indMaq, indGen, limpioDirecto: r.ingresos - directo, limpioReal: r.ingresos - directo - indirecto};
+}
 function costesTrabajoCalcular(j, tarifas){
   const docs = Object.values(documentosRealesById).filter(d => !d.deleted_at);
   const dia = s => String(s || '').slice(0, 10);
@@ -29904,7 +29944,9 @@ function costesTrabajoCalcular(j, tarifas){
   const casos = base.map(c => ({...c, mec: false})).concat(base.map(c => ({...c, mec: true, nombre: c.nombre + ' + mecánico', gente: c.gente + costeMec, neto: c.neto - costeMec + ahorroTaller, ganado: c.ganado + ahorroTaller})));
   casos.forEach(c => { c.dif = c.neto - casos[0].neto; });
   const casosInfo = {D, H, hAll, m, sociosCoste, ahorroTallerOk: ahorroTaller > 0, ayud, rateMec, costeMec, ahorroTaller, taller12};
-  return {vacio: false, casos, casosInfo, nAlb: mios.length, desde, hasta, ingresos, combMio, litros, asocTot, asocN: asoc.length, sinDesglose, H, diasTrab: fechas.length, diasReal, netoSin, rate, sueldosReal: ayud, valorSocios: H * rate, netoCon: netoSin - ayud, esc, netoHora};
+  const _r = {vacio: false, casos, casosInfo, nAlb: mios.length, desde, hasta, ingresos, combMio, litros, asocTot, asocN: asoc.length, sinDesglose, H, diasTrab: fechas.length, diasReal, netoSin, rate, sueldosReal: ayud, valorSocios: H * rate, netoCon: netoSin - ayud, esc, netoHora};
+  try{ _r.real = costeRealCalcular(j, _r, tarifas); }catch(e){ console.error('Costes: fallo en el cálculo real', e); _r.real = null; }
+  return _r;
 }
 function costesTrabajoHtml(j, tarifas, media){
   const r = costesTrabajoCalcular(j, tarifas), eur = n => costeEur(n);
@@ -29931,6 +29973,21 @@ function costesTrabajoHtml(j, tarifas, media){
     ${fila('Fechas', fmt(r.desde) + ' – ' + fmt(r.hasta), 'primer y último albarán')}
     ${fila('Días en que se trabajó', dias, 'días distintos con albarán')}
     ${fila('Horas cobradas al cliente', hf(r.H) + ' h', hf(hDia) + ' h de media por día')}
+    ${r.real ? (() => { const q = r.real, L = (t, v, c, x) => linea(t + (x ? `<span style="display:block;font-size:11px;color:var(--ink-soft);">${x}</span>` : ''), v, c);
+      return tit('Resultado real de la obra').replace('margin:14px 0 4px', 'margin:0 0 4px') + nota('Obra de ' + q.dCal + ' días naturales. Lo indirecto es lo del último año entre 365 y por esos ' + q.dCal + ' días.') +
+      `<div style="border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin:0 0 8px;"><div style="font-weight:800;">1 · Gasto directo</div><div style="font-size:12.5px;">
+        ${L('Cobrado al cliente', eur(r.ingresos), '', 'sin IVA')}
+        ${L('Combustible de esos días', '− ' + eur(r.combMio), 'var(--red)')}
+        ${r.sueldosReal ? L('Pagado a ayudantes y subcontratados', '− ' + eur(r.sueldosReal), 'var(--red)') : ''}
+        ${r.asocN ? L('Otros gastos de la obra', '− ' + eur(r.asocTot), 'var(--red)') : ''}
+        ${L('Averías y piezas de las máquinas usadas', '− ' + eur(q.aver), 'var(--red)', 'solo las facturas ya anotadas a cada máquina, entre esas fechas')}
+        <div style="display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line);margin-top:4px;padding-top:5px;font-weight:800;"><span>Queda tras lo directo</span><span style="color:${col(q.limpioDirecto)};">${eur(q.limpioDirecto)}</span></div></div></div>
+      <div style="border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin:0 0 8px;"><div style="font-weight:800;">2 · Gasto indirecto, repartido por días</div><div style="font-size:11.5px;color:var(--ink-soft);margin:2px 0 6px;">Lo que cuesta tener todo en marcha, aunque no se trabaje.</div><div style="font-size:12.5px;">
+        ${q.maqLineas.map(m => L(escHtml(m.nombre), '− ' + eur(m.parte), 'var(--red)', 'seguro, impuestos e ITV: ' + eur(m.anual) + ' al año')).join('') || '<div style="font-size:11.5px;color:var(--orange);">No encuentro qué máquinas se usaron en esta obra.</div>'}
+        ${q.generales.map(g => L(g.nombre, '− ' + eur(g.parte), 'var(--red)', eur(g.anual) + ' al año')).join('')}
+        ${L('Lo que sacan Rafa y Manolo', '− ' + eur(q.sociosParte), 'var(--red)', eur(q.sociosAnual) + ' al año (retiradas y gastos personales)')}
+        <div style="display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line);margin-top:4px;padding-top:5px;font-weight:800;"><span>Total indirecto</span><span style="color:var(--red);">− ${eur(q.indirecto)}</span></div></div></div>
+      <div style="border:2px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 8px;background:var(--concrete-2);"><div style="display:flex;justify-content:space-between;font-weight:800;"><span>Limpio real de la obra</span><span style="color:${col(q.limpioReal)};">${eur(q.limpioReal)}</span></div><div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">cobrado − directo − indirecto${q.dCal ? ' · ' + eur(q.limpioReal / q.dCal) + ' al día' : ''}</div></div>`; })() : ''}
     ${tit('Dinero')}
     ${fila('Cobrado al cliente', eur(r.ingresos), 'sin IVA, suma de los albaranes')}
     ${fila('Combustible de esos días', '− ' + eur(r.combMio), hf(r.litros) + ' litros', false, 'var(--red)')}
