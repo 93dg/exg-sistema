@@ -158,15 +158,25 @@ R.calcular = function(job, P, asig){
   Object.keys(hClase).forEach(c => { const ms = R.maquinasDeClase(P, c); ms.forEach(m => { const x = maq.get(m.id) || {m, horas: 0, dias: new Set(), clases: new Set()}; x.horas += hClase[c] / ms.length; (diasClase[c] || new Set()).forEach(f => x.dias.add(f)); x.clases.add(c); maq.set(m.id, x); }); });
   const sinFlota = Object.keys(hClase).filter(c => !PAT_MAQ[c] && hClase[c] > 0);
   if(sinFlota.length) avisos.push('Horas de ' + sinFlota.map(c => R.NOMBRE_CLASE[c]).join(', ') + ' sin máquina en la flota: no llevan coste de máquina.');
-  // ---- DIRECTO: combustible ----
+  // ---- DIRECTO: combustible (V9.60) ----
+  // Por meses: el combustible de las máquinas de cada mes de la obra × la parte de la obra en lo trabajado ese mes (por ingreso de las líneas, que siempre está; las horas no siempre).
+  // Solo se estima un mes de la obra si aún no tiene factura de combustible (p. ej. el mes en curso), con el gasto medio por € trabajado de los meses que sí la tienen.
   const horasIndep = ev.horasDia, CO = P.costes;
-  const fuel = (P.gastos || []).filter(g => /combust/i.test(g.categoria || '') && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada'));
-  let combReal = 0, litros = 0, sinDesg = 0, nSin = 0;
-  fuel.forEach(g => { if(Array.isArray(g.lineas_fechadas)){ const tot = Math.abs(num(g.importe)), ratio = tot ? R.baseGasto(g) / tot : 1; let usadoDoc = false; g.lineas_fechadas.forEach(l => { const f = '20' + l[0], hm = lin.filter(x => x.f === f).reduce((s, x) => s + x.h, 0); if(!hm) return; const rep = horasIndep[f] > 0 ? Math.min(1, hm / horasIndep[f]) : 1; combReal += num(l[3]) * ratio * rep; litros += num(l[2]) * rep; usadoDoc = true; }); if(usadoDoc) usados.add(g.id); }
-    else if(g.fecha_devengo && g.fecha_devengo.slice(0, 7) >= desde.slice(0, 7) && g.fecha_devengo.slice(0, 7) <= hasta.slice(0, 7)){ sinDesg += R.baseGasto(g); nSin++; } });
-  lineasD.push(L('combustible', 'Combustible de esos días', combReal, combReal ? 'calculada' : 'falta', 'facturas con líneas por día, repartido por horas trabajadas ese día', combReal ? h1(litros) + ' litros' : 'No hay facturas de combustible desglosadas por día en estas fechas.'));
-  const consumoH = ev.horas > 0 ? ev.comb / ev.horas : 0, combEst = Math.max(0, consumoH * H - combReal);
-  if(combEst > 1) lineasD.push(L('combustible_est', 'Combustible sin desglose por día', combEst, 'estimada', 'consumo medio de la empresa (12 meses) × horas de esta obra − lo ya comprobado', 'Consumo medio ' + eur(consumoH, 2) + ' por hora facturada. ' + (nSin ? nSin + ' factura(s) de combustible de esos meses no traen el detalle por día.' : '')));
+  const coches = new Set((P.flota || []).filter(f => /todoterreno|turismo|coche/i.test(f.clase || '')).map(f => f.id));
+  const fuel = (P.gastos || []).filter(g => /combust/i.test(g.categoria || '') && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada') && !(g.vehiculo_id && coches.has(g.vehiculo_id)));
+  const mesD = desde.slice(0, 7), mesH = hasta.slice(0, 7), fuelMes = {}, litMes = {};
+  fuel.forEach(g => { const tot = Math.abs(num(g.importe)), ratio = tot ? R.baseGasto(g) / tot : 1;
+    if(Array.isArray(g.lineas_fechadas) && g.lineas_fechadas.length){ g.lineas_fechadas.forEach(l => { const m = ('20' + l[0]).slice(0, 7); if(m < mesD || m > mesH) return; fuelMes[m] = (fuelMes[m] || 0) + num(l[3]) * ratio; litMes[m] = (litMes[m] || 0) + num(l[2]); usados.add(g.id); }); }
+    else if(g.fecha_devengo){ const m = g.fecha_devengo.slice(0, 7); if(m < mesD || m > mesH) return; fuelMes[m] = (fuelMes[m] || 0) + R.baseGasto(g); usados.add(g.id); } });
+  const ingEmpMes = {}, ingObraMes = {};
+  R.efectivos(P).lista.forEach(d => { const f = R.factorLineas(d); R.lineas(d).forEach(l => { const m = l.f.slice(0, 7); if(m < mesD || m > mesH) return; ingEmpMes[m] = (ingEmpMes[m] || 0) + l.imp * f; }); });
+  albs.forEach(d => { const f = R.factorLineas(d); R.lineas(d).forEach(l => { const m = l.f.slice(0, 7); ingObraMes[m] = (ingObraMes[m] || 0) + l.imp * f; }); });
+  let combReal = 0, litros = 0, fCub = 0, iCub = 0; const sinFact = [];
+  Object.keys(ingObraMes).forEach(m => { const io = ingObraMes[m], ie = ingEmpMes[m] || io, parte = ie > 0 ? Math.min(1, io / ie) : 0;
+    if(fuelMes[m] > 0){ combReal += fuelMes[m] * parte; litros += (litMes[m] || 0) * parte; fCub += fuelMes[m]; iCub += ie; } else if(io > 0) sinFact.push(m); });
+  lineasD.push(L('combustible', 'Combustible de esos meses', combReal, combReal ? 'calculada' : 'falta', 'combustible de las máquinas de cada mes × la parte de esta obra en lo trabajado ese mes', combReal ? (litros ? h1(litros) + ' litros' : '') : 'No hay facturas de combustible en los meses de la obra.'));
+  const combEst = iCub > 0 ? sum(sinFact, m => ingObraMes[m]) * fCub / iCub : 0;
+  if(combEst > 1) lineasD.push(L('combustible_est', 'Combustible de meses aún sin factura', combEst, 'estimada', 'gasto medio de combustible por € trabajado en los meses con factura × lo trabajado en ' + sinFact.join(', '), 'Se sustituye por el real cuando llegue la factura de ese mes.'));
   const idsMaqX = null;
   // ---- DIRECTO: gastos vinculados, ayudantes, reparaciones ----
   const vinG = (P.vinculos || []).filter(v => v.job_id === job.id && v.rol === 'gasto' && v.accion === 'incluir');
