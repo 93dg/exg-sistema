@@ -4591,10 +4591,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.49" defer></script>
-<script src="costes/norm.js?v=V9.49" defer></script>
+<script src="rentabilidad/rent.js?v=V9.50" defer></script>
+<script src="costes/norm.js?v=V9.50" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.49</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.50</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4647,9 +4647,9 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
 .busq-mas{display:block;margin:2px 14px 0;padding:6px 10px;font-size:12.5px;font-weight:700;color:var(--sc);background:none;border:none;cursor:pointer;}
 @media(max-width:768px){
   #busq-ov{background:transparent;pointer-events:none;align-items:flex-end;}
-  #busq-caja{position:absolute;left:16px;right:16px;top:var(--vvb,100dvh);bottom:auto;transform:translateY(calc(-100% - 100px - env(safe-area-inset-bottom)));width:auto;height:auto;max-height:none;margin:0;border-radius:0;background:transparent;flex-direction:column-reverse;gap:8px;pointer-events:auto;}
+  #busq-caja{position:absolute;left:16px;right:16px;top:var(--vvb,100dvh);bottom:auto;transform:translateY(calc(-100% - 100px - env(safe-area-inset-bottom) + var(--busq-fix,0px)));width:auto;height:auto;max-height:none;margin:0;border-radius:0;background:transparent;flex-direction:column-reverse;gap:8px;pointer-events:auto;}
   html.kb-on #mobile-tabbar, html.kb-on #mobile-add-menu{visibility:hidden !important;}
-  html.kb-on #busq-caja{transform:translateY(calc(-100% - 12px));}
+  html.kb-on #busq-caja{transform:translateY(calc(-100% - 12px + var(--busq-fix,0px)));}
   #busq-cab{height:48px;box-sizing:border-box;padding:0 8px 0 14px;background:var(--paper);border:1px solid var(--line);border-radius:24px;box-shadow:0 6px 22px rgba(0,0,0,.22);}
   #busq-cab{will-change:clip-path;}
   #busq-ov.abierto #busq-cab{animation:busq-pastilla .38s cubic-bezier(.2,.8,.2,1);}
@@ -4741,7 +4741,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.49</div>
+        <div class="sub" id="version-badge">V9.50</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9146,7 +9146,7 @@ new MutationObserver(() => { const v = document.getElementById('flota-asistencia
 // Se guardan en Sistema (tipo=alerta_banco) y el saldo es el del último aviso; si no hay avisos más nuevos, el último de Fintable
 let _saldoSync = false;
 const saldoNum = t => Number(String(t).replace(/\./g, '').replace(',', '.'));
-function saldoParsear(asunto, texto){   // V9.49: NUNCA descarta un aviso del banco; si no lo entiende lo guarda como «otro» con el texto, para revisarlo
+function saldoParsear(asunto, texto){   // V9.50: NUNCA descarta un aviso del banco; si no lo entiende lo guarda como «otro» con el texto, para revisarlo
   const t = String(texto || '').replace(/\s+/g, ' '), a = String(asunto || '').toLowerCase();
   const tipo = /reintegro/.test(a) || /disposici[oó]n de [\d.]+,\d{2}|en cajero/i.test(t) ? 'reintegro' : /abono/.test(a) ? 'abono' : /pr[eé]stamo/.test(a) ? 'prestamo' : /recibo/.test(a) ? 'recibo' : /tarjeta/.test(a) ? 'tarjeta' : /cargo/.test(a) ? 'cargo' : 'otro';
   const f = t.match(/(\d{2})-(\d{2})-(\d{4})/), imp = t.match(/(?:importe de|compra de|disposici[oó]n de) (-?[\d.]+,\d{2}) ?EUR/i) || t.match(/(-?[\d.]+,\d{2}) ?EUR/i), sal = t.match(/saldo actual es(?: de)? (-?[\d.]+,\d{2}) ?EUR/i);
@@ -9229,7 +9229,7 @@ async function econ2Cargar(){
       const est = d.estado_cobro || '', admin = esAdministracion(E[d.entidad_id] || ''), falta = Math.max(0, imp - Number(d.cobrado_importe || 0) - (est === 'parcial_otra' ? enOtraSuma(d) : 0));
       let pend = 0, sinFact = 0;
       if(!['cobrado', 'nula', 'rectificativa', 'cobrado_otra'].includes(est)){
-        if(d.tipo === 'factura'){ if(['pendiente_cobrar', 'parcial'].includes(est)) pend = falta; else if(['entregado', 'por_cobrar_otra'].includes(est)) pend = Math.max(0, falta - enOtraSuma(d)); }   // V9.49: en otra enlazada → la cuenta la factura que la incluye
+        if(d.tipo === 'factura'){ if(['pendiente_cobrar', 'parcial'].includes(est)) pend = falta; else if(['entregado', 'por_cobrar_otra'].includes(est)) pend = Math.max(0, falta - enOtraSuma(d)); }   // V9.50: en otra enlazada → la cuenta la factura que la incluye
         else if(d.tipo !== 'gasto' && !d.documento_siguiente_id && !enl.has(d.id) && falta){ if(admin) sinFact = falta; else if(['pendiente_cobrar', 'pendiente_enviar', 'parcial', 'borrador', 'entregado', 'por_cobrar_otra', 'parcial_otra'].includes(est)) pend = falta; }
       }
       return {id: d.id, tipo: d.tipo, numero: d.numero, fecha: f, cli: E[d.entidad_id] || '—', an, tr, legal, sinF, gasto: d.tipo === 'gasto' ? imp : 0, pend, sinFact}; });
@@ -28692,7 +28692,7 @@ function econImporteSinFactura(d, enlazados){
   return 0;
 }
 const esAdministracion = nombre => /(AYUNTAMIENTO|AYTO\.|DIPUTACI|JUNTA DE ANDALUC|CONSEJER|MINISTERIO|MANCOMUNIDAD|CONFEDERACI)/i.test(String(nombre || ''));
-const SOLO_PROF_ALB = [];   // V9.49: Entregada, Por cobrar en otra y las «en otra» valen también para facturas (Daniel 09/10/2026)   // V8.99: estados de proformas y albaranes (no de facturas)
+const SOLO_PROF_ALB = [];   // V9.50: Entregada, Por cobrar en otra y las «en otra» valen también para facturas (Daniel 09/10/2026)   // V8.99: estados de proformas y albaranes (no de facturas)
 const estadosDeTipo = (tipo, doc) => tipo === 'presupuesto' ? ESTADOS_PRESUPUESTO
   : ((tipo === 'proforma' || tipo === 'albaran') && doc && esAdministracion(doc.client || doc.cliente)) ? ESTADOS_DOCUMENTO.filter(o => !['pendiente_cobrar','parcial','cobrado'].includes(o[0]) && (tipo === 'albaran' || o[0] !== 'trabajo_activo'))
   : tipo === 'albaran' ? ESTADOS_DOCUMENTO : tipo === 'proforma' ? ESTADOS_DOCUMENTO.filter(o => o[0] !== 'trabajo_activo') : ESTADOS_DOCUMENTO.filter(o => o[0] !== 'trabajo_activo' && !SOLO_PROF_ALB.includes(o[0]));   // V8.68 (Daniel): «Trabajo activo» es una fase del albarán abierto
@@ -30374,7 +30374,13 @@ if('serviceWorker' in navigator){
   const cache = {rec: null, flota: null}, bq = new WeakMap();
   let abiertas = new Set(), items = [], sel = -1, deb = null;
   function kbAjusta(){ try{ const v = window.visualViewport; if(!v) return; const rt = document.documentElement.classList; if(!(rt.contains('busq-abierta') || rt.contains('ai-abierto'))){ rt.remove('kb-on'); return; } const kb = Math.round(window.innerHeight - v.height - v.offsetTop); const vvb = Math.round(v.offsetTop + v.height); if(kbAjusta._b !== vvb){ kbAjusta._b = vvb; document.documentElement.style.setProperty('--vvb', vvb + 'px'); }   // borde inferior de lo que se ve de verdad (Safari con teclado)
-    if(kbAjusta._k !== kb){ kbAjusta._k = kb; document.documentElement.style.setProperty('--busq-kb', kb + 'px'); document.documentElement.style.setProperty('--busq-vh', Math.round(v.height) + 'px'); } const ae = document.activeElement; rt.toggle('kb-on', !!(ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && v.height < screen.height * 0.72)); }catch(e){} }   // la barra sube con el teclado
+    if(kbAjusta._k !== kb){ kbAjusta._k = kb; document.documentElement.style.setProperty('--busq-kb', kb + 'px'); document.documentElement.style.setProperty('--busq-vh', Math.round(v.height) + 'px'); } const ae = document.activeElement; rt.toggle('kb-on', !!(ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && v.height < screen.height * 0.72));
+    // V9.50 (reporte 07/10: con teclado salía sin barra donde escribir): se mide la barra de verdad y, si queda fuera de lo que se ve, se corrige sola
+    if(rt.contains('busq-abierta') && window.innerWidth <= 768){ const cab = document.getElementById('busq-cab'); if(cab){ const r = cab.getBoundingClientRect(), a0 = v.offsetTop + 6, a1 = v.offsetTop + v.height - 6, st = document.documentElement.style; let fix = parseFloat(st.getPropertyValue('--busq-fix')) || 0;
+      if(r.height > 0){ const nat0 = r.top - fix, nat1 = r.bottom - fix;
+        if(nat0 >= a0 && nat1 <= a1){ if(fix){ fix = 0; st.removeProperty('--busq-fix'); } }
+        else{ let d = 0; if(r.bottom > a1) d = a1 - r.bottom; else if(r.top < a0) d = a0 - r.top; if(Math.abs(d) > 2){ fix += d; st.setProperty('--busq-fix', Math.round(fix) + 'px'); } } } } }
+  }catch(e){} }   // la barra sube con el teclado
   setInterval(() => { const rt = document.documentElement.classList; if(rt.contains('busq-abierta') || rt.contains('ai-abierto')) kbAjusta(); }, 120);
   document.addEventListener('focusin', () => { [50, 250, 600].forEach(t => setTimeout(kbAjusta, t)); });
   try{ if(window.visualViewport){ window.visualViewport.addEventListener('resize', kbAjusta); window.visualViewport.addEventListener('scroll', kbAjusta); } }catch(e){}
@@ -30472,7 +30478,7 @@ if('serviceWorker' in navigator){
     try{ aiRegistrarEvento('buscador_abierto', typeof aiVistaActual === 'function' ? aiVistaActual() : ''); }catch(e){}
   };
   document.addEventListener('click', e => { if(document.documentElement.classList.contains('busq-abierta') && !e.target.closest('#busq-caja') && !e.target.closest('#asistente-ia-fab') && !e.target.closest('#busq-fab')) busqCerrar(); }, true);   // click y no pointerdown: así hacer scroll no la cierra
-  window.busqCerrar = function(){ const ov = document.getElementById('busq-ov'); ov.classList.remove('anim'); document.documentElement.classList.remove('busq-abierta'); clearTimeout(busqCerrar._t); busqCerrar._t = setTimeout(() => { if(!document.documentElement.classList.contains('busq-abierta')) ov.classList.remove('abierto'); }, 320); document.documentElement.style.removeProperty('--busq-kb'); kbAjusta._k = null; document.documentElement.classList.remove('kb-on'); const i = document.getElementById('busq-in'); i.blur(); i.value = ''; document.getElementById('busq-res').innerHTML = ''; };
+  window.busqCerrar = function(){ const ov = document.getElementById('busq-ov'); ov.classList.remove('anim'); document.documentElement.classList.remove('busq-abierta'); clearTimeout(busqCerrar._t); busqCerrar._t = setTimeout(() => { if(!document.documentElement.classList.contains('busq-abierta')) ov.classList.remove('abierto'); }, 320); document.documentElement.style.removeProperty('--busq-kb'); document.documentElement.style.removeProperty('--busq-fix'); document.documentElement.style.removeProperty('--vvb'); kbAjusta._k = null; kbAjusta._b = null; document.documentElement.classList.remove('kb-on'); const i = document.getElementById('busq-in'); i.blur(); i.value = ''; document.getElementById('busq-res').innerHTML = ''; };
   document.addEventListener('DOMContentLoaded', () => {
     const inp = document.getElementById('busq-in'), cont = document.getElementById('busq-res'); if(!inp) return;
     inp.addEventListener('input', () => { clearTimeout(deb); deb = setTimeout(pinta, 70); });
