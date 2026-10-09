@@ -4590,10 +4590,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.40" defer></script>
-<script src="costes/norm.js?v=V9.40" defer></script>
+<script src="rentabilidad/rent.js?v=V9.41" defer></script>
+<script src="costes/norm.js?v=V9.41" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.40</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.41</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4740,7 +4740,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.40</div>
+        <div class="sub" id="version-badge">V9.41</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9695,6 +9695,8 @@ document.addEventListener('click', ev => {
   if(b.dataset.r === 'dudosos') renderGastosProDudosos();
   if(b.dataset.r === 'recibos' && typeof renderRecibos === 'function') renderRecibos();
 });
+// Control interno (Economía, Gastos): solo cuentan los gastos de la actividad. Los personales / no relacionados / dudosos no (aunque en Impuestos sí puedan declararse: ver impMotivoExclusion).
+function gastoCuentaControl(d){ return d.relacion_actividad == null || d.relacion_actividad === 'relacionada'; }
 function gastosProDocs(){
   // los dudosos y los marcados como no válidos NO cuentan: ni en totales ni en listas ni para el gestor
   return Object.values(documentosRealesById).filter(d=>(d.type==='gasto' || d.tipo==='gasto') && (d.relacion_actividad==null || d.relacion_actividad==='relacionada'));
@@ -12358,7 +12360,7 @@ function renderGraficoFacturacion(){
       const dt = new Date(d.dateRaw);
       if(dt.getFullYear() !== anio) return;
       const m = dt.getMonth();
-      if(d.type==='gasto') gastos[m] += (d.total||0);
+      if(d.type==='gasto') gastos[m] += gastoCuentaControl(d) ? (d.total||0) : 0;
       else if(esIngreso(d)) ingresos[m] += (d.total||0);
     });
     renderGraficoBarrasDual('grafico-facturacion-svg', MESES, ingresos, gastos);
@@ -12370,7 +12372,7 @@ function renderGraficoFacturacion(){
       if(!d.dateRaw) return;
       const idx = anios.indexOf(new Date(d.dateRaw).getFullYear());
       if(idx<0) return;
-      if(d.type==='gasto') gastos[idx] += (d.total||0);
+      if(d.type==='gasto') gastos[idx] += gastoCuentaControl(d) ? (d.total||0) : 0;
       else if(esIngreso(d)) ingresos[idx] += (d.total||0);
     });
     renderGraficoBarrasDual('grafico-facturacion-svg', anios.map(String), ingresos, gastos);
@@ -12382,7 +12384,7 @@ function renderGraficoFacturacion(){
       const dt = new Date(d.dateRaw);
       if(dt.getFullYear() !== anio) return;
       const q = Math.floor(dt.getMonth()/3);
-      if(d.type==='gasto') gastos[q] += (d.total||0);
+      if(d.type==='gasto') gastos[q] += gastoCuentaControl(d) ? (d.total||0) : 0;
       else if(esIngreso(d)) ingresos[q] += (d.total||0);
     });
     renderGraficoBarrasDual('grafico-facturacion-svg', TRIMS, ingresos, gastos);
@@ -12394,7 +12396,7 @@ function renderGraficoFacturacion(){
     if(!d.dateRaw) return;
     const dt = new Date(d.dateRaw);
     if(dt.getFullYear() !== anio) return;
-    if(d.type==='gasto') gastosAnio += (d.total||0);
+    if(d.type==='gasto') gastosAnio += gastoCuentaControl(d) ? (d.total||0) : 0;
     else if(esIngreso(d)){
       ingresosAnio += (d.total||0);
       const entidad = clientes.find(c=>c.name===d.client);
@@ -12675,7 +12677,7 @@ function calcularKPIsReales(){
   const cobradoEnBMes = docs.filter(d=>d.type==='albaran' && d.estado_cobro==='cobrado' && esDelMes(d)).reduce((s,d)=>s+(d.total||0),0);
   const cobradoMes = cobradoLegalMes + cobradoEnBMes;
 
-  const gastosMes = docs.filter(d=>d.type==='gasto' && esDelMes(d)).reduce((s,d)=>s+(d.total||0),0);
+  const gastosMes = docs.filter(d=>d.type==='gasto' && gastoCuentaControl(d) && esDelMes(d)).reduce((s,d)=>s+(d.total||0),0);
   const margenMes = facturadoMes - gastosMes;
 
   // "Pendiente de cobro" = mismo cálculo que en la ficha de cliente y en Facturas: total
@@ -24433,7 +24435,7 @@ function impTratGasto(d){
 // ¿Cuenta como gasto del trimestre? Las compras de vehículos son inversión y los dudosos no se cuentan.
 function impMotivoExclusion(d){
   if(d.relacion_actividad === 'dudosa') return d.incluir_dudoso ? null : 'Dudoso: falta decidir si es válido';   // un dudoso se puede incluir mientras se decide (incluir_dudoso)
-  if(d.relacion_actividad === 'no_relacionada') return 'Marcado como no relacionado con la actividad';
+  if(d.relacion_actividad === 'no_relacionada') return d.incluir_dudoso ? null : 'Marcado como no relacionado con la actividad';   // V9.41: con «incluir» se declara en Impuestos aunque no cuente para el control
   if(d.categoria === 'Compra de vehículos') return 'Compra de vehículo: es inversión, no gasto del trimestre' + (impDesgloseGasto(d).some(impEsExtranjero) ? '; el IVA de otro país no se deduce' : '');
   return null;
 }
@@ -24742,7 +24744,7 @@ function impPintarApartados(q, anio, D){
   const todos = Object.values(documentosRealesById).filter(d => d.type === 'gasto' && d.estado !== 'anulado' && enQ(d));
   const enB = todos.filter(d => !impEsOficial(d)), oficiales = todos.filter(impEsOficial);
   const dudNo = oficiales.filter(d => d.relacion_actividad === 'dudosa' && !d.incluir_dudoso && d.categoria !== 'Compra de vehículos');
-  const noInc = oficiales.filter(d => d.relacion_actividad === 'no_relacionada' || (d.categoria === 'Compra de vehículos' && d.relacion_actividad !== 'dudosa'));
+  const noInc = oficiales.filter(d => (d.relacion_actividad === 'no_relacionada' && !d.incluir_dudoso) || (d.categoria === 'Compra de vehículos' && d.relacion_actividad !== 'dudosa'));
   const dudSi = D.gq.filter(d => d.relacion_actividad === 'dudosa');
   const resto = D.gq.filter(d => d.relacion_actividad !== 'dudosa');
   const mixtos = resto.filter(d => impPct(d) < 1), sinMixto = resto.filter(d => impPct(d) >= 1);
@@ -29175,7 +29177,7 @@ function recalcularResumenEconomia(){
   else if(filtro==='en_b'){ ingresos = ingresoEnB; etiquetaIngreso = 'Cobrado sin factura'; }
   else { ingresos = facturadoLegal + ingresoEnB; etiquetaIngreso = 'Ingresos (todo)'; }
 
-  const gastosRango = docs.filter(d=>d.type==='gasto' && enRango(d) && (!filtro || (d.contabilidad||'oficial')===filtro)).reduce((s,d)=>s+(d.total||0),0);
+  const gastosRango = docs.filter(d=>d.type==='gasto' && gastoCuentaControl(d) && enRango(d) && (!filtro || (d.contabilidad||'oficial')===filtro)).reduce((s,d)=>s+(d.total||0),0);
   const cobradoRango = facturasRango.reduce((s,d)=>s+Number(d.cobrado_importe||0),0);
   const pendiente = Math.max(0, facturadoLegal - cobradoRango);
   const iva = filtro==='en_b' ? 0 : facturasRango.reduce((s,d)=>s+(d.iva||0),0);
