@@ -4590,8 +4590,9 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
+<script src="rentabilidad/rent.js?v=V9.33" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.32</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.33</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4738,7 +4739,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.32</div>
+        <div class="sub" id="version-badge">V9.33</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8460,7 +8461,7 @@ function teRender(){
   const dias = t.h / 8, meses = t.h / 160;
   const sub = TE.sub === 'costes' ? 'costes' : 'graficos';
   app.innerHTML = `
-  <div class="docs-tabs" id="te-subtabs" style="margin:0 0 10px;"><button type="button" class="docs-tab ${sub === 'graficos' ? 'active' : ''}" onclick="teSub('graficos')">Gráficos</button><button type="button" class="docs-tab ${sub === 'costes' ? 'active' : ''}" onclick="teSub('costes')">Costes</button></div>
+  <div class="docs-tabs" id="te-subtabs" style="margin:0 0 10px;"><button type="button" class="docs-tab ${sub === 'graficos' ? 'active' : ''}" onclick="teSub('graficos')">Gráficos</button><button type="button" class="docs-tab ${sub === 'costes' ? 'active' : ''}" onclick="teSub('costes')">Rentabilidad</button></div>
   <div id="te-sec-graf" style="display:${sub === 'graficos' ? 'block' : 'none'};">
   <div class="panel te-panel">
     <div class="te-kpis">
@@ -24015,6 +24016,7 @@ function tbJobParaCostes(j){
 function costeEur(n, dec){ n = Number(n) || 0; const neg = n < 0 && Math.abs(n) >= (dec ? 0.005 : 0.5); const [e, d] = Math.abs(n).toFixed(dec || 0).split('.'); return (neg ? '−' : '') + e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (d ? ',' + d : '') + ' €'; }
 async function tbRenderCostes(){
   const lista = document.getElementById('te-costes'); if(!lista) return;
+  if(window.RENT && RENT.pintar){ try{ return await RENT.pintar(lista); }catch(e){ console.error('Rentabilidad', e); } }   // V9.33: sección Rentabilidad nueva (rentabilidad/rent.js); si falla, queda el cálculo anterior
   const tarifas = {...(await costeHoraCargar()), socios: await costeSociosCargar(), base: await costeBaseCargar()};
   const eur = n => costeEur(n);
   const errores = [], filas = [];
@@ -29856,7 +29858,7 @@ async function costeAyudanteGuardar(jobId, v){
   try{ if(t._id){ await sb.from('sistema').update({data: datos}).eq('id', t._id); } else { const {data} = await sb.from('sistema').insert({tipo: 'coste_hora', data: datos}).select('id').single(); if(data) t._id = data.id; } }catch(e){ mostrarToast('No se pudo guardar lo pagado a ayudantes'); }
   tbRenderCostes();
 }
-// ===== V9.32 (Daniel 09/10/2026): DIRECTO, INDIRECTO REPARTIDO POR DÍAS y LIMPIO REAL de cada obra =====
+// ===== V9.33 (Daniel 09/10/2026): DIRECTO, INDIRECTO REPARTIDO POR DÍAS y LIMPIO REAL de cada obra =====
 // Indirecto = lo que cuesta tener las máquinas usadas (seguro, impuestos, ITV: último año) + autónomos, nave, gestoría, préstamos, etc. + lo que sacan Rafa y Manolo,
 // todo del último año, entre 365 y por los días que duró la obra. Directo = combustible, otros gastos de la obra, lo pagado a ayudantes y piezas/taller de las máquinas usadas esos días.
 let _costeBase = null;
@@ -29865,7 +29867,7 @@ const COSTE_GENERALES = [['Autónomos y Seguridad Social', /aut[oó]nomo|segurid
 async function costeBaseCargar(){
   if(_costeBase) return _costeBase;
   const hace = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10), gastos = [];
-  try{ let o = 0; while(true){ const {data, error} = await sb.from('documentos_economicos').select('categoria, importe, base, fecha_devengo, vehiculo_id, relacion_actividad').is('deleted_at', null).eq('tipo', 'gasto').gte('fecha_devengo', hace).range(o, o + 999); if(error || !data || !data.length) break; gastos.push(...data); if(data.length < 1000) break; o += 1000; } }catch(e){ console.error('Costes base: gastos', e); }
+  try{ let o = 0; while(true){ const {data, error} = await sb.from('documentos_economicos').select('categoria, importe, fecha_devengo, vehiculo_id, relacion_actividad').is('deleted_at', null).eq('tipo', 'gasto').gte('fecha_devengo', hace).range(o, o + 999); if(error || !data || !data.length) break; gastos.push(...data); if(data.length < 1000) break; o += 1000; } }catch(e){ console.error('Costes base: gastos', e); }
   let flota = [], polizas = [];
   try{ const {data} = await sb.from('flota').select('id, nombre, clase, matricula, estado').in('estado', ['activo', 'averiada', 'averia']); flota = data || []; }catch(e){}
   try{ const {data} = await sb.from('polizas_seguro').select('flota_id, coste_anual, activa'); polizas = (data || []).filter(p => p.activa !== false); }catch(e){}
