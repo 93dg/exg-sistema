@@ -30,14 +30,15 @@
     img.onerror = () => { URL.revokeObjectURL(url); opc.aviso && opc.aviso("No se pudo abrir la foto para marcarla."); };
     img.onload = () => {
       const MAX = 2400, k = Math.min(1, MAX/Math.max(img.naturalWidth, img.naturalHeight));
-      const W = Math.round(img.naturalWidth*k), H = Math.round(img.naturalHeight*k);
+      let W = Math.round(img.naturalWidth*k), H = Math.round(img.naturalHeight*k), base = img, hist = [], rec = null, drag = null;
       const ov = document.createElement("div"); ov.id = "marcar-ov";
-      ov.innerHTML = '<div class="mk-top"><button type="button" data-a="x">Cancelar</button><button type="button" data-a="u" aria-label="Deshacer">'+ico("deshacer")+'</button><button type="button" class="mk-ok" data-a="ok">Listo</button></div><div class="mk-lienzo"></div><div class="mk-bot"></div>';
+      ov.innerHTML = '<div class="mk-top"><button type="button" data-a="x">Cancelar</button><button type="button" data-a="u" aria-label="Deshacer">'+ico("deshacer")+'</button><button type="button" class="mk-ok" data-a="ok">Listo</button><button type="button" class="mk-ok" data-a="ap" style="display:none">Aplicar</button></div><div class="mk-lienzo"></div><div class="mk-bot"></div>';
       const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
       ov.querySelector(".mk-lienzo").appendChild(cv);
       const bot = ov.querySelector(".mk-bot");
       let herr = "lapiz", color = COLORES[0], trazos = [], actual = null;
       [["lapiz","Lápiz"],["circulo","Círculo"],["flecha","Flecha"]].forEach(([id,t]) => { const b = document.createElement("button"); b.type="button"; b.dataset.h=id; b.setAttribute("aria-label",t); b.innerHTML = ico(id)+t; bot.appendChild(b); });
+      { const b = document.createElement("button"); b.type="button"; b.dataset.h="recorte"; b.setAttribute("aria-label","Recortar"); b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14M2 6h14a2 2 0 0 1 2 2v14"/></svg>Recortar'; bot.appendChild(b); }
       COLORES.forEach(c => { const b = document.createElement("button"); b.type="button"; b.className="mk-col"; b.dataset.c=c; b.style.background=c; b.setAttribute("aria-label","Color"); bot.appendChild(b); });
       const ctx = cv.getContext("2d");
       const grosor = () => Math.max(4, Math.round(Math.max(W,H)/180));
@@ -50,25 +51,45 @@
           ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
           ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(b.x-h*Math.cos(ang-0.45),b.y-h*Math.sin(ang-0.45)); ctx.moveTo(b.x,b.y); ctx.lineTo(b.x-h*Math.cos(ang+0.45),b.y-h*Math.sin(ang+0.45)); ctx.stroke(); }
       }
-      function pintar(){ ctx.drawImage(img,0,0,W,H); trazos.forEach(dibujar); if (actual) dibujar(actual); }
+      function pintar(){ ctx.drawImage(base,0,0,W,H); trazos.forEach(dibujar); if (actual) dibujar(actual);
+        if (rec){ ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(0,0,W,rec.y); ctx.fillRect(0,rec.y+rec.h,W,H-rec.y-rec.h); ctx.fillRect(0,rec.y,rec.x,rec.h); ctx.fillRect(rec.x+rec.w,rec.y,W-rec.x-rec.w,rec.h);
+          const g = Math.max(3, W/300); ctx.strokeStyle = "#fff"; ctx.lineWidth = g; ctx.strokeRect(rec.x,rec.y,rec.w,rec.h);
+          ctx.lineWidth = g/2; ctx.beginPath(); for (let i=1;i<3;i++){ ctx.moveTo(rec.x+rec.w*i/3,rec.y); ctx.lineTo(rec.x+rec.w*i/3,rec.y+rec.h); ctx.moveTo(rec.x,rec.y+rec.h*i/3); ctx.lineTo(rec.x+rec.w,rec.y+rec.h*i/3); } ctx.stroke();
+          ctx.fillStyle = "#fff"; const hs = Math.max(10, W/45); [[rec.x,rec.y],[rec.x+rec.w,rec.y],[rec.x,rec.y+rec.h],[rec.x+rec.w,rec.y+rec.h]].forEach(([x,y]) => ctx.fillRect(x-hs/2,y-hs/2,hs,hs)); } }
       function marca(){ bot.querySelectorAll("[data-h]").forEach(b => b.classList.toggle("on", b.dataset.h===herr)); bot.querySelectorAll("[data-c]").forEach(b => b.classList.toggle("on", b.dataset.c===color)); }
+      function modoRecorte(on){ rec = on ? { x:W*0.05, y:H*0.05, w:W*0.9, h:H*0.9 } : null; ov.querySelector('[data-a="ap"]').style.display = on ? "" : "none"; ov.querySelector('[data-a="ok"]').style.display = on ? "none" : ""; pintar(); }
+      function aplicarRecorte(){ const r = rec; if (!r || r.w<20 || r.h<20){ modoRecorte(false); return; }
+        pintar(); rec = null; pintar();
+        const nb = document.createElement("canvas"); nb.width = Math.round(r.w); nb.height = Math.round(r.h); nb.getContext("2d").drawImage(cv, Math.round(r.x), Math.round(r.y), nb.width, nb.height, 0, 0, nb.width, nb.height);
+        hist.push({ crop:true, base, W, H, trazos }); base = nb; W = nb.width; H = nb.height; trazos = []; cv.width = W; cv.height = H; modoRecorte(false); ajustar(); }
       const pos = e => { const r = cv.getBoundingClientRect(); return { x:(e.clientX-r.left)*W/r.width, y:(e.clientY-r.top)*H/r.height }; };
-      cv.addEventListener("pointerdown", e => { e.preventDefault(); try{cv.setPointerCapture(e.pointerId);}catch(_){} actual = { h:herr, color, g:grosor(), pts:[pos(e)] }; pintar(); });
-      cv.addEventListener("pointermove", e => { if (!actual) return; e.preventDefault(); const p = pos(e); if (actual.h==="lapiz") actual.pts.push(p); else actual.pts[1]=p; pintar(); });
-      const fin = e => { if (!actual) return; trazos.push(actual); actual = null; pintar(); };
+      cv.addEventListener("pointerdown", e => { e.preventDefault(); try{cv.setPointerCapture(e.pointerId);}catch(_){}
+        if (rec){ const p = pos(e), t = Math.max(30, W/18), cx = [rec.x, rec.x+rec.w], cy = [rec.y, rec.y+rec.h]; let mx = null, my = null;
+          cx.forEach((x,i) => { if (Math.abs(p.x-x)<t) mx = i; }); cy.forEach((y,i) => { if (Math.abs(p.y-y)<t) my = i; });
+          if (mx!==null || my!==null) drag = { m:"borde", mx, my }; else if (p.x>rec.x && p.x<rec.x+rec.w && p.y>rec.y && p.y<rec.y+rec.h) drag = { m:"mover", dx:p.x-rec.x, dy:p.y-rec.y }; else drag = null; return; }
+        actual = { h:herr, color, g:grosor(), pts:[pos(e)] }; pintar(); });
+      cv.addEventListener("pointermove", e => { if (rec){ if (!drag) return; e.preventDefault(); const p = pos(e), c = (v,a,b) => Math.max(a,Math.min(b,v)), mn = 40;
+          if (drag.m==="mover"){ rec.x = c(p.x-drag.dx,0,W-rec.w); rec.y = c(p.y-drag.dy,0,H-rec.h); }
+          else { if (drag.mx===0){ const r = rec.x+rec.w; rec.x = c(p.x,0,r-mn); rec.w = r-rec.x; } else if (drag.mx===1){ rec.w = c(p.x,rec.x+mn,W)-rec.x; }
+                 if (drag.my===0){ const b = rec.y+rec.h; rec.y = c(p.y,0,b-mn); rec.h = b-rec.y; } else if (drag.my===1){ rec.h = c(p.y,rec.y+mn,H)-rec.y; } }
+          pintar(); return; }
+        if (!actual) return; e.preventDefault(); const p = pos(e); if (actual.h==="lapiz") actual.pts.push(p); else actual.pts[1]=p; pintar(); });
+      const fin = e => { if (rec){ drag = null; return; } if (!actual) return; trazos.push(actual); hist.push({});  actual = null; pintar(); };
       cv.addEventListener("pointerup", fin); cv.addEventListener("pointercancel", fin);
       let cerrar = function(){ ov.remove(); URL.revokeObjectURL(url); };
       ov.addEventListener("click", e => {
         const b = e.target.closest("button"); if (!b) return;
-        if (b.dataset.h){ herr = b.dataset.h; marca(); }
+        if (b.dataset.h==='recorte'){ modoRecorte(!rec); bot.querySelector('[data-h=recorte]').classList.toggle('on', !!rec); }
+        else if (b.dataset.h){ if (rec) modoRecorte(false); bot.querySelector('[data-h=recorte]').classList.remove('on'); herr = b.dataset.h; marca(); }
         else if (b.dataset.c){ color = b.dataset.c; marca(); }
-        else if (b.dataset.a==="u"){ trazos.pop(); pintar(); }
+        else if (b.dataset.a==="ap"){ aplicarRecorte(); bot.querySelector('[data-h=recorte]').classList.remove('on'); }
+        else if (b.dataset.a==="u"){ if (rec){ modoRecorte(false); bot.querySelector('[data-h=recorte]').classList.remove('on'); return; } const h = hist.pop(); if (!h) return; if (h.crop){ base = h.base; W = h.W; H = h.H; trazos = h.trazos; cv.width = W; cv.height = H; ajustar(); } else trazos.pop(); pintar(); }
         else if (b.dataset.a==="x"){ cerrar(); }
         else if (b.dataset.a==="ok"){
-          if (!trazos.length){ cerrar(); return; }
+          if (!trazos.length && !hist.length){ cerrar(); return; }
           cv.toBlob(bl => {
             if (!bl){ opc.aviso && opc.aviso("No se pudo guardar la marca."); return; }
-            const nombre = (file.name||"foto").replace(/\.[^.]+$/,"") + "-marcada.jpg";
+            const nombre = (file.name||"foto").replace(/\.[^.]+$/,"") + "-editada.jpg";
             const f = new File([bl], nombre, { type:"image/jpeg", lastModified: Date.now() });
             cerrar(); opc.listo && opc.listo(f);
           }, "image/jpeg", 0.92);
