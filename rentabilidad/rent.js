@@ -380,6 +380,25 @@ const guarda = async (q, nota) => { const {error} = await q; if(error){ alert('N
 R.repinta = () => { if(R.el && R.P) R.el.innerHTML = R.vista(R.P); };
 R.setTab = n => { R.tab = n; R.repinta(); R.snapshot(); };
 R.setSel = id => { R.sel = id; R.repinta(); R.snapshot(); };
+
+// ---------- Economía: ¿estamos en precio? (precio actual por hora frente al mínimo que sale de los gastos; se recalcula con los gastos de los últimos 12 meses) ----------
+R.tablaPrecios = function(P){
+  const ref = R.referencia(P); if(!ref || !P.costes) return null;
+  const r = R.calcular(ref.job, P, R.asignar(P)); if(r.vacio || !r.H || !r.niv || !isFinite(r.niv.minImp)) return null;
+  const cl = Object.keys(r.hClase).filter(c => r.hClase[c] > 0 && ref.cls[c] && P.costes.clases.find(x => x.clase === c && x.horaFija != null));
+  const fija = c => P.costes.clases.find(x => x.clase === c).horaFija, avgF = sum(cl, c => fija(c) * r.hClase[c]) / sum(cl, c => r.hClase[c]);
+  const filas = cl.map(c => { const tarifa = ref.cls[c].tarifa, min = r.niv.minImp + (fija(c) - avgF); return {clase: c, nombre: R.NOMBRE_CLASE[c] || c, horas: r.hClase[c], tarifa, min, dif: tarifa - min}; });
+  return {filas, obra: ref.job.trabajo, minMedio: r.niv.minImp, tarifaMedia: r.niv.tarifa, impuesto: R.param.impuesto, horas: r.H};
+};
+R.htmlPrecios = T => {
+  if(!T) return '<div class="panel" style="padding:12px;margin-top:12px;font-size:12.5px;color:var(--ink-soft);">¿Estamos en precio? Aún no hay una obra con horas completas para calcularlo.</div>';
+  const f = T.filas, ok = f.filter(x => x.dif >= 0).length, td = 'padding:7px 6px;border-bottom:1px solid var(--line,#0001);';
+  const cab = '<tr style="font-size:11px;color:var(--ink-soft);text-align:right;"><th style="text-align:left;padding:4px 6px;">Máquina</th><th style="padding:4px 6px;">Precio actual</th><th style="padding:4px 6px;">Mínimo para no perder</th><th style="padding:4px 6px;">Diferencia</th></tr>';
+  const rows = f.map(x => '<tr style="text-align:right;font-size:13px;"><td style="' + td + 'text-align:left;font-weight:700;">' + esc(x.nombre) + '</td><td style="' + td + '">' + eur(x.tarifa, 2) + '/h</td><td style="' + td + '">' + eur(x.min, 2) + '/h</td><td style="' + td + 'font-weight:800;color:' + col(x.dif) + ';">' + (x.dif >= 0 ? '+' : '') + eur(x.dif, 2) + '</td></tr>').join('');
+  return '<div class="panel" style="padding:12px;margin-top:12px;"><div style="font-weight:800;font-size:14px;">¿Estamos en precio?</div><div style="font-size:12px;color:var(--ink-soft);margin:2px 0 8px;">' + ok + ' de ' + f.length + ' máquinas cubren su coste. En conjunto cobráis ' + eur(T.tarifaMedia, 2) + '/h y el mínimo medio es ' + eur(T.minMedio, 2) + '/h.</div><table style="width:100%;border-collapse:collapse;">' + cab + rows + '</table>'
+    + '<div style="font-size:11px;color:var(--ink-soft);margin-top:8px;">El mínimo es el coste completo por hora (combustible, averías, seguros, impuestos, autónomos, gestoría, estructura y la retribución de Rafa y Manolo) más los impuestos estimados (' + T.impuesto + ' %). Se recalcula solo con los gastos de los últimos 12 meses. Precio actual y horas: obra de referencia «' + esc(T.obra) + '» (' + h1(T.horas) + ' h). Aún no incluye la reposición de las máquinas.</div></div>';
+};
+R.pintarPrecios = async function(el){ if(!el) return; try{ const P = await R.cargar(false); el.innerHTML = R.htmlPrecios(R.tablaPrecios(P)); }catch(e){ console.error(e); el.innerHTML = ''; } };
 R.recargar = async () => { R.invalidar(); if(R.el) await R.pintar(R.el, true); };
 R.param_ = async () => { const P = R.P; const data = {...R.param}; if(P.paramId) await guarda(sb.from('sistema').update({data}).eq('id', P.paramId), 'hipótesis'); else { const {data: d, error} = await sb.from('sistema').insert({tipo: 'rent_parametros', data}).select('id').single(); if(!error && d) P.paramId = d.id; } };
 R.setRef = async id => { R.param.refJob = id || null; await R.param_(); if(R.P) delete R.P._ref; R.repinta(); };
