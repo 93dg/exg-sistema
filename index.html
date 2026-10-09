@@ -4590,9 +4590,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.35" defer></script>
+<script src="rentabilidad/rent.js?v=V9.36" defer></script>
+<script src="costes/norm.js?v=V9.36" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.35</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.36</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4739,7 +4740,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.35</div>
+        <div class="sub" id="version-badge">V9.36</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5756,6 +5757,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
         <button type="button" class="docs-tab" data-sub="proveedores">Proveedores</button>
         <button type="button" class="docs-tab" data-sub="resumen">Resumen</button>
         <button type="button" class="docs-tab" data-sub="control">Control</button>
+        <button type="button" class="docs-tab" data-sub="normal">Normalización</button>
         <button type="button" class="docs-tab" data-sub="combustible">Combustible</button>
         <button type="button" class="docs-tab" data-sub="prestamos">Préstamos</button>
         <button type="button" class="docs-tab" data-sub="revisar">Revisar</button>
@@ -5863,6 +5865,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
 
       <!-- REVISAR: lo que llega del correo y los gastos dudosos -->
       <!-- PRÉSTAMOS: deuda que se sigue mes a mes; los intereses de cada recibo son gasto, la amortización no -->
+      <div class="sub-view" id="gpro-normal" style="display:none;"><div id="norm-cont"></div></div>
       <div class="sub-view" id="gpro-prestamos" style="display:none;">
         <div id="prest-lista"></div>
         <div class="two-col-note">Los intereses de cada recibo son un gasto financiero (sin IVA). La amortización del capital no es gasto: es devolver deuda. El cuadro se calcula con el tipo y la cuota del préstamo y se ha comprobado con las filas que da el banco.</div>
@@ -9672,7 +9675,7 @@ function setupSubtabs(navId, prefix, mapping, opts){
 }
 setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',asistencia:'flota-asistencia',mantenimiento:'flota-mantenimiento',averias:'flota-averias',repuestos:'flota-repuestos',historial:'flota-historial',particulares:'flota-particulares'});
 setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad'});
-setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',proveedores:'gpro-proveedores',control:'gpro-control',combustible:'gpro-comb',prestamos:'gpro-prestamos',revisar:'gpro-revisar'},{onSwitch:{proveedores:()=>renderGastosProProveedores(), revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible(), control:()=>renderGastosProControl(), prestamos:()=>iniciarPrestamos()}});
+setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',proveedores:'gpro-proveedores',control:'gpro-control',normal:'gpro-normal',combustible:'gpro-comb',prestamos:'gpro-prestamos',revisar:'gpro-revisar'},{onSwitch:{normal:()=>{ if(window.COSTES) COSTES.pintar(document.getElementById('norm-cont')); },proveedores:()=>renderGastosProProveedores(), revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible(), control:()=>renderGastosProControl(), prestamos:()=>iniciarPrestamos()}});
 document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filters .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     chip.parentElement.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
