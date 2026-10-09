@@ -184,6 +184,7 @@ R.calcular = function(job, P, asig){
     const est = iCub > 0 ? sum(sinF, m => ingObra[k][m]) * fCub / iCub : 0;
     if(est > 1) lineasD.push(L('combustible_est:' + k, nom + ' (meses aún sin factura)', est, 'estimada', 'gasto medio por € trabajado de los meses con factura × lo trabajado en ' + sinF.join(', '), 'Se sustituye por el real cuando llegue la factura.', ex));
     combReal += real; });
+  if(lineasD.some(x => /^combustible(_est)?:A$/.test(x.clave) && x.valor > 0)) avisos.push('El gasóleo A incluye también el de los coches (X-Trail, Matrix y Audi): el coste del camión sale más alto de lo real.');
   // ---- DIRECTO: gastos vinculados, ayudantes, reparaciones ----
   const vinG = (P.vinculos || []).filter(v => v.job_id === job.id && v.rol === 'gasto' && v.accion === 'incluir');
   const porCat = {}; vinG.forEach(v => { const g = (P.gastos || []).find(x => x.id === v.documento_id); if(!g) return; usados.add(g.id); const c = g.categoria || 'Otros'; porCat[c] = (porCat[c] || 0) + R.baseGasto(g); });
