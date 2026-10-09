@@ -4590,10 +4590,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.46" defer></script>
-<script src="costes/norm.js?v=V9.46" defer></script>
+<script src="rentabilidad/rent.js?v=V9.47" defer></script>
+<script src="costes/norm.js?v=V9.47" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.46</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.47</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4740,7 +4740,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.46</div>
+        <div class="sub" id="version-badge">V9.47</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9144,15 +9144,15 @@ new MutationObserver(() => { const v = document.getElementById('flota-asistencia
 // Se guardan en Sistema (tipo=alerta_banco) y el saldo es el del último aviso; si no hay avisos más nuevos, el último de Fintable
 let _saldoSync = false;
 const saldoNum = t => Number(String(t).replace(/\./g, '').replace(',', '.'));
-function saldoParsear(asunto, texto){
+function saldoParsear(asunto, texto){   // V9.47: NUNCA descarta un aviso del banco; si no lo entiende lo guarda como «otro» con el texto, para revisarlo
   const t = String(texto || '').replace(/\s+/g, ' '), a = String(asunto || '').toLowerCase();
-  const tipo = /abono/.test(a) ? 'abono' : /pr[eé]stamo/.test(a) ? 'prestamo' : /recibo/.test(a) ? 'recibo' : /tarjeta/.test(a) ? 'tarjeta' : /cargo/.test(a) ? 'cargo' : null;
-  if(!tipo) return null;
-  const f = t.match(/(\d{2})-(\d{2})-(\d{4})/), imp = t.match(/importe de (-?[\d.]+,\d{2}) ?EUR/i) || t.match(/compra de (-?[\d.]+,\d{2}) ?EUR/i), sal = t.match(/saldo actual es(?: de)? (-?[\d.]+,\d{2}) ?EUR/i);
-  if(!imp) return null;
+  const tipo = /reintegro/.test(a) || /disposici[oó]n de [\d.]+,\d{2}|en cajero/i.test(t) ? 'reintegro' : /abono/.test(a) ? 'abono' : /pr[eé]stamo/.test(a) ? 'prestamo' : /recibo/.test(a) ? 'recibo' : /tarjeta/.test(a) ? 'tarjeta' : /cargo/.test(a) ? 'cargo' : 'otro';
+  const f = t.match(/(\d{2})-(\d{2})-(\d{4})/), imp = t.match(/(?:importe de|compra de|disposici[oó]n de) (-?[\d.]+,\d{2}) ?EUR/i) || t.match(/(-?[\d.]+,\d{2}) ?EUR/i), sal = t.match(/saldo actual es(?: de)? (-?[\d.]+,\d{2}) ?EUR/i);
+  const fecha = f ? `${f[3]}-${f[2]}-${f[1]}` : null, cuenta = (t.match(/\*\*(\d{4})/) || [])[1] || (t.match(/tarjeta \*+(\d{4})/i) || [])[1] || null;
+  if(!imp) return {tipo, fecha, importe: null, saldo: sal ? saldoNum(sal[1]) : null, concepto: String(asunto || '').slice(0, 80) || null, cuenta, sin_interpretar: true, texto: t.slice(0, 400)};
   let importe = Math.abs(saldoNum(imp[1])); if(tipo !== 'abono') importe = -importe;
-  const conc = tipo === 'recibo' ? (t.match(/recibo de (.+?) en su cuenta/i) || [])[1] : tipo === 'tarjeta' ? (t.match(/ en (.+?)\. Quedamos/i) || [])[1] : null;
-  return {tipo, fecha: f ? `${f[3]}-${f[2]}-${f[1]}` : null, importe, saldo: sal ? saldoNum(sal[1]) : null, concepto: conc || null, cuenta: (t.match(/\*\*(\d{4})/) || [])[1] || null};
+  const conc = tipo === 'recibo' ? (t.match(/recibo de (.+?) en su cuenta/i) || [])[1] : tipo === 'tarjeta' ? (t.match(/ en (.+?)\. Quedamos/i) || [])[1] : tipo === 'reintegro' ? 'Retirada en cajero' : null;
+  return {tipo, fecha, importe, saldo: sal ? saldoNum(sal[1]) : null, concepto: conc || null, cuenta};
 }
 async function saldoSincronizar(){   // lee los avisos nuevos de Ruralvía del correo de la empresa (sin abrir nada si Gmail no está conectado)
   if(_saldoSync || !sb) return false; _saldoSync = true;
@@ -9248,7 +9248,7 @@ function econ2Detalle(k, {sel, e}){   // V8.13: el detalle que se despliega al t
   const lista = (rs, imp, extra, max = 15) => { const o = rs.slice().sort((a, b) => imp(b) - imp(a)); return o.slice(0, max).map(r => filaDoc(r, imp(r), extra && extra(r))).join('') + (o.length > max ? `<div class="e2-mas">y ${o.length - max} más</div>` : ''); };
   const porCli = (rs, imp, max = 12) => { const m = {}; rs.forEach(r => { m[r.cli] = (m[r.cli] || 0) + imp(r); }); const o = Object.entries(m).filter(x => x[1] > 0.5).sort((a, b) => b[1] - a[1]), tot = o.reduce((a, x) => a + x[1], 0);
     return o.slice(0, max).map(([c, v]) => `<div class="e2-fila"><div><b>${escHtml(c)}</b><span>${Math.round(v / tot * 100)} %</span></div><strong>${e(v)}</strong></div>`).join('') + (o.length > max ? `<div class="e2-mas">y ${o.length - max} más</div>` : ''); };
-  if(k === 'saldo') return (_e2.avisos || []).length ? (_e2.avisos || []).map(a => `<div class="e2-fila"><div><b>${escHtml(a.concepto || ({abono: 'Abono', cargo: 'Cargo', recibo: 'Recibo', prestamo: 'Préstamo', tarjeta: 'Tarjeta'})[a.tipo] || '')}</b><span>${fch(a.fecha)}${a.saldo != null ? ' · saldo ' + e(a.saldo) : ''}</span></div><strong class="${a.importe >= 0 ? 'pos' : 'neg'}">${a.importe >= 0 ? '+' : ''}${e(a.importe)}</strong></div>`).join('') : '<div class="e2-mas">Aún no hay avisos del banco leídos.</div>';
+  if(k === 'saldo') return (_e2.avisos || []).length ? (_e2.avisos || []).map(a => `<div class="e2-fila"><div><b>${escHtml(a.concepto || ({abono: 'Abono', cargo: 'Cargo', recibo: 'Recibo', prestamo: 'Préstamo', tarjeta: 'Tarjeta', reintegro: 'Cajero', otro: 'Aviso sin interpretar'})[a.tipo] || '')}</b><span>${fch(a.fecha)}${a.saldo != null ? ' · saldo ' + e(a.saldo) : ''}</span></div><strong class="${a.importe == null ? '' : a.importe >= 0 ? 'pos' : 'neg'}">${a.importe == null ? '—' : (a.importe >= 0 ? '+' : '') + e(a.importe)}</strong></div>`).join('') : '<div class="e2-mas">Aún no hay avisos del banco leídos.</div>';
   if(k === 'flota') return ((_valFlotaRaw && _valFlotaRaw.items) || []).filter(x => x.maquina).map(x => { const f = (typeof fleet !== 'undefined' ? fleet : []).find(m => m.id === x.flota_id); return `<div class="e2-fila"><div><b>${escHtml(f ? (f.modelo || f.name) : 'Máquina')}</b><span>${x.min && x.max ? 'entre ' + e(x.min) + ' y ' + e(x.max) : ''}</span></div><strong>≈ ${e(x.estimado)}</strong></div>`; }).join('');
   if(k === 'deuda') return (_e2Deuda || []).map(x => `<div class="e2-fila"><div><b>${escHtml(x.quien)}</b><span>${escHtml(x.que || '')}</span></div><strong>${x.imp == null ? '<em style="font-style:normal;color:#E8A33A;">Falta</em>' : (x.aprox ? '≈ ' : '') + e(x.imp)}</strong></div>`).join('') || '<div class="e2-mas">No hay deudas apuntadas.</div>';
   if(k === 'cobrar') return lista(_e2.filter(r => r.pend > 0 || r.sinFact > 0), r => r.pend + r.sinFact, r => dias(r.fecha) + ' días' + (r.sinFact > 0 ? ' · (sin facturar)' : ''));   // V8.36: con lo de la Administración sin facturar, marcado
