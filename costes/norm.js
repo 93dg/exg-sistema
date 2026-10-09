@@ -3,11 +3,11 @@
 (function(){
 const C = window.COSTES = {};
 const U = () => window.RENT.util;
-const DEF = {diasLab: 217, horasJornada: 8, diasNat: 365, horasNat: 8760, incluirB: true, horasProd: {}, convenio: {maquinista: 38629, oficial2: 37203.8}};
+const DEF = {diasLab: 217, horasJornada: 8, diasNat: 365, horasNat: 8760, incluirB: true, horasProd: {}, usoVeh: {}, convenio: {maquinista: 38629, oficial2: 37203.8}};
 C.cfg = JSON.parse(JSON.stringify(DEF)); C.cfgId = null; C.D = null;
 const FREQ = {mensual: 12, bimestral: 6, trimestral: 4, semestral: 2, anual: 1};
 const CLASES_MAQ = ['mixta', 'camion', 'giratoria', 'niveladora', 'rulo', 'cuba'];
-const NOM = {mixta: 'Mixta (retro)', camion: 'Camión', giratoria: 'Giratoria', niveladora: 'Niveladora', rulo: 'Rulo', cuba: 'Cuba de agua', turismo: 'Turismos / otros vehículos', pool: 'Flota sin asignar a máquina'};
+const NOM = {mixta: 'Mixta (retro)', camion: 'Camión', giratoria: 'Giratoria', niveladora: 'Niveladora', rulo: 'Rulo', cuba: 'Cuba de agua', desplazamiento: 'Coches de empresa (desplazamiento a obras)', pool: 'Flota sin asignar a máquina'};
 
 // ---- a qué grupo de coste y a qué criterio de reparto pertenece cada categoría ----
 const GRUPOS = {
@@ -15,7 +15,8 @@ const GRUPOS = {
   personal: ['Personal y autónomos', 'horas de jornada'],
   estructura: ['Estructura de la empresa', 'días laborables'],
   obra: ['Directo de obra (subcontratas, vertedero)', 'se imputa a la obra concreta'],
-  socios: ['Retiradas y gastos personales de los socios', 'no es coste de explotación'],
+  socios: ['Retiradas y gastos personales de los socios (incluye coches personales de Rafa)', 'no es coste de explotación'],
+  ajeno: ['No es de la empresa (coche de Alberto)', 'no es coste de explotación'],
   fuera: ['Fuera de la explotación (Hacienda, compra de vehículos)', 'no es coste de explotación'],
   sin: ['Sin clasificar', 'revisar']
 };
@@ -30,7 +31,13 @@ C.grupoDe = cat => {
   if(/alquiler|gestor|financ|comisi|pr[eé]stamo|tecnolog|software|suministro|ferreter|prevenci|electric|amazon|bazar|cooperativa|compras varias/i.test(t)) return 'estructura';
   return 'sin';
 };
-const claseFlota = f => { const t = ((f && f.nombre) || '') + ' ' + ((f && f.clase) || ''); if(/todoterreno|turismo|coche|audi|hyundai|range/i.test(t)) return 'turismo'; if(/mixta/i.test(t)) return 'mixta'; if(/cami[oó]n|iveco|multilift/i.test(t)) return 'camion'; if(/giratoria/i.test(t)) return 'giratoria'; if(/niveladora/i.test(t)) return 'niveladora'; if(/rulo/i.test(t)) return 'rulo'; if(/cuba/i.test(t)) return 'cuba'; return 'turismo'; };
+const claseFlota = f => { const t = ((f && f.nombre) || '') + ' ' + ((f && f.clase) || ''); if(/todoterreno|turismo|coche|audi|hyundai|range|nissan/i.test(t)) return 'turismo'; if(/mixta/i.test(t)) return 'mixta'; if(/cami[oó]n|iveco|multilift/i.test(t)) return 'camion'; if(/giratoria/i.test(t)) return 'giratoria'; if(/niveladora/i.test(t)) return 'niveladora'; if(/rulo/i.test(t)) return 'rulo'; if(/cuba/i.test(t)) return 'cuba'; return 'turismo'; };
+
+// ---- uso de cada vehículo: lo que Daniel ha dicho (Nissan X-Trail y Hyundai Matrix = coches de empresa; los dos Audi = personales de Rafa, aunque fiscalmente se deduzcan como mixtos; Galloper averiado; Evoque = Alberto) ----
+const USOS = {maquina: 'Máquina', empresa: 'Coche de empresa', socio: 'Personal de Rafa', alberto: 'De Alberto', averiado: 'Averiado, sin uso'};
+C.USOS = USOS;
+C.usoDe = f => { if(!f) return null; const m = C.cfg.usoVeh && C.cfg.usoVeh[f.id]; if(m) return m; if(claseFlota(f) !== 'turismo') return 'maquina'; const t = (f.nombre || '') + ' ' + (f.matricula || ''); if(/x-trail|matrix/i.test(t)) return 'empresa'; if(/audi/i.test(t)) return 'socio'; if(/galloper/i.test(t)) return 'averiado'; if(/evoque|range/i.test(t)) return 'alberto'; return 'empresa'; };
+const usoTexto = t => { t = String(t || ''); if(/retroexcavadora|liebherr|nissan|x-trail|mixta|iveco|cami[oó]n/i.test(t)) return null; if(/evoque|range rover/i.test(t)) return 'alberto'; if(/audi|galloper/i.test(t)) return 'socio'; if(/hyundai matrix/i.test(t)) return 'empresa'; return null; };
 
 // ---- conversiones automáticas a partir del importe ANUAL ----
 C.conv = anual => {
@@ -59,11 +66,17 @@ C.calcular = function(P, contratos){
   const porCat = new Map(), porGrupo = {}, porClase = {}; const add = (o, k, v) => { o[k] = (o[k] || 0) + v; };
   let nB = 0, baseB = 0;
   gW.forEach(g => {
-    const base = R.baseGasto(g), cat = g.categoria || '(sin categoría)', grupo = C.grupoDe(cat), esB = g.contabilidad === 'en_b';
-    const e = porCat.get(cat) || {cat, grupo, base: 0, baseB: 0, n: 0}; e.base += base; e.n++; if(esB){ e.baseB += base; baseB += base; nB++; } porCat.set(cat, e);
+    const base = R.baseGasto(g), cat = g.categoria || '(sin categoría)', esB = g.contabilidad === 'en_b', veh = g.vehiculo_id ? flotaById.get(g.vehiculo_id) : null;
+    let grupo = C.grupoDe(cat), uso = veh ? C.usoDe(veh) : usoTexto(g.concepto), recl = false;
+    if(grupo !== 'fuera' && grupo !== 'socios'){   // un gasto de vehículo manda el uso del vehículo sobre la categoría
+      if(uso === 'socio'){ grupo = 'socios'; recl = true; } else if(uso === 'alberto'){ grupo = 'ajeno'; recl = true; } else if(uso === 'averiado'){ grupo = 'fuera'; recl = true; }
+      else if(uso === 'empresa' && grupo !== 'personal'){ grupo = 'flota'; }
+    }
+    const e = porCat.get(cat + '|' + grupo) || {cat, grupo, base: 0, baseB: 0, n: 0, recl: 0}; e.base += base; e.n++; if(recl) e.recl++; if(esB){ e.baseB += base; baseB += base; nB++; } porCat.set(cat + '|' + grupo, e);
     add(porGrupo, grupo, base);
     if(grupo === 'flota'){
-      if(g.vehiculo_id && flotaById.has(g.vehiculo_id)){ add(porClase, claseFlota(flotaById.get(g.vehiculo_id)), base); return; }
+      if(uso === 'empresa'){ add(porClase, 'desplazamiento', base); return; }
+      if(veh && uso === 'maquina'){ add(porClase, claseFlota(veh), base); return; }
       add(porClase, 'pool', base);
     }
   });
@@ -72,13 +85,13 @@ C.calcular = function(P, contratos){
   CLASES_MAQ.forEach(k => {
     const h = horasProd[k].h, directo = porClase[k] || 0, parte = hMaq ? poolF * h / hMaq : 0, total = directo + parte;
     if(!h && !directo) return;
-    clases.push({clase: k, nombre: NOM[k], h, hReal: horasProd[k].real, manual: horasProd[k].manual, directo, parte, total, ...C.conv(total), horaProd: h ? total / h : null, maquinas: (P.flota || []).filter(f => claseFlota(f) === k && f.estado !== 'vendida')});
+    clases.push({clase: k, nombre: NOM[k], h, hReal: horasProd[k].real, manual: horasProd[k].manual, directo, parte, total, ...C.conv(total), horaProd: h ? total / h : null, maquinas: (P.flota || []).filter(f => claseFlota(f) === k && C.usoDe(f) === 'maquina' && f.estado !== 'vendida')});
   });
-  if(porClase.turismo) clases.push({clase: 'turismo', nombre: NOM.turismo, h: 0, directo: porClase.turismo, parte: 0, total: porClase.turismo, ...C.conv(porClase.turismo), horaProd: null, maquinas: []});
+  if(porClase.desplazamiento) clases.push({clase: 'desplazamiento', nombre: NOM.desplazamiento, h: 0, directo: porClase.desplazamiento, parte: 0, total: porClase.desplazamiento, ...C.conv(porClase.desplazamiento), horaProd: null, maquinas: (P.flota || []).filter(f => C.usoDe(f) === 'empresa' && f.estado !== 'vendida')});
   // amortización (provisión): solo con precio de compra conocido
-  const amort = (P.flota || []).filter(f => f.estado !== 'vendida' && claseFlota(f) !== 'turismo').map(f => {
+  const amort = (P.flota || []).filter(f => f.estado !== 'vendida' && ['maquina', 'empresa'].includes(C.usoDe(f))).map(f => {
     const compra = f.coste_compra != null ? num(f.coste_compra) : null, vida = num(R.param.vidaUtil) || 10, res = num(R.param.residualPct) || 0;
-    return {id: f.id, nombre: f.nombre, clase: claseFlota(f), compra, anual: compra ? compra * (1 - res / 100) / vida : null};
+    return {id: f.id, nombre: f.nombre, clase: claseFlota(f), uso: C.usoDe(f), compra, anual: compra ? compra * (1 - res / 100) / vida : null};
   });
   const amortTot = sum(amort.filter(a => a.anual != null), a => a.anual);
   // contratos: importe original + periodicidad real → anual recalculado
@@ -122,6 +135,8 @@ C.vista = function(D){
     + nota('Hora de jornada = días laborables × horas de jornada = <b>' + U().h1(hJ) + ' h</b> (convenio: 1.736 h = 217 días × 8 h). La hora natural (8.760 h) es solo referencia: nunca se usa para repartir a las obras. Horas con actividad en albaranes (12 m): <b>' + U().h1(D.horasEmpresa) + ' h</b> en <b>' + D.diasActividad + '</b> días.'));
   // 2. Tipos
   h += card('Qué es cada cosa', '<div style="font-size:12px;line-height:1.5;">' + REAL + ' gasto realmente pagado o facturado, sin IVA, últimos 12 meses (' + D.W0 + ' a ' + D.hoy + ').<br>' + CALC + ' coste obtenido por cálculo (reparto, convenio) a partir de datos registrados.<br>' + PROV + ' amortización: reserva para renovar, no es un pago. Necesita el precio de compra de cada máquina.</div>');
+  const vu = (D.P.flota || []).filter(f => f.estado !== 'vendida').map(f => '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:3px 0;border-bottom:1px solid var(--line,#0001);"><span>' + esc(f.nombre) + ' <span style="color:var(--ink-soft);font-size:11px;">' + esc(f.matricula || '') + '</span></span><select onchange="COSTES.setUso(\'' + f.id + '\',this.value)" style="font-size:12px;">' + Object.keys(USOS).map(k => '<option value="' + k + '"' + (C.usoDe(f) === k ? ' selected' : '') + '>' + USOS[k] + '</option>').join('') + '</select></div>').join('');
+  h += card('Uso de cada vehículo', vu + nota('Un gasto de un vehículo va a donde diga su uso. Nissan X-Trail y Hyundai Matrix: coches de empresa para ir a las obras. Los dos Audi: personales de Rafa, fuera del coste de explotación aunque a efectos fiscales se sigan deduciendo como mixtos (eso no se toca aquí). Galloper averiado, sin uso. El Evoque es de Alberto.'));
   // 3. Contratos
   const cf = D.ctr.map(k => {
     const v = k.anualCalc != null ? C.conv(k.anualCalc) : null, aviso = k.imp == null ? FALTA + ' sin importe' : k.cuadra === false ? EST + ' no cuadra: registrado ' + f2(k.reg) + ' / calculado ' + f2(k.anualCalc) : k.reg == null ? EST + ' sin coste anual registrado' : '';
@@ -132,12 +147,12 @@ C.vista = function(D){
   const grup = Object.keys(GRUPOS).filter(k => D.porGrupo[k]).map(k => {
     const cats = D.porCat.filter(x => x.grupo === k);
     return '<tr><td style="' + TD + 'text-align:left;background:var(--concrete-2);" colspan="7"><b>' + GRUPOS[k][0] + '</b> · reparto: ' + GRUPOS[k][1] + ' · ' + eur(D.porGrupo[k]) + '</td></tr>'
-      + cats.map(x => '<tr><td style="' + TD + 'text-align:left;white-space:normal;">' + esc(x.cat) + ' <span style="font-size:10.5px;color:var(--ink-soft);">(' + x.n + ' doc.' + (x.baseB ? ', ' + eur(x.baseB) + ' en B' : '') + ')</span></td>' + celdas(C.conv(x.base)) + '</tr>').join('');
+      + cats.map(x => '<tr><td style="' + TD + 'text-align:left;white-space:normal;">' + esc(x.cat) + ' <span style="font-size:10.5px;color:var(--ink-soft);">(' + x.n + ' doc.' + (x.baseB ? ', ' + eur(x.baseB) + ' en B' : '') + (x.recl ? ', ' + x.recl + ' pasados aquí por el uso del vehículo' : '') + ')</span></td>' + celdas(C.conv(x.base)) + '</tr>').join('');
   }).join('');
   h += card('Gastos registrados 12 meses por categoría ' + REAL, tabla(CAB, grup) + nota(D.gastos + ' gastos sin IVA' + (c.incluirB ? ' (incluye ' + D.nB + ' en B por ' + eur(D.baseB) + ')' : ' (sin los gastos en B)') + '. Los gastos de socios y los de fuera de la explotación se muestran pero no entran en el coste de explotación.'));
   // 5. Coste por recurso
   const rc = D.clases.map(k => '<tr><td style="' + TD + 'text-align:left;white-space:normal;"><b>' + k.nombre + '</b><div style="font-size:10.5px;color:var(--ink-soft);">' + (k.maquinas.length ? k.maquinas.map(m => esc(m.nombre)).join(', ') + ' · ' : '') + 'directo ' + f2(k.directo) + ' + reparto del resto de la flota ' + f2(k.parte) + '</div></td>' + celdas(k) + '</tr>').join('');
-  const hp = D.clases.filter(k => k.clase !== 'turismo').map(k => '<tr><td style="' + TD + 'text-align:left;">' + k.nombre + '</td><td style="' + TD + '">' + U().h1(k.hReal) + ' h</td><td style="' + TD + '">' + inp(k.manual ? k.h : '', "COSTES.setHP('" + k.clase + "',this.value)") + '</td><td style="' + TD + '"><b>' + U().h1(k.h) + ' h</b> ' + (k.manual ? EST : CALC) + '</td><td style="' + TD + '"><b>' + f2(k.horaProd) + '</b> / h productiva</td></tr>').join('');
+  const hp = D.clases.filter(k => k.clase !== 'desplazamiento').map(k => '<tr><td style="' + TD + 'text-align:left;">' + k.nombre + '</td><td style="' + TD + '">' + U().h1(k.hReal) + ' h</td><td style="' + TD + '">' + inp(k.manual ? k.h : '', "COSTES.setHP('" + k.clase + "',this.value)") + '</td><td style="' + TD + '"><b>' + U().h1(k.h) + ' h</b> ' + (k.manual ? EST : CALC) + '</td><td style="' + TD + '"><b>' + f2(k.horaProd) + '</b> / h productiva</td></tr>').join('');
   h += card('Coste por recurso: máquinas y vehículos ' + CALC, tabla(CAB, rc) + nota('Solo se asigna a una máquina lo que tiene vehículo o máquina indicados en el gasto; el resto de la flota (combustible, seguros, repuestos…) se reparte entre máquinas por sus horas productivas. Si pocos gastos llevan máquina, el reparto es aproximado.')
     + '<div style="font-weight:700;font-size:12.5px;margin-top:8px;">Horas productivas por máquina</div>' + tabla('<th style="' + TH + 'text-align:left;">Clase</th><th style="' + TH + '">Reales (albaranes)</th><th style="' + TH + '">Fijar a mano</th><th style="' + TH + '">Se usan</th><th style="' + TH + '">Coste</th>', hp) + nota('Horas reales sacadas de los albaranes de los últimos 12 meses. Si dejas el campo vacío se usan las reales; si escribes un número se usa ese y se marca como Estimado.'));
   // 6. Trabajadores
@@ -169,6 +184,7 @@ const num = v => { const n = Number(String(v).replace(',', '.')); return isFinit
 C.set = async (k, v) => { const n = num(v); if(n <= 0) return; C.cfg[k] = n; await C.save(); };
 C.toggleB = async b => { C.cfg.incluirB = !!b; await C.save(); };
 C.setHP = async (k, v) => { C.cfg.horasProd = {...(C.cfg.horasProd || {})}; if(String(v).trim() === '') delete C.cfg.horasProd[k]; else C.cfg.horasProd[k] = num(v); await C.save(); };
+C.setUso = async (id, v) => { C.cfg.usoVeh = {...(C.cfg.usoVeh || {}), [id]: v}; await C.save(); };
 C.setConv = async (k, v) => { C.cfg.convenio = {...C.cfg.convenio, [k]: num(v)}; await C.save(); };
 C.setCompra = async (id, v) => { const n = String(v).trim() === '' ? null : num(v); const {error} = await sb.from('flota').update({coste_compra: n}).eq('id', id); if(error){ alert('No se pudo guardar: ' + error.message); return; } await C.recargar(); };
 C.repinta = async () => { if(C.el) await C.pintar(C.el, false); };
