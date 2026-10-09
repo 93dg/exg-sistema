@@ -6,7 +6,7 @@
 'use strict';
 const R = window.RENT = {};
 const DAY = 86400000;
-const PARAM0 = {reduccionAverias: 30, horasMecanicaSemana: 10, jornadas: 250, impuesto: 20, vidaUtil: 10, residualPct: 0, horasSocioDia: 8, diasSemanaSocios: 5, ocupacion: 70, indisponibilidad: 10, ahorroTaller: 50, condMecPct: 50, usarEstimaciones: true};
+const PARAM0 = {reduccionAverias: 30, horasMecanicaSemana: 10, jornadas: 250, impuesto: 20, vidaUtil: 10, residualPct: 0, horasSocioDia: 8, diasSemanaSocios: 5, ocupacion: 70, indisponibilidad: 10, ahorroTaller: 50, condMecPct: 50, usarEstimaciones: true, margen: 10, repSemana: 10, gesSemana: 0};
 R.param = {...PARAM0};
 R.P = null;   // datos cargados
 const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -52,7 +52,7 @@ R.cargar = async function(forzar){
   P.jobs = sis.filter(r => r.tipo === 'trabajo_cola' && r.data).map(r => ({id: r.id, ...r.data}));
   const ch = sis.find(r => r.tipo === 'coste_hora'); P.ayudantes = (ch && ch.data && ch.data.ayudantes) || {};
   const pa = sis.find(r => r.tipo === 'rent_parametros'); P.paramId = pa ? pa.id : null; R.param = {...PARAM0, ...((pa && pa.data) || {})};
-  const es = sis.find(r => r.tipo === 'rent_escenarios'); P.escId = es ? es.id : null; P.escenarios = (es && es.data && es.data.lista) || [];
+  const es = sis.find(r => r.tipo === 'rent_escenarios'); P.escId = es ? es.id : null; P.escenarios = (es && es.data && es.data.lista) || []; P.esc2 = (es && es.data && es.data.lista2) || [];
   try{ P.socios = await costeSociosCargar(); }catch(e){ P.socios = []; R.errores.push('socios: ' + e.message); }
   try{ const {data} = await sb.from('tarifas').select('concepto,precio_particular'); P.tarifas = data || []; }catch(e){ P.tarifas = []; }
   if(window.COSTES){ try{ COSTES.aplicarCfg(sis.find(r => r.tipo === 'costes_config')); P.costes = COSTES.calcular(P, []); }catch(e){ P.costes = null; R.errores.push('costes: ' + e.message); console.error('COSTES', e); } }
@@ -211,7 +211,7 @@ R.calcular = function(job, P, asig){
   const comprobado = ejecutado - directoComp - indirectoComp - sociosV;
   const estimadoImp = sum(lineasD.concat(lineasI).filter(est), x => x.valor), totalCostes = directo + indirecto + sociosV;
   const dCal = diffDays(desde, hasta) + 1;
-  const res = {vacio: false, job, desde, hasta, D, H, dCal, ing, lineasD, lineasI, socios: socL, directo, indirecto, ejecutado, resultadoDirecto: ejecutado - directo, bAntesSocios, beneficioReal, comprobado, impuestos, neto, tesoreria, cobrado, estimadoImp, pctEstimado: totalCostes > 0 ? estimadoImp / totalCostes * 100 : 0, avisos, maq: [...maq.values()].map(x => ({id: x.m.id, nombre: x.m.nombre, horas: x.horas, dias: x.dias.size})), hClase, ev: {diasEmp: Math.max(1, ev.dias), horas: ev.horas, ingresos: ev.ingresos, comb: ev.comb}, albs};
+  const res = {vacio: false, job, desde, hasta, D, H, dCal, ing, lineasD, lineasI, socios: socL, directo, indirecto, ejecutado, resultadoDirecto: ejecutado - directo, bAntesSocios, beneficioReal, comprobado, impuestos, neto, tesoreria, cobrado, estimadoImp, pctEstimado: totalCostes > 0 ? estimadoImp / totalCostes * 100 : 0, avisos, maq: [...maq.values()].map(x => ({id: x.m.id, nombre: x.m.nombre, horas: x.horas, dias: x.dias.size, clases: [...x.clases]})), hClase, ev: {diasEmp: Math.max(1, ev.dias), horas: ev.horas, ingresos: ev.ingresos, comb: ev.comb}, albs};
   // ---- tres niveles de coste (cada nivel contiene al anterior; no se suman) ----
   const rel = x => /^(maq:|amort:|gen:ss|gen:coches|gen:gestoria)/.test(x.clave), relI = sum(lineasI.filter(rel), x => x.valor), gloI = indirecto - relI;
   const n1 = directo, n2 = directo + relI + sociosV, n3 = directo + indirecto + sociosV;
@@ -289,7 +289,7 @@ R.conclusiones = function(r, P, b){
   q.push(['¿Cuánto habría que facturar extra para recuperar cada contratación?', sims.map(([n, s]) => n + ': ' + (isFinite(s.equilibrioFact) ? eur(s.equilibrioFact) + ' al año (≈ ' + h1(s.equilibrioHoras) + ' h extra)' : 'sin datos')).join(' · ')]);
   const todas = R.combinaciones(B).sort((a, c) => c.beneficio - a.beneficio), mejor = todas[0], suave = todas.filter(s => s.horasSocios <= (R.simular(B, R.ESC0).horasSocios) * 0.8).sort((a, c) => c.beneficio - a.beneficio)[0];
   q.push(['¿Qué organización gana más con menos esfuerzo físico?', 'Más beneficio: ' + mejor.nombre + ' (' + eur(mejor.beneficio) + ' al año, ' + eur(mejor.dBenef) + ' sobre hoy). ' + (suave ? 'Con al menos un 20 % menos de horas de los socios, la mejor es ' + suave.nombre + ' (' + eur(suave.beneficio) + ', ' + h1(suave.esfuerzoEvitado) + ' h menos al año). ' : 'Ninguna combinación baja un 20 % el esfuerzo de los socios con los datos actuales. ') + 'Estimación: depende de la ocupación, la demanda y las averías de Hipótesis.']);
-  return q;
+  return q.slice(0, 6);   // V9.55: las de contratar viven en el simulador nuevo (sin límite por demanda)
 };
 
 // ================= PANTALLA =================
@@ -321,7 +321,6 @@ R.secReal = r => {
   const grande = (t, v, s) => '<div style="display:flex;justify-content:space-between;font-weight:700;font-size:13px;padding:3px 0;"><span>' + t + '</span><span style="color:' + col(v) + ';">' + eur(v) + '</span></div>' + (s ? '<div style="font-size:11px;color:var(--ink-soft);margin:-2px 0 4px;">' + s + '</div>' : '');
   return card('', '<div style="font-size:12px;color:var(--ink-soft);">BENEFICIO REAL</div><div style="font-size:26px;font-weight:900;color:' + col(r.beneficioReal) + ';">' + eur(r.beneficioReal) + '</div><div style="font-size:12px;">' + pct(m.pctIngresos) + ' del ingreso · ' + eur(m.porJornada) + ' por jornada · ' + (isFinite(m.porHora) ? eur(m.porHora, 2) + ' por hora' : 'sin horas') + '</div><div style="margin-top:6px;">' + (r.pctEstimado > 0 ? badge('estimada') + ' <span style="font-size:11px;">' + Math.round(r.pctEstimado) + ' % de los costes son estimados. Solo con datos comprobados: <b>' + eur(r.comprobado) + '</b></span>' : badge('calculada')) + '</div>', 'background:var(--concrete-2);')
     + card('Costes indirectos repartidos a esta obra', ind + fila('<b>Total indirectos</b> (sin retribución socios)', '<b>' + eur(r.indirecto) + '</b>') + '<div style="margin-top:6px;"><a href="#" onclick="RENT.anadir(\'' + r.job.id + '\',\'indirecto\');return false" style="font-size:12px;">+ añadir coste indirecto</a></div>')
-    + R.cardNiveles(r)
     + card('Cuenta final', grande('Resultado directo', r.resultadoDirecto) + grande('− Indirectos', -r.indirecto) + grande('Beneficio antes de retribuir a los socios', r.bAntesSocios, 'Antes de impuestos.') + grande('− Retribución de Rafa y Manolo', -r.socios.valor, 'No es gasto deducible: las retiradas no bajan los impuestos.') + grande('Beneficio real (antes de impuestos)', r.beneficioReal) + grande('− Impuestos estimados (' + R.param.impuesto + ' %)', -r.impuestos, 'Hipótesis editable. Se calcula sobre el beneficio antes de retribuir a los socios.') + grande('Beneficio neto estimado', r.neto) + '<div style="border-top:1px solid var(--line,#0002);margin:6px 0;"></div>' + grande('Tesorería: cobrado − pagos − retiradas', r.tesoreria, 'Dinero que ha entrado menos lo que ha salido, sin contar amortización (no sale dinero). Lo no cobrado aún no cuenta.'));
 };
 R.secOport = r => {
@@ -356,25 +355,178 @@ R.secComp = (r, P, b) => {
   if(!r || r.vacio) return card('', '<div style="font-size:12.5px;">Elige una obra con albaranes en el apartado 1 para ver las conclusiones.</div>');
   return card('Conclusiones: ' + esc(r.job.trabajo || 'obra'), R.conclusiones(r, P, b).map(([a, c]) => '<div style="margin-bottom:9px;"><div style="font-weight:700;font-size:12.5px;">' + esc(a) + '</div><div style="font-size:12.5px;">' + esc(c) + '</div></div>').join('') + '<div style="font-size:11px;color:var(--orange);">Las cifras estimadas están marcadas en cada apartado. Las conclusiones de contratación son del conjunto de la empresa, no de esta obra.</div>');
 };
+// ================= V9.55 · PANTALLA ÚNICA: 4 niveles + simulador de plantilla (Daniel 09/10/2026) =================
+// Reparto por máquina: cada gasto general se reparte UNA sola vez por horas de máquina (si dos máquinas trabajan el mismo día no se cuenta dos veces); los costes fijos de una máquina van solo a esa máquina.
+R.objetivo = (ded, soc, t, m) => { const den = (1 - t) - m; return den > 0.01 ? ((1 - t) * ded + soc) / den : NaN; };   // precio que deja m (% del ingreso) NETO tras impuestos: E − ded − soc − t·(E − ded) = m·E; las retiradas no desgravan
+R.porClase = function(r){
+  const H = r.H; if(!(H > 0)) return null;
+  const cls = Object.keys(r.hClase).filter(c => r.hClase[c] > 0), t = num(R.param.impuesto) / 100, m = num(R.param.margen) / 100;
+  const ing = {}; r.albs.forEach(d => { const f = R.factorLineas(d); R.lineas(d).forEach(l => { if(l.h > 0) ing[l.clase] = (ing[l.clase] || 0) + l.imp * f; }); });
+  const maqCl = {}; (r.maq || []).forEach(x => { maqCl[String(x.id)] = (x.clases || []).filter(c => r.hClase[c] > 0); });
+  const parte = (x, c) => { let k;
+    if((k = /^maq:(.+)$/.exec(x.clave))) return k[1] === c ? x.valor : 0;
+    if((k = /^amort:(.+)$/.exec(x.clave))){ const cs = maqCl[k[1]] || []; if(!cs.length) return x.valor * r.hClase[c] / H; return cs.includes(c) ? x.valor * r.hClase[c] / sum(cs, q => r.hClase[q]) : 0; }
+    return x.valor * r.hClase[c] / H; };
+  const rel = x => /^(maq:|amort:|gen:ss|gen:coches|gen:gestoria)/.test(x.clave);
+  return cls.map(c => { const h = r.hClase[c], D = sum(r.lineasD, x => parte(x, c)), I = sum(r.lineasI, x => parte(x, c)), IR = sum(r.lineasI.filter(rel), x => parte(x, c)), S = r.socios.valor * h / H;
+    return {clase: c, nombre: R.NOMBRE_CLASE[c] || c, h, n1: D, n2: D + IR + S, n3: D + I + S, n4: R.objetivo(D + I, S, t, m), cobrado: ing[c] || 0, tarifa: ing[c] ? ing[c] / h : NaN}; });
+};
+R.niveles4 = function(r){
+  const t = num(R.param.impuesto) / 100, m = num(R.param.margen) / 100, ded = r.directo + r.indirecto, soc = r.socios.valor, E = R.objetivo(ded, soc, t, m);
+  return {n1: r.niv.n1, n2: r.niv.n2, n3: r.niv.n3, n4: E, imp: isFinite(E) ? t * Math.max(0, E - ded) : NaN, mar: isFinite(E) ? m * E : NaN, t, m, H: r.H};
+};
+// horas de Rafa y Manolo por actividad (12 meses): máquina y camión salen de los albaranes; reparar y gestionar son horas/semana de Hipótesis (no hay otro dato)
+R.horasSocios = function(b){
+  const ev = b.ev, hc = ev.horasClase || {}, prm = R.param, cond = hc.camion || 0, maq = Math.max(0, ev.horas - cond), rep = num(prm.repSemana) * 46, ges = num(prm.gesSemana) * 46;
+  return {maq, cond, rep, ges, total: maq + cond + rep + ges, porDia: ev.dias ? ev.horas / ev.dias : NaN};
+};
+R.ESC2 = {rafa: 'hoy', manolo: 'hoy', mec: 0, cm: 0, maq: 0};
+R.build2 = {...R.ESC2};
+R.nombreEsc2 = e => { const p = [], pl = (n, s) => '+' + n + ' ' + s + (n > 1 ? 's' : ''); if(e.rafa !== 'hoy') p.push('Rafa ' + e.rafa); if(e.manolo !== 'hoy') p.push('Manolo ' + e.manolo); if(e.maq) p.push(pl(e.maq, 'maquinista')); if(e.mec) p.push(pl(e.mec, 'mecánico')); if(e.cm) p.push(pl(e.cm, 'conductor/mecánico')); return p.length ? p.join(', ') : 'Como hoy'; };
+// Simulador: capacidad (lo que se podría producir) separada de lo asegurado (lo que ya se factura). La demanda NO limita: hay trabajo de sobra y conseguirlo es gestión comercial aparte.
+R.simular2 = function(b, e){
+  const prm = R.param, jorn = num(prm.jornadas) || 250, oc = num(prm.ocupacion) / 100, cmP = num(prm.condMecPct) / 100, t = num(prm.impuesto) / 100, contrato = 8 * jorn, hs = R.horasSocios(b);
+  const cMaq = coste('maquinista'), cMec = coste('oficial1'), faltan = [], nMaq = e.maq | 0, nMec = e.mec | 0, nCM = e.cm | 0, ok = x => isFinite(x) ? x : 0;
+  if((nMaq || e.rafa === 'empleado' || e.manolo === 'empleado') && !isFinite(cMaq)) faltan.push('convenio de maquinista'); if((nMec || nCM) && !isFinite(cMec)) faltan.push('convenio de mecánico');
+  const red = Math.min(1, nMec + nCM * (1 - cmP));
+  let capSoc = 0, costeEmp = 0, retrib = 0, nFuera = 0;
+  [e.rafa, e.manolo].forEach(m => {
+    if(m === 'hoy'){ capSoc += b.horas / 2 + hs.rep / 2 * red * oc; retrib += b.socios / 2; }
+    else if(m === 'empleado'){ costeEmp += ok(cMaq); capSoc += Math.max(0, contrato - hs.rep / 2 * (1 - red) - hs.ges / 2) * oc; }
+    else nFuera++; });
+  const capHired = nMaq * contrato * oc + nCM * contrato * oc * cmP, costeHired = nMaq * ok(cMaq) + (nMec + nCM) * ok(cMec), costePers = costeHired + costeEmp;
+  const ind0 = num(prm.indisponibilidad) / 100, ind1 = Math.max(0, num(prm.indisponibilidad) - red * num(prm.reduccionAverias) * num(prm.indisponibilidad) / 100) / 100;
+  const capMaq0 = Math.max(b.horas, b.maquinas * 8 * jorn * oc * (1 - ind0)), capMaq = capMaq0 * (1 - ind1) / (1 - ind0);
+  const capPers = capSoc + capHired, cap = Math.min(capMaq, capPers);
+  const ahorro = red * num(prm.ahorroTaller) / 100 * b.taller, mH = isFinite(b.margenH) ? b.margenH : 0, ingH = isFinite(b.ingH) ? b.ingH : 0;
+  const horasAseg = Math.min(b.horas, cap), dPot = cap - b.horas, dAseg = horasAseg - b.horas, base = b.beneficio - b.socios, cambio = costePers + retrib - b.socios;
+  const benAseg = base + dAseg * mH + ahorro - cambio, benPot = base + dPot * mH + ahorro - cambio, imp = x => t * Math.max(0, x + retrib);
+  const falta = Math.max(0, cambio - ahorro), eqH = mH > 0 ? falta / mH : NaN;
+  // trabajo de Rafa y Manolo (h/año) por actividad
+  const nP = 2 - nFuera, maqSoc = capPers > 0 ? horasAseg * capSoc / capPers : 0, shareC = (hs.maq + hs.cond) ? hs.cond / (hs.maq + hs.cond) : 0;
+  const tr = {maq: maqSoc * (1 - shareC), cond: maqSoc * shareC, rep: hs.rep * (1 - red), ges: hs.ges}; tr.total = tr.maq + tr.cond + tr.rep + tr.ges;
+  const notas = []; if(nFuera && hs.ges > 0) notas.push('Con ' + (nFuera === 2 ? 'los dos fuera' : 'uno fuera') + ' la gestión de la empresa queda sin cubrir.'); if(nFuera === 2 && !nMaq && !nCM) notas.push('Sin Rafa ni Manolo y sin nadie que maneje máquinas, no se produce.');
+  if(capPers > capMaq + 1) notas.push('El límite son las máquinas, no las personas.'); if(faltan.length) notas.push('Falta dato: ' + faltan.join(', ') + '.'); if(!hs.ges) notas.push('Las horas de gestión de Rafa y Manolo están a 0: ponlas en Hipótesis para que cuenten.');
+  return {e, nombre: R.nombreEsc2(e), costePers, retrib, capacidad: cap, capPers, capMaq, dPot, dAseg, horasAseg, ahorro, benAseg, benPot, netAseg: benAseg - imp(benAseg), netPot: benPot - imp(benPot), dBenAseg: benAseg - base, dBenPot: benPot - base, eqH, eqFact: eqH * ingH, ingPot: Math.max(0, dPot) * ingH, tr, nP, red, notas};
+};
+
+// ---------- presentación ----------
+if(!document.getElementById('rt-css')){ const st = document.createElement('style'); st.id = 'rt-css'; st.textContent = `
+.rt-w{display:flex;flex-direction:column;gap:12px}
+.rt-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.rt-t{background:var(--concrete-2,#f1eee8);border-radius:16px;padding:10px 6px;text-align:center}
+.rt-t span{display:block;font-size:11px;color:var(--ink-soft)}
+.rt-t b{display:block;font-size:19px;font-weight:900;margin-top:2px}
+.rt-t small{display:block;font-size:11px;color:var(--ink-soft)}
+.rt-c{background:var(--concrete-2,#f1eee8);border-radius:16px;padding:12px}
+.rt-c>h3{margin:0 0 8px;font-size:14px;font-weight:800}
+.rt-n{display:grid;grid-template-columns:5px 1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line,#0001)}
+.rt-n:first-of-type{border-top:0}
+.rt-n i{align-self:stretch;border-radius:3px}
+.rt-n b{font-size:13.5px}.rt-n small{display:block;font-size:11px;color:var(--ink-soft)}
+.rt-n .v{text-align:right}.rt-n .v b{font-size:16px;font-weight:900;display:block}
+.rt-n .d{font-size:12px;font-weight:800;text-align:right;min-width:62px}
+.rt-ch{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;font-size:12px}
+.rt-ch button,.rt-seg button{border:1.5px solid var(--line,#0003);background:transparent;border-radius:999px;padding:5px 9px;font-size:12.5px;font-weight:700;color:inherit}
+.rt-ch button.on,.rt-seg button.on{background:var(--orange,#e8892b);border-color:var(--orange,#e8892b);color:#fff}
+.rt-tb{width:100%;border-collapse:collapse;font-size:12.5px}
+.rt-tb th{font-size:11px;color:var(--ink-soft);font-weight:600;text-align:right;padding:3px 4px}
+.rt-tb th:first-child,.rt-tb td:first-child{text-align:left}
+.rt-tb td{padding:7px 4px;text-align:right;border-top:1px solid var(--line,#0001);white-space:nowrap}
+.rt-d{background:transparent;border-radius:16px;border:1.5px solid var(--line,#0002);padding:0 12px}
+.rt-d>summary{padding:11px 0;font-weight:800;font-size:13px;color:var(--orange,#e8892b);cursor:pointer}
+.rt-d[open]>summary{margin-bottom:6px}
+.rt-sim-r{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line,#0001);font-size:13px}
+.rt-sim-r:first-of-type{border-top:0}
+.rt-st{display:inline-flex;align-items:center;gap:8px}
+.rt-st button{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--line,#0003);background:transparent;font-size:18px;font-weight:800;color:inherit;line-height:1}
+.rt-st b{min-width:18px;text-align:center;font-size:16px}
+.rt-seg{display:flex;gap:5px}
+.rt-big{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 8px}
+.rt-big div{background:var(--card,#fff);border-radius:14px;padding:10px;text-align:center}
+.rt-big span{display:block;font-size:11px;color:var(--ink-soft)}.rt-big b{display:block;font-size:20px;font-weight:900;margin-top:2px}.rt-big small{font-size:10.5px;color:var(--ink-soft)}
+.rt-an{font-size:11.5px;color:var(--orange);margin-top:4px}
+`; document.head.appendChild(st); }
+
+const dEur = (v, dec) => (v >= 0 ? '+' : '') + eur(v, dec);
+const dh = v => isFinite(v) ? '<span style="color:' + col(v) + ';">' + (v >= 0 ? '+' : '') + eur(v, 2) + '/h</span>' : '';
+const det = (t, inner) => '<details class="rt-d"><summary>' + t + '</summary>' + inner + '</details>';
+
+R.vistaObra = function(r, P, b){
+  const nv = R.niveles4(r), cl = R.porClase(r), tar = r.niv.tarifa, hOk = r.H > 0;
+  const fila = (n, titulo, sub, tot, color) => { const h = hOk ? tot / r.H : NaN; return '<div class="rt-n"><i style="background:' + color + ';"></i><div><b>' + titulo + '</b><small>' + sub + '</small></div><div class="v"><b>' + (isFinite(tot) ? eur(tot) : 'sin dato') + '</b><small>' + (isFinite(h) ? eur(h, 2) + '/h' : 'sin horas') + '</small></div><div class="d">' + (isFinite(h) && isFinite(tar) ? dh(tar - h) : '') + '</div></div>'; };
+  const margenChips = [5, 10, 15, 20, 25].map(v => '<button type="button" class="' + (num(R.param.margen) === v ? 'on' : '') + '" onclick="RENT.setParam(\'margen\',' + v + ')">' + v + ' %</button>').join('');
+  const resumen = '<div class="rt-sum"><div class="rt-t"><span>Trabajo hecho</span><b>' + eur(r.ejecutado) + '</b><small>' + (hOk ? h1(r.H) + ' h' : 'sin horas') + '</small></div><div class="rt-t"><span>Beneficio real</span><b style="color:' + col(r.beneficioReal) + ';">' + eur(r.beneficioReal) + '</b><small>' + pct(r.m.pctIngresos) + ' del ingreso</small></div><div class="rt-t"><span>Cobráis por hora</span><b>' + (isFinite(tar) ? eur(tar, 2) : '—') + '</b><small>' + (isFinite(r.m.porHora) ? 'quedan ' + eur(r.m.porHora, 2) + '/h' : '') + '</small></div></div>';
+  const niveles = '<div class="rt-c"><h3>¿Cuánto cuesta y a cuánto hay que cobrar?</h3>'
+    + fila(1, '1 · Directo', 'combustible, averías, ayudantes', nv.n1, '#2f8f5b') + fila(2, '2 · Para poder hacerla', 'máquina fija, coches, autónomos, gestoría, Rafa y Manolo', nv.n2, '#2f6fb0')
+    + fila(3, '3 · Coste completo', 'más el resto de la empresa', nv.n3, '#c58a1b') + fila(4, '4 · Precio objetivo', 'más impuestos y vuestro margen', nv.n4, '#c0392b')
+    + '<div class="rt-ch"><span>Margen:</span>' + margenChips + '</div></div>';
+  const maq = cl ? '<div class="rt-c"><h3>Por máquina (€/hora)</h3><table class="rt-tb"><tr><th>Máquina</th><th>Cobráis</th><th>Completo</th><th>Objetivo</th></tr>' + cl.map(x => '<tr><td><b>' + esc(x.nombre) + '</b><small style="display:block;color:var(--ink-soft);font-size:11px;">' + h1(x.h) + ' h</small></td><td>' + (isFinite(x.tarifa) ? eur(x.tarifa, 2) : '—') + '</td><td>' + eur(x.n3 / x.h, 2) + '</td><td style="font-weight:800;color:' + (isFinite(x.n4) && isFinite(x.tarifa) ? col(x.tarifa - x.n4 / x.h) : 'inherit') + ';">' + (isFinite(x.n4) ? eur(x.n4 / x.h, 2) : '—') + '</td></tr>').join('') + '</table></div>' : '';
+  const detNiv = '<div class="rt-c" style="background:transparent;padding:0;">' + (cl ? '<table class="rt-tb"><tr><th>Máquina</th><th>Directo</th><th>Para hacerla</th><th>Completo</th><th>Objetivo</th></tr>' + cl.map(x => '<tr><td>' + esc(x.nombre) + '</td><td>' + eur(x.n1) + '</td><td>' + eur(x.n2) + '</td><td>' + eur(x.n3) + '</td><td>' + (isFinite(x.n4) ? eur(x.n4) : '—') + '</td></tr>').join('') + '<tr style="font-weight:800;"><td>Total</td><td>' + eur(nv.n1) + '</td><td>' + eur(nv.n2) + '</td><td>' + eur(nv.n3) + '</td><td>' + (isFinite(nv.n4) ? eur(nv.n4) : '—') + '</td></tr></table>' : '')
+    + (isFinite(nv.n4) ? fila(0, 'Precio objetivo', 'costes ' + eur(nv.n3) + ' + impuestos ' + eur(nv.imp) + ' + margen ' + eur(nv.mar), nv.n4, '#c0392b') : '<div class="rt-an">Con ese margen e impuestos no hay precio posible: baja el margen.</div>')
+    + '<div style="font-size:11.5px;color:var(--ink-soft);margin-top:6px;">Los gastos generales se reparten una sola vez por horas de máquina: si dos máquinas trabajan el mismo día, ese día no se cuenta dos veces. Los costes fijos de cada máquina van solo a ella. Impuestos: ' + R.param.impuesto + ' % sobre el beneficio, sin contar lo que se llevan Rafa y Manolo, que no desgrava. El margen es lo que queda limpio tras impuestos, como % del precio. Falta la reposición real de las máquinas sin precio de compra.</div></div>';
+  const avisos = (r.avisos.length ? '<div class="rt-an">' + r.avisos.map(a => '• ' + esc(a)).join('<br>') + '</div>' : '') + R.sinHorasAviso(r);
+  const detalle = det('Ver detalle', avisos + detNiv + R.secDirecto(r) + R.secReal(r) + R.secOport(r) + R.secComp(r, P, b));
+  return resumen + niveles + maq + detalle;
+};
+
+R.escHtml2 = (b, lista) => {
+  const hoy = R.simular2(b, R.ESC2), filas = [hoy, ...lista.map(e => R.simular2(b, e))];
+  const f = (t, fn, st) => '<tr><td style="color:var(--ink-soft);white-space:normal;' + (st || '') + '">' + t + '</td>' + filas.map(s => '<td>' + fn(s) + '</td>').join('') + '</tr>';
+  return '<div style="overflow-x:auto;"><table class="rt-tb"><tr><th></th>' + filas.map((s, i) => '<th style="max-width:96px;white-space:normal;">' + esc(s.nombre) + (i ? ' <a href="#" onclick="RENT.escDel2(' + (i - 1) + ');return false" style="color:var(--red);">✕</a>' : '') + '</th>').join('') + '</tr>'
+    + f('Coste de personal', s => s.costePers + s.retrib ? eur(s.costePers + s.retrib) : '—') + f('Se podría producir', s => h1(s.capacidad) + ' h') + f('Beneficio asegurado', s => '<b style="color:' + col(s.benAseg) + ';">' + eur(s.benAseg) + '</b>') + f('Beneficio si se ocupa todo', s => '<b style="color:' + col(s.benPot) + ';">' + eur(s.benPot) + '</b>') + f('Trabajo de Rafa y Manolo', s => h1(s.tr.total) + ' h') + '</table></div>';
+};
+R.simHtml = function(P, b){
+  const bd = R.build2, s = R.simular2(b, bd), hs = R.horasSocios(b), hoy = R.simular2(b, R.ESC2);
+  const seg = (k) => '<div class="rt-seg">' + [['hoy', 'Como hoy'], ['empleado', 'Empleado'], ['fuera', 'Fuera']].map(([v, t]) => '<button type="button" class="' + (bd[k] === v ? 'on' : '') + '" onclick="RENT.setEsc2(\'' + k + '\',\'' + v + '\')">' + t + '</button>').join('') + '</div>';
+  const st = (k, t) => '<div class="rt-sim-r"><span>' + t + '</span><span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>';
+  const controles = '<div class="rt-c"><h3>Organización</h3><div class="rt-sim-r"><span>Rafa</span>' + seg('rafa') + '</div><div class="rt-sim-r"><span>Manolo</span>' + seg('manolo') + '</div>' + st('maq', 'Maquinistas') + st('mec', 'Mecánicos') + st('cm', 'Conductor / mecánico') + '</div>';
+  const res = '<div class="rt-c"><h3>' + esc(s.nombre) + '</h3><div class="rt-big"><div><span>Beneficio asegurado</span><b style="color:' + col(s.benAseg) + ';">' + eur(s.benAseg) + '</b><small>' + dEur(s.dBenAseg) + ' sobre hoy · al año</small></div><div><span>Si se ocupa toda la capacidad</span><b style="color:' + col(s.benPot) + ';">' + eur(s.benPot) + '</b><small>' + dEur(s.dBenPot) + ' sobre hoy · al año</small></div></div>'
+    + '<div class="rt-sim-r"><span>Se podría producir</span><b>' + h1(s.capacidad) + ' h <small style="font-weight:600;color:' + col(s.dPot) + ';">(' + (s.dPot >= 0 ? '+' : '') + h1(s.dPot) + ' h)</small></b></div>'
+    + '<div class="rt-sim-r"><span>Coste de personal nuevo</span><b>' + eur(s.costePers + s.retrib - b.socios) + '</b></div>'
+    + (s.ahorro ? '<div class="rt-sim-r"><span>Ahorro en taller <small style="color:var(--orange);">estimado</small></span><b style="color:var(--green);">' + eur(s.ahorro) + '</b></div>' : '')
+    + '<div class="rt-sim-r"><span>Trabajo de Rafa y Manolo</span><b>' + h1(s.tr.total) + ' h <small style="font-weight:600;color:' + col(hoy.tr.total - s.tr.total) + ';">(hoy ' + h1(hs.total) + ')</small></b></div>'
+    + '<div class="rt-ch"><button type="button" onclick="RENT.escAdd2()">Guardar para comparar</button></div></div>';
+  const comp = (P.esc2 || []).length ? '<div class="rt-c"><h3>Comparar</h3>' + R.escHtml2(b, P.esc2) + '</div>' : '';
+  const act = (n, a, c) => '<tr><td>' + n + '</td><td>' + h1(a) + ' h</td><td>' + h1(c) + ' h</td></tr>';
+  const detalle = det('Ver detalle', '<div class="rt-c" style="background:transparent;padding:0;"><table class="rt-tb"><tr><th>Trabajo de Rafa y Manolo al año</th><th>Hoy</th><th>Esta organización</th></tr>' + act('Manejar máquinas', hs.maq, s.tr.maq) + act('Conducir', hs.cond, s.tr.cond) + act('Reparar', hs.rep, s.tr.rep) + act('Gestionar la empresa', hs.ges, s.tr.ges) + '<tr style="font-weight:800;"><td>Total</td><td>' + h1(hs.total) + ' h</td><td>' + h1(s.tr.total) + ' h</td></tr></table>'
+    + '<div style="font-size:11.5px;color:var(--ink-soft);margin:6px 0;">Hoy trabajan de media ' + h1(hs.porDia) + ' h de máquina por día de trabajo, de 16 posibles (8 h cada uno, lunes a viernes). Manejar y conducir salen de las horas de los albaranes (12 meses); reparar y gestionar son horas por semana de Hipótesis.</div>'
+    + '<div class="rt-sim-r"><span>Beneficio asegurado tras impuestos</span><b>' + eur(s.netAseg) + '</b></div><div class="rt-sim-r"><span>Si se ocupa todo, tras impuestos</span><b>' + eur(s.netPot) + '</b></div><div class="rt-sim-r"><span>Ingreso extra posible (si se factura esa capacidad)</span><b>' + eur(s.ingPot) + '</b></div><div class="rt-sim-r"><span>Para cubrir el coste nuevo habría que facturar</span><b>' + (s.eqH > 0 && isFinite(s.eqH) ? h1(s.eqH) + ' h ≈ ' + eur(s.eqFact) + ' al año' : '—') + '</b></div>'
+    + '<div class="rt-sim-r"><span>Trabajos pendientes ya conocidos</span><b>' + (b.backlog ? h1(b.backlog) + ' h en ' + b.nBack + ' trabajos' : '—') + '</b></div>'
+    + (s.notas.length ? s.notas.map(n => '<div class="rt-an">• ' + esc(n) + '</div>').join('') : '')
+    + '<div style="font-size:11.5px;color:var(--ink-soft);margin:8px 0;"><b>Cómo se calcula.</b> Asegurado: las horas que ya se facturan hoy (o menos, si falta gente), más los ahorros, menos el coste de personal. Si se ocupa todo: igual, pero facturando las horas que cabrían, a lo que deja cada hora hoy. No se limita por falta de trabajo. Los sueldos salen del convenio. El empleado trabaja 8 h, lunes a viernes, menos el tiempo de reparar y gestionar. El mecánico no suma horas de máquina: quita reparaciones externas, paradas y trabajo físico a Rafa y Manolo. Los ahorros son estimaciones de Hipótesis.</div>'
+    + R.hipHtml(P) + '</div>');
+  return '<div class="rt-c" style="padding:8px 12px;"><h3 style="margin:4px 0;">Simulador: ¿y con otra plantilla?</h3><div style="font-size:12px;color:var(--ink-soft);">Últimos 12 meses: ' + eur(b.ingresos) + ' facturados, ' + h1(b.horas) + ' h de máquina.</div></div>' + controles + res + comp + detalle;
+};
+R.hipHtml = P => { const prm = R.param, inp = (k, l, u) => '<label style="font-size:11.5px;display:flex;flex-direction:column;gap:2px;">' + l + '<input type="number" value="' + prm[k] + '" onchange="RENT.setParam(\'' + k + '\',this.value)" style="width:90px;"><span style="color:var(--ink-soft);">' + (u || '') + '</span></label>';
+  return '<div style="font-weight:800;font-size:13px;margin:8px 0 4px;">Hipótesis</div><div style="display:flex;flex-wrap:wrap;gap:10px;">' + inp('jornadas', 'Jornadas al año', 'd') + inp('ocupacion', 'Ocupación', '% de la jornada con máquina') + inp('indisponibilidad', 'Averías / paradas', '% de tiempo') + inp('reduccionAverias', 'Reducción con mecánico', '% de las averías') + inp('ahorroTaller', 'Ahorro en taller con mecánico', '%') + inp('condMecPct', 'Conductor/mecánico conduce', '% del tiempo') + inp('repSemana', 'Rafa y Manolo reparan', 'h/semana entre los dos') + inp('gesSemana', 'Rafa y Manolo gestionan', 'h/semana entre los dos') + inp('impuesto', 'Impuestos', '% sobre beneficio') + inp('vidaUtil', 'Vida útil maquinaria', 'años') + inp('residualPct', 'Valor residual', '%') + '</div>'
+  + '<div style="font-weight:800;font-size:13px;margin:10px 0 4px;">Obra de referencia (precio por hora)</div><select onchange="RENT.setRef(this.value)" style="font-size:12.5px;max-width:100%;"><option value="">Automática: nave avícola</option>' + (P.jobs || []).filter(j => (R.asignar(P).porJob[j.id] || []).length).map(j => '<option value="' + j.id + '"' + (R.param.refJob === j.id ? ' selected' : '') + '>' + esc(j.trabajo || j.id) + '</option>').join('') + '</select>'; };
+
 R.vista = function(P){
   const asig = R.asignar(P), b = R.base12(P);
   const calc = j => { try{ return R.calcular(j, P, asig); }catch(e){ return {vacio: true, job: j, error: e.message}; } };
   const jobs = (P.jobs || []).filter(j => j.estado !== 'Cancelado'), todos = jobs.map(calc), con = todos.filter(x => !x.vacio).sort((a, c) => c.hasta.localeCompare(a.hasta));
   if(!R.sel || !con.some(x => x.job.id === R.sel)) R.sel = con[0] ? con[0].job.id : null;
   const r = con.find(x => x.job.id === R.sel) || {vacio: true}; R._r = r; R._asig = asig;
-  const tabs = ['Resultado directo', 'Beneficio real', 'Coste de oportunidad', 'Simulador', 'Comparativa'].map((t, i) => '<button type="button" class="docs-tab ' + (R.tab === i + 1 ? 'active' : '') + '" onclick="RENT.setTab(' + (i + 1) + ')">' + (i + 1) + '. ' + t + '</button>').join('');
   const dep = (P.jobs || []).filter(j => j.estado !== 'Cancelado' && !asig.porJob[j.id].length).length;
-  const selector = '<select onchange="RENT.setSel(this.value)" style="width:100%;margin-bottom:8px;">' + con.map(x => '<option value="' + x.job.id + '" ' + (x.job.id === R.sel ? 'selected' : '') + '>' + esc((x.job.trabajo || 'Obra') + ' · ' + (x.job.cliente || '') + ' · ' + eur(x.beneficioReal)) + '</option>').join('') + '</select>';
+  const selector = '<select onchange="RENT.setSel(this.value)" style="width:100%;">' + con.map(x => '<option value="' + x.job.id + '" ' + (x.job.id === R.sel ? 'selected' : '') + '>' + esc((x.job.trabajo || 'Obra') + ' · ' + (x.job.cliente || '') + ' · ' + eur(x.beneficioReal)) + '</option>').join('') + '</select>';
   const amb = asig.ambiguos.length ? card('Albaranes por asignar (' + asig.ambiguos.length + ')', '<div style="font-size:11.5px;color:var(--ink-soft);margin-bottom:6px;">El mismo cliente tiene varias obras abiertas en esas fechas. No se reparten solos para no mezclar obras.</div>' + asig.ambiguos.slice(0, 8).map(a => '<div style="font-size:12px;padding:3px 0;">' + esc((a.doc.numero || 'albarán') + ' · ' + R.fechaRef(a.doc) + ' · ' + eur(R.baseIngreso(a.doc))) + ' <select onchange="if(this.value)RENT.asignarAlb(\'' + a.doc.id + '\',this.value)"><option value="">asignar a…</option>' + a.candidatos.map(id => { const j = jobs.find(x => x.id === id); return '<option value="' + id + '">' + esc(j ? j.trabajo : id) + '</option>'; }).join('') + '</select></div>').join('')) : '';
-  let cuerpo;
-  if(R.tab === 4) cuerpo = R.secSim(P, b);
-  else if(!con.length) cuerpo = card('', '<div style="font-size:12.5px;">Todavía no hay obras con albaranes asignados. ' + (asig.sinAsignar.length ? asig.sinAsignar.length + ' albaranes sin obra reconocible.' : '') + '</div>') + amb;
-  else cuerpo = selector + (r.vacio ? '' : (r.avisos.length ? '<div style="font-size:11.5px;color:var(--orange);margin-bottom:8px;">' + r.avisos.map(a => '• ' + esc(a)).join('<br>') + '</div>' : '') + R.sinHorasAviso(r)) + (r.vacio ? '' : (R.tab === 1 ? R.secDirecto(r) : R.tab === 2 ? R.secReal(r) : R.tab === 3 ? R.secOport(r) : R.secComp(r, P, b))) + (R.tab <= 2 ? amb : '');
-  const albs = !r.vacio && R.tab === 1 ? card('Documentos incluidos (una factura sustituye a sus albaranes)', r.albs.map(d => fila(esc((d.tipo === 'albaran' ? 'Albarán ' : d.tipo === 'proforma' ? 'Proforma ' : 'Factura ') + (d.numero || '') + ' · ' + R.fechaRef(d)) + ' <i style="font-size:11px;">(' + ((asig.origen[d.id] || {}).como || '?') + ')</i>', eur(R.baseIngreso(d)) + ' <a href="#" onclick="RENT.excluirAlb(\'' + d.id + '\',\'' + r.job.id + '\');return false" style="font-size:11px;">quitar</a>')).join('')) : '';
-  const hist = !r.vacio && R.tab === 2 && R.hist ? card('Histórico de cálculos', (R.hist.length ? R.hist.map(h => fila(new Date(h.created_at).toLocaleDateString('es-ES'), eur(h.resultado && h.resultado.beneficioReal))).join('') : '<div style="font-size:12px;">Primer cálculo guardado hoy.</div>')) : '';
-  const manual = !r.vacio && R.tab <= 2 ? (() => { const m = (P.imput || []).filter(i => i.job_id === r.job.id); return m.length ? card('Correcciones manuales', m.map(i => fila(esc(i.concepto) + ' <span style="font-size:11px;">(' + i.modo + ', ' + i.origen + ', ' + new Date(i.created_at).toLocaleDateString('es-ES') + ')</span>', eur(i.importe) + ' <a href="#" onclick="RENT.quitarImp(\'' + i.id + '\');return false" style="font-size:11px;">deshacer</a>', esc(i.nota || ''))).join('')) : ''; })() : '';
-  return '<div class="panel te-panel"><div style="font-weight:800;font-size:15px;margin-bottom:6px;">Rentabilidad de trabajos</div><div class="docs-tabs" style="margin:0 0 10px;display:flex;flex-wrap:wrap;gap:4px;">' + tabs + '</div>' + cuerpo + albs + manual + hist + '<div style="font-size:11px;color:var(--ink-soft);margin-top:6px;"><a href="#" onclick="RENT.recargar();return false">Actualizar datos</a> · ' + dep + ' obras sin albaranes asignados no se calculan.' + (R.errores && R.errores.length ? ' Fallos al leer: ' + esc(R.errores.join(', ')) : '') + '</div></div>';
+  let obra;
+  if(!con.length) obra = '<div class="rt-c">Todavía no hay obras con albaranes asignados. ' + (asig.sinAsignar.length ? asig.sinAsignar.length + ' albaranes sin obra reconocible.' : '') + '</div>';
+  else if(r.vacio) obra = '<div class="rt-c">Esta obra no tiene albaranes asignados.</div>';
+  else {
+    const albs = card('Documentos incluidos (una factura sustituye a sus albaranes)', r.albs.map(d => fila(esc((d.tipo === 'albaran' ? 'Albarán ' : d.tipo === 'proforma' ? 'Proforma ' : 'Factura ') + (d.numero || '') + ' · ' + R.fechaRef(d)) + ' <i style="font-size:11px;">(' + ((asig.origen[d.id] || {}).como || '?') + ')</i>', eur(R.baseIngreso(d)) + ' <a href="#" onclick="RENT.excluirAlb(\'' + d.id + '\',\'' + r.job.id + '\');return false" style="font-size:11px;">quitar</a>')).join(''));
+    const hist = R.hist ? card('Histórico de cálculos', (R.hist.length ? R.hist.map(h => fila(new Date(h.created_at).toLocaleDateString('es-ES'), eur(h.resultado && h.resultado.beneficioReal))).join('') : '<div style="font-size:12px;">Primer cálculo guardado hoy.</div>')) : '';
+    const m = (P.imput || []).filter(i => i.job_id === r.job.id), manual = m.length ? card('Correcciones manuales', m.map(i => fila(esc(i.concepto) + ' <span style="font-size:11px;">(' + i.modo + ', ' + i.origen + ', ' + new Date(i.created_at).toLocaleDateString('es-ES') + ')</span>', eur(i.importe) + ' <a href="#" onclick="RENT.quitarImp(\'' + i.id + '\');return false" style="font-size:11px;">deshacer</a>', esc(i.nota || ''))).join('')) : '';
+    obra = R.vistaObra(r, P, b).replace(/<\/details>$/, albs + manual + hist + amb + '</details>');
+  }
+  return '<div class="panel te-panel rt-w">' + selector + obra + R.simHtml(P, b) + '<div style="font-size:11px;color:var(--ink-soft);"><a href="#" onclick="RENT.recargar();return false">Actualizar datos</a> · ' + dep + ' obras sin albaranes asignados no se calculan.' + (R.errores && R.errores.length ? ' Fallos al leer: ' + esc(R.errores.join(', ')) : '') + '</div></div>';
 };
+R.setEsc2 = (k, v) => { R.build2[k] = v; R.repinta(); };
+R.stepEsc2 = (k, d) => { R.build2[k] = Math.max(0, Math.min(10, (R.build2[k] | 0) + d)); R.repinta(); };
+R.escAdd2 = async () => { const P = R.P, e = {...R.build2}; if(R.nombreEsc2(e) === R.nombreEsc2(R.ESC2)) return; P.esc2 = [...(P.esc2 || []), e]; await R.escGuardar(); R.repinta(); };
+R.escDel2 = async i => { R.P.esc2.splice(i, 1); await R.escGuardar(); R.repinta(); };
+
 // ---- acciones ----
 const guarda = async (q, nota) => { const {error} = await q; if(error){ alert('No se pudo guardar' + (nota ? ' (' + nota + ')' : '') + ': ' + error.message); return false; } return true; };
 R.repinta = () => { if(R.el && R.P) R.el.innerHTML = R.vista(R.P); };
@@ -421,7 +573,7 @@ R.anadir = async (jobId, bloque) => {
 R.quitarImp = async id => { if(await guarda(sb.from('rent_imputaciones').update({activo: false}).eq('id', id))) await R.recargar(); };
 R.escAdd = async () => { const P = R.P, e = {...R.build}; if(R.nombreEsc(e) === R.nombreEsc(R.ESC0)) return; P.escenarios = [...(P.escenarios || []), e]; await R.escGuardar(); R.repinta(); };
 R.escDel = async i => { R.P.escenarios.splice(i, 1); await R.escGuardar(); R.repinta(); };
-R.escGuardar = async () => { const P = R.P, data = {lista: P.escenarios}; if(P.escId) await guarda(sb.from('sistema').update({data}).eq('id', P.escId), 'escenarios'); else { const {data: d, error} = await sb.from('sistema').insert({tipo: 'rent_escenarios', data}).select('id').single(); if(!error && d) P.escId = d.id; } };
+R.escGuardar = async () => { const P = R.P, data = {lista: P.escenarios || [], lista2: P.esc2 || []}; if(P.escId) await guarda(sb.from('sistema').update({data}).eq('id', P.escId), 'escenarios'); else { const {data: d, error} = await sb.from('sistema').insert({tipo: 'rent_escenarios', data}).select('id').single(); if(!error && d) P.escId = d.id; } };
 R.snapshot = async () => {   // histórico: solo guarda si cambió algo respecto al último cálculo
   const r = R._r; if(!r || r.vacio || !window.sb) return; const hu = R.huella(r);
   try{ const {data} = await sb.from('rent_historial').select('huella,created_at,resultado').eq('job_id', r.job.id).order('created_at', {ascending: false}).limit(6); R.hist = data || [];
