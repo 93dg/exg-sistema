@@ -216,6 +216,7 @@ R.calcular = function(job, P, asig){
   const rel = x => /^(maq:|amort:|gen:ss|gen:coches|gen:gestoria)/.test(x.clave), relI = sum(lineasI.filter(rel), x => x.valor), gloI = indirecto - relI;
   const n1 = directo, n2 = directo + relI + sociosV, n3 = directo + indirecto + sociosV;
   res.niv = {n1, n2, n3, relI, gloI, socios: sociosV, r1: ejecutado - n1, r2: ejecutado - n2, r3: ejecutado - n3, h1: H ? n1 / H : NaN, h2: H ? n2 / H : NaN, h3: H ? n3 / H : NaN, tarifa: H ? ejecutado / H : NaN};
+  { const t = num(prm.impuesto) / 100, di = directo + indirecto, eMin = (n3 - t * di) / (1 - t); res.niv.t = t; res.niv.minImp = H ? eMin / H : NaN; res.niv.margenH = H ? (ejecutado - n3) / H : NaN; res.niv.margenPct = n3 ? (ejecutado - n3) / n3 * 100 : NaN; res.niv.impH = H ? (res.niv.minImp - res.niv.h3) : NaN; }
   res.m = {pctIngresos: ejecutado ? beneficioReal / ejecutado * 100 : NaN, porJornada: beneficioReal / D, porHora: H ? beneficioReal / H : NaN, directoPctIng: ejecutado ? (ejecutado - directo) / ejecutado * 100 : NaN};
   // ---- coste de oportunidad (independiente del beneficio real) ----
   const hMaq = sum(['mixta', 'camion', 'giratoria', 'niveladora'], c => hClase[c] || 0);
@@ -312,6 +313,8 @@ R.cardNiveles = r => { const v = r.niv, fl = (t, c, res, hh, n) => fila('<b>' + 
   return card('Tres niveles de coste (cada nivel contiene al anterior)', fl('1. Directo', v.n1, v.r1, v.h1, 'Combustible, averías, ayudantes y lo vinculado, solo de las fechas de la obra.')
     + fl('2. Directo + indirecto relacionado', v.n2, v.r2, v.h2, 'Añade lo necesario para poder hacerla: costes fijos de máquina, coches, autónomos, gestoría y la retribución de Rafa y Manolo (' + eur(v.relI + v.socios) + ').')
     + fl('3. Coste completo', v.n3, v.r3, v.h3, 'Añade el resto de la estructura de la empresa (' + eur(v.gloI) + '), prorrateada por días de obra.')
+    + fila('Precio mínimo por hora que cubre todo e impuestos', '<b>' + (isFinite(v.minImp) ? eur(v.minImp, 2) + '/h' : 'sin horas') + '</b>', 'Coste completo más los impuestos estimados (' + R.param.impuesto + ' %, hipótesis). Por debajo pierdes dinero.')
+    + fila('Margen sobre el coste completo', '<b style="color:' + col(v.margenH) + ';">' + (isFinite(v.margenH) ? eur(v.margenH, 2) + '/h · ' + pct(v.margenPct) : 'sin horas') + '</b>', 'Lo cobrado por hora − el coste del nivel 3. Cuando haya precios de compra se descontará la reposición.')
     + fila('Lo que se cobró por hora', '<b>' + (isFinite(v.tarifa) ? eur(v.tarifa, 2) + '/h' : 'sin horas') + '</b>', 'Ingreso ejecutado ÷ horas de máquina. Para ganar de verdad debe superar el coste por hora del nivel 3.') + '<div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Falta la reposición de las máquinas (amortizadas, pendiente de dato) y el camión (deuda con Alberto).</div>'); };
 R.secReal = r => {
   const m = r.m, ind = r.lineasI.map(x => R.lineaHtml(r, x, 'indirecto')).join('') + R.lineaHtml(r, r.socios, 'indirecto');
