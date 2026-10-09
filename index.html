@@ -4590,10 +4590,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.41" defer></script>
-<script src="costes/norm.js?v=V9.41" defer></script>
+<script src="rentabilidad/rent.js?v=V9.42" defer></script>
+<script src="costes/norm.js?v=V9.42" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.41</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.42</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4740,7 +4740,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.41</div>
+        <div class="sub" id="version-badge">V9.42</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6048,6 +6048,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
           <div class="filters" id="econ-contabilidad-filter" style="margin:0;">
             <div class="chip-filter" data-cf="oficial">Legal</div>
             <div class="chip-filter" data-cf="en_b">En B</div>
+            <div class="chip-filter" data-cf="no_incluido">No incluidos</div>
             <div class="chip-filter active" data-cf="">Todo</div>
           </div>
         </div>
@@ -6071,6 +6072,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
           <div class="kpi"><div class="lbl">IVA repercutido est.</div><div class="val" id="resumen-iva">0,00 €</div></div>
           <div class="kpi"><div class="lbl">Margen operativo</div><div class="val green" id="resumen-margen">0,00 €</div></div>
         </div>
+        <div class="panel" id="econ-no-incluidos" style="display:none;margin-bottom:12px;"><div class="panel-head"><h3>Gastos que NO se han incluido</h3></div><div class="panel-body" id="econ-no-incluidos-cuerpo" style="padding:8px 12px;"></div></div>
         <div class="filters" id="econ-filtro-anio-chips" style="margin-bottom:10px;"></div>
         <div class="filters" id="econ-filtro-trim-chips" style="margin-bottom:16px;">
           <div class="chip-filter active" data-trim="">Todos los trimestres</div>
@@ -9697,6 +9699,12 @@ document.addEventListener('click', ev => {
 });
 // Control interno (Economía, Gastos): solo cuentan los gastos de la actividad. Los personales / no relacionados / dudosos no (aunque en Impuestos sí puedan declararse: ver impMotivoExclusion).
 function gastoCuentaControl(d){ return d.relacion_actividad == null || d.relacion_actividad === 'relacionada'; }
+function gastosTodosDocs(){ return Object.values(documentosRealesById).filter(d => (d.type === 'gasto' || d.tipo === 'gasto') && d.estado !== 'anulado'); }
+// Por qué un gasto NO cuenta para el control, y qué pasa con él en Impuestos
+function motivoNoIncluido(d){
+  const m = d.relacion_actividad === 'dudosa' ? 'Dudoso, falta decidir' : /^gasto personal/i.test(d.categoria || '') ? 'Gasto personal' : 'No relacionado con la actividad';
+  return m + (d.incluir_dudoso ? ' · SÍ se declara en Impuestos' : ' · no se declara en Impuestos');
+}
 function gastosProDocs(){
   // los dudosos y los marcados como no válidos NO cuentan: ni en totales ni en listas ni para el gestor
   return Object.values(documentosRealesById).filter(d=>(d.type==='gasto' || d.tipo==='gasto') && (d.relacion_actividad==null || d.relacion_actividad==='relacionada'));
@@ -11055,7 +11063,7 @@ function gproPintarChips(anios){
   set('gpro-f-anio', ch('', 'Todos los años', GPF.anio.size === 0, true) + anios.map(a => ch(a, a, GPF.anio.has(a))).join(''));
   set('gpro-f-trim', ch('', 'Todos', GPF.trim.size === 0, true) + [1, 2, 3, 4].map(q => ch(String(q), q + 'º trimestre', GPF.trim.has(String(q)))).join(''));
   set('gpro-f-tipo', ch('', 'Todos', GPF.tipo === '', true) + GP_TIPOS.map(([v, t]) => ch(v, t, GPF.tipo === v)).join(''));
-  set('gpro-f-cont', ch('', 'Todos', GPF.cont === '', true) + ch('oficial', 'Oficial', GPF.cont === 'oficial') + ch('en_b', 'En B', GPF.cont === 'en_b'));
+  set('gpro-f-cont', ch('', 'Todos', GPF.cont === '', true) + ch('oficial', 'Oficial', GPF.cont === 'oficial') + ch('en_b', 'En B', GPF.cont === 'en_b') + ch('no_incluido', 'No incluidos', GPF.cont === 'no_incluido'));
   set('gpro-f-just', ch('', 'Todos', GPF.just === '', true) + ch('falta', 'Faltan', GPF.just === 'falta'));
   set('gpro-f-orden', GP_ORD.map(([v, t]) => ch(v, t + (GPF.orden === v ? (GPF.dir === 'asc' ? ' ↑' : ' ↓') : ''), GPF.orden === v)).join(''));
 }
@@ -11090,8 +11098,8 @@ function renderGastosProLista(){
   const cont = GPF.cont, tipo = GPF.tipo, soloPendientes = GPF.just === 'falta';
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   const _t = new Map(), tms = d => { let v = _t.get(d); if(v === undefined){ v = +new Date(d.dateRaw||0); _t.set(d, v); } return v; };   // la fecha de cada gasto se calcula una vez, no en cada comparación del orden
-  const todos = gastosProDocs();
-  const anios = [...new Set(todos.map(d => d.dateRaw ? String(new Date(d.dateRaw).getFullYear()) : null).filter(Boolean))].sort().reverse();
+  const todos = GPF.cont === 'no_incluido' ? gastosTodosDocs().filter(d => !gastoCuentaControl(d)) : gastosProDocs();
+  const anios = [...new Set(gastosTodosDocs().map(d => d.dateRaw ? String(new Date(d.dateRaw).getFullYear()) : null).filter(Boolean))].sort().reverse();
   if(anios.join() !== _gpAnios){ _gpAnios = anios.join(); gproPintarChips(anios); try{ if(typeof PLEG2 !== 'undefined' && PLEG2.gpro) pleg2Render('gpro'); }catch(e){} }
   let docs = todos.slice();
   const nombres = mapaClientes();
@@ -11100,7 +11108,7 @@ function renderGastosProLista(){
   if(GPF.anio.size) docs = docs.filter(d => d.dateRaw && GPF.anio.has(String(new Date(d.dateRaw).getFullYear())));
   if(GPF.trim.size) docs = docs.filter(d => d.dateRaw && GPF.trim.has(String(Math.floor(new Date(d.dateRaw).getMonth() / 3) + 1)));
   docs.sort((a, b) => GPF.dir === 'asc' ? cmp(a, b) : cmp(b, a));
-  if(cont) docs = docs.filter(d=>(d.contabilidad||'oficial')===cont);
+  if(cont && cont !== 'no_incluido') docs = docs.filter(d=>(d.contabilidad||'oficial')===cont);
   if(tipo && GASTO_TIPOS[tipo]) docs = docs.filter(GASTO_TIPOS[tipo]);
   if(soloPendientes) docs = docs.filter(d=>(d.estado_justificante||'pendiente')!=='completo');
   if(buscar) docs = docs.filter(d=>(d.concepto||'').toLowerCase().includes(buscar) || (nombres.get(d.entidad_id)?.name||'').toLowerCase().includes(buscar));
@@ -11112,13 +11120,13 @@ function renderGastosProLista(){
   const masBtn = faltan ? `<button class="btn" onclick="gastosProMostrarMas()">Mostrar más (${faltan})</button>` : '';
   document.getElementById('gpro-lista-tbody').innerHTML = esMovil ? '' : docs.length ? vis.map(d=>{
     const nombre = nombres.get(d.entidad_id)?.name || '—';
-    const contPill = (d.contabilidad||'oficial')==='en_b' ? '<span class="pill mantenimiento">En B</span>' : '<span class="pill adjudicado">Oficial</span>';
+    const contPill = !gastoCuentaControl(d) ? `<span class="pill noadjudicado" title="${escHtml(motivoNoIncluido(d))}">No incluido</span><div style="font-size:10.5px;color:var(--orange);">${escHtml(motivoNoIncluido(d))}</div>` : (d.contabilidad||'oficial')==='en_b' ? '<span class="pill mantenimiento">En B</span>' : '<span class="pill adjudicado">Oficial</span>';
     const justPill = d.estado_justificante==='completo' ? '<span class="pill adjudicado">✓ Justificado</span>' : '<span class="pill noadjudicado">Pendiente</span>';
     return `<tr><td class="mono">${formatFechaCorta ? formatFechaCorta(d.dateRaw) : (d.dateLabel||'—')}</td><td>${d.concepto||'—'}</td><td>${nombre}</td><td>${d.categoria||'—'}</td><td>${contPill}</td><td>${d.recurrencia?`<span class="pill mantenimiento">${d.recurrencia}</span>`:'—'}</td><td class="num">${euro(d.importe||d.total)}</td><td>${justPill}</td><td class="celda-gestor-${d.id}">${gestorPillHtml(d.id, d.enviado_gestor, d.enviado_gestor_fecha)}</td></tr>`;
   }).join('') + (faltan ? `<tr><td colspan="9" style="text-align:center;padding:12px;">${masBtn}</td></tr>` : '') : '<tr><td colspan="9" class="empty">Todavía no hay gastos registrados. Usa "+ Registrar gasto" desde Economía para empezar.</td></tr>';
   const mov = document.getElementById('gpro-lista-movil');
   if(mov){
-    mov.innerHTML = !esMovil ? '' : docs.length ? vis.map(d=>gastoCardHtml(d, 'normal')).join('') + (faltan ? `<div style="padding:12px;text-align:center;">${masBtn}</div>` : '')
+    mov.innerHTML = !esMovil ? '' : docs.length ? vis.map(d=>(!gastoCuentaControl(d) ? `<div style="font-size:11.5px;color:var(--orange);padding:4px 2px 0;">No incluido: ${escHtml(motivoNoIncluido(d))}</div>` : '') + gastoCardHtml(d, 'normal')).join('') + (faltan ? `<div style="padding:12px;text-align:center;">${masBtn}</div>` : '')
       : '<div class="empty" style="padding:16px;">Todavía no hay gastos registrados.</div>';
     enlazarTarjetasGasto(mov); autoMas(mov);
   }
@@ -29172,6 +29180,16 @@ function recalcularResumenEconomia(){
   const enlazadosFact = econEnlazadosAFactura(docs);   // V7.80: sin factura = proformas y albaranes de particulares cobrados que no acaban en factura
   const ingresoEnB = docs.filter(enRango).reduce((s,d)=>s+econImporteSinFactura(d, enlazadosFact),0);
 
+  const panelNI = document.getElementById('econ-no-incluidos'); if(panelNI) panelNI.style.display = filtro==='no_incluido' ? 'block' : 'none';
+  if(filtro==='no_incluido'){   // solo lo que NO cuenta para el control: se enseña uno por uno para poder verificarlo
+    const ni = gastosTodosDocs().filter(d => !gastoCuentaControl(d) && enRango(d)).sort((a, b) => String(b.dateRaw || '').localeCompare(String(a.dateRaw || '')));
+    const tot = ni.reduce((x, d) => x + Math.abs(d.total || d.importe || 0), 0);
+    const cuerpo = document.getElementById('econ-no-incluidos-cuerpo');
+    if(cuerpo) cuerpo.innerHTML = ni.length ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px;">' + ni.length + ' gasto' + (ni.length === 1 ? '' : 's') + ' · ' + euro(tot) + ' (con IVA). No suman en Gastos, Economía ni gráficos.</div>' + ni.map(d => '<div style="padding:6px 0;border-bottom:1px solid var(--line,#0001);font-size:12.5px;"><div style="display:flex;justify-content:space-between;gap:10px;"><span>' + (d.dateRaw ? formatFechaCorta(d.dateRaw) : '—') + ' · ' + escHtml(d.categoria || '—') + '</span><b style="white-space:nowrap;">' + euro(Math.abs(d.total || d.importe || 0)) + '</b></div><div>' + escHtml(String(d.concepto || '').slice(0, 140)) + '</div><div style="font-size:11px;color:var(--orange);">' + escHtml(motivoNoIncluido(d)) + '</div></div>').join('') : '<div class="empty">Ningún gasto excluido en este periodo.</div>';
+    const setT = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+    setT('resumen-facturado', '—'); setT('resumen-cobrado', '—'); setT('resumen-pendiente', '—'); setT('resumen-iva', '—'); setT('resumen-margen', '—'); setT('resumen-gastos', euro(tot));
+    return;
+  }
   let ingresos, etiquetaIngreso;
   if(filtro==='oficial'){ ingresos = facturadoLegal; etiquetaIngreso = 'Facturado'; }
   else if(filtro==='en_b'){ ingresos = ingresoEnB; etiquetaIngreso = 'Cobrado sin factura'; }
