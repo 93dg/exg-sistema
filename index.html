@@ -4590,10 +4590,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.38" defer></script>
-<script src="costes/norm.js?v=V9.38" defer></script>
+<script src="rentabilidad/rent.js?v=V9.39" defer></script>
+<script src="costes/norm.js?v=V9.39" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.38</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.39</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4740,7 +4740,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.38</div>
+        <div class="sub" id="version-badge">V9.39</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -22856,8 +22856,11 @@ function actualizarResumenLinea(id){
 }
 // tamaño del input de CONCEPTO desplegado, por longitud — misma técnica de clases CSS
 // (nunca style/custom-property), igual motivo que claseTamañoResumen arriba
+// Regla de Daniel (09/10/26): toda línea que hable del martillo lleva «(MIXTA)» al final, porque el martillo se hace con la mixta (se cobra más caro, pero las horas y el dinero son de la mixta). Si el texto ya dice giratoria, no se toca.
+function martilloMixta(t){ const s = String(t == null ? '' : t).trim(); if(!/martillo/i.test(s) || /giratoria/i.test(s) || /\(\s*mixta\s*\)\s*$/i.test(s)) return t; return s + ' (MIXTA)'; }
 function ajustarInputConcepto(input){
   if(!input) return;
+  if(!input.dataset.mm){ input.dataset.mm = '1'; input.addEventListener('change', () => { const n = martilloMixta(input.value); if(n !== input.value){ input.value = n; ajustarInputConcepto(input); } }); }
   const len = (input.value || '').length;
   input.classList.remove('ci13','ci11','ci10');
   if(len > 28 && len <= 38) input.classList.add('ci13');
@@ -22984,7 +22987,7 @@ function tieneMaquinaBienPuesta(concepto, precio){
   const {maquina} = maquinaCorrectaPara(concepto, precio);
   if(!maquina) return false;
   const c = (concepto||'').trim().toUpperCase();
-  return new RegExp('CON ' + maquina.replace(/[ÁÉÍÓÚ]/g,x=>({Á:'[ÁA]',É:'[ÉE]',Í:'[ÍI]',Ó:'[ÓO]',Ú:'[ÚU]'}[x])) + '\\s*$').test(c);
+  return new RegExp('CON ' + maquina.replace(/[ÁÉÍÓÚ]/g,x=>({Á:'[ÁA]',É:'[ÉE]',Í:'[ÍI]',Ó:'[ÓO]',Ú:'[ÚU]'}[x])) + '(\\s*\\(MIXTA\\))?\\s*$').test(c);
 }
 // Construye la propuesta: quita la máquina de donde esté (principio o en medio) y la añade al final ya normalizada.
 function proponerConMaquinaAlFinal(concepto, maquina){
@@ -22994,7 +22997,7 @@ function proponerConMaquinaAlFinal(concepto, maquina){
     texto = texto.replace(re, (m0,pre)=>pre ? '' : '');
   }
   texto = texto.replace(/^CON\s+/i,'').replace(/\s{2,}/g,' ').trim();
-  return `${texto} CON ${maquina}`;
+  return martilloMixta(`${texto} CON ${maquina}`);
 }
 
 async function buscarTarifaPorConcepto(concepto){
