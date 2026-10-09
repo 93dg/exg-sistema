@@ -26,7 +26,7 @@ R.baseGasto = d => { const des = Array.isArray(d.desglose_iva) ? d.desglose_iva 
 R.baseIngreso = d => { const t = num(d.importe), p = d.iva_pct != null ? num(d.iva_pct) : 0; return p > 0 ? t / (1 + p / 100) : t; };
 
 // ---------- clasificación de líneas de albarán por máquina ----------
-const CLASES = [['giratoria', /giratoria|excavadora|oruga|miniexcavadora/i], ['niveladora', /niveladora|motoniveladora/i], ['camion', /cami[oó]n|doble carro|multilift|volquete|portes?\b|carro\b/i], ['mixta', /retro|mixta|cargadora|pala\b/i], ['rulo', /rulo|compactad/i], ['cuba', /cuba|riego|agua/i]];
+const CLASES = [['giratoria', /giratoria|excavadora|oruga|miniexcavadora/i], ['niveladora', /niveladora|motoniveladora/i], ['camion', /cami[oó]n|doble carro|multilift|volquete|portes?\b|carro\b/i], ['mixta', /retro|mixta|cargadora|pala\b|martillo/i], ['rulo', /rulo|compactad/i], ['cuba', /cuba|riego|agua/i]];
 R.claseLinea = txt => { const t = String(txt || '').trim(), ini = t.split(/\s+/).slice(0, 2).join(' '); const c = CLASES.find(([, re]) => re.test(ini)) || CLASES.find(([, re]) => re.test(t)); return c ? c[0] : 'otros'; };   // la máquina va al principio de la línea («Retro cargando camión» es retro, no camión)
 R.NOMBRE_CLASE = {mixta: 'Mixta (retro)', camion: 'Camión', giratoria: 'Giratoria', niveladora: 'Niveladora', rulo: 'Rulo', cuba: 'Cuba de agua', otros: 'Otros / sin máquina'};
 R.lineas = d => (Array.isArray(d.conceptos) ? d.conceptos : []).map(c => ({f: dia(c.fecha) || dia(d.fecha_devengo), h: num(c.horas != null ? c.horas : (c.unidad === 'h' ? c.cantidad : 0)), imp: num(c.importe), clase: R.claseLinea(c.descripcion), desc: c.descripcion || ''})).filter(l => l.f);
@@ -45,7 +45,7 @@ R.cargar = async function(forzar){
     pag('polizas_seguro', 'flota_id,coste_anual,activa'),
     pag('rent_vinculos', '*'),
     pag('rent_imputaciones', '*', b => b.eq('activo', true)),
-    pag('sistema', 'id,tipo,data', b => b.in('tipo', ['trabajo_cola', 'coste_hora', 'rent_parametros', 'rent_escenarios'])),
+    pag('sistema', 'id,tipo,data', b => b.in('tipo', ['trabajo_cola', 'coste_hora', 'rent_parametros', 'rent_escenarios', 'costes_config'])),
     pag('entidades', 'id,nombre,tipo', b => b.is('deleted_at', null))
   ]);
   P.docs = docs; P.gastos = gastos; P.flota = flota; P.polizas = polizas.filter(p => p.activa !== false); P.vinculos = vinc; P.imput = imp; P.entidades = tarifas;
@@ -55,6 +55,7 @@ R.cargar = async function(forzar){
   const es = sis.find(r => r.tipo === 'rent_escenarios'); P.escId = es ? es.id : null; P.escenarios = (es && es.data && es.data.lista) || [];
   try{ P.socios = await costeSociosCargar(); }catch(e){ P.socios = []; R.errores.push('socios: ' + e.message); }
   try{ const {data} = await sb.from('tarifas').select('concepto,precio_particular'); P.tarifas = data || []; }catch(e){ P.tarifas = []; }
+  if(window.COSTES){ try{ COSTES.aplicarCfg(sis.find(r => r.tipo === 'costes_config')); P.costes = COSTES.calcular(P, []); }catch(e){ P.costes = null; R.errores.push('costes: ' + e.message); console.error('COSTES', e); } }
   P.cargadoEn = Date.now(); R.P = P; return P;
 };
 R.invalidar = () => { R.P = null; };
@@ -100,16 +101,30 @@ R.asignar = function(P){
 };
 
 // ---------- ventana de empresa (12 meses hasta una fecha): horas, días trabajados, ingresos, combustible ----------
+R.factorLineas = d => { const ls = Array.isArray(d.conceptos) ? d.conceptos : [], sl = sum(ls, c => num(c.importe)), g = Math.abs(num(d.importe)), n = Math.abs(R.baseIngreso(d)); if(!sl || !g || g === n) return 1; return Math.abs(sl - n) <= Math.abs(sl - g) ? 1 : n / g; };   // las líneas de unos documentos suman el neto y las de otros el total con IVA
 R.empresaVentana = function(P, hasta){
   const k = hasta; P._ev = P._ev || {}; if(P._ev[k]) return P._ev[k];
   const W0 = addDays(hasta, -364);
   const indep = R.efectivos(P).lista;
-  const horasDia = {}, horasClase = {}, dias = new Set(); let ingresos = 0, horas = 0;
-  indep.forEach(d => { const ls = R.lineas(d).filter(l => l.f >= W0 && l.f <= hasta); if(!ls.length) return; ingresos += sum(ls, l => l.imp) * (d.iva_pct != null && num(d.iva_pct) > 0 ? 1 / (1 + num(d.iva_pct) / 100) : 1);
+  const horasDia = {}, horasClase = {}, dias = new Set(); let ingresos = 0, horas = 0, ingConHoras = 0;
+  indep.forEach(d => { const ls = R.lineas(d).filter(l => l.f >= W0 && l.f <= hasta); if(!ls.length) return; const fl = R.factorLineas(d); ingresos += sum(ls, l => l.imp) * fl; ingConHoras += sum(ls.filter(l => l.h > 0), l => l.imp) * fl;
     ls.forEach(l => { horasDia[l.f] = (horasDia[l.f] || 0) + l.h; horasClase[l.clase] = (horasClase[l.clase] || 0) + l.h; horas += l.h; if(l.h > 0 || l.imp > 0) dias.add(l.f); }); });
   const gW = (P.gastos || []).filter(g => g.fecha_devengo >= W0 && g.fecha_devengo <= hasta && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada'));
   const comb = sum(gW.filter(g => /combust/i.test(g.categoria || '')), R.baseGasto);
-  return P._ev[k] = {W0, hasta, horasDia, horasClase, horas, dias: dias.size, ingresos, gW, comb};
+  return P._ev[k] = {W0, hasta, horasDia, horasClase, horas, dias: dias.size, ingresos, ingConHoras, gW, comb};
+};
+
+// ---------- obra de referencia: precio actual por hora y mezcla de horas por máquina ----------
+R.referencia = function(P){
+  if(P._ref !== undefined) return P._ref;
+  const asig = R.asignar(P), jobs = P.jobs || [], idm = R.param.refJob;
+  const job = jobs.find(j => j.id === idm) || jobs.find(j => /nave av[ií]cola/i.test(j.trabajo || '') && (asig.porJob[j.id] || []).length);
+  if(!job) return P._ref = null;
+  const cls = {}; let H = 0, I = 0;
+  (asig.porJob[job.id] || []).forEach(d => { const f = R.factorLineas(d); R.lineas(d).forEach(l => { if(!(l.h > 0)) return; const o = cls[l.clase] = cls[l.clase] || {h: 0, imp: 0}; o.h += l.h; o.imp += l.imp * f; H += l.h; I += l.imp * f; }); });
+  const CO = P.costes; let mh = 0, cub = 0;
+  Object.keys(cls).forEach(c => { const o = cls[c], k = CO && CO.clases.find(x => x.clase === c); o.tarifa = o.imp / o.h; o.costeH = k && k.horaProd != null ? k.horaProd : null; o.margenH = o.costeH != null ? o.tarifa - o.costeH : null; if(o.margenH != null){ mh += o.margenH * o.h; cub += o.h; } });
+  return P._ref = {job, cls, H, I, ingH: H ? I / H : NaN, margenH: cub ? mh / cub : NaN, cobertura: H ? cub / H : 0};
 };
 
 // ---------- máquinas ----------
@@ -143,53 +158,31 @@ R.calcular = function(job, P, asig){
   Object.keys(hClase).forEach(c => { const ms = R.maquinasDeClase(P, c); ms.forEach(m => { const x = maq.get(m.id) || {m, horas: 0, dias: new Set(), clases: new Set()}; x.horas += hClase[c] / ms.length; (diasClase[c] || new Set()).forEach(f => x.dias.add(f)); x.clases.add(c); maq.set(m.id, x); }); });
   const sinFlota = Object.keys(hClase).filter(c => !PAT_MAQ[c] && hClase[c] > 0);
   if(sinFlota.length) avisos.push('Horas de ' + sinFlota.map(c => R.NOMBRE_CLASE[c]).join(', ') + ' sin máquina en la flota: no llevan coste de máquina.');
-  // ---- DIRECTO: combustible ----
-  const horasIndep = ev.horasDia;
-  const fuel = (P.gastos || []).filter(g => /combust/i.test(g.categoria || '') && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada'));
-  let combReal = 0, litros = 0, sinDesg = 0, nSin = 0;
-  fuel.forEach(g => { if(Array.isArray(g.lineas_fechadas)){ const tot = Math.abs(num(g.importe)), ratio = tot ? R.baseGasto(g) / tot : 1; let usadoDoc = false; g.lineas_fechadas.forEach(l => { const f = '20' + l[0], hm = lin.filter(x => x.f === f).reduce((s, x) => s + x.h, 0); if(!hm) return; const rep = horasIndep[f] > 0 ? Math.min(1, hm / horasIndep[f]) : 1; combReal += num(l[3]) * ratio * rep; litros += num(l[2]) * rep; usadoDoc = true; }); if(usadoDoc) usados.add(g.id); }
-    else if(g.fecha_devengo && g.fecha_devengo.slice(0, 7) >= desde.slice(0, 7) && g.fecha_devengo.slice(0, 7) <= hasta.slice(0, 7)){ sinDesg += R.baseGasto(g); nSin++; } });
-  lineasD.push(L('combustible', 'Combustible de esos días', combReal, combReal ? 'calculada' : 'falta', 'facturas con líneas por día, repartido por horas trabajadas ese día', combReal ? h1(litros) + ' litros' : 'No hay facturas de combustible desglosadas por día en estas fechas.'));
-  const consumoH = ev.horas > 0 ? ev.comb / ev.horas : 0, combEst = Math.max(0, consumoH * H - combReal);
-  if(combEst > 1) lineasD.push(L('combustible_est', 'Combustible sin desglose por día', combEst, 'estimada', 'consumo medio de la empresa (12 meses) × horas de esta obra − lo ya comprobado', 'Consumo medio ' + eur(consumoH, 2) + ' por hora facturada. ' + (nSin ? nSin + ' factura(s) de combustible de esos meses no traen el detalle por día.' : '')));
+  // ---- DIRECTO: coste de las máquinas por hora productiva (Gastos → Normalización: combustible, seguros, impuestos, taller y repuestos de la flota, repartidos por las horas de utilización de cada máquina) ----
+  const CO = P.costes; let combReal = 0;
+  Object.keys(hClase).forEach(c => { if(!(hClase[c] > 0)) return; const k = CO && CO.clases.find(x => x.clase === c), nom = R.NOMBRE_CLASE[c] || c;
+    if(k && k.horaProd != null) lineasD.push(L('maq:' + c, 'Coste de máquina: ' + nom, k.horaProd * hClase[c], k.manual ? 'estimada' : 'calculada', eur(k.horaProd, 2) + ' por hora productiva × ' + h1(hClase[c]) + ' h', 'Combustible, seguros, impuestos, taller y repuestos de la flota repartidos por horas de utilización (Gastos → Normalización). Si faltan horas en los albaranes antiguos, el coste por hora sale más alto.'));
+    else lineasD.push(L('maq:' + c, 'Coste de máquina: ' + nom, 0, 'falta', '', 'No hay coste por hora para esta clase en Normalización (sin gastos ni horas suficientes).')); });
   // ---- DIRECTO: gastos vinculados, ayudantes, reparaciones ----
   const vinG = (P.vinculos || []).filter(v => v.job_id === job.id && v.rol === 'gasto' && v.accion === 'incluir');
   const porCat = {}; vinG.forEach(v => { const g = (P.gastos || []).find(x => x.id === v.documento_id); if(!g) return; usados.add(g.id); const c = g.categoria || 'Otros'; porCat[c] = (porCat[c] || 0) + R.baseGasto(g); });
   Object.keys(porCat).forEach(c => lineasD.push(L('vinc:' + c, c + ' (asignado a la obra)', porCat[c], 'real', 'facturas asignadas a mano a esta obra', '')));
   const ayu = num(P.ayudantes[job.id]); if(ayu) lineasD.push(L('ayudantes', 'Ayudantes y subcontratados', ayu, 'real', 'apuntado a mano', ''));
-  const idsMaq = new Set([...maq.keys()]);
-  const rep = (P.gastos || []).filter(g => g.vehiculo_id && idsMaq.has(g.vehiculo_id) && CAT_MANT.test(g.categoria || '') && g.fecha_devengo >= desde && g.fecha_devengo <= hasta && !usados.has(g.id) && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada'));
-  rep.forEach(g => usados.add(g.id)); const repTot = sum(rep, R.baseGasto);
-  lineasD.push(L('reparaciones', 'Reparaciones de las máquinas usadas', repTot, repTot ? 'real' : 'falta', 'facturas anotadas a la máquina entre las fechas de la obra', repTot ? rep.length + ' factura(s)' : 'No hay ninguna factura anotada a las máquinas usadas en esas fechas (puede que no haya habido o que no estén asignadas).'));
-  // ---- INDIRECTO por máquina ----
-  const W0 = ev.W0, W1 = hasta, gW = ev.gW;
-  const horasAnualMaq = m => { let h = 0; Object.keys(ev.horasClase).forEach(c => { const ms = R.maquinasDeClase(P, c); if(ms.some(x => x.id === m.id)) h += ev.horasClase[c] / ms.length; }); return h; };
-  let totHorasMaqAnual = 0, totHorasMaqObra = 0, taggedMantObra = 0;
-  maq.forEach(x => { const m = x.m, jorn = num(prm.jornadas) || 250, d = x.dias.size;
-    const docs = gW.filter(g => g.vehiculo_id === m.id && CAT_FIJO.test(g.categoria || '')), anualDocs = sum(docs, R.baseGasto), pol = sum(P.polizas.filter(p => p.flota_id === m.id), p => num(p.coste_anual)), haySeg = docs.some(g => /seguro/i.test(g.categoria || ''));
-    const fijos = anualDocs + (haySeg ? 0 : pol);
-    lineasI.push(L('fijos:' + m.id, m.nombre + ': seguro, impuestos e ITV', fijos / jorn * d, fijos > 0 ? 'calculada' : 'falta', 'jornadas de disponibilidad: ' + eur(fijos) + ' al año ÷ ' + jorn + ' jornadas × ' + d + ' días de uso', fijos > 0 ? '' : 'No hay seguro, impuesto ni ITV anotados a esta máquina en los últimos 12 meses.'));
-    const compra = num(m.coste_compra);
-    if(compra > 0){ const vida = num(prm.vidaUtil) || 10, res = num(prm.residualPct) / 100, am = compra * (1 - res) / vida; lineasI.push(L('amort:' + m.id, m.nombre + ': amortización', am / jorn * d, 'estimada', 'compra ' + eur(compra) + ' ÷ ' + vida + ' años de vida útil (hipótesis), por jornadas', 'Vida útil y valor residual son hipótesis tuyas, editables en Hipótesis.')); }
-    else lineasI.push(L('amort:' + m.id, m.nombre + ': amortización', 0, 'falta', '', 'Falta el coste de compra de la máquina (ficha de flota): no se imputa amortización.'));
-    const ha = horasAnualMaq(m); totHorasMaqAnual += ha; totHorasMaqObra += x.horas;
-    const tagged = gW.filter(g => g.vehiculo_id === m.id && CAT_MANT.test(g.categoria || '') && !usados.has(g.id)); const tm = sum(tagged, R.baseGasto);
-    taggedMantObra += ha > 0 ? tm / ha * x.horas : 0; if(ha <= 0 && tm > 0) avisos.push(m.nombre + ' tiene mantenimiento anotado pero sin horas de uso en los albaranes del año.');
-  });
-  if(taggedMantObra > 0) lineasI.push(L('mant_maq', 'Mantenimiento y piezas de las máquinas usadas', taggedMantObra, 'calculada', 'por horas de utilización: gasto anual de cada máquina ÷ sus horas del año × horas en esta obra', ''));
-  const flotaProd = new Set((P.flota || []).filter(f => !/todoterreno|turismo|coche/i.test(f.clase || '')).map(f => f.id));
-  const poolMant = sum(gW.filter(g => !g.vehiculo_id && CAT_MANT.test(g.categoria || '') && !usados.has(g.id)), R.baseGasto);
-  const horasMaqEmpresa = sum(['mixta', 'camion', 'giratoria', 'niveladora'], c => ev.horasClase[c] || 0);
-  if(poolMant > 0 && horasMaqEmpresa > 0){ const hObraMaq = sum(['mixta', 'camion', 'giratoria', 'niveladora'], c => hClase[c] || 0); lineasI.push(L('mant_pool', 'Taller, neumáticos y piezas sin máquina asignada', poolMant / horasMaqEmpresa * hObraMaq, 'calculada', 'por horas de utilización: ' + eur(poolMant) + ' al año ÷ ' + h1(horasMaqEmpresa) + ' h de máquina × ' + h1(hObraMaq) + ' h de esta obra', 'Estas facturas no dicen a qué máquina pertenecen; asignarlas mejora el reparto.')); }
-  // ---- INDIRECTO generales, vehículos y socios: por actividad real (días trabajados) ----
-  const diasEmp = Math.max(1, ev.dias), usadosG = new Set();
-  const generalGasto = g => !g.vehiculo_id && !usados.has(g.id) && !/^gasto personal|n[oó]mina|compra de veh/i.test(g.categoria || '');
-  GENERALES.forEach(([t, re]) => { const docs = gW.filter(g => generalGasto(g) && !usadosG.has(g.id) && re.test(g.categoria || '')); docs.forEach(g => usadosG.add(g.id)); const anual = sum(docs, R.baseGasto); if(anual > 0) lineasI.push(L('gen:' + t, t, anual / diasEmp * D, 'calculada', 'actividad real: ' + eur(anual) + ' al año ÷ ' + diasEmp + ' días trabajados por la empresa × ' + D + ' días de esta obra', '')); });
-  const vehNoProd = new Set((P.flota || []).filter(f => ['activo', 'averiada', 'averia'].includes(f.estado) && /todoterreno|turismo|coche/i.test(f.clase || '')).map(f => f.id));
-  const vehAnual = sum(gW.filter(g => vehNoProd.has(g.vehiculo_id) && !/compra de veh|^gasto personal/i.test(g.categoria || '')), R.baseGasto);
-  if(vehAnual > 0) lineasI.push(L('vehiculos', 'Vehículos de la empresa (coches)', vehAnual / diasEmp * D, 'calculada', 'actividad real: ' + eur(vehAnual) + ' al año ÷ ' + diasEmp + ' días × ' + D, ''));
-  const sociosAnual = sum((P.socios || []).filter(x => x.f >= W0 && x.f <= W1), x => x.imp), socios = sociosAnual / diasEmp * D;
-  const socL = L('socios', 'Retribución de Rafa y Manolo (retiradas y gastos personales)', socios, sociosAnual > 0 ? 'calculada' : 'falta', 'actividad real: ' + eur(sociosAnual) + ' al año ÷ ' + diasEmp + ' días × ' + D, 'No es un gasto deducible: se resta para ver cuánto queda de verdad, pero no baja los impuestos.', {deducible: false});
+  // ---- INDIRECTO: amortización (provisión; solo con precio de compra) ----
+  const W0 = ev.W0, W1 = hasta, jorn = num(window.COSTES && COSTES.cfg.diasLab) || num(prm.jornadas) || 250;
+  maq.forEach(x => { const m = x.m, d = x.dias.size, compra = num(m.coste_compra);
+    if(compra > 0){ const vida = num(prm.vidaUtil) || 10, res = num(prm.residualPct) / 100, am = compra * (1 - res) / vida; lineasI.push(L('amort:' + m.id, m.nombre + ': amortización', am / jorn * d, 'estimada', 'compra ' + eur(compra) + ' ÷ ' + vida + ' años de vida útil (hipótesis), por ' + jorn + ' días laborables', 'Vida útil y valor residual son hipótesis tuyas, editables en Hipótesis.')); }
+    else lineasI.push(L('amort:' + m.id, m.nombre + ': amortización', 0, 'falta', '', 'Falta el coste de compra de la máquina (ficha de flota): no se imputa amortización.')); });
+  // ---- INDIRECTO: estructura, Seguridad Social/autónomos y coches de empresa (Normalización, por días laborables) y retribución de los socios ----
+  const dLab = num(window.COSTES && COSTES.cfg.diasLab) || 217;
+  if(CO){
+    const est = CO.porGrupo.estructura || 0; if(est > 0) lineasI.push(L('gen:estructura', 'Estructura de la empresa (nave, gestoría, financiación, suministros, programas…)', est / dLab * D, 'calculada', eur(est) + ' al año ÷ ' + dLab + ' días laborables × ' + D + ' días de esta obra', 'Gastos → Normalización, grupo Estructura.'));
+    const ss = sum(CO.porCat.filter(x => x.grupo === 'personal' && /seguridad social|aut[oó]nomo/i.test(x.cat)), x => x.base), otrosP = (CO.porGrupo.personal || 0) - ss;
+    if(ss > 0) lineasI.push(L('gen:ss', 'Autónomos y Seguridad Social', ss / dLab * D, 'calculada', eur(ss) + ' al año ÷ ' + dLab + ' días laborables × ' + D, otrosP > 1 ? 'No se imputan ' + eur(otrosP) + ' de nóminas y pagos en B a personas: falta decidir si son coste de obra.' : ''));
+    const des = CO.clases.find(x => x.clase === 'desplazamiento'); if(des && des.total > 0) lineasI.push(L('gen:coches', 'Coches de empresa (desplazamiento a obras)', des.total / dLab * D, 'calculada', eur(des.total) + ' al año ÷ ' + dLab + ' días laborables × ' + D, 'Nissan X-Trail y Hyundai Matrix.'));
+  } else avisos.push('No se pudo leer la normalización de costes: faltan los costes generales.');
+  const sociosAnual = sum((P.socios || []).filter(x => x.f >= W0 && x.f <= W1), x => x.imp), socios = sociosAnual / dLab * D;
+  const socL = L('socios', 'Retribución de Rafa y Manolo (retiradas y gastos personales)', socios, sociosAnual > 0 ? 'calculada' : 'falta', eur(sociosAnual) + ' al año ÷ ' + dLab + ' días laborables × ' + D, 'No es un gasto deducible: se resta para ver cuánto queda de verdad, pero no baja los impuestos.', {deducible: false});
   // ---- imputaciones manuales y correcciones ----
   const imps = (P.imput || []).filter(i => i.job_id === job.id);
   const aplicar = (arr, bloque) => { imps.filter(i => i.bloque === bloque).forEach(i => { if(i.modo === 'sustituir' && i.clave){ const x = arr.find(y => y.clave === i.clave); if(x){ x.original = x.valor; x.valor = num(i.importe); x.nivel = i.nivel; x.nota = (x.nota ? x.nota + ' · ' : '') + 'Corregido a mano: ' + (i.nota || 'sin nota'); x.manualId = i.id; return; } } arr.push(L('man:' + i.id, i.concepto, num(i.importe), i.nivel, 'imputación manual (' + i.origen + ')', i.nota || '', {manualId: i.id})); }); };
@@ -203,12 +196,12 @@ R.calcular = function(job, P, asig){
   const comprobado = ejecutado - directoComp - indirectoComp - sociosV;
   const estimadoImp = sum(lineasD.concat(lineasI).filter(est), x => x.valor), totalCostes = directo + indirecto + sociosV;
   const dCal = diffDays(desde, hasta) + 1;
-  const res = {vacio: false, job, desde, hasta, D, H, dCal, ing, lineasD, lineasI, socios: socL, directo, indirecto, ejecutado, resultadoDirecto: ejecutado - directo, bAntesSocios, beneficioReal, comprobado, impuestos, neto, tesoreria, cobrado, estimadoImp, pctEstimado: totalCostes > 0 ? estimadoImp / totalCostes * 100 : 0, avisos, maq: [...maq.values()].map(x => ({id: x.m.id, nombre: x.m.nombre, horas: x.horas, dias: x.dias.size})), hClase, ev: {diasEmp, horas: ev.horas, ingresos: ev.ingresos, comb: ev.comb}, albs};
+  const res = {vacio: false, job, desde, hasta, D, H, dCal, ing, lineasD, lineasI, socios: socL, directo, indirecto, ejecutado, resultadoDirecto: ejecutado - directo, bAntesSocios, beneficioReal, comprobado, impuestos, neto, tesoreria, cobrado, estimadoImp, pctEstimado: totalCostes > 0 ? estimadoImp / totalCostes * 100 : 0, avisos, maq: [...maq.values()].map(x => ({id: x.m.id, nombre: x.m.nombre, horas: x.horas, dias: x.dias.size})), hClase, ev: {diasEmp: Math.max(1, ev.dias), horas: ev.horas, ingresos: ev.ingresos, comb: ev.comb}, albs};
   res.m = {pctIngresos: ejecutado ? beneficioReal / ejecutado * 100 : NaN, porJornada: beneficioReal / D, porHora: H ? beneficioReal / H : NaN, directoPctIng: ejecutado ? (ejecutado - directo) / ejecutado * 100 : NaN};
   // ---- coste de oportunidad (independiente del beneficio real) ----
   const hMaq = sum(['mixta', 'camion', 'giratoria', 'niveladora'], c => hClase[c] || 0);
   const resto = {ing: Math.max(0, ev.ingresos - ejecutado), h: Math.max(0, ev.horas - H), comb: Math.max(0, ev.comb - combReal)};
-  const margenH = resto.h > 0 ? (resto.ing - resto.comb) / resto.h : NaN;
+  const ref = R.referencia(P), margenH = ref ? ref.margenH : NaN;
   const pend = (P.jobs || []).filter(j => j.estado === 'Pendiente' && j.id !== job.id), backlog = sum(pend, j => (typeof tbDurHoras === 'function' ? num(tbDurHoras(j.duracion)) : 0));
   const hReal = Math.min(hMaq, backlog), opMaq = isFinite(margenH) ? hReal * margenH : NaN;
   let costeHoraPersona = NaN; try{ costeHoraPersona = convenioSueldoInfo('maquinista').costeHora; }catch(e){}
@@ -227,8 +220,8 @@ R.base12 = function(P){
   const maquinas = (P.flota || []).filter(f => ['activo'].includes(f.estado) && !/todoterreno|turismo|coche/i.test(f.clase || '')).length;
   const pend = (P.jobs || []).filter(j => j.estado === 'Pendiente'); let backlog = 0, nBack = 0;
   pend.forEach(j => { const h = typeof tbDurHoras === 'function' ? num(tbDurHoras(j.duracion)) : 0; if(h > 0){ backlog += h; nBack++; } });
-  const margenH = ev.horas > 0 ? (ev.ingresos - ev.comb) / ev.horas : NaN, ingH = ev.horas > 0 ? ev.ingresos / ev.horas : NaN;
-  return {ev, ingresos: ev.ingresos, horas: ev.horas, dias: ev.dias, comb: ev.comb, costesOp, socios, taller, maquinas, backlog, nBack, pendientes: pend.length, margenH, ingH, margenPct: ev.ingresos > 0 ? (ev.ingresos - ev.comb) / ev.ingresos : NaN, beneficio: ev.ingresos - costesOp, beneficioTrasSocios: ev.ingresos - costesOp - socios};
+  const ref = R.referencia(P), margenH = ref ? ref.margenH : NaN, ingH = ref ? ref.ingH : NaN;
+  return {ev, ingresos: ev.ingresos, horas: ev.horas, dias: ev.dias, comb: ev.comb, costesOp, socios, taller, maquinas, backlog, nBack, pendientes: pend.length, margenH, ingH, cobHoras: ev.ingresos > 0 ? ev.ingConHoras / ev.ingresos : NaN, ref, margenPct: ref && ref.ingH > 0 ? ref.margenH / ref.ingH : NaN, beneficio: ev.ingresos - costesOp, beneficioTrasSocios: ev.ingresos - costesOp - socios};
 };
 R.ESC0 = {socios8: false, operarios: 0, mecanico: false, mecCond: false};
 R.nombreEsc = e => { const p = []; if(e.socios8) p.push('Rafa y Manolo 8 h L-V'); if(e.operarios) p.push(e.operarios + ' operario' + (e.operarios > 1 ? 's' : '')); if(e.mecanico) p.push('mecánico'); if(e.mecCond) p.push('mecánico-conductor'); return p.length ? p.join(' + ') : 'Situación actual real'; };
@@ -267,8 +260,8 @@ R.conclusiones = function(r, P, b){
   q.push(['¿Cuánto beneficio real ha dejado?', eur(r.beneficioReal) + ' tras pagar todos los costes y la retribución de Rafa y Manolo (' + eur(r.bAntesSocios) + ' antes de retribuirles). Solo con datos comprobados: ' + eur(r.comprobado) + '. ' + incierto + (r.ing.facturado < r.ejecutado ? ' Falta facturar ' + eur(r.ejecutado - r.ing.facturado) + ' y cobrar ' + eur(r.ejecutado - r.cobrado) + '.' : '')]);
   q.push(['¿Qué gastos han reducido más la rentabilidad?', peso.length ? peso.map(x => x.label + ' (' + eur(x.valor) + ', ' + pct(r.ejecutado ? x.valor / r.ejecutado * 100 : NaN) + ' del ingreso)').join(' · ') : 'No hay gastos imputados: faltan datos.']);
   q.push(['¿Cuánto hemos ganado por día y por hora?', eur(r.m.porJornada) + ' por jornada trabajada (' + r.D + ' días con horas)' + (r.H ? ' y ' + eur(r.m.porHora, 2) + ' por hora de máquina (' + h1(r.H) + ' h)' : ' (sin horas en los albaranes)') + '.']);
-  const refH = B.horas > 0 ? B.beneficioTrasSocios / B.horas : NaN;
-  let comp; if(!isFinite(refH) || !r.H) comp = 'No hay datos para comparar con el resto de la empresa.'; else comp = (r.m.porHora >= refH ? 'Sí, por encima' : 'Por debajo') + ' de la media de la empresa en 12 meses (' + eur(refH, 2) + ' por hora tras retribuir a los socios; esta obra ' + eur(r.m.porHora, 2) + '). ' + (r.beneficioReal < 0 ? 'Perdió dinero.' : '') + (isFinite(r.op.opMaq) && r.op.opMaq > r.beneficioReal ? ' Las mismas horas en trabajo que ya estaba pendiente habrían dado ≈ ' + eur(r.op.opMaq) + ' (estimado).' : '');
+  const refH = B.horas > 0 ? B.beneficioTrasSocios / B.horas : NaN, cobH = B.cobHoras;
+  let comp; if(isFinite(cobH) && cobH < 0.9) comp = 'Beneficio real de la obra: ' + eur(r.beneficioReal) + (r.ejecutado ? ' (' + pct(r.beneficioReal / r.ejecutado * 100) + ' del ingreso)' : '') + '. No se puede comparar de forma fiable con el resto de la empresa: solo el ' + Math.round(cobH * 100) + ' % de los ingresos de los últimos 12 meses tiene horas anotadas en los albaranes.' + (isFinite(r.op.opMaq) && r.op.opMaq > r.beneficioReal ? ' Las mismas horas en trabajo que ya estaba pendiente habrían dado ≈ ' + eur(r.op.opMaq) + ' (estimado).' : ''); else if(!isFinite(refH) || !r.H) comp = 'No hay datos para comparar con el resto de la empresa.'; else comp = (r.m.porHora >= refH ? 'Sí, por encima' : 'Por debajo') + ' de la media de la empresa en 12 meses (' + eur(refH, 2) + ' por hora tras retribuir a los socios; esta obra ' + eur(r.m.porHora, 2) + '). ' + (r.beneficioReal < 0 ? 'Perdió dinero.' : '') + (isFinite(r.op.opMaq) && r.op.opMaq > r.beneficioReal ? ' Las mismas horas en trabajo que ya estaba pendiente habrían dado ≈ ' + eur(r.op.opMaq) + ' (estimado).' : '');
   q.push(['¿Nos ha compensado hacerla?', comp]);
   const mdias = sum(r.maq, x => x.dias), hd = mdias ? r.H / mdias : NaN, dias8 = Math.max(0, ...r.maq.map(x => x.horas)) / 8; q.push(['¿Qué habría cambiado trabajando más horas?', !isFinite(hd) ? 'Los albaranes no traen horas ni máquinas: no se puede estimar.' : hd >= 8 ? 'Cada máquina trabajó una media de ' + h1(hd) + ' h por día de uso: no hay margen de jornada.' : 'Cada máquina trabajó una media de ' + h1(hd) + ' h por día de uso. A 8 h/día la obra habría ocupado ' + h1(dias8) + ' días en vez de ' + r.D + ': se liberan ' + h1(Math.max(0, r.D - dias8)) + ' jornadas que se pueden dedicar a otro trabajo (solo si hay trabajo) y los costes que se reparten por actividad real (' + eur(sum(r.lineasI.filter(x => /^(gen|vehiculos)/.test(x.clave)), x => x.valor) + r.socios.valor) + ' aquí) bajarían ≈ ' + eur((sum(r.lineasI.filter(x => /^(gen|vehiculos)/.test(x.clave)), x => x.valor) + r.socios.valor) * (1 - dias8 / r.D)) + ' (estimado). No se supone que facture más.']);
   const sims = [['operario', {operarios: 1}], ['mecánico', {mecanico: true}], ['mecánico-conductor', {mecCond: true}]].map(([n, e]) => [n, R.simular(B, {...R.ESC0, ...e})]);
@@ -309,7 +302,7 @@ R.secOport = r => {
     + fila('Horas de máquina usadas', '<b>' + h1(o.hMaq) + ' h</b>', 'Según las líneas de los albaranes. ' + badge('real'))
     + fila('Trabajo pendiente en cola (con duración conocida)', '<b>' + h1(o.backlog) + ' h</b>', badge('real') + ' Si no había trabajo esperando, las máquinas no habrían ingresado nada distinto.')
     + fila('Horas que realmente podían haberse ocupado', '<b>' + h1(o.hReal) + ' h</b>', 'Menor entre las horas usadas y las horas pendientes. ' + badge('calculada'))
-    + fila('Margen medio por hora del resto de la empresa (12 m)', isFinite(o.margenH) ? '<b>' + eur(o.margenH, 2) + '</b>' : '<i>sin dato</i>', 'Ingresos − combustible, ÷ horas facturadas. ' + badge('calculada'))
+    + fila('Margen por hora de la obra de referencia', isFinite(o.margenH) ? '<b>' + eur(o.margenH, 2) + '</b>' : '<i>sin dato</i>', 'Precio actual por hora (obra de referencia) − coste de máquina por hora productiva, mezcla de horas de esa obra. ' + badge('estimada'))
     + fila('<b>Alternativa de las máquinas</b>', isFinite(o.opMaq) ? '<b>' + eur(o.opMaq) + '</b>' : '<i>sin dato</i>', 'Horas ocupables × margen medio. Es una hipótesis, no un ingreso seguro. ' + badge('estimada'))
     + fila('Margen de esta obra por hora (antes de indirectos)', isFinite(o.margenObraH) ? '<b>' + eur(o.margenObraH, 2) + '</b>' : '<i>sin dato</i>', 'Para comparar con la fila de arriba.')
     + fila('Valor del tiempo de las personas', isFinite(o.valorTiempo) ? '<b>' + eur(o.valorTiempo) + '</b>' : '<i>sin dato</i>', h1(r.H) + ' h × ' + (isFinite(o.costeHoraPersona) ? eur(o.costeHoraPersona, 2) : '—') + ' por hora (coste de un maquinista de convenio). Lo que costaría pagar ese tiempo, no lo que ganarían Rafa y Manolo. ' + badge('estimada')));
@@ -325,9 +318,10 @@ R.tablaEsc = (b, lista) => {
 };
 R.secSim = (P, b) => {
   const bd = R.build, nb = R.simular(b, bd), inp = (k, l, u) => '<label style="font-size:11.5px;display:flex;flex-direction:column;gap:2px;">' + l + '<input type="number" value="' + R.param[k] + '" onchange="RENT.setParam(\'' + k + '\',this.value)" style="width:90px;"><span style="color:var(--ink-soft);">' + (u || '') + '</span></label>';
-  return card('Situación actual real (últimos 12 meses)', fila('Ingresos sin IVA', '<b>' + eur(b.ingresos) + '</b>', badge('calculada')) + fila('Horas facturadas', h1(b.horas) + ' h', b.dias + ' días con trabajo · ' + b.maquinas + ' máquinas productivas') + fila('Costes de actividad (sin retiradas)', eur(b.costesOp), 'Incluye combustible ' + eur(b.comb)) + fila('Beneficio antes de retribuir a los socios', '<b style="color:' + col(b.beneficio) + ';">' + eur(b.beneficio) + '</b>') + fila('Retiradas y gastos personales de los socios', eur(b.socios), 'No deducible.') + fila('Margen por hora (ingreso − combustible)', isFinite(b.margenH) ? eur(b.margenH, 2) : 'sin dato') + fila('Trabajo pendiente en cola', b.backlog ? h1(b.backlog) + ' h' : 'sin duración conocida', b.pendientes + ' trabajos pendientes, ' + b.nBack + ' con duración'))
+  return card('Situación actual real (últimos 12 meses)', fila('Ingresos sin IVA', '<b>' + eur(b.ingresos) + '</b>', badge('calculada')) + fila('Horas facturadas', h1(b.horas) + ' h', b.dias + ' días con trabajo · ' + b.maquinas + ' máquinas productivas') + fila('Costes de actividad (sin retiradas)', eur(b.costesOp), 'Incluye combustible ' + eur(b.comb)) + fila('Beneficio antes de retribuir a los socios', '<b style="color:' + col(b.beneficio) + ';">' + eur(b.beneficio) + '</b>') + fila('Retiradas y gastos personales de los socios', eur(b.socios), 'No deducible.') + fila('Margen por hora (obra de referencia' + (b.ref ? ': ' + esc(b.ref.job.trabajo || '') + ', ' + h1(b.ref.H) + ' h, ' + eur(b.ref.ingH, 2) + ' por hora' : '') + ')', isFinite(b.margenH) ? eur(b.margenH, 2) : 'sin dato', 'Precio por hora actual − coste de máquina por hora productiva. ' + badge('estimada') + (b.ref && b.ref.cobertura < 1 ? ' Solo ' + Math.round(b.ref.cobertura * 100) + ' % de las horas tienen coste de máquina.' : '')) + fila('Trabajo pendiente en cola', b.backlog ? h1(b.backlog) + ' h' : 'sin duración conocida', b.pendientes + ' trabajos pendientes, ' + b.nBack + ' con duración'))
     + card('Montar escenario', '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;"><label style="font-size:12px;"><input type="checkbox" ' + (bd.socios8 ? 'checked' : '') + ' onchange="RENT.build.socios8=this.checked;RENT.repinta()"> Rafa y Manolo 8 h L-V</label><label style="font-size:12px;">Operarios <select onchange="RENT.build.operarios=+this.value;RENT.repinta()">' + [0, 1, 2, 3].map(n => '<option ' + (bd.operarios === n ? 'selected' : '') + '>' + n + '</option>').join('') + '</select></label><label style="font-size:12px;"><input type="checkbox" ' + (bd.mecanico ? 'checked' : '') + ' onchange="RENT.build.mecanico=this.checked;RENT.repinta()"> Mecánico</label><label style="font-size:12px;"><input type="checkbox" ' + (bd.mecCond ? 'checked' : '') + ' onchange="RENT.build.mecCond=this.checked;RENT.repinta()"> Mecánico-conductor</label><button type="button" class="btn" onclick="RENT.escAdd()">Guardar y comparar</button></div><div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">Vista previa: <b>' + esc(nb.nombre) + '</b> → ' + eur(nb.beneficio) + ' al año (' + (nb.dBenef >= 0 ? '+' : '') + eur(nb.dBenef) + ' sobre hoy). Todo escenario es una ' + badge('estimada') + '</div>')
     + card('Comparación', R.tablaEsc(b, P.escenarios || []))
+    + card('Obra de referencia (precio por hora y mezcla de máquinas)', '<select onchange="RENT.setRef(this.value)" style="font-size:12.5px;max-width:100%;"><option value="">Automática: nave avícola</option>' + (P.jobs || []).filter(j => (R.asignar(P).porJob[j.id] || []).length).map(j => '<option value="' + j.id + '"' + (R.param.refJob === j.id ? ' selected' : '') + '>' + esc(j.trabajo || j.id) + '</option>').join('') + '</select><div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Solo cuentan las líneas con horas. De aquí salen el precio actual por hora de cada máquina y el margen por hora del simulador.</div>')
     + card('Hipótesis (editables)', '<div style="display:flex;flex-wrap:wrap;gap:10px;">' + inp('jornadas', 'Jornadas al año', 'd') + inp('ocupacion', 'Ocupación productiva', '% de la jornada con máquina trabajando') + inp('indisponibilidad', 'Averías / paradas', '% de tiempo') + inp('reduccionAverias', 'Reducción con mecánico', '% de las averías') + inp('ahorroTaller', 'Ahorro en taller con mecánico', '%') + inp('condMecPct', 'Mecánico-conductor conduce', '% del tiempo') + inp('horasMecanicaSemana', 'Horas de mecánica de los socios', 'h/semana') + inp('impuesto', 'Impuestos', '% sobre beneficio') + inp('vidaUtil', 'Vida útil maquinaria', 'años') + inp('residualPct', 'Valor residual', '%') + '</div><div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">Estos valores son hipótesis tuyas, no datos. La capacidad extra solo se factura si hay trabajo pendiente en cola; no se supone que más horas = más ingresos.</div>');
 };
 R.secComp = (r, P, b) => {
@@ -360,6 +354,7 @@ R.setTab = n => { R.tab = n; R.repinta(); R.snapshot(); };
 R.setSel = id => { R.sel = id; R.repinta(); R.snapshot(); };
 R.recargar = async () => { R.invalidar(); if(R.el) await R.pintar(R.el, true); };
 R.param_ = async () => { const P = R.P; const data = {...R.param}; if(P.paramId) await guarda(sb.from('sistema').update({data}).eq('id', P.paramId), 'hipótesis'); else { const {data: d, error} = await sb.from('sistema').insert({tipo: 'rent_parametros', data}).select('id').single(); if(!error && d) P.paramId = d.id; } };
+R.setRef = async id => { R.param.refJob = id || null; await R.param_(); if(R.P) delete R.P._ref; R.repinta(); };
 R.setParam = async (k, v) => { R.param[k] = Number(String(v).replace(',', '.')) || 0; await R.param_(); R.repinta(); };
 R.asignarAlb = async (docId, jobId) => { if(await guarda(sb.from('rent_vinculos').upsert({job_id: jobId, documento_id: docId, rol: 'albaran', accion: 'incluir', nota: 'asignado a mano'}, {onConflict: 'job_id,documento_id'}))) await R.recargar(); };
 R.excluirAlb = async (docId, jobId) => { if(!confirm('¿Quitar este albarán de la obra?')) return; if(await guarda(sb.from('rent_vinculos').upsert({job_id: jobId, documento_id: docId, rol: 'albaran', accion: 'excluir', nota: 'quitado a mano'}, {onConflict: 'job_id,documento_id'}))) await R.recargar(); };

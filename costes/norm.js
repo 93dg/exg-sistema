@@ -40,6 +40,7 @@ C.usoDe = f => { if(!f) return null; const m = C.cfg.usoVeh && C.cfg.usoVeh[f.id
 const usoTexto = t => { t = String(t || ''); if(/retroexcavadora|liebherr|nissan|x-trail|mixta|iveco|cami[oó]n/i.test(t)) return null; if(/evoque|range rover/i.test(t)) return 'alberto'; if(/audi|galloper/i.test(t)) return 'socio'; if(/hyundai matrix/i.test(t)) return 'empresa'; return null; };
 
 // ---- conversiones automáticas a partir del importe ANUAL ----
+C.aplicarCfg = row => { if(row){ C.cfgId = row.id; C.cfg = {...JSON.parse(JSON.stringify(DEF)), ...(row.data || {})}; } };
 C.conv = anual => {
   const c = C.cfg, hJ = c.diasLab * c.horasJornada;
   return {anual, mes: anual / 12, diaNat: anual / c.diasNat, diaLab: c.diasLab ? anual / c.diasLab : null, horaNat: anual / c.horasNat, horaJ: hJ ? anual / hJ : null};
