@@ -4589,7 +4589,7 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.23</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.24</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4736,7 +4736,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.23</div>
+        <div class="sub" id="version-badge">V9.24</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6710,6 +6710,19 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
         <div><h1>Configuración</h1><div class="desc">Qué secciones puede ver cada usuario</div></div>
         <div class="quickactions"><button class="btn primary" id="permisos-guardar-btn" onclick="guardarPermisos()" disabled>Guardado</button></div>
       </div>
+      <div class="panel" id="panel-impresora">
+        <div class="panel-head"><h3>Impresora de la oficina</h3><span class="count">Brother MFC-L2710DW</span></div>
+        <div class="panel-body" style="padding:14px 16px;font-size:14px;">
+          <div id="impresora-estado" style="margin-bottom:10px;">—</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <button type="button" class="btn dark" onclick="imprimirPruebaOficina()">Página de prueba</button>
+            <button type="button" class="btn" onclick="cargarEstadoImpresora()">Actualizar</button>
+            <a class="btn" href="impresora/instalar_impresora_exg.bat" download>Instalar en el ordenador</a>
+          </div>
+          <div style="color:var(--ink-soft);font-size:12.5px;margin-bottom:8px;">«Instalar en el ordenador»: se descarga y se abre una sola vez en el ordenador de la oficina. Ese ordenador tiene que quedar encendido (la pantalla puede apagarse).</div>
+          <div id="impresora-ultimos" style="font-size:12.5px;"></div>
+        </div>
+      </div>
       <div class="panel">
         <div class="panel-head"><h3>Permisos por usuario</h3><span class="count">Dani G ve siempre todo</span></div>
         <div class="panel-body" style="padding:0;">
@@ -7598,6 +7611,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
     <div class="ie-actions ie-actions-secondary" id="ie-pdf-acciones-escritorio">
       <button type="button" class="btn dark" onclick="descargarPDF()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:17px;height:17px;vertical-align:-3px;"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg> Descargar PDF</button>
       <button type="button" class="btn ie-edit-only" onclick="imprimirDocumento(editingDocId)"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:17px;height:17px;vertical-align:-3px;"><path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/></svg> Imprimir</button>
+          <button type="button" class="btn" onclick="imprimirEnOficina()">🖨 Imprimir en la oficina</button>
     </div>
     <button type="button" class="btn primary" id="ni-convert-btn" style="display:none;width:calc(100% - 40px);margin:0 20px 10px 20px;" onclick="convertirDocumento()">Convertir en albarán</button>
     <button type="button" class="btn" id="ni-deshacer-btn" style="display:none;color:var(--red);width:calc(100% - 40px);margin:0 20px 10px 20px;" onclick="deshacerConversion()">Deshacer: volver a albarán</button>
@@ -8026,6 +8040,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     }
     // V8.77: Economía, Ayuntamiento y Archivos ya no construyen todo el histórico al abrirse (sus cifras salen de los datos en memoria o de la base); las filas antiguas solo se construyen por año, al elegirlo en Facturas, Albaranes o Presupuestos
     if(btn.dataset.view==='impuestos') iniciarImpuestos();
+    if(btn.dataset.view==='config') cargarEstadoImpresora();
     if(btn.dataset.view==='sistema'){ const t = document.querySelector('#sistema-subtabs .client-tab.active')?.dataset.sub; if(!t || t === 'arranque'){ cargarPromptsSistema(); cargarArranqueSistema(); } }   // la pestaña que ya está abierta también carga sus datos
     if(btn.dataset.view==='trabajos') iniciarTrabajosPrueba();   // la nueva lista de trabajos (el nombre interno se queda)
     if(btn.dataset.view==='backup') cargarPapelera();
@@ -23148,6 +23163,53 @@ async function imprimirPDF(){
   if(!(await confirmarFacturaCompleta('Imprimirla'))) return;
   generarPDFDocumento('imprimir');
 }
+
+/* V9.24 — Impresora de la oficina (Brother): la app deja el PDF en la cola y el ordenador de la oficina lo imprime solo */
+async function imprimirEnOficina(){
+  if(!(await confirmarFacturaCompleta('Imprimirla'))) return;
+  generarPDFDocumento('oficina');
+}
+async function estadoImpresoraOficina(){
+  try{
+    const {data} = await sb.from('impresora_agente').select('last_seen,impresora').eq('id',1).maybeSingle();
+    if(!data) return {ok:false, texto:'Nunca se ha conectado', impresora:null};
+    const seg = Math.round((Date.now() - new Date(data.last_seen).getTime())/1000);
+    if(seg <= 90) return {ok:true, texto:'Conectada', impresora:data.impresora};
+    const min = Math.round(seg/60);
+    const hace = min < 60 ? `${min} min` : (min < 2880 ? `${Math.round(min/60)} h` : `${Math.round(min/1440)} días`);
+    return {ok:false, texto:`Sin conexión desde hace ${hace}`, impresora:data.impresora};
+  }catch(e){ return {ok:false, texto:'No se pudo comprobar', impresora:null}; }
+}
+async function encolarImpresion(pdfBase64, nombre, copias, origen){
+  try{
+    const {error} = await sb.from('cola_impresion').insert({nombre, pdf_base64: pdfBase64, copias: copias||1, origen: origen||'app'});
+    if(error) throw error;
+    const est = await estadoImpresoraOficina();
+    mostrarToast(est.ok ? 'Enviado a la impresora de la oficina.' : `Enviado, pero el ordenador de la oficina no responde (${est.texto.toLowerCase()}). Saldrá cuando se conecte.`);
+  }catch(e){
+    mostrarToast('No se pudo enviar a la impresora: ' + (e?.message || e));
+  }
+}
+async function cargarEstadoImpresora(){
+  const caja = document.getElementById('impresora-estado'); if(!caja) return;
+  caja.textContent = 'Comprobando…';
+  const est = await estadoImpresoraOficina();
+  caja.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${est.ok?'#2e9d4a':'#c2410c'};margin-right:6px;"></span><b>${est.texto}</b>${est.impresora ? ' · ' + est.impresora : ''}`;
+  try{
+    const {data} = await sb.from('cola_impresion').select('nombre,estado,error,created_at').order('created_at',{ascending:false}).limit(5);
+    const ult = document.getElementById('impresora-ultimos');
+    if(ult) ult.innerHTML = (data||[]).length ? (data||[]).map(r=>`<div style="padding:4px 0;border-top:1px solid var(--line);">${formatFechaCorta(r.created_at)} ${new Date(r.created_at).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})} · ${r.nombre} · <b>${r.estado==='impreso'?'impreso':r.estado==='error'?'error':r.estado==='imprimiendo'?'imprimiendo':'en cola'}</b>${r.error?` <span style="color:#c2410c;">(${r.error})</span>`:''}</div>`).join('') : '<div style="color:var(--ink-soft);">Todavía no se ha enviado nada.</div>';
+  }catch(e){}
+}
+function imprimirPruebaOficina(){
+  if(!window.jspdf){ exgLibLocal('jspdf'); mostrarToast('Preparando… vuelve a pulsar en un momento.'); return; }
+  const doc = new window.jspdf.jsPDF({unit:'mm', format:'a4'});
+  doc.setFontSize(20); doc.text('Prueba de impresión — EXG', 20, 30);
+  doc.setFontSize(12); doc.text('Si lees esto, la impresora de la oficina funciona desde la app.', 20, 45);
+  doc.text(new Date().toLocaleString('es-ES'), 20, 55);
+  encolarImpresion(doc.output('datauristring').split('base64,')[1], 'prueba.pdf', 1, 'prueba');
+  setTimeout(cargarEstadoImpresora, 8000);
+}
 // Menú compacto móvil: las MISMAS dos funciones reales (descargarPDF/imprimirPDF), solo
 // agrupadas — nunca se pierde ninguna de las dos.
 function abrirMenuPdfMovil(){
@@ -23155,6 +23217,7 @@ function abrirMenuPdfMovil(){
     <div style="display:flex;flex-direction:column;gap:8px;">
       <button class="btn dark" style="width:100%;" onclick="cerrarModalGenerico();descargarPDF()">⬇ Descargar PDF</button>
       <button class="btn" style="width:100%;" onclick="cerrarModalGenerico();imprimirPDF()">🖨 Imprimir</button>
+      <button class="btn" style="width:100%;" onclick="cerrarModalGenerico();imprimirEnOficina()">🖨 Imprimir en la oficina</button>
     </div>
   `);
 }
@@ -23400,6 +23463,9 @@ function generarPDFDocumento(accion, modoForzado, portadaForzada){
     visorAbrir(url, `${num || 'documento'}.pdf`);
   } else if(accion==='blob'){
     return doc.output('blob');
+  } else if(accion==='oficina'){
+    // V9.24: el mismo PDF (con portada si está marcada) va a la cola de la impresora de la oficina
+    encolarImpresion(doc.output('datauristring').split('base64,')[1], `${num || 'documento'}.pdf`, 1, 'editor');
   } else {
     doc.save(`${num || 'documento'}.pdf`);
   }
