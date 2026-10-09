@@ -158,26 +158,32 @@ R.calcular = function(job, P, asig){
   Object.keys(hClase).forEach(c => { const ms = R.maquinasDeClase(P, c); ms.forEach(m => { const x = maq.get(m.id) || {m, horas: 0, dias: new Set(), clases: new Set()}; x.horas += hClase[c] / ms.length; (diasClase[c] || new Set()).forEach(f => x.dias.add(f)); x.clases.add(c); maq.set(m.id, x); }); });
   const sinFlota = Object.keys(hClase).filter(c => !PAT_MAQ[c] && hClase[c] > 0);
   if(sinFlota.length) avisos.push('Horas de ' + sinFlota.map(c => R.NOMBRE_CLASE[c]).join(', ') + ' sin máquina en la flota: no llevan coste de máquina.');
-  // ---- DIRECTO: combustible (V9.60) ----
-  // Por meses: el combustible de las máquinas de cada mes de la obra × la parte de la obra en lo trabajado ese mes (por ingreso de las líneas, que siempre está; las horas no siempre).
-  // Solo se estima un mes de la obra si aún no tiene factura de combustible (p. ej. el mes en curso), con el gasto medio por € trabajado de los meses que sí la tienen.
+  // ---- DIRECTO: combustible (V9.62) ----
+  // Por meses y por tipo: el gasóleo B (agrícola) es de las máquinas de obra, el gasóleo A del camión; la gasolina es de los coches y no entra.
+  // A la obra le toca, cada mes, su parte de lo que trabajaron esas máquinas (por ingreso de las líneas). Solo se estima un mes que aún no tiene factura.
   const horasIndep = ev.horasDia, CO = P.costes;
   const coches = new Set((P.flota || []).filter(f => /todoterreno|turismo|coche/i.test(f.clase || '')).map(f => f.id));
   const fuel = (P.gastos || []).filter(g => /combust/i.test(g.categoria || '') && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada') && !(g.vehiculo_id && coches.has(g.vehiculo_id)));
-  const mesD = desde.slice(0, 7), mesH = hasta.slice(0, 7), fuelMes = {}, litMes = {};
+  const mesD = desde.slice(0, 7), mesH = hasta.slice(0, 7), GR = c => c === 'camion' ? 'A' : 'B';
+  const fMes = {A: {}, B: {}}, lMes = {A: {}, B: {}};
+  const suma = (o, m, v) => { o[m] = (o[m] || 0) + v; };
   fuel.forEach(g => { const tot = Math.abs(num(g.importe)), ratio = tot ? R.baseGasto(g) / tot : 1;
-    if(Array.isArray(g.lineas_fechadas) && g.lineas_fechadas.length){ g.lineas_fechadas.forEach(l => { const m = ('20' + l[0]).slice(0, 7); if(m < mesD || m > mesH) return; fuelMes[m] = (fuelMes[m] || 0) + num(l[3]) * ratio; litMes[m] = (litMes[m] || 0) + num(l[2]); usados.add(g.id); }); }
-    else if(g.fecha_devengo){ const m = g.fecha_devengo.slice(0, 7); if(m < mesD || m > mesH) return; fuelMes[m] = (fuelMes[m] || 0) + R.baseGasto(g); usados.add(g.id); } });
-  const ingEmpMes = {}, ingObraMes = {};
-  R.efectivos(P).lista.forEach(d => { const f = R.factorLineas(d); R.lineas(d).forEach(l => { const m = l.f.slice(0, 7); if(m < mesD || m > mesH) return; ingEmpMes[m] = (ingEmpMes[m] || 0) + l.imp * f; }); });
-  albs.forEach(d => { const f = R.factorLineas(d); R.lineas(d).forEach(l => { const m = l.f.slice(0, 7); ingObraMes[m] = (ingObraMes[m] || 0) + l.imp * f; }); });
-  let combReal = 0, litros = 0, fCub = 0, iCub = 0; const sinFact = [];
-  Object.keys(ingObraMes).forEach(m => { const io = ingObraMes[m], ie = ingEmpMes[m] || io, parte = ie > 0 ? Math.min(1, io / ie) : 0;
-    if(fuelMes[m] > 0){ combReal += fuelMes[m] * parte; litros += (litMes[m] || 0) * parte; fCub += fuelMes[m]; iCub += ie; } else if(io > 0) sinFact.push(m); });
-  lineasD.push(L('combustible', 'Combustible de esos meses', combReal, combReal ? 'calculada' : 'falta', 'combustible de las máquinas de cada mes × la parte de esta obra en lo trabajado ese mes', combReal ? (litros ? h1(litros) + ' litros' : '') : 'No hay facturas de combustible en los meses de la obra.'));
-  const combEst = iCub > 0 ? sum(sinFact, m => ingObraMes[m]) * fCub / iCub : 0;
-  if(combEst > 1) lineasD.push(L('combustible_est', 'Combustible de meses aún sin factura', combEst, 'estimada', 'gasto medio de combustible por € trabajado en los meses con factura × lo trabajado en ' + sinFact.join(', '), 'Se sustituye por el real cuando llegue la factura de ese mes.'));
-  const idsMaqX = null;
+    if(Array.isArray(g.lineas_fechadas) && g.lineas_fechadas.length){ g.lineas_fechadas.forEach(l => { const m = ('20' + l[0]).slice(0, 7), t = String(l[1] || 'A').toUpperCase(); if(m < mesD || m > mesH || t === 'G') return; const k = t === 'B' ? 'B' : 'A'; suma(fMes[k], m, num(l[3]) * ratio); suma(lMes[k], m, num(l[2])); usados.add(g.id); }); }
+    else if(g.fecha_devengo){ const m = g.fecha_devengo.slice(0, 7); if(m < mesD || m > mesH) return; const cs = Array.isArray(g.conceptos) ? g.conceptos : [], b = sum(cs.filter(c => c.tipo === 'gasoleo_b'), c => num(c.importe)), a = sum(cs.filter(c => c.tipo === 'diesel'), c => num(c.importe)), t0 = b + a;
+      if(t0 > 0){ suma(fMes.B, m, R.baseGasto(g) * b / sum(cs, c => num(c.importe))); suma(fMes.A, m, R.baseGasto(g) * a / sum(cs, c => num(c.importe))); } else suma(fMes.A, m, R.baseGasto(g)); usados.add(g.id); } });
+  const ingEmp = {A: {}, B: {}}, ingObra = {A: {}, B: {}};
+  R.efectivos(P).lista.forEach(d => { const f = R.factorLineas(d); R.lineas(d).forEach(l => { const m = l.f.slice(0, 7); if(m < mesD || m > mesH || l.clase === 'otros') return; suma(ingEmp[GR(l.clase)], m, l.imp * f); }); });
+  albs.forEach(d => { const f = R.factorLineas(d); R.lineas(d).forEach(l => { if(l.clase === 'otros') return; suma(ingObra[GR(l.clase)], l.f.slice(0, 7), l.imp * f); }); });
+  const CLS = {A: ['camion'], B: Object.keys(hClase).filter(c => c !== 'camion' && c !== 'otros')};
+  let combReal = 0;
+  ['B', 'A'].forEach(k => { let real = 0, lit = 0, fCub = 0, iCub = 0; const sinF = [];
+    Object.keys(ingObra[k]).forEach(m => { const io = ingObra[k][m], ie = ingEmp[k][m] || io, parte = ie > 0 ? Math.min(1, io / ie) : 0;
+      if(fMes[k][m] > 0){ real += fMes[k][m] * parte; lit += (lMes[k][m] || 0) * parte; fCub += fMes[k][m]; iCub += ie; } else if(io > 0) sinF.push(m); });
+    const nom = k === 'B' ? 'Gasóleo B de las máquinas' : 'Gasóleo A del camión', ex = {clases: CLS[k]};
+    if(real > 0 || sum(Object.values(ingObra[k])) > 0) lineasD.push(L('combustible:' + k, nom, real, real ? 'calculada' : 'falta', 'combustible de cada mes × la parte de esta obra en lo que trabajaron ' + (k === 'B' ? 'las máquinas' : 'el camión') + ' ese mes', real ? h1(lit) + ' litros' : 'No hay facturas en los meses de la obra.', ex));
+    const est = iCub > 0 ? sum(sinF, m => ingObra[k][m]) * fCub / iCub : 0;
+    if(est > 1) lineasD.push(L('combustible_est:' + k, nom + ' (meses aún sin factura)', est, 'estimada', 'gasto medio por € trabajado de los meses con factura × lo trabajado en ' + sinF.join(', '), 'Se sustituye por el real cuando llegue la factura.', ex));
+    combReal += real; });
   // ---- DIRECTO: gastos vinculados, ayudantes, reparaciones ----
   const vinG = (P.vinculos || []).filter(v => v.job_id === job.id && v.rol === 'gasto' && v.accion === 'incluir');
   const porCat = {}; vinG.forEach(v => { const g = (P.gastos || []).find(x => x.id === v.documento_id); if(!g) return; usados.add(g.id); const c = g.categoria || 'Otros'; porCat[c] = (porCat[c] || 0) + R.baseGasto(g); });
@@ -186,7 +192,9 @@ R.calcular = function(job, P, asig){
   const idsMaq = new Set([...maq.keys()]);
   const rep = (P.gastos || []).filter(g => g.vehiculo_id && idsMaq.has(g.vehiculo_id) && CAT_MANT.test(g.categoria || '') && g.fecha_devengo >= desde && g.fecha_devengo <= hasta && !usados.has(g.id) && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada'));
   rep.forEach(g => usados.add(g.id)); const repTot = sum(rep, R.baseGasto);
-  lineasD.push(L('reparaciones', 'Reparaciones de las máquinas usadas', repTot, repTot ? 'real' : 'falta', 'facturas anotadas a la máquina entre las fechas de la obra', repTot ? rep.length + ' factura(s)' : 'No hay ninguna factura anotada a las máquinas usadas en esas fechas (puede que no haya habido o que no estén asignadas).'));
+  { const porV = {}; rep.forEach(g => { (porV[g.vehiculo_id] = porV[g.vehiculo_id] || []).push(g); });
+    const ids = Object.keys(porV); if(!ids.length) lineasD.push(L('reparaciones', 'Reparaciones de las máquinas usadas', 0, 'falta', 'facturas anotadas a la máquina entre las fechas de la obra', 'No hay ninguna factura anotada a las máquinas usadas en esas fechas (puede que no haya habido o que no estén asignadas).'));
+    ids.forEach(id => { const x = maq.get(id) || [...maq.values()].find(y => String(y.m.id) === String(id)), gs = porV[id]; lineasD.push(L('reparaciones:' + id, 'Reparaciones: ' + (x ? x.m.nombre : 'máquina'), sum(gs, R.baseGasto), 'real', 'facturas anotadas a esta máquina entre las fechas de la obra', gs.length + ' factura(s)', {clases: x ? [...x.clases] : []})); }); }
   // ---- INDIRECTO: parte fija de las máquinas (seguros, impuestos…) de los 12 meses, repartida por horas de utilización ----
   Object.keys(hClase).forEach(c => { if(!(hClase[c] > 0)) return; const k = CO && CO.clases.find(x => x.clase === c), nom = R.NOMBRE_CLASE[c] || c;
     if(k && k.horaFija != null) lineasI.push(L('maq:' + c, 'Costes fijos de máquina: ' + nom, k.horaFija * hClase[c], k.manual ? 'estimada' : 'calculada', eur(k.horaFija, 2) + ' por hora productiva × ' + h1(hClase[c]) + ' h', 'Seguros, impuestos y demás costes fijos de la flota (12 meses) repartidos por horas de utilización (Gastos → Normalización).'));
@@ -381,6 +389,7 @@ R.porClase = function(r){
   const parte = (x, c) => { let k;
     if((k = /^maq:(.+)$/.exec(x.clave))) return k[1] === c ? x.valor : 0;
     if((k = /^amort:(.+)$/.exec(x.clave))){ const cs = maqCl[k[1]] || []; if(!cs.length) return x.valor * r.hClase[c] / H; return cs.includes(c) ? x.valor * r.hClase[c] / sum(cs, q => r.hClase[q]) : 0; }
+    if(Array.isArray(x.clases) && x.clases.length){ const cs = x.clases.filter(q => r.hClase[q] > 0); if(cs.length) return cs.includes(c) ? x.valor * r.hClase[c] / sum(cs, q => r.hClase[q]) : 0; }
     return x.valor * r.hClase[c] / H; };
   const rel = x => /^(maq:|amort:|gen:ss|gen:coches|gen:gestoria)/.test(x.clave);
   return cls.map(c => { const h = r.hClase[c], D = sum(r.lineasD, x => parte(x, c)), I = sum(r.lineasI, x => parte(x, c)), IR = sum(r.lineasI.filter(rel), x => parte(x, c)), S = r.socios.valor * h / H;
