@@ -32,7 +32,7 @@ R.NOMBRE_CLASE = {mixta: 'Mixta (retro)', camion: 'Camión', giratoria: 'Girator
 R.lineas = d => (Array.isArray(d.conceptos) ? d.conceptos : []).map(c => ({f: dia(c.fecha) || dia(d.fecha_devengo), h: num(c.horas != null ? c.horas : (c.unidad === 'h' ? c.cantidad : 0)), imp: num(c.importe), clase: R.claseLinea(c.descripcion), desc: c.descripcion || ''})).filter(l => l.f);
 
 // ---------- carga ----------
-async function pag(q, cols, fn){ const out = []; let o = 0; while(true){ let b = sb.from(q).select(cols); if(fn) b = fn(b); const {data, error} = await b.range(o, o + 999); if(error){ console.error('RENT carga ' + q, error); R.errores.push(q + ': ' + (error.message || error)); break; } out.push(...(data || [])); if(!data || data.length < 1000) break; o += 1000; } return out; }
+async function pag(q, cols, fn){ const out = []; let o = 0; while(true){ let b = sb.from(q).select(cols); if(fn) b = fn(b); const {data, error} = await b.order(q === 'polizas_seguro' ? 'flota_id' : 'id', {ascending: true}).range(o, o + 999); if(error){ console.error('RENT carga ' + q, error); R.errores.push(q + ': ' + (error.message || error)); break; } out.push(...(data || [])); if(!data || data.length < 1000) break; o += 1000; } const vistos = new Set(); return out.filter(r => { if(r.id == null) return true; if(vistos.has(r.id)) return false; vistos.add(r.id); return true; }); }
 R.errores = [];
 R.cargar = async function(forzar){
   if(R.P && !forzar) return R.P;
@@ -67,7 +67,9 @@ R.efectivos = function(P){
   const une = (a, b) => { if(!a || !b || !byId.has(a) || !byId.has(b) || a === b) return; (ady.get(a) || ady.set(a, new Set()).get(a)).add(b); (ady.get(b) || ady.set(b, new Set()).get(b)).add(a); };
   docs.forEach(d => { une(d.id, d.documento_relacionado_id); une(d.id, d.documento_anterior_id); une(d.id, d.documento_siguiente_id); });
   const tieneLin = d => R.lineas(d).length > 0, cubiertos = new Set(), cubrePor = {};
-  docs.filter(d => d.tipo !== 'albaran' && tieneLin(d)).forEach(f => { (ady.get(f.id) || []).forEach(x => { const a = byId.get(x); if(a && a.tipo === 'albaran'){ cubiertos.add(a.id); (cubrePor[f.id] = cubrePor[f.id] || []).push(a); } }); });
+  const firma = l => [l.f, norm(l.desc), Math.round(l.h * 100), Math.round(l.imp * 100)].join('|');
+  docs.filter(d => d.tipo !== 'albaran' && tieneLin(d)).forEach(f => { const fs = new Set(R.lineas(f).map(firma)); (ady.get(f.id) || []).forEach(x => { const a = byId.get(x); if(!a || a.tipo !== 'albaran') return; const ls = R.lineas(a); if(!ls.length) return; (cubrePor[f.id] = cubrePor[f.id] || []).push(a);
+    if(ls.filter(l => fs.has(firma(l))).length / ls.length >= 0.8) cubiertos.add(a.id); }); });   // el albarán solo desaparece si la factura repite sus mismas líneas; si son líneas distintas (factura parcial de un trabajo), cuentan los dos
   // proformas enlazadas con una factura: cuenta solo la factura
   const prof = new Set(); docs.filter(d => d.tipo === 'proforma').forEach(pf => { if([...(ady.get(pf.id) || [])].some(x => byId.get(x).tipo === 'factura' && tieneLin(byId.get(x)))) prof.add(pf.id); });
   const lista = docs.filter(d => !cubiertos.has(d.id) && !prof.has(d.id));
@@ -87,7 +89,7 @@ R.asignar = function(P){
     if(inc && porJob[inc.job_id]){ porJob[inc.job_id].push(d); origen[d.id] = {job: inc.job_id, como: 'manual'}; return; }
     const excl = new Set(vs.filter(v => v.accion === 'excluir').map(v => v.job_id));
     const ent = entById.get(d.entidad_id), fr = R.fechaRef(d), obra = norm(d.obra_texto);
-    const porTexto = jobs.filter(j => !excl.has(j.id) && norm(j.trabajo).length >= 4 && obra && obra.includes(norm(j.trabajo)));
+    const porTexto = jobs.filter(j => !excl.has(j.id) && norm(j.trabajo).length >= 4 && obra && obra.includes(norm(j.trabajo)) && (!norm(j.cliente) || (ent && R.entidadCasa(j, ent))));   // el texto de obra solo vale si el cliente también es el de la obra (hay otras «NAVE AVÍCOLA» de otros clientes)
     if(porTexto.length){ const j = porTexto.sort((a, b) => norm(b.trabajo).length - norm(a.trabajo).length)[0]; porJob[j.id].push(d); origen[d.id] = {job: j.id, como: 'obra'}; return; }
     const cand = jobs.filter(j => { if(excl.has(j.id) || !ent || !R.entidadCasa(j, ent)) return false; const ini = dia(j.plan && j.plan.fecha); if(!ini || fr < ini) return false; const fin = j.terminado_at ? dia(j.terminado_at) : ''; return !fin || fr <= fin; });
     if(cand.length === 1){ porJob[cand[0].id].push(d); origen[d.id] = {job: cand[0].id, como: 'cliente y fechas'}; }
@@ -132,7 +134,8 @@ R.calcular = function(job, P, asig){
   const conFact = albs.filter(a => a.tipo !== 'albaran' || a.documento_siguiente_id && docById.get(a.documento_siguiente_id) && ['factura', 'proforma'].includes(docById.get(a.documento_siguiente_id).tipo));
   const facturado = sum(conFact, R.baseIngreso), cobrado = sum(albs, a => { const imp = num(a.importe); return imp ? Math.min(1, num(a.cobrado_importe) / imp) * R.baseIngreso(a) : 0; });
   const ing = {ejecutado, facturado, cobrado, nAlb: albs.length, nFact: conFact.length, sinImporte: albs.filter(a => !num(a.importe)).length};
-  albs.filter(a => a.tipo !== 'albaran').forEach(f => { const cub = R.efectivos(P).cubrePor[f.id] || [], sc = sum(cub, R.baseIngreso), bf = R.baseIngreso(f); if(Math.abs(bf - sc) > 1) avisos.push('La factura ' + (f.numero || '') + ' suma ' + eur(bf) + ' y sus ' + cub.length + ' albarán(es) enlazados ' + eur(sc) + (bf > sc ? ': la diferencia es trabajo sin albarán en el sistema (se cuenta, vale la factura).' : ': la factura es menor que los albaranes (se cuenta la factura).')); });
+  albs.filter(a => a.tipo !== 'albaran').forEach(f => { const cub = (R.efectivos(P).cubrePor[f.id] || []).filter(a => R.efectivos(P).cubiertos.has(a.id)), sc = sum(cub, R.baseIngreso); if(cub.length && R.baseIngreso(f) < sc - 1) avisos.push('La factura ' + (f.numero || '') + ' repite las líneas de ' + cub.length + ' albarán(es) y suma menos (' + eur(R.baseIngreso(f)) + ' frente a ' + eur(sc) + '): se cuenta la factura.'); });
+  const parcial = albs.filter(a => a.tipo === 'albaran' && (R.efectivos(P).lista.includes(a)) && [...(P.docs || [])].some(f => f.tipo === 'factura' && f.documento_relacionado_id === a.id)); if(parcial.length) avisos.push('Factura y albarán enlazados con líneas distintas: se cuentan los dos (' + parcial.map(a => 'albarán ' + (a.numero || '') + ' ' + eur(R.baseIngreso(a))).join(', ') + ').');
   if(ing.sinImporte) avisos.push(ing.sinImporte + ' documento(s) sin importe: el ingreso puede estar incompleto.');
   if(cobrado > facturado + 1) avisos.push('Hay ' + eur(cobrado - facturado) + ' cobrados sin factura enlazada.');
   // ---- máquinas usadas (por lo que dicen las líneas de los albaranes) ----
