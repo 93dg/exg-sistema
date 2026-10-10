@@ -4618,10 +4618,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.99" defer></script>
-<script src="costes/norm.js?v=V9.99" defer></script>
+<script src="rentabilidad/rent.js?v=V10.00" defer></script>
+<script src="costes/norm.js?v=V10.00" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.99</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.00</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4773,7 +4773,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.99</div>
+        <div class="sub" id="version-badge">V10.00</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8980,12 +8980,14 @@ function c3Uso(excluir){ const u = {}; c3Cola().forEach(j => { if(j === excluir)
 function c3Choques(j, dias, uso){ const n = c3Necesita(j), out = new Set(); dias.forEach(iso => Object.entries(n).forEach(([m, k]) => { if(((uso[iso] || {})[m] || 0) + k > C3_CAP[m]) out.add(m); })); return [...out]; }
 const C3_NOM_MAQ = {mixta: 'las dos mixtas', giratoria: 'la giratoria', niveladora: 'la niveladora', camion: 'el camión'};
 // V8.21 (reporte de Daniel): si el día ya tiene otro trabajo, se pregunta: los dos el mismo día, o meter este y mover hacia delante los que hay
+// V9.100: al colocar un trabajo en un día se parte de cero: los días saltados / de fin de semana de su sitio anterior no valen en el nuevo (por eso «se metía en mitad de otro»)
+const c3PlanNuevo = (plan, iso) => { const p = {...(plan || {}), fecha: iso, extra: (plan && plan.extra) || 0, saltar: [], findes: []}; delete p.pausa_desde; return p; };
 function c3PonerPreguntando(j, iso){
   let otros = (c3PorDia()[iso] || []).map(x => x.j).filter((x, k, a) => x !== j && a.indexOf(x) === k);
   // V9.84 (Daniel): aunque el primer día esté libre, si en algún día del trabajo no queda máquina libre también se pregunta si se mueve lo de delante
   let choque = [];
   if(!otros.length){
-    const pl = j.plan; j.plan = {...(pl || {}), fecha: iso};
+    const pl = j.plan; j.plan = c3PlanNuevo(pl, iso);
     let o = []; try{ o = c3Ocupa(j); choque = c3Choques(j, o, c3Uso(j)); }catch(e){} j.plan = pl;
     if(choque.length){ const PD = c3PorDia(); otros = [...new Set(o.flatMap(d => (PD[d] || []).map(x => x.j)))].filter(x => x !== j && Object.keys(c3Necesita(x)).some(m => choque.includes(m))); }
   }
@@ -9004,12 +9006,12 @@ function c3MeterYMover(j, iso){
     if(x.plan.fecha >= iso) x.plan = {...x.plan, fecha: c3MoverLab(x.plan.fecha, n)};   // empieza después: se mueve entero
     else { const salto = []; let d = iso; for(let k = 0; k < n; k++){ salto.push(d); d = c3MoverLab(d, 1); } x.plan = {...x.plan, saltar: [...new Set([...(x.plan.saltar || []), ...salto])]}; }   // ya empezado: se para esos días y sigue después
     cambiados.push(x); });
-  j.plan = {...(j.plan || {}), fecha: iso, extra: (j.plan && j.plan.extra) || 0}; _c3Colocar = null;
+  j.plan = c3PlanNuevo(j.plan, iso); _c3Colocar = null;
   c2Guardar([j, ...cambiados]); if(document.getElementById('cal3-app')) c3Pintar(); try{ c2Cerrar(); }catch(e){} if(document.getElementById('tb-lista')?.offsetParent) tbRender();
   c2Aviso(`${escHtml(c3Nom(j))} desde el <b>${c2FechaTxt(iso)}</b>; ${cambiados.length} trabajo${cambiados.length === 1 ? '' : 's'} movido${cambiados.length === 1 ? '' : 's'} ${n} día${n === 1 ? '' : 's'} hacia delante.`);
 }
 function c3PonerDia(j, iso){
-  const antes = JSON.stringify(j.plan || null); j.plan = {...(j.plan || {}), fecha: iso, extra: (j.plan && j.plan.extra) || 0}; _c3Colocar = null;
+  const antes = JSON.stringify(j.plan || null); j.plan = c3PlanNuevo(j.plan, iso); _c3Colocar = null;
   c2Guardar([j]); c3Pintar(); _c2Deshacer = [[j.id, antes, j.estado, j.terminado_at || null]];
   const o = c3Ocupa(j), ch = c3Choques(j, o, c3Uso(j));
   c2Aviso(`${escHtml(c3Nom(j))}: <b>${c2FechaTxt(o[0])}${o.length > 1 ? ' → ' + c2FechaTxt(o[o.length - 1]) : ''}</b>${ch.length ? '. Ojo: esos días no queda ' + ch.map(m => ({mixta: 'mixta', giratoria: 'giratoria', niveladora: 'niveladora', camion: 'camión'})[m] + ' libre').join(' ni ') + '.' : ''}`);
@@ -9088,11 +9090,12 @@ function c3Auto(){   // rellena desde mañana por prioridad, en el primer hueco 
     if(!dia) return;
     if(dia.dataset.c3Dia < c2Iso(new Date())){ c2Aviso('No se puede poner un trabajo en un día que ya pasó.'); return; }   // V9.97: caían trabajos en días pasados y todo se liaba
     if(od){ const T = dia.dataset.c3Dia, o = c3Ocupa(j), finAntes = o[o.length - 1]; if(T === od) return;
+      const idx = Math.max(0, o.indexOf(od)), ini = c2Laborable(new Date(T + 'T00:00')) ? c3MoverLab(T, -idx) : null;   // V9.100: el trabajo se coloca según el día donde se suelta (menos los días ya recorridos del trabajo), no según un «inicio» que podía estar lejos del dibujo
       if(!c2Laborable(new Date(T + 'T00:00'))){   // a un sábado, domingo o festivo: ese día se trabaja (cuenta como un día del trabajo)
         _c2Deshacer = c2Foto(); if(T < j.plan.fecha) j.plan.fecha = T; else j.plan = {...j.plan, findes: [...new Set([...(j.plan.findes || []), T])]};
         c2Guardar([j]); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))}: se trabaja el ${c2FechaTxt(T)}.`);
-      } else if(c3PonerPreguntando(j, c3MoverLab(j.plan.fecha, c3LabEntre(od, T)))) return;   // V9.84: si ahí no cabe, se pregunta si se mueve lo de delante
-      c3PreguntarSiguientes(j, finAntes); }
+      } else { c3PonerPreguntando(j, ini); }   // solo se pregunta si pisa a otro (V9.84); si el día está libre, se pone y ya
+    }
     else c3PonerPreguntando(j, dia.dataset.c3Dia); };
   document.addEventListener('pointerup', fin); document.addEventListener('pointercancel', fin);
 })();
