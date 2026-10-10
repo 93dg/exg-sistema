@@ -3532,7 +3532,7 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .imp-linea .mono{white-space:nowrap;}
 .imp-linea.tot{font-weight:700;}
 .imp-linea.sub{color:var(--ink-soft);font-size:12.5px;}
-.imp-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper);margin-bottom:12px;}
+.imp-tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper);margin-bottom:12px;}
 .imp-tabs button{padding:12px 2px;font-size:13px;white-space:nowrap;font-weight:600;border:none;background:transparent;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
 .imp-tabs button.active{background:var(--asphalt);color:#fff;}
 .imp-gestor-btn{width:100%;padding:14px;font-size:15px;margin:2px 0 10px;}
@@ -4622,11 +4622,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.09" defer></script>
-<script src="costes/norm.js?v=V10.09" defer></script>
-<script src="ajustes/calc.js?v=V10.09" defer></script>
+<script src="rentabilidad/rent.js?v=V10.10" defer></script>
+<script src="costes/norm.js?v=V10.10" defer></script>
+<script src="ajustes/calc.js?v=V10.10" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.09</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.10</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4778,7 +4778,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.09</div>
+        <div class="sub" id="version-badge">V10.10</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5492,8 +5492,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
       </div>
       <div class="topbar">
         <div><h1>Facturas</h1><div class="desc">Todas las facturas — conectado con Economía</div></div>
-        <div class="quickactions"><button type="button" class="btn" onclick="AJU.abrir()">Calculadora de ajustes</button></div>
-      </div>
+              </div>
 
       <div class="kpi-strip" id="facturas-kpi-strip" style="margin-bottom:16px;"></div>
 
@@ -6211,8 +6210,9 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
         <div><h1>Impuestos</h1><div class="desc">IVA (303) e IRPF (130)</div></div>
       </div>
       <div class="imp-tabs" id="imp-tabs">
-        <button type="button" data-p="trim" class="active">Trimestres</button><button type="button" data-p="anual">IRPF anual</button><button type="button" data-p="presentadas">Presentadas</button><button type="button" data-p="deudas">Deudas</button>
+        <button type="button" data-p="trim" class="active">Trimestres</button><button type="button" data-p="anual">IRPF anual</button><button type="button" data-p="presentadas">Presentadas</button><button type="button" data-p="deudas">Deudas</button><button type="button" data-p="calc">Calculadoras</button>
       </div>
+      <div id="imp-pag-calc" style="display:none;"><div class="panel"><div class="panel-head"><h3>Calculadora de ajustes</h3></div><div class="panel-body"><p style="margin:0 0 10px;font-size:13px;color:var(--ink-soft);">Rectificaciones, contrafacturas y compensaciones con tus datos fiscales reales. Solo simula; no modifica nada.</p><button type="button" class="btn" onclick="AJU.abrir()">Abrir calculadora de ajustes</button></div></div></div>
 
       <!-- ===== TRIMESTRES ===== -->
       <div id="imp-pag-trim">
@@ -25045,14 +25045,15 @@ async function iniciarImpuestos(){
 // ===== Pestañas de Impuestos: Trimestres / IRPF anual =====
 let _impPag = 'trim';
 function impPestana(p){
-  _impPag = p; try{ localStorage.setItem('imp_pag', p); }catch(e){}
+  _impPag = p; try{ if(p !== 'calc') localStorage.setItem('imp_pag', p); }catch(e){}
   document.querySelectorAll('#imp-tabs button').forEach(b => b.classList.toggle('active', b.dataset.p === p));
   document.getElementById('imp-pag-trim').style.display = p === 'trim' ? '' : 'none';
   document.getElementById('imp-pag-anual').style.display = p === 'anual' ? '' : 'none';
   document.getElementById('imp-pag-presentadas').style.display = p === 'presentadas' ? '' : 'none';
   document.getElementById('imp-pag-deudas').style.display = p === 'deudas' ? '' : 'none';
+  document.getElementById('imp-pag-calc').style.display = p === 'calc' ? '' : 'none';
   document.getElementById('imp-pag-gestor').style.display = 'none';
-  if(p === 'anual') renderImpAnual(); else if(p === 'presentadas') renderImpPresentadas(); else if(p === 'deudas') iniciarDeudas(); else renderImpuestos();
+  if(p === 'anual') renderImpAnual(); else if(p === 'presentadas') renderImpPresentadas(); else if(p === 'deudas') iniciarDeudas(); else if(p !== 'calc') renderImpuestos();
 }
 // ===== Deudas con Hacienda: embargos cobrados en la cuenta y plazos pagados de los aplazamientos (se leen de los correos del banco) =====
 let _deudas = null;
