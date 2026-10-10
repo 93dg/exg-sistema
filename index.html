@@ -4574,6 +4574,7 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 
 /* V8.69 — seleccionado = borde naranja, nunca relleno naranja entero (el texto de color se perdía) */
 .chip-filter.active,.chip-filter.activo-todos,.docs-tab.active,.chip-orden.active,.ai-chip.sel,.rb-c.act,.emp-pest button.act,.dir-pest button.act,.eq-plus button.act,.visor-hojas button.on{background:var(--paper) !important;border:2px solid var(--orange) !important;color:inherit;}
+.chip-filter.impl{background:var(--paper) !important;border:2px solid var(--orange) !important;color:var(--ink) !important;}   /* V9.86: marcadas «de serie» (lo que ya se está aplicando sin haber elegido nada) */
 .chip-filter.active:not([class*="tp-"]),.docs-tab.active,.chip-orden.active,.ai-chip.sel,.rb-c.act,.emp-pest button.act,.dir-pest button.act,.eq-plus button.act,.visor-hojas button.on{color:var(--ink) !important;}
 .pleg .chip-filter.active[data-n]:not([data-n=""])::after{color:var(--orange);opacity:1;}
 .chip-filter.active .tp-albaran,.chip-filter.active .tp-factura,.chip-filter.active .tp-proforma,.chip-filter.active .tp-presupuesto{filter:none;}
@@ -4602,10 +4603,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.86" defer></script>
-<script src="costes/norm.js?v=V9.86" defer></script>
+<script src="rentabilidad/rent.js?v=V9.87" defer></script>
+<script src="costes/norm.js?v=V9.87" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.86</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.87</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4757,7 +4758,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.86</div>
+        <div class="sub" id="version-badge">V9.87</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13635,13 +13636,15 @@ document.addEventListener('click', ev => {   // en vista plegada, tocar una tarj
   // V8.81: ya desplegada, tocar su franja superior la vuelve a plegar
   if(ev.clientY - card.getBoundingClientRect().top < 34){ ev.stopPropagation(); ev.preventDefault(); card.classList.remove('cc-abierta'); }
 }, true);
+// V9.86 (Daniel): al abrir Estado/Tipo se ven marcadas las que ya se están aplicando; al tocar una, esas pasan a ser la selección y se quita/pone la tocada
+function ccChipTog(el){ const box = el.parentElement; if(box && !box.querySelector('.chip-filter.active')) box.querySelectorAll('.chip-filter.impl').forEach(c => c.classList.add('active')); el.classList.toggle('active'); ccDocsFiltroSync(); }
 function ccDocsFiltroSync(){
   const act = id => Array.from(document.querySelectorAll('#' + id + ' .chip-filter.active')).map(x => x.dataset.ccv);
   window._ccTiposSel = act('cc-doc-tipo-chips'); window._ccEstadosSel = act('cc-doc-estado-chips'); window._ccAniosSel = act('cc-doc-anio-chips'); window._ccTrimsSel = act('cc-doc-trim-chips');   // sin ninguna elegida = todos los pendientes
   renderControlDocs();
 }
 function ccDocsMontarFiltro(){ try{
-  const pon = (id, lista) => { const f = document.getElementById(id); if(f && !f.children.length) f.innerHTML = lista.map(([v, l]) => `<div class="chip-filter" data-ccv="${v}" onclick="this.classList.toggle('active');ccDocsFiltroSync()">${l}</div>`).join(''); };
+  const pon = (id, lista) => { const f = document.getElementById(id); if(f && !f.children.length) f.innerHTML = lista.map(([v, l]) => `<div class="chip-filter" data-ccv="${v}" onclick="ccChipTog(this)">${l}</div>`).join(''); };
   pon('cc-doc-tipo-chips', CC_DOC_TIPOS); pon('cc-doc-estado-chips', CC_DOC_ESTADOS); pon('cc-doc-trim-chips', [['1', '1º'], ['2', '2º'], ['3', '3º'], ['4', '4º']]);
   if(!PLEG2.ccdocs) pleg2Crear({id: 'ccdocs', despuesDe: '#cc-docs-ancla', plegados: ['tipo', 'estado', 'anio', 'trim'], grupos: [['tipo', 'Tipo', 'cc-doc-tipo-chips'], ['estado', 'Estado', 'cc-doc-estado-chips'], ['anio', 'Año', 'cc-doc-anio-chips'], ['trim', 'Trimestre', 'cc-doc-trim-chips']], extra: {id: 'cc-docs-vista-btn', titulo: 'Vista plegada de tarjetas', html: ICO_VISTA_PLEGADA, fn: 'ccDocsVistaPlegada', activo: () => !!window._ccCompacto}});
   try{ if(PLEG2.ccdocs && !localStorage.getItem('cc_pleg_anio_trim')){ localStorage.setItem('cc_pleg_anio_trim', '1'); ['anio', 'trim'].forEach(k => { if(!PLEG2.ccdocs.plegados.includes(k)) PLEG2.ccdocs.plegados.push(k); }); pleg2Guardar('ccdocs'); pleg2Render('ccdocs'); } }catch(e){}   // Año y Trimestre salen plegados como Tipo y Estado
@@ -28632,7 +28635,7 @@ function renderControlDocs(){
   if(!controlDocsAniosPoblado){
     const anios = [...new Set(todos.map(d=>d.dateRaw ? String(new Date(d.dateRaw).getFullYear()) : null).filter(Boolean))].sort().reverse();
     document.getElementById('dd-anio-panel').innerHTML = anios.map(a=>`<label><input type="checkbox" data-anio="${a}" onchange="renderControlDocs()"> ${a}</label>`).join('') || '<div style="padding:8px;color:var(--ink-faint);font-size:12.5px;">Sin años todavía</div>';
-    { const fa = document.getElementById('cc-doc-anio-chips'); if(fa && !fa.children.length) fa.innerHTML = anios.map(a => `<div class="chip-filter" data-ccv="${a}" onclick="this.classList.toggle('active');ccDocsFiltroSync()">${String(a).slice(-2)}</div>`).join(''); }
+    { const fa = document.getElementById('cc-doc-anio-chips'); if(fa && !fa.children.length) fa.innerHTML = anios.map(a => `<div class="chip-filter" data-ccv="${a}" onclick="ccChipTog(this)">${String(a).slice(-2)}</div>`).join(''); }
     controlDocsAniosPoblado = true;
   }
   const tipoChecks = ddChecked('#dd-tipo');
@@ -28672,6 +28675,11 @@ function renderControlDocs(){
     if(campo==='cliente') return asc*String(a.client||'').localeCompare(String(b.client||''));
     return asc*(new Date(b.dateRaw||b.created_at||0) - new Date(a.dateRaw||a.created_at||0));
   });
+  try{ const marca = (id, set) => document.querySelectorAll('#' + id + ' .chip-filter').forEach(ch => ch.classList.toggle('impl', !!set && !ch.classList.contains('active') && set.has(ch.dataset.ccv)));
+    const cT = window._ccTiposSel || [], cE = window._ccEstadosSel || [];
+    marca('cc-doc-tipo-chips', cT.length ? null : tiposSel);
+    marca('cc-doc-estado-chips', cE.length ? null : new Set(CC_DOC_ESTADOS.map(x => x[0]).filter(e => { if(e === 'rectificativa' && !estadosSel.has('rectificativa')) return false; if(!estadosSel.size) return true; return CC_ESTADOS_CAJA().has(e) ? estadosSel.has(e) : !CC_ESTADOS_CERRADOS.has(e); })));
+  }catch(e){ console.warn(e); }
   // V8.71 (Daniel: «un mismo trabajo no puede salir como albarán, proforma y factura; solo la última fase»): una sola fila por trabajo (expediente), la fase más avanzada
   const ORDEN_FASE = {presupuesto:0, albaran:1, proforma:2, factura:3};
   const porExp = new Map();
