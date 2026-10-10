@@ -4620,10 +4620,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.03" defer></script>
-<script src="costes/norm.js?v=V10.03" defer></script>
+<script src="rentabilidad/rent.js?v=V10.04" defer></script>
+<script src="costes/norm.js?v=V10.04" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.03</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.04</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4775,7 +4775,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.03</div>
+        <div class="sub" id="version-badge">V10.04</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -15318,12 +15318,13 @@ function rbSanearEstilos(doc){
   Array.from(doc.styleSheets).forEach(h => { try{ Array.from(h.cssRules).forEach(regla); }catch(e){} });
   doc.querySelectorAll('[style]').forEach(el => { const s = el.getAttribute('style'); if(MAL.test(s)) el.setAttribute('style', rbQuitarColorModerno(s)); });
 }
+const RB_PROPS_COLOR = ['color', 'background-color', 'background-image', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color', 'outline-color', 'text-decoration-color', 'caret-color', 'column-rule-color', 'fill', 'stroke', 'box-shadow', 'text-shadow', 'border-image-source', 'filter', '-webkit-text-fill-color', '-webkit-text-stroke-color'];
 function rbSanearComputados(doc){   // segunda vuelta: cualquier propiedad calculada con color(...)/lab/oklch (no solo las de color) se pasa a rgba
   const vista = doc.defaultView; let n = 0;
   doc.querySelectorAll('body *').forEach(el => {
     if(n > 4000) return; const r = el.getBoundingClientRect(); if(r.bottom < -50 || r.top > vista.innerHeight + 50) return; n++;
     const cs = vista.getComputedStyle(el);
-    for(let i = 0; i < cs.length; i++){ const pr = cs[i], v = cs.getPropertyValue(pr); if(v && /(color|lab|lch|oklab|oklch)\(/i.test(v)){ try{ el.style.setProperty(pr, rbColorARgba(v), 'important'); }catch(e){} } }
+    for(const pr of RB_PROPS_COLOR){ const v = cs.getPropertyValue(pr); if(v && /(color|lab|lch|oklab|oklch)\(/i.test(v)){ try{ el.style.setProperty(pr, rbColorARgba(v), 'important'); }catch(e){} } }   // V10.04: solo las propiedades que pueden llevar color (antes se recorrían ~350 por elemento: 3 s de los 4 que tardaba abrir el reporte)
   });
 }
 function rbCompactarStyle(doc){   // V9.96 (Daniel: «¿por qué no se ve igual al reportar?»): la copia reescribe style="font-size: 12px" con espacio y las reglas móviles [style*="font-size:12px"] dejaban de aplicarse (letra más pequeña que en pantalla). Se vuelve a escribir sin espacios
@@ -28762,9 +28763,9 @@ function renderControlDocs(){
   filtrados.forEach(d=>{ if(!d.expediente_id) return; const p = porExp.get(d.expediente_id); if(!p || (ORDEN_FASE[d.type]||0) > (ORDEN_FASE[p.type]||0)) porExp.set(d.expediente_id, d); });
   const unicos = filtrados.filter(d=> !d.expediente_id || porExp.get(d.expediente_id) === d);
   // dos bloques claros: pendiente de FACTURAR (albarán/proforma/factura sin emitir) y pendiente de COBRAR (proforma/factura emitida sin cobrar del todo)
-  const bloqueDe = d=>{ if(d.type==='presupuesto') return 'presupuesto'; const est = controlDocsEstadoDe(d); if(CC_ESTADOS_CERRADOS.has(est)) return 'cerrado'; return (['entregado','por_cobrar_otra','parcial_otra'].includes(est) || (d.type!=='albaran' && ['pendiente_cobrar','parcial'].includes(est))) ? 'cobrar' : 'facturar'; };
+  const bloqueDe = d=>{ if(d.type==='presupuesto') return 'presupuesto'; const est = controlDocsEstadoDe(d); if(CC_ESTADOS_CERRADOS.has(est)) return 'cerrado'; return (['entregado','por_cobrar_otra','parcial_otra','parcial'].includes(est) || (d.type!=='albaran' && ['pendiente_cobrar','parcial'].includes(est))) ? 'cobrar' : 'facturar'; };
   const BLOQUES = [['facturar','Por entregar'],['cobrar','Por cobrar'],['presupuesto','Presupuestos'],['cerrado','Cerrados']];
-  const sumaImp = l => l.reduce((s,d)=> s + (Number(d.base != null ? d.base : (d.total||d.importe))||0) * (d.estado_cobro==='parcial_otra' && Number(d.total||d.importe) ? Math.max(0, 1 - enOtraSuma(d)/Number(d.total||d.importe)) : 1), 0);   // V8.74: totales SIN IVA
+  const sumaImp = l => l.reduce((s,d)=> s + (Number(d.base != null ? d.base : (d.total||d.importe))||0) * (['parcial','parcial_otra'].includes(d.estado_cobro) && Number(d.total||d.importe) ? Math.max(0, 1 - (Number(d.cobrado_importe||0) + (d.estado_cobro==='parcial_otra' ? enOtraSuma(d) : 0))/Number(d.total||d.importe)) : 1), 0);   // V8.74: totales SIN IVA
   const fmtEur = n => n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
   document.getElementById('control-docs-count').textContent = unicos.length;
   // V8.72 (Daniel): en el cabecero, pendiente de facturar + pendiente de cobrar + total de ambos (los presupuestos no cuentan: no son dinero pendiente)
