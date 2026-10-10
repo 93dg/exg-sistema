@@ -327,10 +327,22 @@ const resumen = r => r.vacio ? null : {ej: r.ejecutado, dir: r.resultadoDirecto,
 
 R.lineaHtml = (r, x, bloque) => fila(esc(x.label) + ' ' + badge(x.nivel) + (x.manualId ? ' <a href="#" onclick="RENT.quitarImp(\'' + x.manualId + '\');return false" style="font-size:11px;">deshacer</a>' : ''), x.nivel === 'falta' ? '<i>sin dato</i>' : '<b style="color:var(--red);">' + eur(x.valor) + '</b>', esc([x.criterio, x.nota].filter(Boolean).join(' — ')) + (x.manualId || !/^(socios|man:)/.test(x.clave) || true ? ' <a href="#" onclick="RENT.corregir(\'' + r.job.id + '\',\'' + esc(x.clave) + '\',\'' + bloque + '\');return false" style="font-size:11px;">corregir</a>' : ''));
 
+// V9.82 (reporte de Daniel: «¿por qué dos cifras de combustible?»): el combustible sale como UNA sola cifra; el desglose por tipo (B, A) y por meses con factura o sin ella queda dentro, plegado
+R.lineasDirectoHtml = r => {
+  const comb = r.lineasD.filter(x => /^combustible/.test(x.clave)), resto = r.lineasD.filter(x => !/^combustible/.test(x.clave));
+  let h = '';
+  if(comb.length === 1) h += R.lineaHtml(r, comb[0], 'directo');
+  else if(comb.length > 1){
+    const tot = sum(comb, x => x.valor), est = sum(comb.filter(x => x.nivel === 'estimada'), x => x.valor), real = tot - est;
+    h += fila('Combustible ' + badge(est > 1 ? 'estimada' : 'calculada'), '<b style="color:var(--red);">' + eur(tot) + '</b>', est > 1 ? 'Con factura ' + eur(real) + ' + estimado ' + eur(est) + ' de los meses que aún no tienen factura.' : 'Sacado de las facturas de combustible de los meses de la obra.')
+      + det('Ver el desglose del combustible', comb.map(x => R.lineaHtml(r, x, 'directo')).join(''));
+  }
+  return h + resto.map(x => R.lineaHtml(r, x, 'directo')).join('');
+};
 R.secDirecto = r => {
   const i = r.ing, f = (t, v, n) => fila(t, '<b style="color:var(--green);">' + eur(v) + '</b>', n);
   return card('Ingreso (sin IVA)', f('Ejecutado (trabajo hecho)', i.ejecutado, i.nAlb + ' documento(s): ' + i.nFact + ' factura(s) y ' + (i.nAlb - i.nFact) + ' albarán(es) sin facturar. Trabajo hecho, no dinero cobrado.') + f('Facturado', i.facturado, i.nFact + ' con factura enlazada' + (i.facturado < i.ejecutado ? ' · pendiente de facturar ' + eur(i.ejecutado - i.facturado) : '')) + f('Cobrado', i.cobrado, i.cobrado < i.ejecutado ? 'pendiente de cobrar ' + eur(i.ejecutado - i.cobrado) : 'todo cobrado') + '<div style="margin-top:4px;">' + badge('real') + '</div>')
-    + card('Coste directo de la obra', r.lineasD.map(x => R.lineaHtml(r, x, 'directo')).join('') + fila('<b>Total directos</b>', '<b style="color:var(--red);">' + eur(r.directo) + '</b>') + '<div style="margin-top:6px;"><a href="#" onclick="RENT.anadir(\'' + r.job.id + '\',\'directo\');return false" style="font-size:12px;">+ añadir gasto directo</a></div>')
+    + card('Coste directo de la obra', R.lineasDirectoHtml(r) + fila('<b>Total directos</b>', '<b style="color:var(--red);">' + eur(r.directo) + '</b>') + '<div style="margin-top:6px;"><a href="#" onclick="RENT.anadir(\'' + r.job.id + '\',\'directo\');return false" style="font-size:12px;">+ añadir gasto directo</a></div>')
     + card('', '<div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;"><span>Resultado directo</span><span style="color:' + col(r.resultadoDirecto) + ';">' + eur(r.resultadoDirecto) + '</span></div><div style="font-size:11.5px;color:var(--ink-soft);">Ejecutado − directos. Aún sin repartir seguros, amortización, gestoría ni la retribución de los socios.</div>', 'background:var(--paper);border-color:var(--line);');
 };
 R.cardNiveles = r => { const v = r.niv, fl = (t, c, res, hh, n) => fila('<b>' + t + '</b>', '<b>' + eur(c) + '</b> · ' + (isFinite(hh) ? eur(hh, 2) + '/h' : 'sin horas'), n + ' Resultado: <b style="color:' + col(res) + ';">' + eur(res) + '</b>');
