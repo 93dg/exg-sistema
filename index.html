@@ -3176,7 +3176,7 @@ html.rb-marcando #report-bug-btn{transform:translateY(170px) !important;opacity:
 /* V9.93 (Daniel): la caja del reporte, como la de búsqueda: una sola pastilla blanca con +, micro y enviar a la derecha; Enter = nueva línea; siempre por encima del teclado */
 #rb-marcar{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 72px);}
 #rb-marcar #rb-texto{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);padding:4px 4px 4px 4px;gap:2px;background:#fff;border-radius:26px;box-shadow:0 6px 22px rgba(0,0,0,.35);align-items:flex-end;z-index:5;}
-#rb-marcar #rb-txt{background:transparent;border-radius:0;padding:10px 0;resize:none;line-height:20px;height:40px;max-height:96px;overflow-y:auto;outline:none;}
+#rb-marcar #rb-txt{background:transparent;border-radius:0;padding:10px 0;resize:none;line-height:20px;height:40px;min-height:40px !important;box-sizing:border-box;margin:0;max-height:96px;overflow-y:auto;outline:none;}
 #rb-marcar #rb-texto .rb-b, #rb-marcar #rb-mas{background:transparent;color:#555;flex:0 0 40px;width:40px;height:40px;}
 #rb-marcar #rb-enviar{flex:0 0 44px;width:44px;height:44px;}
 
@@ -4616,10 +4616,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.95" defer></script>
-<script src="costes/norm.js?v=V9.95" defer></script>
+<script src="rentabilidad/rent.js?v=V9.96" defer></script>
+<script src="costes/norm.js?v=V9.96" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.95</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.96</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4771,7 +4771,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.95</div>
+        <div class="sub" id="version-badge">V9.96</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7869,7 +7869,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
 <script>
 /* ---------------- LIBRERÍAS BAJO DEMANDA ---------------- */
 // Excel (xlsx, casi 1 MB) y la captura de pantalla (html2canvas) ya no se cargan al abrir la web: solo cuando se usan, y una vez.
-const CDN_LIBS = {xlsx: 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', html2canvas: 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'}, _libsCargadas = {};
+const CDN_LIBS = {xlsx: 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', html2canvas: 'lib/html2canvas.min.js'}, _libsCargadas = {};
 function cargarLib(nombre){
   if(_libsCargadas[nombre]) return _libsCargadas[nombre];
   return _libsCargadas[nombre] = new Promise((ok, ko) => {
@@ -15269,6 +15269,9 @@ function rbSanearComputados(doc){   // segunda vuelta: cualquier propiedad calcu
     for(let i = 0; i < cs.length; i++){ const pr = cs[i], v = cs.getPropertyValue(pr); if(v && /(color|lab|lch|oklab|oklch)\(/i.test(v)){ try{ el.style.setProperty(pr, rbColorARgba(v), 'important'); }catch(e){} } }
   });
 }
+function rbCompactarStyle(doc){   // V9.96 (Daniel: «¿por qué no se ve igual al reportar?»): la copia reescribe style="font-size: 12px" con espacio y las reglas móviles [style*="font-size:12px"] dejaban de aplicarse (letra más pequeña que en pantalla). Se vuelve a escribir sin espacios
+  try{ doc.querySelectorAll('[style]').forEach(el => { const t = el.getAttribute('style'); if(t && /:\s|;\s/.test(t)) el.setAttribute('style', t.replace(/;\s+/g, ';').replace(/:\s+/g, ':')); }); }catch(e){ console.warn(e); }
+}
 async function rbCapturar(){
   // V8.56 (reporte de Daniel: la foto no coincide con lo que veía al pulsar): si la librería ya está cargada, no se espera NADA antes de medir; todo se lee en el instante de la pulsación
   // V8.59 (reporte de Daniel, 3.ª vuelta: la foto sale corrida y sin la barra): sin teclado ni zoom, la pantalla es la de la ventana (scrollY e innerHeight); con teclado o zoom, la zona visible real (V8.14)
@@ -15321,7 +15324,7 @@ async function rbCapturar(){
   try{
     for(const intento of [1, 2]){   // 1: se quitan los colores modernos de los estilos; 2: además se revisan los colores ya calculados de lo que se ve
       try{
-        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { subirCopia(doc); fijarCopia(doc); doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); }})), 9000);
+        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { subirCopia(doc); fijarCopia(doc); doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); rbCompactarStyle(doc); }})), 9000);
         if(cap && cap.width > 0){ const fin = recortar(cap); return {cap: fin, error: '', diag: fin._diag}; }
       }catch(e){ ultimoError = String(e && e.message || e).slice(0, 160); console.warn('captura, intento ' + intento, e); }
     }
