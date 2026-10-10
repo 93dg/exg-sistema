@@ -4598,7 +4598,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 <script src="rentabilidad/rent.js?v=V9.70" defer></script>
 <script src="costes/norm.js?v=V9.70" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.71</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.72</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4750,7 +4750,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.71</div>
+        <div class="sub" id="version-badge">V9.72</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5779,7 +5779,6 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
         <button type="button" class="docs-tab active" data-sub="lista">Lista</button>
         <button type="button" class="docs-tab" data-sub="proveedores">Proveedores</button>
         <button type="button" class="docs-tab" data-sub="resumen">Resumen</button>
-        <button type="button" class="docs-tab" data-sub="control">Control</button>
         <button type="button" class="docs-tab" data-sub="normal">Normalización</button>
         <button type="button" class="docs-tab" data-sub="combustible">Combustible</button>
         <button type="button" class="docs-tab" data-sub="prestamos">Préstamos</button>
@@ -5788,19 +5787,32 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
 
       <!-- RESUMEN -->
       <div class="sub-view" id="gpro-resumen" style="display:none;">
-        <div class="filters" style="margin-bottom:16px;">
+        <!-- V9.72 (Daniel): Resumen y Control fusionados en una sola pantalla: lo mejor de cada una -->
+        <div class="filters" style="margin-bottom:12px;">
           <div class="chip-filter" data-per="mes">Mes</div>
           <div class="chip-filter active" data-per="trim">Trimestre</div>
           <div class="chip-filter" data-per="anio">Año</div>
+          <div class="chip-filter" data-per="12m">12 meses</div>
           <div class="chip-filter" data-per="todo">Todo</div>
+        </div>
+        <div class="filters" id="gpro-ctl-vista" style="margin-bottom:16px;">
+          <div class="chip-filter active" data-vista="categoria">Por categoría</div>
+          <div class="chip-filter" data-vista="maquina">Por máquina</div>
         </div>
         <div id="gpro-alerta-recibos"></div>
         <div class="kpi-strip">
           <div class="kpi"><div class="lbl">Gasto del periodo</div><div class="val" id="gpro-kpi-total">0,00 €</div></div>
           <div class="kpi"><div class="lbl">Oficial</div><div class="val green" id="gpro-kpi-oficial">0,00 €</div></div>
           <div class="kpi"><div class="lbl">En B</div><div class="val orange" id="gpro-kpi-enb">0,00 €</div></div>
-          <div class="kpi"><div class="lbl">Fijo mensual</div><div class="val" id="gpro-kpi-fijo">0,00 €</div></div>
+          <div class="kpi"><div class="lbl" id="gpro-ctl-lbl-mayor">Mayor partida</div><div class="val" id="gpro-ctl-kpi-mayor">—</div></div>
+          <div class="kpi"><div class="lbl">Sin detalle</div><div class="val orange" id="gpro-ctl-kpi-sindet">—</div></div>
         </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3 id="gpro-ctl-titulo">A qué se va el dinero</h3></div>
+          <div class="panel-body" id="gpro-ctl-lista"></div>
+        </div>
+        <div id="gpro-ctl-aviso" style="font-size:11.5px;color:var(--ink-soft);margin:8px 0 16px;line-height:1.5;"></div>
 
         <div class="grid-2">
           <div class="panel">
@@ -5808,10 +5820,6 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
             <div class="panel-body">
               <div class="bar-chart" id="gpro-chart-evolucion"></div>
             </div>
-          </div>
-          <div class="panel">
-            <div class="panel-head"><h3>Por categoría</h3></div>
-            <div class="panel-body" id="gpro-por-categoria" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
           <div class="panel">
             <div class="panel-head"><h3>Por proveedor</h3></div>
@@ -5863,29 +5871,6 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
       </div>
 
       <!-- CONTROL: a qué se va el dinero (solo control interno: no es fiscal; sale de las líneas de cada gasto) -->
-      <div class="sub-view" id="gpro-control" style="display:none;">
-        <div class="filters" id="gpro-control-chips" style="margin-bottom:12px;">
-          <div class="chip-filter" data-per="trim">Trimestre</div>
-          <div class="chip-filter" data-per="anio">Año</div>
-          <div class="chip-filter active" data-per="12m">12 meses</div>
-          <div class="chip-filter" data-per="todo">Todo</div>
-        </div>
-        <div class="filters" id="gpro-control-vista" style="margin-bottom:16px;">
-          <div class="chip-filter active" data-vista="categoria">Por categoría</div>
-          <div class="chip-filter" data-vista="maquina">Por máquina</div>
-        </div>
-        <div class="kpi-strip">
-          <div class="kpi"><div class="lbl">Gasto del periodo</div><div class="val" id="gpro-ctl-kpi-total">—</div></div>
-          <div class="kpi"><div class="lbl" id="gpro-ctl-lbl-mayor">Mayor partida</div><div class="val" id="gpro-ctl-kpi-mayor">—</div></div>
-          <div class="kpi"><div class="lbl">Sin detalle</div><div class="val orange" id="gpro-ctl-kpi-sindet">—</div></div>
-        </div>
-        <div class="panel">
-          <div class="panel-head"><h3 id="gpro-ctl-titulo">A qué se va el dinero</h3></div>
-          <div class="panel-body" id="gpro-ctl-lista"></div>
-        </div>
-        <div id="gpro-ctl-aviso" style="font-size:11.5px;color:var(--ink-soft);margin-top:8px;line-height:1.5;"></div>
-      </div>
-
       <!-- REVISAR: lo que llega del correo y los gastos dudosos -->
       <!-- PRÉSTAMOS: deuda que se sigue mes a mes; los intereses de cada recibo son gasto, la amortización no -->
       <div class="sub-view" id="gpro-normal" style="display:none;"><div id="norm-cont"></div></div>
@@ -9702,7 +9687,7 @@ function setupSubtabs(navId, prefix, mapping, opts){
 }
 setupSubtabs('flota-subtabs','flota',{maquinaria:'flota-maquinaria',asistencia:'flota-asistencia',mantenimiento:'flota-mantenimiento',averias:'flota-averias',repuestos:'flota-repuestos',historial:'flota-historial',particulares:'flota-particulares'});
 setupSubtabs('econ-subtabs','econ',{resumen:'econ-resumen',presupuestos:'econ-presupuestos',gastos:'econ-gastos',rentabilidad:'econ-rentabilidad'});
-setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',proveedores:'gpro-proveedores',control:'gpro-control',normal:'gpro-normal',combustible:'gpro-comb',prestamos:'gpro-prestamos',revisar:'gpro-revisar'},{onSwitch:{normal:()=>{ if(window.COSTES) COSTES.pintar(document.getElementById('norm-cont')); },proveedores:()=>renderGastosProProveedores(), revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible(), control:()=>renderGastosProControl(), prestamos:()=>iniciarPrestamos()}});
+setupSubtabs('gpro-subtabs','gpro',{resumen:'gpro-resumen',lista:'gpro-lista',proveedores:'gpro-proveedores',normal:'gpro-normal',combustible:'gpro-comb',prestamos:'gpro-prestamos',revisar:'gpro-revisar'},{onSwitch:{normal:()=>{ if(window.COSTES) COSTES.pintar(document.getElementById('norm-cont')); },proveedores:()=>renderGastosProProveedores(), revisar:()=>{ cargarColaGastosCorreo(); abrirRevisorGastos(); renderGastosProDudosos(); }, combustible:()=>renderGastosProCombustible(), resumen:()=>renderGastosProResumen(), prestamos:()=>iniciarPrestamos()}});
 document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filters .chip-filter').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     chip.parentElement.querySelectorAll('.chip-filter').forEach(c=>c.classList.remove('active'));
@@ -9711,7 +9696,6 @@ document.querySelectorAll('#view-gastospro .chip-filter, #view-gastospro .filter
     if(chip.closest('#gpro-lista')) renderGastosProLista();
     if(chip.closest('#gpro-dudosos-chips')) renderGastosProDudosos();
     if(chip.closest('#gpro-comb-chips') || chip.closest('#gpro-comb-tipos')) renderGastosProCombustible();
-    if(chip.closest('#gpro-control-chips') || chip.closest('#gpro-control-vista')) renderGastosProControl();
   });
 });
 document.addEventListener('click', ev => {
@@ -10752,6 +10736,7 @@ function filtrarDocsPeriodoComb(docs, per, hoy){
     if(isNaN(dt)) return false;
     if(per === 'todo') return true;
     if(per === 'anio') return dt.getFullYear() === hoy.getFullYear();
+    if(per === 'mes') return dt.getFullYear() === hoy.getFullYear() && dt.getMonth() === hoy.getMonth();
     if(per === 'trim') return dt.getFullYear() === hoy.getFullYear() && Math.floor(dt.getMonth() / 3) === Math.floor(hoy.getMonth() / 3);
     const desde = new Date(hoy.getFullYear(), hoy.getMonth() - 11, 1);   // '12m': los 12 meses naturales que terminan en el actual
     return dt >= desde && dt <= new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59);
@@ -10852,11 +10837,11 @@ function agruparControl(lineas, vista){
   return Array.from(grupos.values()).sort((a, b) => b.imp - a.imp);
 }
 function renderGastosProControl(){
-  const vistaEl = document.getElementById('gpro-control');
+  const vistaEl = document.getElementById('gpro-resumen');
   if(!vistaEl) return;
   const $ = id => document.getElementById(id);
-  const per = vistaEl.querySelector('#gpro-control-chips .chip-filter.active')?.dataset.per || '12m';
-  const modo = vistaEl.querySelector('#gpro-control-vista .chip-filter.active')?.dataset.vista || 'categoria';
+  const per = vistaEl.querySelector('.filters:first-child .chip-filter.active')?.dataset.per || 'trim';
+  const modo = vistaEl.querySelector('#gpro-ctl-vista .chip-filter.active')?.dataset.vista || 'categoria';
   const docs = filtrarDocsPeriodoComb(gastosProDocs(), per, new Date());
   const lineas = lineasControlGasto(docs);
   const total = lineas.reduce((s, l) => s + l.imp, 0);
@@ -10864,7 +10849,6 @@ function renderGastosProControl(){
   const grupos = agruparControl(lineas, modo);
   const eur = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
   const pc = (v, t) => t ? Math.round(v / t * 100) : 0;
-  $('gpro-ctl-kpi-total').textContent = eur(total);
   $('gpro-ctl-lbl-mayor').textContent = modo === 'maquina' ? 'Máquina que más gasta' : 'Mayor partida';
   $('gpro-ctl-kpi-mayor').textContent = grupos.length ? grupos[0].nombre : '—';
   $('gpro-ctl-kpi-sindet').textContent = eur(sinDet);
@@ -11006,18 +10990,9 @@ function renderGastosProDudosos(){
 }
 
 function renderGastosProResumen(){
-  const per = document.querySelector('#gpro-resumen .chip-filter.active')?.dataset.per || 'trim';
+  const per = document.querySelector('#gpro-resumen .filters:first-child .chip-filter.active')?.dataset.per || 'trim';
   const hoy = new Date();
-  const docs = gastosProDocs().filter(d=>{
-    if(!d.dateRaw) return per==='todo';
-    const dt = new Date(d.dateRaw);
-    if(isNaN(dt)) return false;
-    if(per==='todo') return true;
-    if(per==='anio') return dt.getFullYear()===hoy.getFullYear();
-    if(per==='mes') return dt.getFullYear()===hoy.getFullYear() && dt.getMonth()===hoy.getMonth();
-    // trimestre
-    return dt.getFullYear()===hoy.getFullYear() && Math.floor(dt.getMonth()/3)===Math.floor(hoy.getMonth()/3);
-  });
+  const docs = filtrarDocsPeriodoComb(gastosProDocs(), per, hoy);
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   const total = docs.reduce((s,d)=>s+(d.importe||d.total||0),0);
   const oficial = docs.filter(d=>(d.contabilidad||'oficial')==='oficial').reduce((s,d)=>s+(d.importe||d.total||0),0);
@@ -11028,7 +11003,7 @@ function renderGastosProResumen(){
   document.getElementById('gpro-kpi-total').textContent = euro(total);
   document.getElementById('gpro-kpi-oficial').textContent = euro(oficial);
   document.getElementById('gpro-kpi-enb').textContent = euro(enB);
-  document.getElementById('gpro-kpi-fijo').textContent = euro(fijo);
+  try{ renderGastosProControl(); }catch(e){ console.error(e); }
 
   // evolución últimos 6 meses (todos los gastos, no filtrados por el chip de periodo)
   const meses = [];
