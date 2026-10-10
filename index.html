@@ -1256,6 +1256,7 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .c3-libre.finde{background:var(--concrete);color:var(--ink-soft);}
 .c3-nofinde{all:unset;cursor:pointer;display:inline-block;margin-top:6px;font-size:12px;font-weight:700;color:#791F1F;background:#fbeaea;border-radius:99px;padding:5px 11px;}
 /* V7.93 Calendario de mes; V7.95: días más altos (hasta 3 trabajos con sitio para cogerlos con el dedo) y sin «+ Trabajo» (se añade con el «+» de abajo) */
+.c3-pausa{display:block;height:4px;margin:2px 3px 0;border-radius:2px;background:repeating-linear-gradient(90deg,var(--jc) 0 4px,transparent 4px 7px);opacity:.9;}
 .c3-chip{position:relative;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 .c3-chip.sigue{opacity:.8;border-radius:2px 5px 5px 2px;}
 .c3-chip.urg{box-shadow:inset 0 0 0 2px #fff;}
@@ -4617,10 +4618,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.98" defer></script>
-<script src="costes/norm.js?v=V9.98" defer></script>
+<script src="rentabilidad/rent.js?v=V9.99" defer></script>
+<script src="costes/norm.js?v=V9.99" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.98</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.99</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4772,7 +4773,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.98</div>
+        <div class="sub" id="version-badge">V9.99</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8886,9 +8887,17 @@ const c3Dias = j => { const h = tbDurHoras(j.duracion); return Math.max(1, Math.
 // V8.06 (reporte de Daniel): sábados y domingos salen en el calendario. Normalmente vacíos; un trabajo puede empezar en fin de semana (sueltos,
 // mantenimientos) o sumar un fin de semana suelto en mitad (plan.findes = días trabajados de más, cuentan como días del trabajo)
 function c3Ocupa(j){ if(!j.plan || !j.plan.fecha) return []; const out = [], F = new Set(j.plan.findes || []), Sx = new Set(j.plan.saltar || []), d = new Date(j.plan.fecha + 'T00:00'); let n = c3Dias(j), guard = 0, primero = true;
-  while(n > 0 && guard++ < 400){ const iso = c2Iso(d); if(!Sx.has(iso) && (c2Laborable(d) || F.has(iso) || primero)){ out.push(iso); n--; } primero = false; d.setDate(d.getDate() + 1); } return out; }
+  const P0 = j.plan.pausa_desde || null;   // V9.99: en pausa abierta el trabajo solo ocupa los días anteriores a la pausa
+  while(n > 0 && guard++ < 400){ const iso = c2Iso(d); if(P0 && iso >= P0) break; if(!Sx.has(iso) && (c2Laborable(d) || F.has(iso) || primero)){ out.push(iso); n--; } primero = false; d.setDate(d.getDate() + 1); } return out; }
 const c3Cola = () => (_tbJobs || []).filter(j => C2_ESTADOS.includes(j.estado));
 const c3Sin = () => c3Cola().filter(j => !j.plan || !j.plan.fecha).sort((a, b) => c2Prio(a) - c2Prio(b) || a.orden - b.orden);
+// V9.99 (Daniel: «lo de Rafa Sánchez sigue abierto pero no estamos allí: que en el calendario salga en pausa, con una línea más chiquitita el tiempo que está en pausa»)
+function c3Pausas(){ const m = {}, hoy = c2Iso(new Date());
+  c3Cola().forEach(j => { if(!j.plan || !j.plan.fecha) return; const o = c3Ocupa(j), add = iso => { (m[iso] = m[iso] || []).push(j); };
+    if(j.plan.pausa_desde){ const d = new Date(j.plan.pausa_desde + 'T00:00'); let g = 0; while(c2Iso(d) <= hoy && g++ < 400){ add(c2Iso(d)); d.setDate(d.getDate() + 1); } return; }
+    if(!o.length) return; (j.plan.saltar || []).forEach(iso => { if(iso > o[0] && iso < o[o.length - 1]) add(iso); }); });
+  return m; }
+function c3PausaHtml(iso, COL, PAU){ const L = (PAU[iso] || []).slice(0, 2); return L.map(j => `<span class="c3-pausa" data-c3-pausa="${j.id}" style="--jc:${COL[j.id] || '#2B5C8F'}" title="En pausa"></span>`).join(''); }
 function c3PorDia(){ const m = {}; c3Cola().forEach(j => c3Ocupa(j).forEach((iso, i) => { (m[iso] = m[iso] || []).push({j, i}); })); return m; }
 const c3Nom = j => tbMay(j.cliente || j.trabajo || 'Trabajo');
 const c3Corto = j => c3Nom(j).split(' ').slice(0, 2).join(' ');
@@ -8939,6 +8948,7 @@ function c3Pintar(){
   const preg = c3Cola().filter(j => { const o = c3Ocupa(j); if(!o.length) return false; const u = o[o.length - 1]; return u < hoyIso || (u === hoyIso && new Date().getHours() >= 15); }).sort((a, b) => c3Ocupa(a).slice(-1)[0].localeCompare(c3Ocupa(b).slice(-1)[0]))[0];
   const sinTodos = c3Sin(), sin = tbFiltrar(sinTodos);   // V8.32: «Sin día» con los mismos filtros que la Lista
   const libresMes = semanas.flat().filter(d => d.getMonth() === base.getMonth() && c2Laborable(d) && c2Iso(d) >= hoyIso && !PD[c2Iso(d)]).length;
+  const PAU = c3Pausas();
   app.innerHTML = `
     ${preg ? `<div class="c3-q"><small>Pregunta del día</small><h2>¿Terminasteis ${escHtml(c3Nom(preg))}${preg.trabajo && preg.cliente ? ' · ' + escHtml(tbMay(preg.trabajo)) : ''}?</h2>
       <div class="c2-bt"><button type="button" class="si" data-c3-fin="${preg.id}">Sí, terminado</button>${[[1, '+1 día'], [2, '+2 días'], [5, '+1 semana']].map(([n, t]) => `<button type="button" data-c3-mas="${n}" data-id="${preg.id}">${t}</button>`).join('')}</div></div>` : ''}
@@ -8952,7 +8962,7 @@ function c3Pintar(){
         const ci = dw !== 1 && O.has(c2Iso(ant)), cd = dw !== 0 && O.has(c2Iso(sig));   // V8.27: si sigue el día de al lado (misma semana), la barra continúa
         let n = 1; if(!ci){ const q = new Date(d); while(q.getDay() !== 0){ q.setDate(q.getDate() + 1); if(O.has(c2Iso(q))) n++; else break; } }   // V8.29: días seguidos del tramo
         const lun = new Date(d); lun.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-        return `<span data-run="${x.j.id}|${c2Iso(lun)}" class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}${ci ? ' cont-izq' : ''}${cd ? ' cont-der' : ''}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${ci ? '&nbsp;' : `<i class="c3-txt" style="--n:${n}">${escHtml(c3Texto(x.j))}</i>`}</span>`; }).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '')}</div>`; }).join('')}</div>
+        return `<span data-run="${x.j.id}|${c2Iso(lun)}" class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}${ci ? ' cont-izq' : ''}${cd ? ' cont-der' : ''}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${ci ? '&nbsp;' : `<i class="c3-txt" style="--n:${n}">${escHtml(c3Texto(x.j))}</i>`}</span>`; }).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '') + c3PausaHtml(iso, COL, PAU)}</div>`; }).join('')}</div>
     <div class="c3-nav-ab"><div class="c3-mes-ab"><b>${MESES_LARGOS[base.getMonth()].replace(/^./, c => c.toUpperCase())} ${base.getFullYear()}</b><span>${libresMes} día${libresMes === 1 ? '' : 's'} libre${libresMes === 1 ? '' : 's'}</span></div>${_c3Mes ? '<button type="button" class="hoy" data-c3-mes="0">Hoy</button>' : ''}<button type="button" data-c3-mes="-1" aria-label="Mes anterior">‹</button><button type="button" data-c3-mes="1" aria-label="Mes siguiente">›</button></div>
     <div class="c3-tray-zona"><div class="c3-tray-cab"><b>Sin día</b><span>${sin.length} trabajo${sin.length === 1 ? '' : 's'}</span></div>
     <div class="tb-filtros2" id="c3-filtros"></div>
@@ -9022,11 +9032,17 @@ function c3HojaDia(iso){   // V7.99 (Daniel): un día con trabajos = sus tarjeta
 function c3HojaTrabajo(j){
   const o = c3Ocupa(j), col = c3Colores()[j.id] || '#2B5C8F';
   c3Hoja(`<div class="c3-ht" style="border-left-color:${col}"><b>${escHtml(c3Nom(j))}</b><span>${escHtml(tbMay(j.trabajo && j.cliente ? j.trabajo : ''))}</span></div>
-    <div class="c3-fechas">${o.length ? `Del <b>${c2FechaTxt(o[0])}</b> al <b>${c2FechaTxt(o[o.length - 1])}</b>` : 'Sin día'}</div>
+    <div class="c3-fechas">${o.length ? `Del <b>${c2FechaTxt(o[0])}</b> al <b>${c2FechaTxt(o[o.length - 1])}</b>` : (j.plan && j.plan.pausa_desde ? 'En pausa' : 'Sin día')}</div>
     <div class="c3-step"><button type="button" data-c3-dias="-1" data-id="${j.id}" ${c3Dias(j) <= 1 ? 'disabled' : ''} aria-label="Un día menos">−</button><div><b>${c3Dias(j)}</b><span>día${c3Dias(j) === 1 ? '' : 's'}</span></div><button type="button" data-c3-dias="1" data-id="${j.id}" aria-label="Un día más">+</button></div>
-    <div class="c3-hb3"><button type="button" class="si" data-c3-fin="${j.id}">Terminado</button><button type="button" data-c3-quitar="${j.id}">Quitar del calendario</button></div>
+    ${j.plan && j.plan.pausa_desde ? `<div class="c3-fechas">En pausa desde el <b>${c2FechaTxt(j.plan.pausa_desde)}</b> · ${c3DiasPausa(j)} día${c3DiasPausa(j) === 1 ? '' : 's'}</div>` : ''}
+    <div class="c3-hb3"><button type="button" class="si" data-c3-fin="${j.id}">Terminado</button><button type="button" data-c3-quitar="${j.id}">Quitar del calendario</button>${j.plan && j.plan.pausa_desde ? `<button type="button" data-c3-reanudar="${j.id}">Reanudar</button>` : (o.length && o[0] <= c2Iso(new Date()) ? `<button type="button" data-c3-pausar="${j.id}">Poner en pausa</button>` : '')}</div>
     <button type="button" class="c2-ok gris" data-c2-cerrar="1">Listo</button>`);
 }
+function c3DiasPausa(j){ const hoy = c2Iso(new Date()); let n = 0; const d = new Date(j.plan.pausa_desde + 'T00:00'), g = {n: 0}; while(c2Iso(d) <= hoy && g.n++ < 400){ if(c2Laborable(d)) n++; d.setDate(d.getDate() + 1); } return n; }
+function c3Pausar(j){ _c2Deshacer = c2Foto(); const o = c3Ocupa(j), hoy = c2Iso(new Date()); const ult = o[o.length - 1];
+  j.plan = {...j.plan, pausa_desde: (ult && ult < hoy) ? c3MoverLab(ult, 1) : hoy}; c2Guardar([j]); c2Cerrar(); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))} en pausa desde el ${c2FechaTxt(j.plan.pausa_desde)}.`); }
+function c3Reanudar(j){ _c2Deshacer = c2Foto(); const hoy = c2Iso(new Date()), salto = []; const d = new Date(j.plan.pausa_desde + 'T00:00'); let g = 0; while(c2Iso(d) < hoy && g++ < 400){ salto.push(c2Iso(d)); d.setDate(d.getDate() + 1); }
+  const p = {...j.plan}; delete p.pausa_desde; p.saltar = [...new Set([...(p.saltar || []), ...salto])]; j.plan = p; c2Guardar([j]); c2Cerrar(); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))} reanudado.`); }
 function c3Terminar(j){
   _c2Deshacer = c2Foto(); j.estado = 'Albarán'; j.terminado_at = new Date().toISOString(); c2Guardar([j]); c2Cerrar(); c3Pintar();
   c2Aviso(`${escHtml(c3Nom(j))} terminado: pasa a «Albarán».`);
@@ -9107,6 +9123,8 @@ document.addEventListener('click', e => {
     const nf = t.closest('[data-c3-nofinde]'); if(nf){ const j = jOf(nf.dataset.c3Nofinde); if(!j) return; _c2Deshacer = c2Foto(); j.plan = {...j.plan, findes: (j.plan.findes || []).filter(x => x !== nf.dataset.dia)}; c2Guardar([j]); c3Pintar(); c3HojaDia(nf.dataset.dia); return; }
     const ab = t.closest('[data-c3-abrir]'); if(ab){ const j = jOf(ab.dataset.c3Abrir); if(j) c3HojaTrabajo(j); return; }
     const mv = t.closest('[data-c3-mover]'); if(mv){ _c3Colocar = mv.dataset.c3Mover; c2Cerrar(); c3Pintar(); window.scrollTo({top: 0, behavior: 'smooth'}); return; }
+    const pz = t.closest('[data-c3-pausar]'); if(pz){ const j = jOf(pz.dataset.c3Pausar); if(j) c3Pausar(j); return; }
+    const rz = t.closest('[data-c3-reanudar]'); if(rz){ const j = jOf(rz.dataset.c3Reanudar); if(j) c3Reanudar(j); return; }
     const q = t.closest('[data-c3-quitar]'); if(q){ const j = jOf(q.dataset.c3Quitar); if(!j) return; _c2Deshacer = c2Foto(); j.plan = {...(j.plan || {}), fecha: null}; c2Guardar([j]); c2Cerrar(); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))} vuelve a «Sin día».`); return; }
     const dd = t.closest('[data-c3-dias]'); if(dd){ const j = jOf(dd.dataset.id); if(!j) return; const n = Number(dd.dataset.c3Dias); if(n < 0 && c3Dias(j) <= 1) return;
       if(!_c2Deshacer || dd.dataset.primero !== '0') _c2Deshacer = c2Foto();
@@ -9126,6 +9144,7 @@ document.addEventListener('click', e => {
   const f = t.closest('[data-c3-fin]'); if(f){ const j = jOf(f.dataset.c3Fin); if(j) c3Terminar(j); return; }
   const m = t.closest('[data-c3-mas]'); if(m){ const j = jOf(m.dataset.id); if(j) c3Mas(j, Number(m.dataset.c3Mas)); return; }
   const c = t.closest('[data-c3-card]'); if(c){ _c3Colocar = _c3Colocar === c.dataset.c3Card ? null : c.dataset.c3Card; c3Pintar(); if(_c3Colocar) window.scrollTo({top: 0, behavior: 'smooth'}); return; }
+  const pau = t.closest('[data-c3-pausa]'); if(pau && !_c3Colocar){ const j = jOf(pau.dataset.c3Pausa); if(j) c3HojaTrabajo(j); return; }
   const chip = t.closest('[data-c3-chip]'); if(chip && !_c3Colocar){ const j = jOf(chip.dataset.c3Chip); if(j) c3HojaTrabajo(j); return; }
   const d = t.closest('[data-c3-dia]'); if(d){ if(_c3Colocar){ const j = jOf(_c3Colocar); if(j) c3PonerPreguntando(j, d.dataset.c3Dia); return; } c3HojaDia(d.dataset.c3Dia); }
 }, true);
