@@ -120,20 +120,23 @@ const REAL = nivel('Registrado', '#2e7d32'), CALC = nivel('Calculado', '#1565c0'
 const TH = 'text-align:right;padding:3px 6px;font-size:11px;color:var(--ink-soft);white-space:nowrap;', TD = 'text-align:right;padding:3px 6px;font-size:12px;white-space:nowrap;border-top:1px solid var(--line,#0001);';
 const CAB = '<th style="' + TH + 'text-align:left;">Concepto</th><th style="' + TH + '">Año</th><th style="' + TH + '">Mes</th><th style="' + TH + '">Día natural</th><th style="' + TH + '">Día laborable</th><th style="' + TH + '">Hora natural</th><th style="' + TH + '">Hora jornada</th>';
 const celdas = v => '<td style="' + TD + '"><b>' + f2(v.anual) + '</b></td><td style="' + TD + '">' + f2(v.mes) + '</td><td style="' + TD + '">' + f2(v.diaNat) + '</td><td style="' + TD + '">' + f2(v.diaLab) + '</td><td style="' + TD + '">' + f2(v.horaNat) + '</td><td style="' + TD + '">' + f2(v.horaJ) + '</td>';
-const tabla = (cab, filas) => '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;min-width:620px;"><thead><tr>' + cab + '</tr></thead><tbody>' + filas + '</tbody></table></div>';
+// V9.71 (Daniel: «esto no está pensado para móvil»): en pantallas estrechas cada fila de la tabla pasa a ser una tarjeta (nombre arriba, cifras en dos columnas con su etiqueta)
+if(!document.getElementById('nm-css')){ const st = document.createElement('style'); st.id = 'nm-css'; st.textContent = '@media (max-width:700px){table.nm-t{min-width:0 !important;display:block;} table.nm-t thead{display:none;} table.nm-t tbody{display:block;} table.nm-t tr{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;padding:10px 12px;margin:0 0 8px;border:1px solid var(--line,#0002);border-radius:14px;background:var(--paper,#fff);} table.nm-t td{display:block;border:0 !important;padding:2px 0 !important;text-align:left !important;white-space:normal !important;font-size:13px !important;} table.nm-t td:first-child,table.nm-t td[colspan]{grid-column:1/-1;font-size:14px !important;padding-bottom:4px !important;} table.nm-t td[data-l]:not(:first-child)::before{content:attr(data-l);display:block;font-size:10.5px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;} table.nm-t td[data-l]:not(:first-child){font-weight:700;}}'; document.head.appendChild(st); }
+const tabla = (cab, filas) => {
+  const labs = (cab.match(/<th[^>]*>(.*?)<\/th>/g) || []).map(t => t.replace(/<[^>]+>/g, ''));
+  const f2 = filas.replace(/<tr>([\s\S]*?)<\/tr>/g, (m, inner) => { let i = 0; return '<tr>' + inner.replace(/<td([^>]*)>/g, (mm, at) => { const l = labs[i] || ''; i += /colspan="(\d+)"/.test(at) ? +RegExp.$1 : 1; return /colspan/.test(at) ? mm : '<td' + at + ' data-l="' + l.replace(/"/g, '') + '">'; }) + '</tr>'; });
+  return '<div style="overflow-x:auto;"><table class="nm-t" style="border-collapse:collapse;width:100%;min-width:620px;"><thead><tr>' + cab + '</tr></thead><tbody>' + f2 + '</tbody></table></div>';
+};
 const inp = (v, fn, w) => '<input type="text" inputmode="decimal" value="' + (v == null ? '' : v) + '" onchange="' + fn + '" style="width:' + (w || 70) + 'px;text-align:right;font-size:12.5px;padding:2px 4px;">';
 
 C.vista = function(D){
   const c = C.cfg, { eur } = U(), hJ = D.hJ;
   let h = '';
   // 1. Parámetros
-  h += card('Parámetros de conversión (una sola configuración para toda la web)',
-    '<div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12.5px;align-items:center;">'
-    + '<label>Días laborables/año ' + inp(c.diasLab, "COSTES.set('diasLab',this.value)") + '</label>'
-    + '<label>Horas de jornada/día ' + inp(c.horasJornada, "COSTES.set('horasJornada',this.value)", 50) + '</label>'
-    + '<label>Días naturales ' + inp(c.diasNat, "COSTES.set('diasNat',this.value)", 50) + '</label>'
-    + '<label>Horas naturales ' + inp(c.horasNat, "COSTES.set('horasNat',this.value)", 60) + '</label>'
-    + '<label><input type="checkbox" ' + (c.incluirB ? 'checked' : '') + ' onchange="COSTES.toggleB(this.checked)"> Incluir gastos en B</label></div>'
+  h += card('Parámetros de conversión',
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;font-size:12.5px;">'
+    + [['Días laborables al año', c.diasLab], ['Horas de jornada al día', c.horasJornada], ['Días naturales', c.diasNat], ['Horas naturales', c.horasNat]].map(([l, v]) => '<div><div style="font-size:10.5px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;">' + l + '</div><b style="font-size:15px;">' + v + '</b></div>').join('') + '</div>'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin-top:10px;"><input type="checkbox" ' + (c.incluirB ? 'checked' : '') + ' onchange="COSTES.toggleB(this.checked)"> Incluir gastos en B</label>'
     + nota('Hora de jornada = días laborables × horas de jornada = <b>' + U().h1(hJ) + ' h</b> (convenio: 1.736 h = 217 días × 8 h). La hora natural (8.760 h) es solo referencia: nunca se usa para repartir a las obras. Horas con actividad en albaranes (12 m): <b>' + U().h1(D.horasEmpresa) + ' h</b> en <b>' + D.diasActividad + '</b> días.'));
   // 2. Tipos
   h += card('Qué es cada cosa', '<div style="font-size:12px;line-height:1.5;">' + REAL + ' gasto realmente pagado o facturado, sin IVA, últimos 12 meses (' + D.W0 + ' a ' + D.hoy + ').<br>' + CALC + ' coste obtenido por cálculo (reparto, convenio) a partir de datos registrados.<br>' + PROV + ' amortización: reserva para renovar, no es un pago. Necesita el precio de compra de cada máquina.</div>');
