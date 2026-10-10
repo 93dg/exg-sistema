@@ -193,12 +193,17 @@
 #aju-app .aju-opt.off{opacity:.6;}
 #aju-sheet .aju-in{max-width:760px;margin:0 auto;padding:0 14px 100px;}
 #aju-sheet .aju-top{position:sticky;top:0;z-index:2;background:var(--paper,#faf8f4);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line,#ddd);}
-#aju-sheet .aju-top b{font-size:17px;}`;
+#aju-sheet .aju-top b{font-size:17px;}
+#aju-app textarea.as-tx{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--line,#ddd);border-radius:12px;background:#fff;font:inherit;font-size:15.5px;line-height:1.4;color:inherit;resize:vertical;}
+#aju-app .as-ent{margin:8px 0;padding:8px 12px;border-radius:12px;background:#eef3ee;font-size:13.5px;line-height:1.45;}
+#aju-app .as-q{margin:10px 0;padding:10px 12px;border-radius:14px;background:#fff;border:2px solid var(--ink,#222);} #aju-app .as-bt{display:grid;gap:6px;margin-top:8px;} #aju-app .as-bt .btn{width:100%;padding:12px;text-align:left;}
+#aju-app .as-paso{border:1px solid var(--line,#ddd);border-radius:14px;background:#fff;padding:10px 12px;margin:8px 0;} #aju-app .as-paso .t{font-weight:700;margin-bottom:4px;} #aju-app .as-paso .aju-l{display:block;padding:6px 0;} #aju-app .as-paso .aju-l span:first-child{display:block;font-size:12.5px;color:var(--ink-soft);} #aju-app .as-paso .aju-l span:last-child{display:block;text-align:left;font-size:15px;margin-top:1px;}
+#aju-app .as-paso .n{display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:var(--ink,#222);color:#fff;font-size:12px;margin-right:8px;}`;
     document.head.appendChild(s);
     // las hojas comparten estilos con la app: se dejan dentro de #aju-app (ver pintar)
   }
-  A.abrir = async function(){
-    css();
+  A.abrirManual = async function(){
+    css(); AS.on = false;
     if(!root){ root = document.createElement('div'); root.id = 'aju-app'; document.body.appendChild(root);
       root.addEventListener('input', ev => { const k = ev.target.getAttribute && ev.target.getAttribute('data-k'); if(k) cambia(k, ev.target, false); });
       root.addEventListener('change', ev => { const k = ev.target.getAttribute && ev.target.getAttribute('data-k'); if(k) cambia(k, ev.target, true); });
@@ -270,6 +275,7 @@
   function conIva(F){ const b = num(S.red); return b > 0.004 ? 'Con IVA: ' + eur(F.isp ? b : b * (1 + F.ivaPct / 100)) : ''; }
 
   function cambia(k, el, fin){
+    if(AS.on) return asCambia(k, el, fin);
     const v = el.type === 'checkbox' ? el.checked : el.value;
     if(k === 'facturaId'){ S.facturaId = v; S.red = ''; S.op.fuente = ''; S.op.base = ''; S.op.parte = ''; _fisc = null; pintar(); return; }
     if(k.indexOf('m.') === 0){ S.manual[k.slice(2)] = v; _fisc = null; const f = document.getElementById('aju-fact'); if(f) f.innerHTML = resumenFactura(facturaCtx()); resultados(true); return; }
@@ -287,6 +293,7 @@
     resultados(true, k === 'irpfAnual' && !fin);
   }
   function accion(a, b, ev){
+    if(AS.on) return asAccion(a, b, ev);
     if(a === 'cerrar') cerrar();
     else if(a === 'tipo'){ if(S.tipo !== b.getAttribute('data-t')) S.red = ''; S.tipo = b.getAttribute('data-t'); document.getElementById('aju-inputs').innerHTML = htmlInputs(); root.querySelectorAll('.aju-chip').forEach(c => c.classList.toggle('on', c.getAttribute('data-t') === S.tipo)); resultados(); }
     else if(a === 'iva'){ if(ev) ev.preventDefault(); S.ivaEdit = true; document.getElementById('aju-inputs').innerHTML = htmlInputs(); }
@@ -346,6 +353,7 @@
 
   function pintarSheet(){
     const sh = document.getElementById('aju-sheet'); if(!sh) return;
+    if(AS.on){ asSheet(sh); return; }
     if(!sheet){ sh.style.display = 'none'; sh.innerHTML = ''; return; }
     const F = facturaCtx(), X = fiscal(F), tit = {cmp: 'Comparar opciones', det: 'Cómo se ha calculado', sav: 'Simulaciones guardadas', inv: 'Cálculo inverso'}[sheet];
     let body = '';
@@ -445,15 +453,187 @@
   async function pintarGuardadas(){
     const el = document.getElementById('aju-guardadas'); if(!el) return;
     if(_guardadas == null){ try{ const {data, error} = await sb.from('sistema').select('id,data,created_at').eq('tipo', 'simulacion_ajuste').order('created_at', {ascending: false}).limit(30); if(error) throw error; _guardadas = data || []; }catch(e){ _guardadas = []; el.innerHTML = '<p class="aju-note">No se pudieron leer las simulaciones guardadas.</p>'; return; } }
-    el.innerHTML = _guardadas.length ? _guardadas.map(r => '<div class="aju-l"><span>' + esc((r.data || {}).nombre || 'Sin nombre') + '<br><small>' + fmtF(r.created_at) + '</small></span><span><button type="button" class="btn sm" data-act="cargar" data-id="' + r.id + '">Abrir</button> <button type="button" class="btn sm" data-act="borrar" data-id="' + r.id + '">Borrar</button></span></div>').join('') : '<p class="aju-note">Todavía no hay simulaciones guardadas.</p>';
+    const LG = AS.on ? _guardadas.filter(r => ((r.data || {}).estado_calc || {}).asesor) : _guardadas; el.innerHTML = LG.length ? LG.map(r => '<div class="aju-l"><span>' + esc((r.data || {}).nombre || 'Sin nombre') + '<br><small>' + fmtF(r.created_at) + '</small></span><span><button type="button" class="btn sm" data-act="cargar" data-id="' + r.id + '">Abrir</button> <button type="button" class="btn sm" data-act="borrar" data-id="' + r.id + '">Borrar</button></span></div>').join('') : '<p class="aju-note">Todavía no hay simulaciones guardadas.</p>';
   }
   async function guardar(){
+    if(AS.on) return asGuardar();
     const F = facturaCtx(), nombre = (window.prompt('Nombre de la simulación', TIPOS[S.tipo] + ' · ' + F.client + ' · ' + F.num) || '').trim(); if(!nombre) return;
     try{ const {error} = await sb.from('sistema').insert({tipo: 'simulacion_ajuste', data: {nombre, estado: 'guardada', estado_calc: JSON.parse(JSON.stringify(S))}}); if(error) throw error; _guardadas = null; pintarGuardadas(); if(typeof mostrarToast === 'function') mostrarToast('Simulación guardada', 'ok'); }
     catch(e){ if(typeof mostrarToast === 'function') mostrarToast('No se pudo guardar', 'err'); }
   }
   function cargar(id){ const r = (_guardadas || []).find(x => x.id === id); if(!r || !(r.data || {}).estado_calc) return; S = Object.assign(nuevoEstado(), r.data.estado_calc); S.op = Object.assign(nuevoEstado().op, S.op); if(S.tipo === 'C' || S.tipo === 'D') S.tipo = 'K'; if(!S.causaTipo && S.causa) S.causaTipo = S.causa === 'justificada' ? 'error' : S.causa === 'sin' ? 'ninguna' : ''; if(!S.op.fuente && num(S.op.base) > 0) S.op.fuente = 'otra'; S.manual = Object.assign(nuevoEstado().manual, S.manual); _fisc = null; sheet = null; pintar(); root.scrollTo({top: 0}); }
   async function borrar(id){ if(!window.confirm('¿Borrar esta simulación?')) return; try{ const {error} = await sb.from('sistema').delete().eq('id', id); if(error) throw error; _guardadas = null; pintarGuardadas(); }catch(e){ if(typeof mostrarToast === 'function') mostrarToast('No se pudo borrar', 'err'); } }
+
+  // ---------- asesor: escribe el problema y propone la solución ----------
+  const AS = {on: false, texto: '', facturaId: null, albId: '', correcto: null, corrSrc: '', causaTipo: '', causaTxt: '', ivaEdit: false};
+  const TEXTO0 = 'Encarni nos pagó 11.243,07 € por la factura 5, que consideramos errónea. Alejandro nos debe 3.690,50 € por el albarán A22 (trabajos realizados). Quiero resolver las dos cosas sin perder dinero.';
+  const nm = s => String(s || '').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+  const prim = s => nm(s).split(' ')[0];
+  const sgn = x => x > 0.004 ? '+' : x < -0.004 ? '−' : '';
+  const asF = () => { const d = AS.facturaId ? (documentosRealesById || {})[AS.facturaId] : null; return d ? deDoc(d) : null; };
+  let _asT = null;
+  function asParse(){
+    const t = AS.texto || '', L = facturas(), AL = albaranes();
+    let m = /factura\s*(?:n[º°o.]*\s*)?([A-Za-z]{0,4}\d[\w\/-]*)/i.exec(t);
+    if(m){ let c = L.filter(d => norm(d.num || d.numero) === norm(m[1])); if(c.length > 1){ const w = norm(t).split(' '); const c2 = c.filter(d => norm(d.client).split(' ').some(x => x.length > 3 && w.indexOf(x) >= 0)); if(c2.length) c = c2; } if(c.length && AS.facturaId !== c[0].id){ AS.facturaId = c[0].id; _fisc = null; } }
+    m = /albar[aá]n\s*([A-Za-z]{0,3}\d+)/i.exec(t) || /\b(A\d{1,4})\b/.exec(t);
+    if(m){ const a = AL.find(d => norm(d.num || d.numero) === norm(m[1])); if(a && AS.albId !== a.id){ AS.albId = a.id; AS.ivaEdit = false; } }
+    const F = asF(); let c = null, mm;
+    if((mm = /(?:deb(?:e|er[ií]a)\s+ser|importe\s+correcto|correcto\s+es|real\s+es|quedar(?:se)?\s+en|dejar(?:la)?\s+en)\s*(?:de\s*)?([\d.,]+)/i.exec(t))){ c = num(mm[1]); if(/con\s+iva/i.test(t) && F) c = r2(c / (1 + (F.isp ? 0 : F.ivaPct / 100))); }
+    else if((mm = /(?:descontar|rebajar|quitar|restar)\s*(?:le\s*)?(?:los|las|el|la)?\s*([\d.,]+)/i.exec(t))){ if(F) c = r2(F.base - num(mm[1])); }
+    else if(/\banul(ar|a|ada|aci[oó]n)\b|\bentera\b/i.test(t)) c = 0;
+    if(c != null){ AS.correcto = c; AS.corrSrc = 'texto'; } else if(AS.corrSrc === 'texto'){ AS.correcto = null; AS.corrSrc = ''; }
+  }
+  function asCalc(){
+    S.facturaId = AS.facturaId; S.tipo = 'K'; S.causaTipo = AS.causaTipo; S.causaTxt = AS.causaTxt; S.red = '';
+    const F = AS.facturaId ? facturaCtx() : null; if(!F || F.manual) return {F: null};
+    const X = fiscal(F), alb = AS.albId ? (documentosRealesById || {})[AS.albId] : null;
+    if(alb){ S.op.fuente = 'alb'; S.op.base = fmtIn(baseAlb(alb)); S.op.parte = alb.client || ''; S.op.ref = alb.num || alb.numero || ''; S.op.sentido = 'nosotros'; S.op.real = true; if(!AS.ivaEdit) S.op.iva = String(Number(alb.ivaPct) || 21); }
+    else { S.op.base = ''; S.op.fuente = ''; S.op.parte = ''; S.op.ref = ''; }
+    const b0 = base0(F, X);
+    if(AS.correcto == null) return {F, X, alb, b0, falta: true};
+    const noRect = AS.causaTipo === 'ninguna', C = noRect ? F.base : r2(Math.min(F.base, Math.max(0, AS.correcto))), r = F.isp ? 0 : F.ivaPct / 100;
+    const sR = sim('B', F, X, {Bf: C}), sC = alb ? sim('C', F, X, {Bf: C}) : sR, v = viab(alb ? 'C' : 'B', F);
+    const dBase = r2(F.base - C), dIva = r2(dBase * r), newIva = r2(C * r);
+    return {F, X, alb, b0, C, noRect, v, sR, sC, dBase, dIva, dTot: r2(dBase + dIva), newIva, newTot: r2(C + newIva), R: sR.weOwe, A: alb ? sC.T2 : 0, P: sC.P,
+      ivaR: r2(sR.ivaNeta - b0.ivaNeta), irpfR: r2(sR.att - b0.att), ivaA: r2(sC.ivaNeta - sR.ivaNeta), irpfA: r2(sC.att - sR.att)};
+  }
+  async function abrirAsesor(){
+    css(); AS.on = true;
+    if(!root){ root = document.createElement('div'); root.id = 'aju-app'; document.body.appendChild(root);
+      root.addEventListener('input', ev => { const k = ev.target.getAttribute && ev.target.getAttribute('data-k'); if(k) cambia(k, ev.target, false); });
+      root.addEventListener('change', ev => { const k = ev.target.getAttribute && ev.target.getAttribute('data-k'); if(k) cambia(k, ev.target, true); });
+      root.addEventListener('click', ev => { const b = ev.target.closest && ev.target.closest('[data-act]'); if(b) accion(b.getAttribute('data-act'), b, ev); });
+    }
+    root.style.display = 'block'; document.body.style.overflow = 'hidden'; sheet = null;
+    root.innerHTML = '<div class="aju-in"><p style="padding:30px 0;color:var(--ink-soft)">Consultando facturas y datos fiscales…</p></div>';
+    try{ if(typeof impCargarPagos === 'function' && !_impPagosCargados) await impCargarPagos(); }catch(e){}
+    try{ if(typeof _docsListos !== 'undefined' && !_docsListos) await new Promise(res => { const t = setTimeout(res, 25000); document.addEventListener('exg-docs-listos', () => { clearTimeout(t); res(); }, {once: true}); }); }catch(e){}
+    if(!AS.texto){ try{ AS.texto = localStorage.getItem('aju_texto') || ''; }catch(e){} if(!AS.texto) AS.texto = TEXTO0; }
+    _fisc = null; asParse(); asPintar();
+  }
+  A.abrir = abrirAsesor;
+  function asPintar(){
+    root.innerHTML = '<div class="aju-top"><b>Asesor de ajustes</b><button type="button" class="btn sm" data-act="cerrar">Cerrar</button></div><div class="aju-in">'
+      + '<h4>Problema</h4><textarea data-k="as.texto" rows="5" class="as-tx">' + esc(AS.texto) + '</textarea><div id="as-chips"></div>'
+      + '<h4>Solución</h4><div id="as-sol"></div><h4>Resultado</h4><div id="as-res"></div>'
+      + '<div class="aju-btns"><button type="button" class="btn" data-act="det">Ver cómo se ha calculado</button></div><div class="aju-btns two"><button type="button" class="btn" data-act="guardar">Guardar</button><button type="button" class="btn" data-act="sav">Guardadas</button></div></div><div id="aju-sheet"></div>';
+    asRender();
+  }
+  function asRender(sinChips){
+    const c = asCalc(), $ = id => document.getElementById(id);
+    if(!sinChips && $('as-chips')) $('as-chips').innerHTML = asChips(c);
+    if($('as-sol')) $('as-sol').innerHTML = asSol(c);
+    if($('as-res')) $('as-res').innerHTML = asRes(c);
+    if(sheet) pintarSheet();
+  }
+  function asChips(c){
+    const L = facturas(), AL = albaranes();
+    const optF = L.map(d => '<option value="' + d.id + '"' + (AS.facturaId === d.id ? ' selected' : '') + '>' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 20) + ' · ' + eur(d.total)) + '</option>').join('');
+    const optA = '<option value="">— ninguna —</option>' + AL.map(d => '<option value="' + d.id + '"' + (AS.albId === d.id ? ' selected' : '') + '>' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 20) + ' · ' + eur(baseAlb(d))) + '</option>').join('');
+    if(!c.F) return '<div class="aju-warn">No sé a qué factura te refieres. ¿Cuál es?</div><select data-k="as.fac"><option value="">Elegir factura…</option>' + optF + '</select>';
+    const F = c.F; let h = '<div class="as-ent"><div><b>Factura ' + esc(F.num) + '</b> · ' + esc(nm(F.client)) + ' · ' + (F.cobrado >= F.total - 0.005 ? 'cobrada ' : 'cobrado ') + eur(F.cobrado) + ' de ' + eur(F.total) + '</div>'
+      + (c.alb ? '<div><b>Albarán ' + esc(S.op.ref) + '</b> · ' + esc(nm(S.op.parte)) + ' · ' + eur(num(S.op.base)) + ' sin IVA</div>' : '<div class="aju-note" style="margin:0">Sin albarán ni otra factura.</div>') + '</div>';
+    h += '<details class="aju-det"><summary>Cambiar factura o albarán</summary><label class="aju-f"><span>Factura</span><select data-k="as.fac">' + optF + '</select></label><label class="aju-f"><span>Albarán o trabajo pendiente de facturar</span><select data-k="as.alb">' + optA + '</select></label></details>';
+    const q = [];
+    if(c.falta){
+      const ab = c.alb ? num(S.op.base) : 0;
+      q.push('<div class="as-q"><b>¿Qué importe sin IVA debería tener la factura de ' + esc(prim(F.client)) + '?</b><div class="as-bt">'
+        + (c.alb && ab > 0 && ab < F.base ? '<button type="button" class="btn" data-act="as-c" data-v="' + r2(F.base - ab) + '">Quitar los ' + eur(ab) + ' del trabajo de ' + esc(prim(S.op.parte)) + ' → ' + eur(F.base - ab) + '</button>' : '')
+        + '<button type="button" class="btn" data-act="as-c" data-v="0">Anularla entera → 0 €</button></div>'
+        + '<div class="aju-row" style="margin-top:6px"><label class="aju-f"><span>Otro importe (sin IVA)</span><input data-k="as.otro" inputmode="decimal" autocomplete="off"></label></div></div>');
+    }else{
+      q.push('<div class="aju-note" style="margin:6px 0">Importe correcto de la factura: <b>' + eur(c.C) + '</b> sin IVA <a href="#" data-act="as-reset" style="color:var(--ink,#222)">cambiar</a></div>');
+    }
+    q.push('<label class="aju-f"><span>¿Por qué es errónea? (causa real)</span><select data-k="as.causa"><option value="">Elegir causa…</option>' + CAUSAS.map(x => '<option value="' + x[0] + '"' + (AS.causaTipo === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label>'
+      + (AS.causaTipo && AS.causaTipo !== 'ninguna' ? '<label class="aju-f"><span>Detalle' + (AS.causaTipo === 'otro' ? '' : ' (opcional)') + '</span><input type="text" data-k="as.causaTxt" maxlength="120" value="' + esc(AS.causaTxt) + '" placeholder="Qué ocurrió"></label>' : ''));
+    return h + q.join('');
+  }
+  function asSol(c){
+    if(!c.F) return '<p class="aju-note">Primero dime de qué factura se trata.</p>';
+    if(c.falta) return '<p class="aju-note">Responde la pregunta de arriba y te digo qué hacer.</p>';
+    const F = c.F, cl = nm(F.client), pa = nm(S.op.parte), p = (n, t, b) => '<div class="as-paso"><div class="t"><span class="n">' + n + '</span>' + t + '</div>' + b + '</div>', l = (a, b) => '<div class="aju-l"><span>' + a + '</span><span>' + b + '</span></div>';
+    let h = '';
+    if(c.noRect){
+      h += '<div class="aju-warn"><b>Sin causa real no se puede rectificar.</b> La factura de ' + esc(prim(F.client)) + ' se queda como está. Si hay un error real, documéntalo antes de rectificar.</div>';
+    }else{
+      h += p(1, 'Rectificativa a ' + esc(prim(F.client)), l('Rectificar de la factura ' + esc(F.num), 'base −' + eur(c.dBase) + ' · IVA −' + eur(c.dIva)) + l('Debe quedar facturado', '<b>' + eur(c.C) + '</b> + IVA ' + eur(c.newIva) + ' = <b>' + eur(c.newTot) + '</b>'));
+    }
+    if(c.alb){
+      h += p(c.noRect ? 1 : 2, 'Factura a ' + esc(prim(S.op.parte)), l('Por el albarán ' + esc(S.op.ref), '<b>' + eur(c.sC.B2) + '</b> + IVA ' + eur(c.sC.IVA2) + ' = <b>' + eur(c.sC.T2) + '</b>')
+        + '<div class="aju-note" style="margin:2px 0 0">IVA del ' + (AS.ivaEdit ? '<input data-k="op.iva" inputmode="decimal" value="' + esc(S.op.iva) + '" style="width:56px;padding:3px 6px;display:inline-block"> %' : esc(S.op.iva) + ' % (el del albarán) <a href="#" data-act="as-iva" style="color:var(--ink,#222)">cambiar</a>') + '</div>');
+    }
+    const n = (c.noRect ? 1 : 1) + (c.noRect ? 0 : 1) + (c.alb ? 1 : 0);
+    let din = '';
+    if(c.R > 0.004) din += l('Devolver a ' + esc(prim(F.client)), '<b class="r">' + eur(c.R) + '</b>');
+    if(c.sR.cobrar > 0.004) din += l(esc(prim(F.client)) + ' todavía debe', '<b class="g">' + eur(c.sR.cobrar) + '</b>');
+    if(c.A > 0.004) din += l(esc(prim(S.op.parte)) + ' debe pagar', '<b class="g">' + eur(c.A) + '</b>');
+    if(!din) din = '<div class="aju-note" style="margin:0">No hay dinero que devolver ni cobrar.</div>';
+    if(c.alb && c.R > 0.004 && c.A > 0.004){
+      const mism = norm(S.op.parte) === norm(F.client);
+      din += '<div class="aju-note" style="margin-top:6px">' + (mism ? 'Es la misma persona: se puede compensar directamente una deuda con la otra.' : '<b>Compensación:</b> ' + esc(prim(F.client)) + ' y ' + esc(prim(S.op.parte)) + ' son personas distintas, así que la ley no compensa estas deudas por sí sola. Se puede hacer con un acuerdo escrito de los tres: la devolución de ' + esc(prim(F.client)) + ' se aplica a la deuda de ' + esc(prim(S.op.parte)) + '. Confírmalo con el gestor.') + '</div>'
+        + '<div class="aju-l"><span>' + (mism ? 'Compensando' : 'Con ese acuerdo') + '</span><span><b>' + (Math.abs(c.P) < 0.05 ? 'no hace falta mover dinero' : c.P > 0 ? esc(prim(S.op.parte)) + ' paga ' + eur(c.P) : 'devolvemos ' + eur(-c.P) + ' a ' + esc(prim(F.client))) + '</b></span></div>';
+    }
+    h += p(n, 'Dinero', din);
+    if(c.X && c.X.qAplica) h += '<p class="aju-note">Las facturas se declaran en el 303 y el 130 del ' + c.X.qAplica + 'T ' + F.anio + ' (el trimestre abierto en que se emiten).</p>';
+    return h;
+  }
+  function asRes(c){
+    if(!c.F || c.falta) return '<p class="aju-note">Pendiente de calcular.</p>';
+    const F = c.F, X = c.X, dN = r2(c.sC.neto - c.b0.neto), ir = x => X.ok ? sgn(x) + eur(Math.abs(x)) : 'Pendiente';
+    const row = (a, b, cl, big) => '<div class="l' + (big ? ' big' : '') + '"><span>' + a + '</span><b class="' + (cl || '') + '">' + b + '</b></div>';
+    const efecto = r2(c.ivaR + c.ivaA + (X.ok ? c.irpfR + c.irpfA : 0));
+    let h = '<div class="aju-v ' + c.v.k + '"><b>' + c.v.txt + '</b>' + (c.v.motivos.length ? ' · ' + esc(c.v.motivos.join(' · ')) : '') + '</div>';
+    h += '<div class="aju-cmpb">' + row('Queda en la empresa, tras impuestos', eur(c.sC.neto), '', true) + row('Hoy, lo cobrado de ' + esc(prim(F.client)) + ' tras impuestos', eur(c.b0.neto)) + row('Diferencia', Math.abs(dN) < 0.05 ? 'Sin pérdida' : sgn(dN) + eur(Math.abs(dN)), Math.abs(dN) < 0.05 ? 'g' : dN > 0 ? 'g' : 'r', true) + '</div>';
+    if(Math.abs(dN) >= 0.05) h += '<p class="aju-note">' + (dN < 0 ? 'La empresa deja de ingresar ' + eur(-dN) + ' netos: es la parte de la factura que no correspondía.' : 'La empresa gana ' + eur(dN) + ' netos más que hoy.') + '</p>';
+    h += '<div class="aju-grp">Impuestos <i class="aju-tag est">estimado</i></div><div class="aju-cmpb">'
+      + (c.noRect ? '' : row('Rectificativa · IVA / IRPF (130)', sgn(c.ivaR) + eur(Math.abs(c.ivaR)) + ' / ' + ir(c.irpfR)))
+      + (c.alb ? row('Factura de ' + esc(prim(S.op.parte)) + ' · IVA / IRPF', sgn(c.ivaA) + eur(Math.abs(c.ivaA)) + ' / ' + ir(c.irpfA)) : '')
+      + row('Efecto fiscal total', sgn(efecto) + eur(Math.abs(efecto)), '', true) + '</div>';
+    if(X.pend.length) h += '<p class="aju-note">Impuestos estimados: faltan datos (no hay 303 registrado, etc.). Detalle en «Ver cómo se ha calculado».</p>';
+    if(!X.ok) h += '<p class="aju-note">Sin IRPF: no hay trimestre abierto donde calcularlo.</p>';
+    return h;
+  }
+  function asDetalle(){
+    const c = asCalc(); if(!c.F || c.falta) return '<p class="aju-note">Falta información para calcular.</p>';
+    return detalles(c.F, c.X, c.sC, c.b0);
+  }
+  function asCambia(k, el, fin){
+    const v = el.type === 'checkbox' ? el.checked : el.value;
+    if(k === 'as.texto'){ AS.texto = v; try{ localStorage.setItem('aju_texto', v); }catch(e){} clearTimeout(_asT); _asT = setTimeout(() => { asParse(); asRender(); }, 500); return; }
+    if(k === 'as.fac'){ if(!v) return; AS.facturaId = v; _fisc = null; AS.correcto = null; AS.corrSrc = ''; asRender(); return; }
+    if(k === 'as.alb'){ AS.albId = v; AS.ivaEdit = false; asRender(); return; }
+    if(k === 'as.causa'){ AS.causaTipo = v; asRender(); return; }
+    if(k === 'as.causaTxt'){ AS.causaTxt = v; asRender(true); return; }
+    if(k === 'as.otro'){ if(fin && String(v).trim()){ AS.correcto = Math.max(0, num(v)); AS.corrSrc = 'boton'; asRender(); } return; }
+    if(k === 'op.iva'){ S.op.iva = v; if(fin) asRender(true); else { const F = asF(); if(F){ const c = asCalc(); const r = document.getElementById('as-res'); if(r) r.innerHTML = asRes(c); } } return; }
+    if(k === 'irpfAnual'){ S.irpfAnual = v; if(fin){ asRender(true); } return; }
+  }
+  function asAccion(a, b, ev){
+    if(a === 'cerrar') cerrar();
+    else if(a === 'as-c'){ AS.correcto = num(b.getAttribute('data-v')); AS.corrSrc = 'boton'; asRender(); }
+    else if(a === 'as-reset'){ if(ev) ev.preventDefault(); AS.correcto = null; AS.corrSrc = ''; asRender(); }
+    else if(a === 'as-iva'){ if(ev) ev.preventDefault(); AS.ivaEdit = true; asRender(true); }
+    else if(a === 'det' || a === 'sav'){ sheet = a; pintarSheet(); }
+    else if(a === 'sheet0'){ sheet = null; pintarSheet(); }
+    else if(a === 'guardar') asGuardar();
+    else if(a === 'cargar') asCargar(b.getAttribute('data-id'));
+    else if(a === 'borrar') borrar(b.getAttribute('data-id'));
+  }
+  function asSheet(sh){
+    if(!sheet){ sh.style.display = 'none'; sh.innerHTML = ''; return; }
+    const tit = sheet === 'det' ? 'Cómo se ha calculado' : 'Casos guardados';
+    const body = sheet === 'det' ? asDetalle() : '<button type="button" class="btn" style="width:100%;padding:14px;margin:12px 0" data-act="guardar">Guardar este caso</button><div id="aju-guardadas"></div>';
+    sh.innerHTML = '<div class="aju-top"><b>' + tit + '</b><button type="button" class="btn sm" data-act="sheet0">Volver</button></div><div class="aju-in">' + body + '</div>';
+    sh.style.display = 'block'; if(sheet === 'sav') pintarGuardadas();
+  }
+  async function asGuardar(){
+    const F = asF(), nombre = (window.prompt('Nombre del caso', F ? F.client + ' · factura ' + F.num : 'Caso') || '').trim(); if(!nombre) return;
+    const st = JSON.parse(JSON.stringify(AS)); delete st.on;
+    try{ const {error} = await sb.from('sistema').insert({tipo: 'simulacion_ajuste', data: {nombre, estado: 'guardada', estado_calc: {asesor: st}}}); if(error) throw error; _guardadas = null; if(sheet === 'sav') pintarGuardadas(); if(typeof mostrarToast === 'function') mostrarToast('Caso guardado', 'ok'); }
+    catch(e){ if(typeof mostrarToast === 'function') mostrarToast('No se pudo guardar', 'err'); }
+  }
+  function asCargar(id){ const r = (_guardadas || []).find(x => x.id === id), st = r && r.data && r.data.estado_calc && r.data.estado_calc.asesor; if(!st) return; Object.assign(AS, st, {on: true}); _fisc = null; sheet = null; asPintar(); root.scrollTo({top: 0}); }
 
   A._test = {sim, base0, viab, resolver, fiscal, facturaCtx, get S(){ return S; }, set S(v){ S = v; }, nuevoEstado, num};
 })();
