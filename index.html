@@ -1212,6 +1212,7 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .c3-ht b{display:block;font-size:18px;font-weight:800;}
 .c3-ht span{font-size:12.5px;color:var(--ink-soft);}
 .c3-fechas{font-size:13.5px;margin:6px 0 12px;}
+.c3-qp{margin-left:8px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:3px 10px;font-size:13px;font-weight:700;}
 .c3-step{display:flex;align-items:center;justify-content:center;gap:18px;margin:6px 0 14px;}
 .c3-step button{all:unset;cursor:pointer;width:64px;height:64px;border-radius:50%;background:var(--asphalt);color:#fff;font-size:34px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:transform .1s;}
 .c3-step button:active{transform:scale(.9);}
@@ -4620,10 +4621,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.04" defer></script>
-<script src="costes/norm.js?v=V10.04" defer></script>
+<script src="rentabilidad/rent.js?v=V10.05" defer></script>
+<script src="costes/norm.js?v=V10.05" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.04</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.05</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4775,7 +4776,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.04</div>
+        <div class="sub" id="version-badge">V10.05</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4930,7 +4931,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
           </div>
         </div>
         <div class="lista-movil-solo" onclick="togglePanelCC('documentos')" style="cursor:pointer;padding:10px 14px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;justify-content:space-between;">
-          <div style="font-weight:700;font-size:15px;"><span id="documentos-chevron-m" style="color:var(--ink-soft);font-size:14px;margin-right:6px;">▾</span>📑 Documentos pendientes <span id="control-docs-count-m" style="font-size:12px;color:var(--ink-soft);font-weight:400;"></span><div id="control-docs-resumen-m" style="font-size:12px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:2px;"></div></div>
+          <div style="font-weight:700;font-size:15px;"><span id="documentos-chevron-m" style="color:var(--ink-soft);font-size:14px;margin-right:6px;">▾</span>📑 Documentos pendientes <span id="control-docs-count-m" style="font-size:12px;color:var(--ink-soft);font-weight:400;"></span><div id="control-docs-resumen-m" style="margin-top:4px;font-weight:400;"></div></div>
           <div style="display:flex;gap:6px;align-items:center;">
             <button type="button" class="cli-icon-btn" onclick="event.stopPropagation();toggleCCDocBuscador()" title="Buscar"><svg width="15" height="15" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="4.5" stroke="currentColor" stroke-width="1.7"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
           </div>
@@ -8884,7 +8885,7 @@ document.addEventListener('click', e => {
 // no me ayudan; quiero ver los días libres y los trabajos sin día, y arrastrarlos o darles un día, añadirlos y quitarlos») =====
 // Cada trabajo pendiente tiene plan.fecha (día en que empieza) o no tiene día y está en «Sin día». Ocupa tantos días laborables como su
 // duración (+ los días de más). Se pone día arrastrando la tarjeta (mantener pulsado) o tocándola y luego tocando el día. Sin equipos
-let _c3Mes = 0, _c3Colocar = null, _c3Arr = null;
+let _c3Mes = 0, _c3Colocar = null, _c3Arr = null, _c3Reanud = null;
 const c3Dias = j => { const h = tbDurHoras(j.duracion); return Math.max(1, Math.ceil(((h == null ? 8 : h) / 8 + ((j.plan && j.plan.extra) || 0)) - 1e-9)); };
 // V8.06 (reporte de Daniel): sábados y domingos salen en el calendario. Normalmente vacíos; un trabajo puede empezar en fin de semana (sueltos,
 // mantenimientos) o sumar un fin de semana suelto en mitad (plan.findes = días trabajados de más, cuentan como días del trabajo)
@@ -8894,9 +8895,9 @@ function c3Ocupa(j){ if(!j.plan || !j.plan.fecha) return []; const out = [], F =
 const c3Cola = () => (_tbJobs || []).filter(j => C2_ESTADOS.includes(j.estado));
 const c3Sin = () => c3Cola().filter(j => !j.plan || !j.plan.fecha).sort((a, b) => c2Prio(a) - c2Prio(b) || a.orden - b.orden);
 // V9.99 (Daniel: «lo de Rafa Sánchez sigue abierto pero no estamos allí: que en el calendario salga en pausa, con una línea más chiquitita el tiempo que está en pausa»)
-function c3Pausas(){ const m = {}, hoy = c2Iso(new Date());
+function c3Pausas(){ const m = {}, hoy = c2Iso(new Date()), tope = c2Iso(new Date(Date.now() + 120 * 86400000));
   c3Cola().forEach(j => { if(!j.plan || !j.plan.fecha) return; const o = c3Ocupa(j), add = iso => { (m[iso] = m[iso] || []).push(j); };
-    if(j.plan.pausa_desde){ const d = new Date(j.plan.pausa_desde + 'T00:00'); let g = 0; while(c2Iso(d) <= hoy && g++ < 400){ add(c2Iso(d)); d.setDate(d.getDate() + 1); } return; }
+    if(j.plan.pausa_desde){ const d = new Date(j.plan.pausa_desde + 'T00:00'); let g = 0; while(c2Iso(d) <= tope && g++ < 500){ add(c2Iso(d)); d.setDate(d.getDate() + 1); } return; }
     if(!o.length) return; (j.plan.saltar || []).forEach(iso => { if(iso > o[0] && iso < o[o.length - 1]) add(iso); }); });
   return m; }
 function c3PausaHtml(iso, COL, PAU){ const d = new Date(iso + 'T00:00'), dw = d.getDay(), ant = new Date(d), sig = new Date(d); ant.setDate(d.getDate() - 1); sig.setDate(d.getDate() + 1);
@@ -8955,6 +8956,7 @@ function c3Pintar(){
   app.innerHTML = `
     ${preg ? `<div class="c3-q"><small>Pregunta del día</small><h2>¿Terminasteis ${escHtml(c3Nom(preg))}${preg.trabajo && preg.cliente ? ' · ' + escHtml(tbMay(preg.trabajo)) : ''}?</h2>
       <div class="c2-bt"><button type="button" class="si" data-c3-fin="${preg.id}">Sí, terminado</button>${[[1, '+1 día'], [2, '+2 días'], [5, '+1 semana']].map(([n, t]) => `<button type="button" data-c3-mas="${n}" data-id="${preg.id}">${t}</button>`).join('')}</div></div>` : ''}
+    ${_c3Reanud ? `<div class="c3-col">Toca el día en que se reanuda <b>${escHtml(c3Nom(_tbJobs.find(j => j.id === _c3Reanud) || {}))}</b><button type="button" data-c3-cancelar>Cancelar</button></div>` : ''}
     ${_c3Colocar ? `<div class="c3-col">Toca el día para <b>${escHtml(c3Nom(_tbJobs.find(j => j.id === _c3Colocar) || {}))}</b><button type="button" data-c3-cancelar>Cancelar</button></div>` : ''}
 
     <div class="c3-sem">${['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].map((t, k) => `<span${k > 5 ? ' class="fin"' : ''}>${t}</span>`).join('')}</div>
@@ -9041,14 +9043,23 @@ function c3HojaTrabajo(j){
     <div class="c3-fechas">${o.length ? `Del <b>${c2FechaTxt(o[0])}</b> al <b>${c2FechaTxt(o[o.length - 1])}</b>` : (j.plan && j.plan.pausa_desde ? 'En pausa' : 'Sin día')}</div>
     <div class="c3-step"><button type="button" data-c3-dias="-1" data-id="${j.id}" ${c3Dias(j) <= 1 ? 'disabled' : ''} aria-label="Un día menos">−</button><div><b>${c3Dias(j)}</b><span>día${c3Dias(j) === 1 ? '' : 's'}</span></div><button type="button" data-c3-dias="1" data-id="${j.id}" aria-label="Un día más">+</button></div>
     ${j.plan && j.plan.pausa_desde ? `<div class="c3-fechas">En pausa desde el <b>${c2FechaTxt(j.plan.pausa_desde)}</b> · ${c3DiasPausa(j)} día${c3DiasPausa(j) === 1 ? '' : 's'}</div>` : ''}
+    ${j.plan ? c3TramosPausa(j).map(t => `<div class="c3-fechas">Pausa ${t.desde === t.hasta ? 'el <b>' + c2FechaTxt(t.desde) + '</b>' : 'del <b>' + c2FechaTxt(t.desde) + '</b> al <b>' + c2FechaTxt(t.hasta) + '</b>'} <button type="button" class="c3-qp" data-c3-qpausa="${j.id}" data-d="${t.desde}" data-h="${t.hasta}">Quitar</button></div>`).join('') : ''}
     <div class="c3-hb3"><button type="button" class="si" data-c3-fin="${j.id}">Terminado</button><button type="button" data-c3-quitar="${j.id}">Quitar del calendario</button>${j.plan && j.plan.pausa_desde ? `<button type="button" data-c3-reanudar="${j.id}">Reanudar</button>` : (o.length && o[0] <= c2Iso(new Date()) ? `<button type="button" data-c3-pausar="${j.id}">Poner en pausa</button>` : '')}</div>
     <button type="button" class="c2-ok gris" data-c2-cerrar="1">Listo</button>`);
 }
 function c3DiasPausa(j){ const hoy = c2Iso(new Date()); let n = 0; const d = new Date(j.plan.pausa_desde + 'T00:00'), g = {n: 0}; while(c2Iso(d) <= hoy && g.n++ < 400){ if(c2Laborable(d)) n++; d.setDate(d.getDate() + 1); } return n; }
 function c3Pausar(j){ _c2Deshacer = c2Foto(); const o = c3Ocupa(j), hoy = c2Iso(new Date()); const ult = o[o.length - 1];
   j.plan = {...j.plan, pausa_desde: (ult && ult < hoy) ? c3MoverLab(ult, 1) : hoy}; c2Guardar([j]); c2Cerrar(); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))} en pausa desde el ${c2FechaTxt(j.plan.pausa_desde)}.`); }
-function c3Reanudar(j){ _c2Deshacer = c2Foto(); const hoy = c2Iso(new Date()), salto = []; const d = new Date(j.plan.pausa_desde + 'T00:00'); let g = 0; while(c2Iso(d) < hoy && g++ < 400){ salto.push(c2Iso(d)); d.setDate(d.getDate() + 1); }
-  const p = {...j.plan}; delete p.pausa_desde; p.saltar = [...new Set([...(p.saltar || []), ...salto])]; j.plan = p; c2Guardar([j]); c2Cerrar(); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))} reanudado.`); }
+function c3Reanudar(j){ _c3Reanud = j.id; c2Cerrar(); c3Pintar(); window.scrollTo({top: 0, behavior: 'smooth'}); }
+function c3ReanudarEn(j, iso){
+  if(!j.plan || !j.plan.pausa_desde) { _c3Reanud = null; return; }
+  if(iso <= j.plan.pausa_desde){ c2Aviso('Toca un día posterior a la pausa.'); return; }
+  _c2Deshacer = c2Foto(); const salto = [], d = new Date(j.plan.pausa_desde + 'T00:00'); let g = 0; while(c2Iso(d) < iso && g++ < 500){ salto.push(c2Iso(d)); d.setDate(d.getDate() + 1); }
+  const p = {...j.plan}; delete p.pausa_desde; p.saltar = [...new Set([...(p.saltar || []), ...salto])]; j.plan = p; _c3Reanud = null; c2Guardar([j]); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))} reanuda el ${c2FechaTxt(iso)}.`); }
+// pausas hechas dentro del trabajo (días saltados entre el primer y el último día): tramos seguidos, para poder quitarlos uno a uno
+function c3TramosPausa(j){ const o = c3Ocupa(j); if(!o.length) return []; const dias = [...new Set(j.plan.saltar || [])].filter(x => x > o[0] && x < o[o.length - 1]).sort(), out = [];
+  dias.forEach(x => { const u = out[out.length - 1]; let seguido = false; if(u){ const d = new Date(u.hasta + 'T00:00'); d.setDate(d.getDate() + 1); let g = 0; while(c2Iso(d) < x && !c2Laborable(d) && g++ < 10) d.setDate(d.getDate() + 1); seguido = c2Iso(d) === x; } if(seguido) u.hasta = x; else out.push({desde: x, hasta: x}); });
+  return out; }
 function c3Terminar(j){
   _c2Deshacer = c2Foto(); j.estado = 'Albarán'; j.terminado_at = new Date().toISOString(); c2Guardar([j]); c2Cerrar(); c3Pintar();
   c2Aviso(`${escHtml(c3Nom(j))} terminado: pasa a «Albarán».`);
@@ -9132,6 +9143,7 @@ document.addEventListener('click', e => {
     const mv = t.closest('[data-c3-mover]'); if(mv){ _c3Colocar = mv.dataset.c3Mover; c2Cerrar(); c3Pintar(); window.scrollTo({top: 0, behavior: 'smooth'}); return; }
     const pz = t.closest('[data-c3-pausar]'); if(pz){ const j = jOf(pz.dataset.c3Pausar); if(j) c3Pausar(j); return; }
     const rz = t.closest('[data-c3-reanudar]'); if(rz){ const j = jOf(rz.dataset.c3Reanudar); if(j) c3Reanudar(j); return; }
+    const qp = t.closest('[data-c3-qpausa]'); if(qp){ const j = jOf(qp.dataset.c3Qpausa); if(!j) return; _c2Deshacer = c2Foto(); const a = qp.dataset.d, b = qp.dataset.h; j.plan = {...j.plan, saltar: (j.plan.saltar || []).filter(x => x < a || x > b)}; c2Guardar([j]); c3Pintar(); c3HojaTrabajo(j); return; }
     const q = t.closest('[data-c3-quitar]'); if(q){ const j = jOf(q.dataset.c3Quitar); if(!j) return; _c2Deshacer = c2Foto(); j.plan = {...(j.plan || {}), fecha: null}; c2Guardar([j]); c2Cerrar(); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))} vuelve a «Sin día».`); return; }
     const dd = t.closest('[data-c3-dias]'); if(dd){ const j = jOf(dd.dataset.id); if(!j) return; const n = Number(dd.dataset.c3Dias); if(n < 0 && c3Dias(j) <= 1) return;
       if(!_c2Deshacer || dd.dataset.primero !== '0') _c2Deshacer = c2Foto();
@@ -9145,15 +9157,15 @@ document.addEventListener('click', e => {
   }
   if(!t.closest('#cal3-app')) return;
   const mes = t.closest('[data-c3-mes]'); if(mes){ const v = Number(mes.dataset.c3Mes); _c3Mes = v === 0 ? 0 : _c3Mes + v; c3Pintar(); return; }
-  if(t.closest('[data-c3-cancelar]')){ _c3Colocar = null; c3Pintar(); return; }
+  if(t.closest('[data-c3-cancelar]')){ _c3Colocar = null; _c3Reanud = null; c3Pintar(); return; }
   if(t.closest('[data-c3-auto]')){ c3Auto(); return; }
   if(t.closest('[data-c3-nuevo]')){ _c2Nuevo = {cliente: '', trabajo: '', flota: ['mixta'], duracion: '1D', prioridad: 'Media', c3: true}; c2HojaNuevo(); return; }
   const f = t.closest('[data-c3-fin]'); if(f){ const j = jOf(f.dataset.c3Fin); if(j) c3Terminar(j); return; }
   const m = t.closest('[data-c3-mas]'); if(m){ const j = jOf(m.dataset.id); if(j) c3Mas(j, Number(m.dataset.c3Mas)); return; }
   const c = t.closest('[data-c3-card]'); if(c){ _c3Colocar = _c3Colocar === c.dataset.c3Card ? null : c.dataset.c3Card; c3Pintar(); if(_c3Colocar) window.scrollTo({top: 0, behavior: 'smooth'}); return; }
-  const pau = t.closest('[data-c3-pausa]'); if(pau && !_c3Colocar){ const j = jOf(pau.dataset.c3Pausa); if(j) c3HojaTrabajo(j); return; }
-  const chip = t.closest('[data-c3-chip]'); if(chip && !_c3Colocar){ const j = jOf(chip.dataset.c3Chip); if(j) c3HojaTrabajo(j); return; }
-  const d = t.closest('[data-c3-dia]'); if(d){ if(_c3Colocar){ const j = jOf(_c3Colocar); if(j) c3PonerPreguntando(j, d.dataset.c3Dia); return; } c3HojaDia(d.dataset.c3Dia); }
+  const pau = t.closest('[data-c3-pausa]'); if(pau && !_c3Colocar && !_c3Reanud){ const j = jOf(pau.dataset.c3Pausa); if(j) c3HojaTrabajo(j); return; }
+  const chip = t.closest('[data-c3-chip]'); if(chip && !_c3Colocar && !_c3Reanud){ const j = jOf(chip.dataset.c3Chip); if(j) c3HojaTrabajo(j); return; }
+  const d = t.closest('[data-c3-dia]'); if(d){ if(_c3Reanud){ const j = jOf(_c3Reanud); if(j) c3ReanudarEn(j, d.dataset.c3Dia); return; } if(_c3Colocar){ const j = jOf(_c3Colocar); if(j) c3PonerPreguntando(j, d.dataset.c3Dia); return; } c3HojaDia(d.dataset.c3Dia); }
 }, true);
 // ===== V8.01 FLOTA › ASISTENCIA (Daniel 04/10/2026: «el teléfono de asistencia en carretera de cada seguro, para una avería o lo que sea»)
 // Datos en Sistema (tipo=asistencia_seguros): teléfonos de cada aseguradora y qué seguro lleva cada vehículo (con fechas si cambia). Un toque llama
@@ -13577,6 +13589,38 @@ function togglePanelCC(panel){
   const servidor = () => { if(typeof sb === 'undefined' || !sb) return setTimeout(servidor, 800);
     sb.from('filtros_persistentes').select('container_id,valor').in('container_id', ['cc-panel-alertas', 'cc-panel-pagos', 'cc-panel-notif', 'cc-panel-documentos']).then(({data}) => (data || []).forEach(f => { const p = f.container_id.replace('cc-panel-', ''); try{ localStorage.setItem(f.container_id, f.valor); }catch(e){} ccPanelPoner(p, f.valor === '1'); })); };
   setTimeout(servidor, 500);
+})();
+
+// V10.05 (Daniel: «botón de plegar en Documentos · Facturas, igual que en el Centro de control»): facturas, albaranes, presupuestos y gastos
+// se pliegan dejando solo la fila de Revisar/Buscar/Filtros; el estado se recuerda en el móvil y en la base, como los paneles del Centro de control
+(function docPanelesPlegar(){
+  const css = document.createElement('style');
+  css.textContent = '.panel.pleg-doc > :not(.panel-head){display:none !important}.panel.pleg-doc > .panel-head > :not(.dd-filter-row-compacta){display:none !important}.pleg-doc-btn{font-size:15px;line-height:1;padding:0 9px;min-width:34px}';
+  document.head.appendChild(css);
+  const claveDe = h => h.id ? h.id.replace('-panel-head', '') : ((h.parentElement.parentElement.closest('[id]') || {}).id || null);
+  const claves = [];
+  const poner = (panel, plegado, btn) => { panel.classList.toggle('pleg-doc', plegado); if(btn) btn.textContent = plegado ? '▸' : '▾'; };
+  const iniciar = () => document.querySelectorAll('.panel > .panel-head').forEach(head => {
+    const fila = head.querySelector(':scope > .dd-filter-row-compacta'); if(!fila || fila.querySelector('.pleg-doc-btn')) return;
+    const clave = claveDe(head); if(!clave) return;
+    const panel = head.parentElement, btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'cli-icon-btn pleg-doc-btn'; btn.title = 'Plegar o desplegar'; btn.setAttribute('aria-label', 'Plegar o desplegar');
+    fila.insertBefore(btn, fila.firstChild); claves.push(clave);
+    let v = null; try{ v = localStorage.getItem('doc-panel-' + clave); }catch(e){}
+    poner(panel, v === '0', btn);
+    btn.addEventListener('click', () => {
+      const plegar = !panel.classList.contains('pleg-doc'); poner(panel, plegar, btn);
+      try{ localStorage.setItem('doc-panel-' + clave, plegar ? '0' : '1'); }catch(e){}
+      try{ if(sb) sb.from('filtros_persistentes').upsert({container_id: 'doc-panel-' + clave, valor: plegar ? '0' : '1'}, {onConflict: 'container_id'}).then(()=>{}); }catch(e){}
+    });
+  });
+  const servidor = () => { if(typeof sb === 'undefined' || !sb) return setTimeout(servidor, 800);
+    sb.from('filtros_persistentes').select('container_id,valor').like('container_id', 'doc-panel-%').then(({data}) => (data || []).forEach(f => {
+      const clave = f.container_id.replace('doc-panel-', ''); try{ localStorage.setItem(f.container_id, f.valor); }catch(e){}
+      document.querySelectorAll('.panel > .panel-head').forEach(h => { const b = h.querySelector('.pleg-doc-btn'); if(!b) return; if(claveDe(h) === clave) poner(h.parentElement, f.valor === '0', b); });
+    })); };
+  const arrancar = () => { iniciar(); setTimeout(servidor, 500); };
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancar); else arrancar();
 })();
 
 // Avisos automáticos de ITV (flota.itv_vence = fecha hasta la que vale la última ITV favorable):
@@ -28772,7 +28816,7 @@ function renderControlDocs(){
   const sumF = sumaImp(unicos.filter(d=>bloqueDe(d)==='facturar')), sumC = sumaImp(unicos.filter(d=>bloqueDe(d)==='cobrar'));
   const resEl = document.getElementById('control-docs-resumen'), resM = document.getElementById('control-docs-resumen-m');
   if(resEl) resEl.innerHTML = `Por entregar <b>${fmtEur(sumF)}</b> · Por cobrar <b>${fmtEur(sumC)}</b> · Total <b>${fmtEur(sumF+sumC)}</b> <span style="font-weight:400;">(sin IVA)</span>`;
-  if(resM) resM.innerHTML = `Por entregar ${fmtEur(sumF)} · Por cobrar ${fmtEur(sumC)}<br>Total ${fmtEur(sumF+sumC)} (sin IVA)`;
+  if(resM) resM.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,auto);justify-content:start;column-gap:16px;"><div style="min-width:0;"><div style="font-size:11px;font-weight:600;color:var(--ink-soft);">Por entregar</div><div style="font-size:13px;font-weight:800;color:var(--ink);white-space:nowrap;">${fmtEur(sumF)}</div></div><div style="min-width:0;"><div style="font-size:11px;font-weight:600;color:var(--ink-soft);">Por cobrar</div><div style="font-size:13px;font-weight:800;color:var(--ink);white-space:nowrap;">${fmtEur(sumC)}</div></div><div style="min-width:0;"><div style="font-size:11px;font-weight:600;color:var(--ink-soft);">Total sin IVA</div><div style="font-size:13px;font-weight:800;color:var(--ink);white-space:nowrap;">${fmtEur(sumF+sumC)}</div></div></div>`;
   const visibles = unicos.slice(0, controlDocsLimite);
   const gruposVis = BLOQUES.map(([k,t])=>[k,t,visibles.filter(d=>bloqueDe(d)===k)]).filter(g=>g[2].length);
   const filaDoc = d=>`<tr onclick="openDocumentViewer('${d.id}')" style="cursor:pointer;">
