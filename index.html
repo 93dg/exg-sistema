@@ -4617,10 +4617,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.97" defer></script>
-<script src="costes/norm.js?v=V9.97" defer></script>
+<script src="rentabilidad/rent.js?v=V9.98" defer></script>
+<script src="costes/norm.js?v=V9.98" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.97</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.98</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4772,7 +4772,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.97</div>
+        <div class="sub" id="version-badge">V9.98</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8988,7 +8988,9 @@ function c3PonerPreguntando(j, iso){
 }
 function c3MeterYMover(j, iso){
   const n = c3Dias(j); _c2Deshacer = c2Foto(); const cambiados = [];
+  const oj = c3Ocupa(j), jIni = oj[0] || null, jFin = oj[oj.length - 1] || null;   // V9.97: dónde estaba; al traerlo hacia delante, lo que iba detrás de su hueco NO se mueve (si no, quedaba un hueco libre entremedias)
   c3Cola().forEach(x => { if(x === j || !x.plan || !x.plan.fecha) return; const o = c3Ocupa(x); if(!o.length || o[o.length - 1] < iso) return;
+    if(jFin && iso < jIni && x.plan.fecha > jFin) return;
     if(x.plan.fecha >= iso) x.plan = {...x.plan, fecha: c3MoverLab(x.plan.fecha, n)};   // empieza después: se mueve entero
     else { const salto = []; let d = iso; for(let k = 0; k < n; k++){ salto.push(d); d = c3MoverLab(d, 1); } x.plan = {...x.plan, saltar: [...new Set([...(x.plan.saltar || []), ...salto])]}; }   // ya empezado: se para esos días y sigue después
     cambiados.push(x); });
@@ -9068,6 +9070,7 @@ function c3Auto(){   // rellena desde mañana por prioridad, en el primer hueco 
     const j = _tbJobs.find(x => x.id === id); if(!j) return;
     if(zona && od){ _c2Deshacer = c2Foto(); j.plan = {...(j.plan || {}), fecha: null}; c2Guardar([j]); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))} vuelve a «Sin día».`); return; }
     if(!dia) return;
+    if(dia.dataset.c3Dia < c2Iso(new Date())){ c2Aviso('No se puede poner un trabajo en un día que ya pasó.'); return; }   // V9.97: caían trabajos en días pasados y todo se liaba
     if(od){ const T = dia.dataset.c3Dia, o = c3Ocupa(j), finAntes = o[o.length - 1]; if(T === od) return;
       if(!c2Laborable(new Date(T + 'T00:00'))){   // a un sábado, domingo o festivo: ese día se trabaja (cuenta como un día del trabajo)
         _c2Deshacer = c2Foto(); if(T < j.plan.fecha) j.plan.fecha = T; else j.plan = {...j.plan, findes: [...new Set([...(j.plan.findes || []), T])]};
