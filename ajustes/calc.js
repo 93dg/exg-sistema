@@ -465,7 +465,7 @@
   async function borrar(id){ if(!window.confirm('¿Borrar esta simulación?')) return; try{ const {error} = await sb.from('sistema').delete().eq('id', id); if(error) throw error; _guardadas = null; pintarGuardadas(); }catch(e){ if(typeof mostrarToast === 'function') mostrarToast('No se pudo borrar', 'err'); } }
 
   // ---------- asesor: escribe el problema y propone la solución ----------
-  const AS = {on: false, texto: '', facturaId: null, albId: '', correcto: null, corrSrc: '', causaTipo: '', causaTxt: '', ivaEdit: false};
+  const AS = {on: false, texto: '', facturaId: null, albId: '', correcto: null, corrSrc: '', causaTipo: '', causaTxt: '', ivaEdit: false, mismo: null, sinAnular: false};
   const TEXTO0 = 'Encarni nos pagó 11.243,07 € por la factura 5, que consideramos errónea. Alejandro nos debe 3.690,50 € por el albarán A22 (trabajos realizados). Quiero resolver las dos cosas sin perder dinero.';
   const nm = s => String(s || '').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
   const prim = s => nm(s).split(' ')[0];
@@ -476,19 +476,25 @@
     const t = AS.texto || '', L = facturas(), AL = albaranes();
     let m = /factura\s*(?:n[º°o.]*\s*)?([A-Za-z]{0,4}\d[\w\/-]*)/i.exec(t);
     if(m){ let c = L.filter(d => norm(d.num || d.numero) === norm(m[1])); if(c.length > 1){ const w = norm(t).split(' '); const c2 = c.filter(d => norm(d.client).split(' ').some(x => x.length > 3 && w.indexOf(x) >= 0)); if(c2.length) c = c2; } if(c.length && AS.facturaId !== c[0].id){ AS.facturaId = c[0].id; _fisc = null; } }
+    const imp = (t.match(/\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}/g) || []).map(num);
+    if(!m && imp.length){ const c = L.filter(d => imp.some(x => Math.abs(x - Number(d.total)) < 0.015)); if(c.length === 1 && AS.facturaId !== c[0].id){ AS.facturaId = c[0].id; _fisc = null; } }
+    if(imp.length && !/albar[aá]n/i.test(t)){ const a2 = AL.filter(d => imp.some(x => Math.abs(x - r2(baseAlb(d) * 1.21)) < 0.02 || Math.abs(x - Number(d.total)) < 0.015)); if(a2.length === 1 && AS.albId !== a2[0].id){ AS.albId = a2[0].id; AS.ivaEdit = false; } }
     m = /albar[aá]n\s*([A-Za-z]{0,3}\d+)/i.exec(t) || /\b(A\d{1,4})\b/.exec(t);
     if(m){ const a = AL.find(d => norm(d.num || d.numero) === norm(m[1])); if(a && AS.albId !== a.id){ AS.albId = a.id; AS.ivaEdit = false; } }
+    if(AS.mismo !== false || AS._mAuto){ const mi = /(?:para\s+ell[ao]|(?:encarni|ella)[^.]{0,40}\bnos\s+debe|nos\s+debe[^.]{0,40}\bell[ao]\b)/i.test(t); if(mi){ AS.mismo = true; AS._mAuto = true; } else if(AS._mAuto){ AS.mismo = null; AS._mAuto = false; } }
+    AS.sinAnular = /no\s+(?:podemos|se\s+puede|hay)[^.]{0,40}anula/i.test(t);
+    if(!AS.causaTipo && /(error|equivoc)/i.test(t)){ AS.causaTipo = 'error'; AS._cAuto = true; } else if(AS._cAuto && !/(error|equivoc)/i.test(t)){ AS.causaTipo = ''; AS._cAuto = false; }
     const F = asF(); let c = null, mm;
     if((mm = /(?:deb(?:e|er[ií]a)\s+ser|importe\s+correcto|correcto\s+es|real\s+es|quedar(?:se)?\s+en|dejar(?:la)?\s+en)\s*(?:de\s*)?([\d.,]+)/i.exec(t))){ c = num(mm[1]); if(/con\s+iva/i.test(t) && F) c = r2(c / (1 + (F.isp ? 0 : F.ivaPct / 100))); }
     else if((mm = /(?:descontar|rebajar|quitar|restar)\s*(?:le\s*)?(?:los|las|el|la)?\s*([\d.,]+)/i.exec(t))){ if(F) c = r2(F.base - num(mm[1])); }
-    else if(/\banul(ar|a|ada|aci[oó]n)\b|\bentera\b/i.test(t)) c = 0;
+    else if(!AS.sinAnular && /\banul(ar|a|ada|aci[oó]n)\b|\bentera\b/i.test(t)) c = 0;
     if(c != null){ AS.correcto = c; AS.corrSrc = 'texto'; } else if(AS.corrSrc === 'texto'){ AS.correcto = null; AS.corrSrc = ''; }
   }
   function asCalc(){
     S.facturaId = AS.facturaId; S.tipo = 'K'; S.causaTipo = AS.causaTipo; S.causaTxt = AS.causaTxt; S.red = '';
     const F = AS.facturaId ? facturaCtx() : null; if(!F || F.manual) return {F: null};
     const X = fiscal(F), alb = AS.albId ? (documentosRealesById || {})[AS.albId] : null;
-    if(alb){ S.op.fuente = 'alb'; S.op.base = fmtIn(baseAlb(alb)); S.op.parte = alb.client || ''; S.op.ref = alb.num || alb.numero || ''; S.op.sentido = 'nosotros'; S.op.real = true; if(!AS.ivaEdit) S.op.iva = String(Number(alb.ivaPct) || 21); }
+    if(alb){ S.op.fuente = 'alb'; S.op.base = fmtIn(baseAlb(alb)); S.op.parte = AS.mismo ? F.client : (alb.client || ''); S.op.ref = alb.num || alb.numero || ''; S.op.sentido = 'nosotros'; S.op.real = true; if(!AS.ivaEdit) S.op.iva = String(Number(alb.ivaPct) || 21); }
     else { S.op.base = ''; S.op.fuente = ''; S.op.parte = ''; S.op.ref = ''; }
     const b0 = base0(F, X);
     if(AS.correcto == null) return {F, X, alb, b0, falta: true};
@@ -534,13 +540,13 @@
     if(!c.F) return '<div class="aju-warn">No sé a qué factura te refieres. ¿Cuál es?</div><select data-k="as.fac"><option value="">Elegir factura…</option>' + optF + '</select>';
     const F = c.F; let h = '<div class="as-ent"><div><b>Factura ' + esc(F.num) + '</b> · ' + esc(nm(F.client)) + ' · ' + (F.cobrado >= F.total - 0.005 ? 'cobrada ' : 'cobrado ') + eur(F.cobrado) + ' de ' + eur(F.total) + '</div>'
       + (c.alb ? '<div><b>Albarán ' + esc(S.op.ref) + '</b> · ' + esc(nm(S.op.parte)) + ' · ' + eur(num(S.op.base)) + ' sin IVA</div>' : '<div class="aju-note" style="margin:0">Sin albarán ni otra factura.</div>') + '</div>';
-    h += '<details class="aju-det"><summary>Cambiar factura o albarán</summary><label class="aju-f"><span>Factura</span><select data-k="as.fac">' + optF + '</select></label><label class="aju-f"><span>Albarán o trabajo pendiente de facturar</span><select data-k="as.alb">' + optA + '</select></label></details>';
+    h += '<details class="aju-det"><summary>Cambiar factura o albarán</summary><label class="aju-f"><span>Factura</span><select data-k="as.fac">' + optF + '</select></label><label class="aju-f"><span>Albarán o trabajo pendiente de facturar</span><select data-k="as.alb">' + optA + '</select></label><label class="aju-f"><span>¿Quién debe ese trabajo?</span><select data-k="as.mismo"><option value=""' + (!AS.mismo ? ' selected' : '') + '>La persona del albarán</option><option value="1"' + (AS.mismo ? ' selected' : '') + '>La misma de la factura (' + esc(prim(F.client)) + ')</option></select></label></details>';
     const q = [];
     if(c.falta){
       const ab = c.alb ? num(S.op.base) : 0;
       q.push('<div class="as-q"><b>¿Qué importe sin IVA debería tener la factura de ' + esc(prim(F.client)) + '?</b><div class="as-bt">'
         + (c.alb && ab > 0 && ab < F.base ? '<button type="button" class="btn" data-act="as-c" data-v="' + r2(F.base - ab) + '">Quitar los ' + eur(ab) + ' del trabajo de ' + esc(prim(S.op.parte)) + ' → ' + eur(F.base - ab) + '</button>' : '')
-        + '<button type="button" class="btn" data-act="as-c" data-v="0">Anularla entera → 0 €</button></div>'
+        + (AS.sinAnular ? '' : '<button type="button" class="btn" data-act="as-c" data-v="0">Anularla entera → 0 €</button>') + '</div>'
         + '<div class="aju-row" style="margin-top:6px"><label class="aju-f"><span>Otro importe (sin IVA)</span><input data-k="as.otro" inputmode="decimal" autocomplete="off"></label></div></div>');
     }else{
       q.push('<div class="aju-note" style="margin:6px 0">Importe correcto de la factura: <b>' + eur(c.C) + '</b> sin IVA <a href="#" data-act="as-reset" style="color:var(--ink,#222)">cambiar</a></div>');
@@ -602,6 +608,7 @@
     const v = el.type === 'checkbox' ? el.checked : el.value;
     if(k === 'as.texto'){ AS.texto = v; try{ localStorage.setItem('aju_texto', v); }catch(e){} clearTimeout(_asT); _asT = setTimeout(() => { asParse(); asRender(); }, 500); return; }
     if(k === 'as.fac'){ if(!v) return; AS.facturaId = v; _fisc = null; AS.correcto = null; AS.corrSrc = ''; asRender(); return; }
+    if(k === 'as.mismo'){ AS.mismo = v === '1' ? true : false; AS._mAuto = false; asRender(); return; }
     if(k === 'as.alb'){ AS.albId = v; AS.ivaEdit = false; asRender(); return; }
     if(k === 'as.causa'){ AS.causaTipo = v; asRender(); return; }
     if(k === 'as.causaTxt'){ AS.causaTxt = v; asRender(true); return; }
