@@ -1858,6 +1858,9 @@ button.e2-fila{cursor:pointer;}
 .cc-fila-compacta .fc-tipo-tag{margin:0 !important;font-size:10px;}
 .cc-fc-num{font-family:var(--mono, monospace);color:var(--ink-soft);flex:none;}
 .cc-fc-cli{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cc-fc-bloque{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;line-height:1.2;}   /* V9.84: cliente más pequeño y la obra en chiquitito debajo */
+.cc-fc-bloque .cc-fc-cli{flex:none;font-size:12.5px;}
+.cc-fc-obra{font-size:10.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cc-fc-imp{flex:none;font-weight:800;}
 .pleg-cols .doc-cli-btn.doc-cli-on, .pleg-cols .doc-ord-btn.doc-cli-on{border-color:var(--orange) !important;color:var(--orange) !important;}
 .pleg-cols .doc-cli-btn.doc-cli-on{border-color:var(--orange) !important;color:var(--orange) !important;}
@@ -4599,10 +4602,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V9.83" defer></script>
-<script src="costes/norm.js?v=V9.83" defer></script>
+<script src="rentabilidad/rent.js?v=V9.84" defer></script>
+<script src="costes/norm.js?v=V9.84" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.83</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.84</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4754,7 +4757,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.83</div>
+        <div class="sub" id="version-badge">V9.84</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8953,12 +8956,20 @@ function c3Choques(j, dias, uso){ const n = c3Necesita(j), out = new Set(); dias
 const C3_NOM_MAQ = {mixta: 'las dos mixtas', giratoria: 'la giratoria', niveladora: 'la niveladora', camion: 'el camión'};
 // V8.21 (reporte de Daniel): si el día ya tiene otro trabajo, se pregunta: los dos el mismo día, o meter este y mover hacia delante los que hay
 function c3PonerPreguntando(j, iso){
-  const otros = (c3PorDia()[iso] || []).map(x => x.j).filter((x, k, a) => x !== j && a.indexOf(x) === k);
-  if(!otros.length){ c3PonerDia(j, iso); return; }
+  let otros = (c3PorDia()[iso] || []).map(x => x.j).filter((x, k, a) => x !== j && a.indexOf(x) === k);
+  // V9.84 (Daniel): aunque el primer día esté libre, si en algún día del trabajo no queda máquina libre también se pregunta si se mueve lo de delante
+  let choque = [];
+  if(!otros.length){
+    const pl = j.plan; j.plan = {...(pl || {}), fecha: iso};
+    let o = []; try{ o = c3Ocupa(j); choque = c3Choques(j, o, c3Uso(j)); }catch(e){} j.plan = pl;
+    if(choque.length){ const PD = c3PorDia(); otros = [...new Set(o.flatMap(d => (PD[d] || []).map(x => x.j)))].filter(x => x !== j && Object.keys(c3Necesita(x)).some(m => choque.includes(m))); }
+  }
+  if(!otros.length){ c3PonerDia(j, iso); return false; }
   const n = c3Dias(j), nom = otros.map(x => '«' + escHtml(c3Corto(x)) + '»').join(' y ');
-  c3Hoja(`<h2>El ${c2FechaTxt(iso)} ya está ${nom}</h2><p style="font-size:14px;margin:0 0 12px;">¿Qué hacemos con ${escHtml(c3Nom(j))} (${n} día${n === 1 ? '' : 's'})?</p>
+  c3Hoja(`<h2>${choque.length ? 'Ahí ya están ' + nom + ' y no queda ' + choque.map(m => ({mixta: 'mixta', giratoria: 'giratoria', niveladora: 'niveladora', camion: 'camión'})[m]).join(' ni ') + ' libre' : 'El ' + c2FechaTxt(iso) + ' ya está ' + nom}</h2><p style="font-size:14px;margin:0 0 12px;">¿Qué hacemos con ${escHtml(c3Nom(j))} (${n} día${n === 1 ? '' : 's'})?</p>
     <div class="c2-acc"><button type="button" class="si" data-c3-meter="${j.id}" data-dia="${iso}">Meterlo aquí y mover hacia delante ${otros.length === 1 ? 'el que hay' : 'los que hay'} (y los de después) ${n} día${n === 1 ? '' : 's'}</button>
     <button type="button" data-c3-juntos="${j.id}" data-dia="${iso}">Los dos el mismo día</button><button type="button" data-c2-cerrar="1">Cancelar</button></div>`);
+  return true;
 }
 function c3MeterYMover(j, iso){
   const n = c3Dias(j); _c2Deshacer = c2Foto(); const cambiados = [];
@@ -9046,7 +9057,7 @@ function c3Auto(){   // rellena desde mañana por prioridad, en el primer hueco 
       if(!c2Laborable(new Date(T + 'T00:00'))){   // a un sábado, domingo o festivo: ese día se trabaja (cuenta como un día del trabajo)
         _c2Deshacer = c2Foto(); if(T < j.plan.fecha) j.plan.fecha = T; else j.plan = {...j.plan, findes: [...new Set([...(j.plan.findes || []), T])]};
         c2Guardar([j]); c3Pintar(); c2Aviso(`${escHtml(c3Nom(j))}: se trabaja el ${c2FechaTxt(T)}.`);
-      } else c3PonerDia(j, c3MoverLab(j.plan.fecha, c3LabEntre(od, T)));   // a un día normal: todo el trabajo se mueve lo mismo
+      } else if(c3PonerPreguntando(j, c3MoverLab(j.plan.fecha, c3LabEntre(od, T)))) return;   // V9.84: si ahí no cabe, se pregunta si se mueve lo de delante
       c3PreguntarSiguientes(j, finAntes); }
     else c3PonerPreguntando(j, dia.dataset.c3Dia); };
   document.addEventListener('pointerup', fin); document.addEventListener('pointercancel', fin);
@@ -13631,7 +13642,7 @@ function ccDocsFiltroSync(){
 }
 function ccDocsMontarFiltro(){ try{
   const pon = (id, lista) => { const f = document.getElementById(id); if(f && !f.children.length) f.innerHTML = lista.map(([v, l]) => `<div class="chip-filter" data-ccv="${v}" onclick="this.classList.toggle('active');ccDocsFiltroSync()">${l}</div>`).join(''); };
-  pon('cc-doc-tipo-chips', CC_DOC_TIPOS); pon('cc-doc-estado-chips', CC_DOC_ESTADOS); pon('cc-doc-trim-chips', [['1', '1º trimestre'], ['2', '2º trimestre'], ['3', '3º trimestre'], ['4', '4º trimestre']]);
+  pon('cc-doc-tipo-chips', CC_DOC_TIPOS); pon('cc-doc-estado-chips', CC_DOC_ESTADOS); pon('cc-doc-trim-chips', [['1', '1º'], ['2', '2º'], ['3', '3º'], ['4', '4º']]);
   if(!PLEG2.ccdocs) pleg2Crear({id: 'ccdocs', despuesDe: '#cc-docs-ancla', plegados: ['tipo', 'estado', 'anio', 'trim'], grupos: [['tipo', 'Tipo', 'cc-doc-tipo-chips'], ['estado', 'Estado', 'cc-doc-estado-chips'], ['anio', 'Año', 'cc-doc-anio-chips'], ['trim', 'Trimestre', 'cc-doc-trim-chips']], extra: {id: 'cc-docs-vista-btn', titulo: 'Vista plegada de tarjetas', html: ICO_VISTA_PLEGADA, fn: 'ccDocsVistaPlegada', activo: () => !!window._ccCompacto}});
   try{ if(PLEG2.ccdocs && !localStorage.getItem('cc_pleg_anio_trim')){ localStorage.setItem('cc_pleg_anio_trim', '1'); ['anio', 'trim'].forEach(k => { if(!PLEG2.ccdocs.plegados.includes(k)) PLEG2.ccdocs.plegados.push(k); }); pleg2Guardar('ccdocs'); pleg2Render('ccdocs'); } }catch(e){}   // Año y Trimestre salen plegados como Tipo y Estado
 }catch(e){ console.warn(e); } }
@@ -28621,7 +28632,7 @@ function renderControlDocs(){
   if(!controlDocsAniosPoblado){
     const anios = [...new Set(todos.map(d=>d.dateRaw ? String(new Date(d.dateRaw).getFullYear()) : null).filter(Boolean))].sort().reverse();
     document.getElementById('dd-anio-panel').innerHTML = anios.map(a=>`<label><input type="checkbox" data-anio="${a}" onchange="renderControlDocs()"> ${a}</label>`).join('') || '<div style="padding:8px;color:var(--ink-faint);font-size:12.5px;">Sin años todavía</div>';
-    { const fa = document.getElementById('cc-doc-anio-chips'); if(fa && !fa.children.length) fa.innerHTML = anios.map(a => `<div class="chip-filter" data-ccv="${a}" onclick="this.classList.toggle('active');ccDocsFiltroSync()">${a}</div>`).join(''); }
+    { const fa = document.getElementById('cc-doc-anio-chips'); if(fa && !fa.children.length) fa.innerHTML = anios.map(a => `<div class="chip-filter" data-ccv="${a}" onclick="this.classList.toggle('active');ccDocsFiltroSync()">${String(a).slice(-2)}</div>`).join(''); }
     controlDocsAniosPoblado = true;
   }
   const tipoChecks = ddChecked('#dd-tipo');
@@ -28706,7 +28717,7 @@ function renderControlDocs(){
         const tipoNum = `Nº ${d.numero||'—'}`;   // V8.64: el tipo va arriba, entre el estado y el icono de imprimir
         const cliente = d.client && d.client !== '—' ? d.client : 'Sin cliente';
         return `<div class="factura-card-movil fc-tipo-${d.type}" data-doc-id="${d.id}" onclick="openDocumentViewer('${d.id}')">
-          <div class="cc-fila-compacta"><span class="fc-tipo-tag tp-${d.type}">${TIPO_DOC_NOMBRE[d.type] || d.type}</span><span class="cc-fc-num">${svgEsc(d.numero||d.num||'—')}</span><span class="cc-fc-cli" data-cli="${escHtml(cliente)}">${svgEsc(cliente)}</span><span class="cc-fc-imp">${d.amountLabel}</span></div>
+          <div class="cc-fila-compacta"><span class="fc-tipo-tag tp-${d.type}">${TIPO_DOC_NOMBRE[d.type] || d.type}</span><span class="cc-fc-num">${svgEsc(d.numero||d.num||'—')}</span><span class="cc-fc-bloque"><span class="cc-fc-cli" data-cli="${escHtml(cliente)}">${svgEsc(cliente)}</span>${(d.obra_texto || d.job) ? `<span class="cc-fc-obra">${svgEsc(d.obra_texto || d.job)}</span>` : ''}</span><span class="cc-fc-imp">${d.amountLabel}</span></div>
           <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${d.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
           <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${d.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
           <input type="checkbox" class="fc-check ctrl-sel-chk" data-id="${d.id}" onclick="event.stopPropagation();" onchange="actualizarSeleccionDoc('ctrl-sel-chk','ctrl-borrar-sel-btn','ctrl-sel-count')">
