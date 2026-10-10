@@ -194,7 +194,9 @@
     root.style.display = 'block'; document.body.style.overflow = 'hidden'; sheet = null;
     root.innerHTML = '<div class="aju-in"><p style="padding:30px 0;color:var(--ink-soft)">Cargando datos fiscales…</p></div>';
     try{ if(typeof impCargarPagos === 'function' && !_impPagosCargados) await impCargarPagos(); }catch(e){}
-    if(!S.facturaId){ const l = facturas(); S.facturaId = l.length ? l[0].id : 'manual'; }
+    try{ if(typeof _docsListos !== 'undefined' && !_docsListos) await new Promise(res => { const t = setTimeout(res, 25000); document.addEventListener('exg-docs-listos', () => { clearTimeout(t); res(); }, {once: true}); }); }catch(e){}
+    const l = facturas(), vacio = !S.manual.base && !S.manual.client;
+    if(!S.facturaId || (S.facturaId === 'manual' && vacio && l.length) || (S.facturaId !== 'manual' && !(documentosRealesById || {})[S.facturaId])) S.facturaId = l.length ? l[0].id : 'manual';
     _fisc = null; pintar();
   };
   function cerrar(){ if(root) root.style.display = 'none'; document.body.style.overflow = ''; sheet = null; }
