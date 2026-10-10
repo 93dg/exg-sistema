@@ -16,12 +16,12 @@
   const tag = (k, t) => '<i class="aju-tag ' + k + '">' + t + '</i>';
   const OK = tag('ok', 'Confirmado'), EST = tag('est', 'Estimado'), PEN = tag('pen', 'Pendiente');
 
-  const TIPOS = {A: 'Completa', B: 'Parcial', C: 'Parcial + contrafactura', D: 'Compensar'};
-  const TIPOS_L = {A: 'Rectificación completa', B: 'Rectificación parcial', C: 'Rectificación parcial + contrafactura', D: 'Compensación de deudas'};
+  const TIPOS = {A: 'Anular', B: 'Descontar', K: 'Compensar'};
+  const TIPOS_L = {A: 'Anular factura', B: 'Descontar importe', C: 'Descontar y añadir otra factura', D: 'Compensar facturas'};
   let S = nuevoEstado(), _fisc = null, _fiscKey = null, _solve = null, _guardadas = null;
   function nuevoEstado(){
-    return {facturaId: null, manual: {client: '', num: '', fecha: '', base: '', iva: '21', cobrado: ''}, tipo: 'B', red: '', causa: 'por_estudiar',
-      op: {sentido: 'nosotros', base: '', iva: '21', real: false, parte: '', ref: ''}, deudaPropia: '', deudaContraria: '', realesD: false, acuerdo: false,
+    return {facturaId: null, manual: {client: '', num: '', fecha: '', base: '', iva: '21', cobrado: ''}, tipo: 'B', red: '', causa: 'por_estudiar', causaTipo: '', causaTxt: '', ivaEdit: false,
+      op: {sentido: 'nosotros', base: '', iva: '21', real: true, parte: '', ref: '', fuente: ''}, deudaPropia: '', deudaContraria: '', realesD: false, acuerdo: false,
       irpfAnual: '', objetivo: '', inversa: false};
   }
 
@@ -83,10 +83,10 @@
     let Bf = F.base, IVAf = F.iva, Tf = F.total;
     if(tipo === 'A'){ Bf = 0; IVAf = 0; Tf = 0; }
     else if(tipo === 'B' || tipo === 'C'){ Bf = r2(Math.max(0, o.Bf != null ? o.Bf : F.base - num(S.red))); IVAf = r2(Bf * r); Tf = r2(Bf + IVAf); }
-    const op = (tipo === 'C' || tipo === 'D') ? S.op : null;
+    const op = (tipo === 'C' || tipo === 'D' || o.withOp) ? S.op : null;
     let B2 = 0, IVA2 = 0, T2 = 0, emite = false, recibe = false;
     if(op){ B2 = r2(Math.max(0, o.B2 != null ? o.B2 : num(op.base))); IVA2 = r2(B2 * num(op.iva) / 100); T2 = r2(B2 + IVA2); emite = op.sentido === 'nosotros'; recibe = !emite && B2 > 0; }
-    const dIn = tipo === 'D' ? r2(num(S.deudaContraria)) : 0, dOut = tipo === 'D' ? r2(num(S.deudaPropia)) : 0;
+    const dIn = op ? r2(num(S.deudaContraria)) : 0, dOut = op ? r2(num(S.deudaPropia)) : 0;
     const issued = emite ? T2 : 0, received = recibe ? T2 : 0, real = op ? !!op.real : true;
     const dev0 = Math.max(0, F.cobrado - Tf), cobr0 = Math.max(0, Tf - F.cobrado);
     const weOwe = r2(dev0 + received + dOut), theyOwe = r2(cobr0 + issued + dIn);
@@ -99,29 +99,38 @@
     const m = num(S.irpfAnual), netoAnual = m > 0 ? r2(valor - ivaNeta - dRend * m / 100) : null;
     return {tipo, Bf, IVAf, Tf, B2, IVA2, T2, emite, recibe, dIn, dOut, weOwe, theyOwe, compensable, cobrar: Math.max(0, P), devolver: Math.max(0, -P), P, valor, ivaDev, ivaSop, ivaNeta, ingB, gasB, dRend, att, neto, netoAnual, real};
   }
-  function base0(F, X){
+  function base0(F, X, withOp){
+    if(withOp){ const d = sim('D', F, X); return {Tf: F.total, valor: d.valor, ivaNeta: d.ivaNeta, att: d.att, neto: d.neto, cobrar: d.cobrar, devolver: d.devolver, base: F.base}; }
     const att = X.ok ? r2(X.f130(X.rendSin + F.base) - X.f130(X.rendSin)) : 0, iva = F.isp ? 0 : F.iva;
     return {Tf: F.total, valor: F.total, ivaNeta: iva, att, neto: r2(F.total - iva - att), cobrar: Math.max(0, F.total - F.cobrado), devolver: 0, base: F.base};
+  }
+  const conOp = () => S.tipo === 'K' && (num(S.op.base) > 0 || num(S.deudaContraria) > 0 || num(S.deudaPropia) > 0);
+  function causaEf(){
+    const c = S.causaTipo;
+    if(!c) return {k: 'por_estudiar', m: 'Indica la causa real de la rectificación'};
+    if(c === 'ninguna') return {k: 'sin'};
+    if(c === 'otro' && !String(S.causaTxt || '').trim()) return {k: 'por_estudiar', m: 'Describe la causa real'};
+    return {k: 'justificada'};
   }
   function viab(tipo, F){
     const rect = tipo !== 'D', op = S.op, opBase = num(op.base) > 0;
     const out = [];
     if(rect){
-      if(S.causa === 'sin') out.push(['no', 'No justificable: sin causa real que respalde la rectificación']);
-      else if(S.causa === 'por_estudiar') out.push(['cond', 'Condicionada: falta justificar y documentar la causa de la rectificación']);
-      if(tipo === 'B' || tipo === 'C'){ if(num(S.red) < -0.004) out.push(['no', 'Subir el importe no es una rectificación a la baja']); }
+      const c = causaEf();
+      if(c.k === 'sin') out.push(['no', 'Sin causa real no se puede rectificar']);
+      else if(c.k === 'por_estudiar') out.push(['cond', c.m]);
+      if((tipo === 'B' || tipo === 'C') && num(S.red) < -0.004) out.push(['no', 'Subir el importe no es una rectificación a la baja']);
     }
-    if((tipo === 'C' || tipo === 'D') && opBase && !op.real) out.push(['no', 'La otra factura debe corresponder a una operación real']);
-    const dif = op.parte && norm(op.parte) !== norm(F.client);
-    if(tipo === 'D'){
-      if(!S.realesD) out.push(['cond', 'Condicionada: las deudas deben ser reales y estar documentadas']);
-      if(dif && !S.acuerdo) out.push(['cond', 'Personas distintas: la compensación necesita acuerdo o justificación']);
-    }else if((tipo === 'C') && dif && opBase && !S.acuerdo) out.push(['cond', 'La otra parte es distinta del cliente de la factura: hace falta acuerdo']);
+    if((tipo === 'C' || tipo === 'D') && opBase){
+      if(op.fuente === 'otra') out.push(['cond', 'La otra operación no está en la app: debe ser real y estar documentada']);
+      if(op.parte && norm(op.parte) !== norm(F.client)) out.push(['cond', 'Son personas distintas: hace falta un acuerdo documentado']);
+    }
+    if((tipo === 'C' || tipo === 'D') && (num(S.deudaContraria) > 0 || num(S.deudaPropia) > 0)) out.push(['cond', 'Las deudas sin factura deben estar documentadas']);
     const k = out.some(x => x[0] === 'no') ? 'no' : out.some(x => x[0] === 'cond') ? 'cond' : 'ok';
     return {k, motivos: out.map(x => x[1]), txt: k === 'ok' ? 'Viable' : k === 'cond' ? 'Condicionada' : 'No viable'};
   }
-  function resolver(tipo, F, X){
-    const target = r2(num(S.objetivo)); let key;
+  function resolver(tipo, F, X, tgt){
+    const target = r2(tgt != null ? tgt : num(S.objetivo)); let key;
     if(tipo === 'B' || tipo === 'C') key = 'Bf'; else if(tipo === 'D' && S.op.sentido === 'nosotros') key = 'B2'; else return null;
     const f = x => sim(tipo, F, X, {[key]: x}).neto - target;
     if(f(0) >= 0) return {key, x: 0, nota: 'Con 0 € de base ya se llega al objetivo'};
@@ -148,6 +157,10 @@
 #aju-app .aju-f>span{font-size:12px;color:var(--ink-soft,#777);}
 #aju-app .aju-row{display:flex;gap:8px;}
 #aju-app .aju-chips{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+#aju-app .aju-chips.three{grid-template-columns:1fr 1fr 1fr;}
+#aju-app .aju-grp{margin:12px 0 4px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft,#777);}
+#aju-app .pc{font-size:13px !important;font-weight:600 !important;color:var(--ink-soft,#777);}
+#aju-app details.aju-det{margin:6px 0;border:none;padding:0;background:none;} #aju-app details.aju-det summary{padding:6px 0;font-weight:600;font-size:13.5px;cursor:pointer;}
 #aju-app .aju-chip{padding:8px;min-height:46px;border:1px solid var(--line,#ddd);border-radius:12px;background:#fff;font:inherit;font-weight:600;font-size:13.5px;cursor:pointer;color:inherit;line-height:1.2;}
 #aju-app .aju-chip.on{border-color:var(--ink,#222);box-shadow:inset 0 0 0 2px var(--ink,#222);}
 #aju-app .aju-kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
@@ -189,7 +202,7 @@
     if(!root){ root = document.createElement('div'); root.id = 'aju-app'; document.body.appendChild(root);
       root.addEventListener('input', ev => { const k = ev.target.getAttribute && ev.target.getAttribute('data-k'); if(k) cambia(k, ev.target, false); });
       root.addEventListener('change', ev => { const k = ev.target.getAttribute && ev.target.getAttribute('data-k'); if(k) cambia(k, ev.target, true); });
-      root.addEventListener('click', ev => { const b = ev.target.closest && ev.target.closest('[data-act]'); if(b) accion(b.getAttribute('data-act'), b); });
+      root.addEventListener('click', ev => { const b = ev.target.closest && ev.target.closest('[data-act]'); if(b) accion(b.getAttribute('data-act'), b, ev); });
     }
     root.style.display = 'block'; document.body.style.overflow = 'hidden'; sheet = null;
     root.innerHTML = '<div class="aju-in"><p style="padding:30px 0;color:var(--ink-soft)">Cargando datos fiscales…</p></div>';
@@ -202,7 +215,7 @@
   function cerrar(){ if(root) root.style.display = 'none'; document.body.style.overflow = ''; sheet = null; }
   function pintar(){
     root.innerHTML = '<div class="aju-top"><b>Calculadora de ajustes</b><button type="button" class="btn sm" data-act="cerrar">Cerrar</button></div><div class="aju-in">'
-      + '<h4>Factura</h4>' + htmlFactura() + '<h4>¿Qué quieres hacer?</h4>' + htmlTipo() + '<div id="aju-inputs">' + htmlInputs() + '</div><div id="aju-res"></div></div><div id="aju-sheet"></div>';
+      + '<h4>Factura</h4>' + htmlFactura() + '<h4>Operación</h4>' + htmlTipo() + '<div id="aju-inputs">' + htmlInputs() + '</div><div id="aju-res"></div></div><div id="aju-sheet"></div>';
     resultados();
   }
   const money = n => eur(n);
@@ -218,90 +231,113 @@
     const d = Math.abs(r2(F.base + F.iva) - F.total);
     return '<p class="aju-note" style="margin-top:6px">Base ' + eur(F.base) + ' · cobrado ' + eur(F.cobrado) + (F.q ? ' · ' + F.q + 'T ' + F.anio : '') + (d >= 0.005 ? ' · <b style="color:var(--red,#b3362b)">base + IVA no suma el total (' + eur(d) + ')</b>' : '') + '</p>';
   }
-  const TIPO_BTN = {A: 'Rectificar completamente', B: 'Rectificar parcialmente', C: 'Rectificar y añadir otra factura', D: 'Compensar deudas'};
-  function htmlTipo(){ return '<div class="aju-chips">' + Object.keys(TIPO_BTN).map(k => '<button type="button" class="aju-chip' + (S.tipo === k ? ' on' : '') + '" data-act="tipo" data-t="' + k + '">' + TIPO_BTN[k] + '</button>').join('') + '</div>'; }
+  const TIPO_BTN = {A: 'Anular factura', B: 'Descontar importe', K: 'Compensar facturas'};
+  const T = () => S.tipo === 'A' ? 'A' : S.tipo === 'B' ? 'B' : (num(S.red) > 0.004 ? 'C' : 'D');
+  const CAUSAS = [['error', 'Error en la factura (datos, importe o IVA)'], ['devolucion', 'Trabajo no realizado o devuelto'], ['descuento', 'Descuento o ajuste acordado con el cliente'], ['otro', 'Otro motivo (especificar)'], ['ninguna', 'No hay causa real']];
+  function htmlTipo(){ return '<div class="aju-chips three">' + Object.keys(TIPO_BTN).map(k => '<button type="button" class="aju-chip' + (S.tipo === k ? ' on' : '') + '" data-act="tipo" data-t="' + k + '">' + TIPO_BTN[k] + '</button>').join('') + '</div>'; }
   const fld = (k, lab, val, ex, st) => '<label class="aju-f"' + (st ? ' style="' + st + '"' : '') + '><span>' + lab + '</span><input data-k="' + k + '" inputmode="decimal" autocomplete="off" value="' + esc(val) + '"' + (ex || '') + '></label>';
-  const dif = F => !!(S.op.parte && norm(S.op.parte) !== norm(F.client));
-  const solvable = () => S.tipo === 'B' || S.tipo === 'C' || (S.tipo === 'D' && S.op.sentido === 'nosotros');
+  const debtsOn = () => num(S.deudaContraria) > 0 || num(S.deudaPropia) > 0;
+  const solvable = () => { const t = T(); return t === 'B' || t === 'C' || (t === 'D' && S.op.sentido === 'nosotros'); };
+  function listo(){ const t = T(); if(t === 'A') return true; if(t === 'B') return num(S.red) > 0.004; return num(S.op.base) > 0 || debtsOn(); }
+  function faltaTxt(){ return S.tipo === 'B' ? 'Indica el importe a descontar.' : S.tipo === 'K' ? 'Elige la otra operación.' : ''; }
+  function htmlCausa(){
+    const o = '<option value="">Elegir motivo…</option>' + CAUSAS.map(c => '<option value="' + c[0] + '"' + (S.causaTipo === c[0] ? ' selected' : '') + '>' + c[1] + '</option>').join('');
+    return '<label class="aju-f"><span>Motivo de la rectificación (causa real)</span><select data-k="causaTipo">' + o + '</select></label>'
+      + (S.causaTipo && S.causaTipo !== 'ninguna' ? '<label class="aju-f"><span>Detalle' + (S.causaTipo === 'otro' ? '' : ' (opcional)') + '</span><input type="text" data-k="causaTxt" maxlength="120" value="' + esc(S.causaTxt) + '" placeholder="Qué ocurrió"></label>' : '');
+  }
+  function opLista(F){
+    const L = albaranes(), mismos = L.filter(d => norm(d.client) === norm(F.client)), otros = L.filter(d => norm(d.client) !== norm(F.client));
+    const op = d => '<option value="' + d.id + '"' + (S.op.fuente === 'alb' && S.op.ref === (d.num || d.numero) && norm(S.op.parte) === norm(d.client) ? ' selected' : '') + '>' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 22) + ' · ' + eur(baseAlb(d))) + '</option>';
+    return '<option value="">Elegir operación…</option>' + (mismos.length ? '<optgroup label="Albaranes y proformas de este cliente">' + mismos.map(op).join('') + '</optgroup>' : '') + (otros.length ? '<optgroup label="De otros clientes">' + otros.map(op).join('') + '</optgroup>' : '') + '<option value="otra"' + (S.op.fuente === 'otra' ? ' selected' : '') + '>Otra operación (indicar importe)</option>';
+  }
   function htmlInputs(){
     const t = S.tipo, F = facturaCtx();
-    const causa = '<label class="aju-f"><span>Motivo</span><select data-k="causa"><option value="justificada"' + (S.causa === 'justificada' ? ' selected' : '') + '>Error real</option><option value="por_estudiar"' + (S.causa === 'por_estudiar' ? ' selected' : '') + '>Por justificar</option><option value="sin"' + (S.causa === 'sin' ? ' selected' : '') + '>Sin causa</option></select></label>';
     let h = '<h4>Cantidades</h4>';
-    if(t === 'A') h += '<p class="aju-note" style="margin:0 0 8px">Se anula toda la factura.</p>' + causa;
-    if(t === 'B' || t === 'C') h += '<div class="aju-row">' + fld('red', 'Importe que descontamos (€)', S.red, ' data-lk="red"') + causa + '</div>';
-    if(t === 'C' || t === 'D'){
-      const al = albaranes().map(d => '<option value="' + d.id + '">' + esc((d.num || d.numero || '—') + ' · ' + (d.client || '—') + ' · ' + eur(baseAlb(d))) + '</option>').join('');
-      h += '<div class="aju-row">' + fld('op.base', 'Importe de la otra factura (base, €)', S.op.base, ' data-lk="b2"') + fld('op.iva', 'IVA %', S.op.iva, '', 'max-width:72px') + '</div>'
-        + '<div class="aju-row"><label class="aju-f"><span>¿Quién la emite?</span><select data-k="op.sentido"><option value="nosotros"' + (S.op.sentido === 'nosotros' ? ' selected' : '') + '>Nosotros</option><option value="cliente"' + (S.op.sentido === 'cliente' ? ' selected' : '') + '>El cliente</option></select></label>'
-        + '<label class="aju-f"><span>Cargar de un albarán</span><select data-k="albaran"><option value="">—</option>' + al + '</select></label></div>';
-      if(t === 'C') h += '<label class="aju-chk"><input type="checkbox" data-k="op.real"' + (S.op.real ? ' checked' : '') + '><span>La otra factura es una operación real</span></label>';
+    if(t === 'A') h += '<p class="aju-note" style="margin:0 0 8px">Se anula toda la factura y se recalculan los impuestos.</p>' + htmlCausa();
+    if(t === 'B'){ h += fld('red', 'Importe a descontar (sin IVA, €)', S.red, ' data-lk="red"') + '<div id="aju-conIva" class="aju-note" style="margin:-2px 0 6px">' + conIva(F) + '</div>' + htmlCausa(); }
+    if(t === 'K'){
+      h += '<label class="aju-f"><span>Otra operación</span><select data-k="opsel">' + opLista(F) + '</select></label>';
+      if(S.op.fuente === 'alb') h += '<div class="aju-note" style="margin:-2px 0 8px">La factura la emitimos nosotros · base ' + eur(num(S.op.base)) + ' · IVA ' + (S.ivaEdit ? '<input data-k="op.iva" inputmode="decimal" value="' + esc(S.op.iva) + '" style="width:60px;padding:4px 6px;display:inline-block"> %' : esc(S.op.iva) + ' %  <a href="#" data-act="iva" style="color:var(--ink,#222)">cambiar</a>') + '</div>';
+      if(S.op.fuente === 'otra') h += '<div class="aju-row">' + fld('op.base', 'Importe (sin IVA, €)', S.op.base) + fld('op.iva', 'IVA %', S.op.iva, '', 'max-width:72px') + '</div>'
+        + '<label class="aju-f"><span>¿Quién emite esta factura?</span><select data-k="op.sentido"><option value="nosotros"' + (S.op.sentido === 'nosotros' ? ' selected' : '') + '>Nosotros</option><option value="cliente"' + (S.op.sentido === 'cliente' ? ' selected' : '') + '>La otra parte</option></select></label>';
+      h += fld('red', 'Descontar también de la factura original (sin IVA, opcional)', S.red, ' data-lk="red"');
+      h += '<div id="aju-causa" data-on="' + (num(S.red) > 0.004 ? '1' : '') + '">' + (num(S.red) > 0.004 ? htmlCausa() : '') + '</div>';
+      h += '<details class="aju-det"><summary>Deudas sin factura (opcional)</summary><div class="aju-row" style="margin-top:8px">' + fld('deudaContraria', 'Nos deben (€)', S.deudaContraria) + fld('deudaPropia', 'Les debemos (€)', S.deudaPropia) + '</div></details>'
+        + '<p class="aju-note">Compensar ajusta cobros y pagos; no sustituye facturar cada operación.</p>';
     }
-    if(t === 'D') h += '<div class="aju-row">' + fld('deudaContraria', 'Nos deben sin factura (€)', S.deudaContraria) + fld('deudaPropia', 'Les debemos sin factura (€)', S.deudaPropia) + '</div>'
-      + '<label class="aju-chk"><input type="checkbox" data-k="realesD"' + (S.realesD ? ' checked' : '') + '><span>Las deudas y facturas son reales y están documentadas</span></label>';
-    if((t === 'C' || t === 'D') && dif(F)) h += '<label class="aju-chk"><input type="checkbox" data-k="acuerdo"' + (S.acuerdo ? ' checked' : '') + '><span>Hay acuerdo para compensar con «' + esc(S.op.parte) + '» (otra persona)</span></label>';
-    if(t !== 'A' && solvable()) h += fld('objetivo', 'Quiero que me queden … € netos (opcional)', S.objetivo) + '<div id="aju-inv"></div>';
     return h;
   }
+  function conIva(F){ const b = num(S.red); return b > 0.004 ? 'Con IVA: ' + eur(F.isp ? b : b * (1 + F.ivaPct / 100)) : ''; }
 
   function cambia(k, el, fin){
     const v = el.type === 'checkbox' ? el.checked : el.value;
-    if(k === 'facturaId'){ S.facturaId = v; S.red = ''; _fisc = null; pintar(); return; }
+    if(k === 'facturaId'){ S.facturaId = v; S.red = ''; S.op.fuente = ''; S.op.base = ''; S.op.parte = ''; _fisc = null; pintar(); return; }
     if(k.indexOf('m.') === 0){ S.manual[k.slice(2)] = v; _fisc = null; const f = document.getElementById('aju-fact'); if(f) f.innerHTML = resumenFactura(facturaCtx()); resultados(true); return; }
-    if(k === 'albaran'){ if(!v) return; const d = (documentosRealesById || {})[v]; if(d){ S.op.base = fmtIn(baseAlb(d)); S.op.parte = d.client || ''; S.op.ref = d.num || d.numero || ''; S.op.sentido = 'nosotros'; S.op.iva = String(Number(d.ivaPct) || 21); }
-      document.getElementById('aju-inputs').innerHTML = htmlInputs(); resultados(); return; }
-    if(k === 'op.sentido'){ S.op.sentido = v; document.getElementById('aju-inputs').innerHTML = htmlInputs(); resultados(); return; }
-    if(k.indexOf('op.') === 0){ const kk = k.slice(3); S.op[kk] = kk === 'real' ? !!v : v; }
-    else if(k === 'realesD'){ S.realesD = !!v; S.op.real = !!v; }
-    else if(k === 'acuerdo') S.acuerdo = !!v;
-    else if(k === 'objetivo'){ S.objetivo = v; S.inversa = num(v) !== 0; }
+    if(k === 'opsel'){
+      if(!v){ S.op.fuente = ''; S.op.base = ''; S.op.parte = ''; S.op.ref = ''; }
+      else if(v === 'otra'){ S.op.fuente = 'otra'; S.op.base = ''; S.op.parte = ''; S.op.ref = ''; S.op.iva = '21'; S.op.sentido = 'nosotros'; }
+      else { const d = (documentosRealesById || {})[v]; if(d){ S.op.fuente = 'alb'; S.op.base = fmtIn(baseAlb(d)); S.op.parte = d.client || ''; S.op.ref = d.num || d.numero || ''; S.op.sentido = 'nosotros'; S.op.iva = String(Number(d.ivaPct) || 21); } }
+      S.ivaEdit = false; document.getElementById('aju-inputs').innerHTML = htmlInputs(); resultados(); return; }
+    if(k === 'op.sentido'){ S.op.sentido = v; resultados(); return; }
+    if(k === 'objetivo'){ S.objetivo = v; pintarInv(); return; }
+    if(k.indexOf('op.') === 0) S.op[k.slice(3)] = v;
+    else if(k === 'causaTipo'){ S.causaTipo = v; document.getElementById('aju-inputs').innerHTML = htmlInputs(); resultados(); return; }
     else S[k] = v;
-    if(k === 'causa' || k === 'realesD' || k === 'acuerdo' || k === 'objetivo' || k === 'op.sentido') { /* nada más */ }
+    if(k === 'red'){ const c = document.getElementById('aju-conIva'); if(c) c.innerHTML = conIva(facturaCtx()); if(S.tipo === 'K'){ const cz = document.getElementById('aju-causa'), need = num(S.red) > 0.004; if(cz && need !== (cz.getAttribute('data-on') === '1')){ cz.setAttribute('data-on', need ? '1' : ''); cz.innerHTML = need ? htmlCausa() : ''; } } }
     resultados(true, k === 'irpfAnual' && !fin);
   }
-  function accion(a, b){
+  function accion(a, b, ev){
     if(a === 'cerrar') cerrar();
-    else if(a === 'tipo'){ S.tipo = b.getAttribute('data-t'); S.inversa = solvable() && num(S.objetivo) !== 0; document.getElementById('aju-inputs').innerHTML = htmlInputs(); root.querySelectorAll('.aju-chip').forEach(c => c.classList.toggle('on', c.getAttribute('data-t') === S.tipo)); resultados(); }
-    else if(a === 'cmp' || a === 'det' || a === 'sav'){ sheet = a; pintarSheet(); }
+    else if(a === 'tipo'){ if(S.tipo !== b.getAttribute('data-t')) S.red = ''; S.tipo = b.getAttribute('data-t'); document.getElementById('aju-inputs').innerHTML = htmlInputs(); root.querySelectorAll('.aju-chip').forEach(c => c.classList.toggle('on', c.getAttribute('data-t') === S.tipo)); resultados(); }
+    else if(a === 'iva'){ if(ev) ev.preventDefault(); S.ivaEdit = true; document.getElementById('aju-inputs').innerHTML = htmlInputs(); }
+    else if(a === 'cmp' || a === 'det' || a === 'sav' || a === 'inv'){ sheet = a; pintarSheet(); }
     else if(a === 'sheet0'){ sheet = null; pintarSheet(); }
+    else if(a === 'aplicarinv') aplicarInv();
+    else if(a === 'igual'){ const F = facturaCtx(); S.objetivo = fmtIn(base0(F, fiscal(F), conOp()).neto); pintarSheet(); }
     else if(a === 'guardar') guardar();
     else if(a === 'cargar') cargar(b.getAttribute('data-id'));
     else if(a === 'borrar') borrar(b.getAttribute('data-id'));
   }
-  function sync(){   // pone en las casillas lo que ha resuelto la inversa, sin tocar la que se está escribiendo
+  function sync(){
     const act = document.activeElement;
     const set = (sel, val) => { const e = root.querySelector(sel); if(e && e !== act) e.value = val; };
-    set('[data-lk="red"]', S.red); set('[data-lk="b2"]', S.op.base);
+    set('[data-lk="red"]', S.red);
   }
-  function configurado(k, F){
+  function configurado(k){
     const opB = num(S.op.base) > 0;
     if(k === 'A') return true;
     if(k === 'B') return num(S.red) > 0.004;
     if(k === 'C') return num(S.red) > 0.004 && opB;
-    return opB || num(S.deudaContraria) > 0 || num(S.deudaPropia) > 0;
+    return opB || debtsOn();
   }
 
   function resultados(sinSync, noSheet){
     const el = document.getElementById('aju-res'); if(!el) return;
-    const F = facturaCtx(), X = fiscal(F); let inv = null;
-    const usaInv = S.inversa && solvable() && num(S.objetivo) !== 0 && S.tipo !== 'A';
-    if(usaInv){ inv = resolver(S.tipo, F, X); if(inv){ if(inv.key === 'Bf') S.red = fmtIn(F.base - inv.x); else S.op.base = fmtIn(inv.x); } }
-    const s = sim(S.tipo, F, X), b0 = base0(F, X), v = viab(S.tipo, F);
-    const efecto = r2((s.ivaNeta + s.att) - (b0.ivaNeta + b0.att)), dN = r2(s.neto - b0.neto);
-    const invEl = document.getElementById('aju-inv');
-    if(invEl){ invEl.innerHTML = !usaInv || !inv ? '' : '<div class="aju-warn" style="background:#e6f2ea">Hay que pactar <b>' + eur(inv.key === 'Bf' ? s.Tf : s.T2) + '</b> <span style="color:var(--ink-soft)">(base ' + eur(inv.key === 'Bf' ? s.Bf : s.B2) + ' + IVA ' + eur(inv.key === 'Bf' ? s.IVAf : s.IVA2) + ')</span>'
-      + (inv.nota ? '<br>' + esc(inv.nota) : '') + (inv.key === 'Bf' && s.Bf > F.base + 0.004 ? '<br><b>Supera la factura original: no sería una rectificación a la baja.</b>' : '') + '</div>'; }
-    const kp = (a, b, c) => '<div class="aju-k"><span>' + a + '</span><b class="' + (c || '') + '">' + b + '</b></div>';
-    let h = '<h4>Resultado</h4><div class="aju-kpis">'
-      + kp('Tenemos que devolver', eur(s.devolver), s.devolver > 0.004 ? 'r' : '')
-      + kp('Nos tienen que pagar', eur(s.cobrar), s.cobrar > 0.004 ? 'g' : '')
-      + kp('Diferencia de impuestos', (efecto > 0.004 ? '+' : efecto < -0.004 ? '−' : '') + eur(Math.abs(efecto)), efecto < -0.004 ? 'g' : efecto > 0.004 ? 'r' : '')
-      + kp('Dinero neto que nos queda', eur(s.neto)) + '</div>';
-    const msg = v.k === 'ok' ? 'Viable' : v.k === 'cond' ? 'Condicionada' : 'No viable';
-    h += '<div class="aju-v ' + v.k + '"><b>' + msg + '</b>' + (v.motivos.length ? ' · ' + esc(v.motivos[0].replace(/^Condicionada: /, '')) : '') + '</div>';
-    h += '<div class="aju-cmpb"><div class="l"><span>ANTES</span><b>' + eur(b0.neto) + ' netos</b></div><div class="l"><span>DESPUÉS</span><b>' + eur(s.neto) + ' netos</b></div>'
-      + '<div class="l big"><span>DIFERENCIA</span><b class="' + (dN > 0.004 ? 'g' : dN < -0.004 ? 'r' : '') + '">' + (dN > 0.004 ? '+' : dN < -0.004 ? '−' : '') + eur(Math.abs(dN)) + '</b></div></div>';
-    h += '<p class="aju-note" style="text-align:center;margin-top:6px">' + (Math.abs(dN) < 0.005 ? 'Sin cambio.' : dN > 0 ? '<b class="g">Salimos ganando.</b>' : '<b class="r">Salimos perdiendo.</b>') + (X.pend.length ? ' Cifras <b>estimadas</b>: faltan datos (ver cálculo).' : '') + '</p>';
-    h += '<div class="aju-btns"><button type="button" class="btn" data-act="cmp">Comparar opciones</button><button type="button" class="btn" data-act="det">Ver cómo se ha calculado</button></div>'
+    const F = facturaCtx(), X = fiscal(F), t = T(), ok = listo();
+    const s = sim(t, F, X), b0 = base0(F, X, conOp()), v = viab(t, F);
+    const dIva = r2(s.ivaNeta - b0.ivaNeta), dIrpf = r2(s.att - b0.att), efecto = r2(dIva + dIrpf), dN = r2(s.neto - b0.neto);
+    const sg = x => x > 0.004 ? '+' : x < -0.004 ? '−' : '';
+    const col = (x, inv) => x > 0.004 ? (inv ? 'g' : 'r') : x < -0.004 ? (inv ? 'r' : 'g') : '';
+    const PC = '<b class="pc">Pendiente de calcular</b>';
+    const row = (lab, val, c, tg, big) => '<div class="l' + (big ? ' big' : '') + '"><span>' + lab + (tg || '') + '</span>' + (ok ? '<b class="' + (c || '') + '">' + val + '</b>' : PC) + '</div>';
+    const sinIrpf = !X.ok;
+    let h = '<h4>Resultado</h4>';
+    if(!ok) h += '<p class="aju-note" style="margin:0 0 6px">' + faltaTxt() + '</p>';
+    else h += '<div class="aju-v ' + v.k + '"><b>' + v.txt + '</b>' + (v.motivos.length ? ' · ' + esc(v.motivos[0]) : '') + '</div>';
+    h += '<div class="aju-grp">Dinero</div><div class="aju-cmpb">'
+      + row('Tenemos que devolver', eur(s.weOwe), s.weOwe > 0.004 ? 'r' : '')
+      + row('Nos tienen que pagar', eur(s.theyOwe), s.theyOwe > 0.004 ? 'g' : '')
+      + row('Saldo económico final', sg(s.P) + eur(Math.abs(s.P)) + (s.P > 0.004 ? ' a favor' : s.P < -0.004 ? ' en contra' : ''), s.P > 0.004 ? 'g' : s.P < -0.004 ? 'r' : '', '', true) + '</div>';
+    h += '<div class="aju-grp">Impuestos <i class="aju-tag est">estimado</i></div><div class="aju-cmpb">'
+      + row('Diferencia de IVA', sg(dIva) + eur(Math.abs(dIva)), col(dIva))
+      + (sinIrpf && ok ? '<div class="l"><span>Diferencia de IRPF (130)</span><b class="pc">Pendiente de calcular</b></div>' : row('Diferencia de IRPF (130)', sg(dIrpf) + eur(Math.abs(dIrpf)), col(dIrpf)))
+      + row('Efecto fiscal total', sg(efecto) + eur(Math.abs(efecto)), col(efecto), '', true) + '</div>';
+    h += '<div class="aju-grp">Comparación <i class="aju-tag est">estimado</i></div><div class="aju-cmpb">'
+      + row('Antes', eur(b0.neto) + ' netos') + row('Después', eur(s.neto) + ' netos')
+      + row('Diferencia', sg(dN) + eur(Math.abs(dN)), col(dN, true), '', true) + '</div>';
+    if(ok) h += '<p class="aju-note" style="text-align:center;margin-top:6px">' + (Math.abs(dN) < 0.005 ? 'Sin cambio.' : dN > 0 ? '<b class="g">Salimos ganando.</b>' : '<b class="r">Salimos perdiendo.</b>') + (X.pend.length ? ' Faltan datos fiscales: las cifras de impuestos son estimadas.' : '') + (sinIrpf ? ' Sin IRPF: no hay trimestre abierto para calcularlo.' : '') + '</p>';
+    h += '<div class="aju-btns two"><button type="button" class="btn" data-act="cmp">Comparar opciones</button><button type="button" class="btn" data-act="inv">Cálculo inverso</button></div>'
+      + '<div class="aju-btns"><button type="button" class="btn" data-act="det">Ver cómo se ha calculado</button></div>'
       + '<div class="aju-btns two"><button type="button" class="btn" data-act="guardar">Guardar</button><button type="button" class="btn" data-act="sav">Guardadas</button></div>';
     el.innerHTML = h;
     if(!noSheet) pintarSheet();
@@ -311,35 +347,76 @@
   function pintarSheet(){
     const sh = document.getElementById('aju-sheet'); if(!sh) return;
     if(!sheet){ sh.style.display = 'none'; sh.innerHTML = ''; return; }
-    const F = facturaCtx(), X = fiscal(F), tit = {cmp: 'Comparar opciones', det: 'Cómo se ha calculado', sav: 'Simulaciones guardadas'}[sheet];
+    const F = facturaCtx(), X = fiscal(F), tit = {cmp: 'Comparar opciones', det: 'Cómo se ha calculado', sav: 'Simulaciones guardadas', inv: 'Cálculo inverso'}[sheet];
     let body = '';
     if(sheet === 'cmp') body = comparador(F, X);
-    else if(sheet === 'det') body = detalles(F, X, sim(S.tipo, F, X), base0(F, X));
+    else if(sheet === 'det') body = detalles(F, X, sim(T(), F, X), base0(F, X, conOp()));
+    else if(sheet === 'inv') body = '<p class="aju-note" style="margin:10px 0">Calcula cuánto habría que pactar para que te quede un neto concreto después de impuestos, con la operación elegida.</p>'
+      + (S.tipo === 'A' ? '<div class="aju-warn">Anular una factura no tiene un importe que despejar.</div>' : !solvable() ? '<div class="aju-warn">Si la factura la emite la otra parte no hay un importe tuyo que despejar.</div>'
+        : fld('objetivo', 'Quiero que me queden … € netos', S.objetivo) + '<button type="button" class="btn" style="width:100%;padding:12px;margin:0 0 8px" data-act="igual">Que la empresa no pierda dinero (neto de antes)</button><div id="aju-invres"></div>');
     else body = '<button type="button" class="btn" style="width:100%;padding:14px;margin:12px 0" data-act="guardar">Guardar la simulación actual</button><div id="aju-guardadas"></div>';
     sh.innerHTML = '<div class="aju-top"><b>' + tit + '</b><button type="button" class="btn sm" data-act="sheet0">Volver</button></div><div class="aju-in">' + body + '</div>';
     sh.style.display = 'block';
     if(sheet === 'sav') pintarGuardadas();
+    if(sheet === 'inv') pintarInv();
+  }
+  function invCalc(){
+    const F = facturaCtx(), X = fiscal(F), t = T();
+    if(S.tipo === 'A' || !solvable() || !(num(S.objetivo) !== 0)) return null;
+    const r = resolver(t, F, X); if(!r) return null;
+    return {r, F, X, t, s: sim(t, F, X, {[r.key]: r.x})};
+  }
+  function pintarInv(){
+    const el = document.getElementById('aju-invres'); if(!el) return;
+    const c = invCalc(); if(!c){ el.innerHTML = '<p class="aju-note">Escribe el neto que quieres conservar.</p>'; return; }
+    const {r, F, s} = c, B = r.key === 'Bf', l = (a, b) => '<div class="aju-l"><span>' + a + '</span><span>' + b + '</span></div>';
+    el.innerHTML = '<div class="aju-cmpb" style="margin-top:6px">'
+      + (B ? l('Importe a descontar (sin IVA)', '<b>' + eur(F.base - s.Bf) + '</b>') + l('Factura final (base)', eur(s.Bf)) + l('IVA', eur(s.IVAf)) + l('Total a pactar', '<b>' + eur(s.Tf) + '</b>')
+        : l('La otra factura (base)', '<b>' + eur(s.B2) + '</b>') + l('IVA', eur(s.IVA2)) + l('Total a pactar', '<b>' + eur(s.T2) + '</b>'))
+      + l('Dinero a devolver', eur(s.devolver)) + l('Dinero a cobrar', eur(s.cobrar)) + l('Efecto IRPF estimado (130)', eur(s.att)) + l('Neto final', '<b>' + eur(s.neto) + '</b>') + '</div>'
+      + (r.nota ? '<p class="aju-note">' + esc(r.nota) + '</p>' : '')
+      + (B && s.Bf > F.base + 0.004 ? '<div class="aju-warn">La base necesaria supera la factura original: no sería una rectificación a la baja.</div>' : '')
+      + '<p class="aju-note">Es una simulación para negociar importes reales y justificables, no para alterar facturas.</p>'
+      + '<button type="button" class="btn" style="width:100%;padding:14px;margin-top:8px" data-act="aplicarinv">Usar este importe en la simulación</button>';
+  }
+  function aplicarInv(){
+    const c = invCalc(); if(!c) return;
+    if(c.r.key === 'Bf') S.red = fmtIn(c.F.base - c.s.Bf);
+    else { S.op.base = fmtIn(c.s.B2); if(!S.op.fuente) S.op.fuente = 'otra'; }
+    sheet = null; _fisc = null; pintar(); root.scrollTo({top: 0});
   }
   function comparador(F, X){
-    const ks = ['A', 'B', 'C', 'D'], R = {};
-    ks.forEach(k => { const cfg = configurado(k, F), V = viab(k, F); R[k] = {cfg, V, s: cfg ? sim(k, F, X) : null}; });
-    let mejor = null; ks.forEach(k => { if(R[k].cfg && R[k].V.k === 'ok' && (mejor == null || R[k].s.neto > R[mejor].s.neto)) mejor = k; });
-    const sheetStyle = '<style>#aju-sheet .aju-opt{border:1px solid var(--line,#ddd);border-radius:14px;background:#fff;padding:12px;margin:8px 0;}#aju-sheet .aju-opt .t{font-weight:700;}#aju-sheet .aju-opt .n{font-size:22px;font-weight:700;margin:2px 0;}#aju-sheet .aju-opt .s{font-size:12.5px;color:var(--ink-soft,#777);}#aju-sheet .aju-opt.best{border-color:var(--green,#2f7a4f);box-shadow:inset 0 0 0 2px var(--green,#2f7a4f);}#aju-sheet .aju-opt.off{opacity:.6;}</style>';
-    let h = sheetStyle + '<p class="aju-note">Neto final tras IVA y 130, con las cantidades de la pantalla.</p>';
-    ks.forEach(k => {
-      const r = R[k];
-      const st = !r.cfg ? 'Pon las cantidades de esta opción para compararla' : r.V.k === 'ok' ? 'Viable' : r.V.k === 'cond' ? 'Condicionada: ' + r.V.motivos[0].replace(/^Condicionada: /, '') : 'No viable: ' + r.V.motivos[0];
-      h += '<div class="aju-opt' + (k === mejor ? ' best' : '') + (!r.cfg || r.V.k === 'no' ? ' off' : '') + '"><div class="t">' + TIPOS_L[k] + (k === mejor ? ' <span class="aju-tag ok">Mayor neto viable</span>' : '') + '</div>'
-        + (r.cfg ? '<div class="n">' + eur(r.s.neto) + '</div>' : '') + '<div class="s">' + esc(st) + '</div></div>';
+    const b0 = base0(F, X, conOp()), cfgOp = conOp(), opB = num(S.op.base) > 0;
+    const caus = '<label class="aju-f"><span>Motivo de la rectificación (causa real)</span><select data-k="causaTipo"><option value="">Elegir motivo…</option>' + CAUSAS.map(c => '<option value="' + c[0] + '"' + (S.causaTipo === c[0] ? ' selected' : '') + '>' + c[1] + '</option>').join('') + '</select></label>';
+    const L = [];
+    if(cfgOp){
+      L.push({n: 'Dejar la factura y compensar', s: sim('D', F, X), v: viab('D', F)});
+      if(opB){
+        L.push({n: 'Descontar lo mismo que la otra factura', s: sim('C', F, X, {Bf: Math.max(0, F.base - num(S.op.base))}), v: viab('C', F)});
+        L.push({n: 'Anular la factura y facturar la otra', s: sim('A', F, X, {withOp: true}), v: viab('C', F)});
+      }
+    }else{
+      L.push({n: TIPOS_L.A, s: sim('A', F, X), v: viab('A', F)});
+      if(num(S.red) > 0.004) L.push({n: TIPOS_L.B, s: sim('B', F, X), v: viab('B', F)});
+    }
+    let mejor = -1; L.forEach((o, i) => { if(o.v.k !== 'no' && (mejor < 0 || o.s.neto > L[mejor].s.neto)) mejor = i; });
+    const sg = x => x > 0.004 ? '+' : x < -0.004 ? '−' : '';
+    let h = '<p class="aju-note">Todo en simulación: no se modifica ninguna factura. Neto tras IVA y 130 (estimado), frente a ' + (cfgOp ? 'dejar las dos operaciones como están' : 'la factura tal cual') + ' (' + eur(b0.neto) + ').</p>' + caus;
+    if(!cfgOp) h += '<p class="aju-note">Para comparar más soluciones, elige «Compensar facturas» y la otra operación.</p>';
+    L.forEach((o, i) => {
+      const d = r2(o.s.neto - b0.neto), st = o.v.k === 'ok' ? 'Viable' : o.v.k === 'cond' ? 'Condicionada: ' + o.v.motivos[0] : 'No viable: ' + o.v.motivos[0];
+      h += '<div class="aju-opt' + (i === mejor ? ' best' : '') + (o.v.k === 'no' ? ' off' : '') + '"><div class="t">' + o.n + (i === mejor ? ' <span class="aju-tag ok">Mayor neto</span>' : '') + '</div>'
+        + '<div class="s">Devolvemos ' + eur(o.s.weOwe) + ' · Nos pagan ' + eur(o.s.theyOwe) + (cfgOp ? ' · Saldo tras compensar: ' + (o.s.P > 0.004 ? 'nos deben ' + eur(o.s.P) : o.s.P < -0.004 ? 'debemos ' + eur(-o.s.P) : 'saldado') : '') + '</div>'
+        + '<div class="n">' + eur(o.s.neto) + ' <small style="font-size:13px;font-weight:600;color:' + (d > 0.004 ? 'var(--green,#2f7a4f)' : d < -0.004 ? 'var(--red,#b3362b)' : 'var(--ink-soft,#777)') + '">' + (Math.abs(d) < 0.005 ? 'igual que antes' : sg(d) + eur(Math.abs(d))) + '</small></div><div class="s">' + esc(st) + '</div></div>';
     });
-    if(!mejor) h += '<p class="aju-note">Ninguna opción es viable todavía, así que no se recomienda ninguna.</p>';
+    if(mejor >= 0 && L[mejor].v.k !== 'ok') h += '<p class="aju-note">La de mayor neto es condicionada: solo vale si se cumplen las condiciones indicadas.</p>';
+    else if(mejor < 0) h += '<p class="aju-note">Ninguna opción es viable, así que no se recomienda ninguna.</p>';
     return h;
   }
   function detalles(F, X, s, b0){
     const l = (a, b, t) => '<div class="aju-l"><span>' + a + '</span><span>' + b + (t || '') + '</span></div>';
     let h = '';
     h += '<p class="aju-note"><b>Quién debe a quién</b></p>' + l('Nosotros debemos', eur(s.weOwe)) + l('Nos deben', eur(s.theyOwe)) + l('Compensable', eur(s.compensable)) + l('Saldo pendiente', s.P > 0.004 ? 'Nos deben ' + eur(s.P) : s.P < -0.004 ? 'Debemos ' + eur(-s.P) : 'Saldado');
-    if(S.tipo === 'C' || S.tipo === 'D'){ if(dif(F)) h += '<div class="aju-warn">«' + esc(S.op.parte) + '» no es el cliente de la factura («' + esc(F.client) + '»): no se da por hecho que sean el mismo deudor.</div>'; }
     if(!X.ok) h += '<div class="aju-warn">No hay datos fiscales reales para esta factura: los resultados no incluyen el IRPF.</div>';
     h += '<p class="aju-note" style="margin-top:12px"><b>Factura</b></p>' + l('Importes de la factura ' + esc(F.num), eur(F.base) + ' + ' + eur(F.iva) + ' = ' + eur(F.total), F.manual ? EST : OK) + l('Cobrado', eur(F.cobrado), F.manual ? EST : OK);
     if(Math.abs(r2(F.base + F.iva) - F.total) >= 0.005) h += '<div class="aju-warn">Diferencia de ' + eur(Math.abs(r2(F.base + F.iva) - F.total)) + ' entre base + IVA (' + eur(F.base + F.iva) + ') y el total (' + eur(F.total) + ').</div>';
@@ -351,7 +428,7 @@
         + l('IVA que cambia con este ajuste', (s.ivaNeta - b0.ivaNeta > 0 ? '+' : '') + eur(s.ivaNeta - b0.ivaNeta), EST) + l('Resultado del 303 tras el ajuste', eur(X.res303 + s.ivaNeta - b0.ivaNeta), EST)
         + l('IVA efectivamente ingresado', X.pago ? eur(X.pago.importe) + ' el ' + fmtF(X.pago.fecha) : 'No consta', X.pago ? OK : PEN)
         + l('IVA pendiente de liquidar', ab ? eur(Math.max(0, X.res303 + s.ivaNeta - b0.ivaNeta)) : 'Sin determinar', ab ? EST : PEN);
-      h += '<p class="aju-note" style="margin-top:12px"><b>IRPF · modelo 130</b></p>'
+      h += '<p class="aju-note" style="margin-top:12px"><b>IRPF · modelo 130 (pago a cuenta, no el IRPF anual)</b></p>'
         + l('Ingresos acumulados del ejercicio', eur(c.R.ing), EST) + l('Gastos computables acumulados', eur(c.R.gas), EST) + l('Rendimiento neto acumulado', eur(c.rend), EST)
         + l('Declarado hasta el ' + c.R.p + 'T (modelos 130 presentados)', eur(c.R.ingDecl) + ' ingresos · ' + eur(c.R.gasDecl) + ' gastos', c.R.desdeDecl ? OK : '')
         + l('Pagos fraccionados anteriores (130)', eur(c.previos), c.faltan.length ? PEN : OK)
@@ -375,7 +452,7 @@
     try{ const {error} = await sb.from('sistema').insert({tipo: 'simulacion_ajuste', data: {nombre, estado: 'guardada', estado_calc: JSON.parse(JSON.stringify(S))}}); if(error) throw error; _guardadas = null; pintarGuardadas(); if(typeof mostrarToast === 'function') mostrarToast('Simulación guardada', 'ok'); }
     catch(e){ if(typeof mostrarToast === 'function') mostrarToast('No se pudo guardar', 'err'); }
   }
-  function cargar(id){ const r = (_guardadas || []).find(x => x.id === id); if(!r || !(r.data || {}).estado_calc) return; S = Object.assign(nuevoEstado(), r.data.estado_calc); S.op = Object.assign(nuevoEstado().op, S.op); S.manual = Object.assign(nuevoEstado().manual, S.manual); _fisc = null; sheet = null; pintar(); root.scrollTo({top: 0}); }
+  function cargar(id){ const r = (_guardadas || []).find(x => x.id === id); if(!r || !(r.data || {}).estado_calc) return; S = Object.assign(nuevoEstado(), r.data.estado_calc); S.op = Object.assign(nuevoEstado().op, S.op); if(S.tipo === 'C' || S.tipo === 'D') S.tipo = 'K'; if(!S.causaTipo && S.causa) S.causaTipo = S.causa === 'justificada' ? 'error' : S.causa === 'sin' ? 'ninguna' : ''; if(!S.op.fuente && num(S.op.base) > 0) S.op.fuente = 'otra'; S.manual = Object.assign(nuevoEstado().manual, S.manual); _fisc = null; sheet = null; pintar(); root.scrollTo({top: 0}); }
   async function borrar(id){ if(!window.confirm('¿Borrar esta simulación?')) return; try{ const {error} = await sb.from('sistema').delete().eq('id', id); if(error) throw error; _guardadas = null; pintarGuardadas(); }catch(e){ if(typeof mostrarToast === 'function') mostrarToast('No se pudo borrar', 'err'); } }
 
   A._test = {sim, base0, viab, resolver, fiscal, facturaCtx, get S(){ return S; }, set S(v){ S = v; }, nuevoEstado, num};
