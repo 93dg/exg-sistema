@@ -197,6 +197,7 @@
 #aju-app textarea.as-tx{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--line,#ddd);border-radius:12px;background:#fff;font:inherit;font-size:15.5px;line-height:1.4;color:inherit;resize:vertical;}
 #aju-app .as-ent{margin:8px 0;padding:8px 12px;border-radius:12px;background:#eef3ee;font-size:13.5px;line-height:1.45;}
 #aju-app .as-q{margin:10px 0;padding:10px 12px;border-radius:14px;background:#fff;border:2px solid var(--ink,#222);} #aju-app .as-bt{display:grid;gap:6px;margin-top:8px;} #aju-app .as-bt .btn{width:100%;padding:12px;text-align:left;}
+#aju-app .as-tb{margin:6px 0;background:#fff;border:1px solid var(--line,#ddd);border-radius:12px;overflow:hidden;} #aju-app .as-r{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:6px;padding:7px 10px;border-top:1px solid var(--line,#eee);font-size:13px;align-items:center;} #aju-app .as-r:first-child{border-top:none;} #aju-app .as-r span+span{text-align:right;} #aju-app .as-r.h{font-size:11.5px;text-transform:uppercase;color:var(--ink-soft);} #aju-app .as-r.t{background:#f4f1ea;}
 #aju-app .as-paso{border:1px solid var(--line,#ddd);border-radius:14px;background:#fff;padding:10px 12px;margin:8px 0;} #aju-app .as-paso .t{font-weight:700;margin-bottom:4px;} #aju-app .as-paso .aju-l{display:block;padding:6px 0;} #aju-app .as-paso .aju-l span:first-child{display:block;font-size:12.5px;color:var(--ink-soft);} #aju-app .as-paso .aju-l span:last-child{display:block;text-align:left;font-size:15px;margin-top:1px;}
 #aju-app .as-paso .n{display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:var(--ink,#222);color:#fff;font-size:12px;margin-right:8px;}`;
     document.head.appendChild(s);
@@ -465,7 +466,8 @@
   async function borrar(id){ if(!window.confirm('¿Borrar esta simulación?')) return; try{ const {error} = await sb.from('sistema').delete().eq('id', id); if(error) throw error; _guardadas = null; pintarGuardadas(); }catch(e){ if(typeof mostrarToast === 'function') mostrarToast('No se pudo borrar', 'err'); } }
 
   // ---------- asesor: escribe el problema y propone la solución ----------
-  const AS = {on: false, texto: '', facturaId: null, albId: '', correcto: null, corrSrc: '', causaTipo: '', causaTxt: '', ivaEdit: false, mismo: null, sinAnular: false};
+  const numE = v => { const t = String(v == null ? '' : v).trim(); return /^\d{1,3}\.\d{3}$/.test(t) ? num(t.replace('.', '')) : num(t); };
+  const AS = {on: false, texto: '', facturaId: null, albId: '', rect: '', just: '', rSrc: '', causaTipo: '', causaTxt: '', ivaEdit: false, mismo: null, sinAnular: false};
   const TEXTO0 = 'Encarni nos pagó 11.243,07 € por la factura 5, que consideramos errónea. Alejandro nos debe 3.690,50 € por el albarán A22 (trabajos realizados). Quiero resolver las dos cosas sin perder dinero.';
   const nm = s => String(s || '').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
   const prim = s => nm(s).split(' ')[0];
@@ -485,10 +487,9 @@
     AS.sinAnular = /no\s+(?:podemos|se\s+puede|hay)[^.]{0,40}anula/i.test(t);
     if(!AS.causaTipo && /(error|equivoc)/i.test(t)){ AS.causaTipo = 'error'; AS._cAuto = true; } else if(AS._cAuto && !/(error|equivoc)/i.test(t)){ AS.causaTipo = ''; AS._cAuto = false; }
     const F = asF(); let c = null, mm;
-    if((mm = /(?:deb(?:e|er[ií]a)\s+ser|importe\s+correcto|correcto\s+es|real\s+es|quedar(?:se)?\s+en|dejar(?:la)?\s+en)\s*(?:de\s*)?([\d.,]+)/i.exec(t))){ c = num(mm[1]); if(/con\s+iva/i.test(t) && F) c = r2(c / (1 + (F.isp ? 0 : F.ivaPct / 100))); }
-    else if((mm = /(?:descontar|rebajar|quitar|restar)\s*(?:le\s*)?(?:los|las|el|la)?\s*([\d.,]+)/i.exec(t))){ if(F) c = r2(F.base - num(mm[1])); }
-    else if(!AS.sinAnular && /\banul(ar|a|ada|aci[oó]n)\b|\bentera\b/i.test(t)) c = 0;
-    if(c != null){ AS.correcto = c; AS.corrSrc = 'texto'; } else if(AS.corrSrc === 'texto'){ AS.correcto = null; AS.corrSrc = ''; }
+    if((mm = /(?:rectific\w*|descontar|rebajar|restar|quitar|devolver)\s+(?:solo\s+|sólo\s+|unos\s+)?(?:los\s+|las\s+)?([\d.,]+\d)/i.exec(t))) c = num(mm[1]);
+    else if(!AS.sinAnular && F && /\banul(ar|a|ada|aci[oó]n)\b|\bentera\b/i.test(t)) c = F.base;
+    if(c != null){ AS.rect = fmtIn(c); AS.rSrc = 'texto'; } else if(AS.rSrc === 'texto'){ AS.rect = ''; AS.rSrc = ''; }
   }
   function asCalc(){
     S.facturaId = AS.facturaId; S.tipo = 'K'; S.causaTipo = AS.causaTipo; S.causaTxt = AS.causaTxt; S.red = '';
@@ -496,13 +497,19 @@
     const X = fiscal(F), alb = AS.albId ? (documentosRealesById || {})[AS.albId] : null;
     if(alb){ S.op.fuente = 'alb'; S.op.base = fmtIn(baseAlb(alb)); S.op.parte = AS.mismo ? F.client : (alb.client || ''); S.op.ref = alb.num || alb.numero || ''; S.op.sentido = 'nosotros'; S.op.real = true; if(!AS.ivaEdit) S.op.iva = String(Number(alb.ivaPct) || 21); }
     else { S.op.base = ''; S.op.fuente = ''; S.op.parte = ''; S.op.ref = ''; }
-    const b0 = base0(F, X);
-    if(AS.correcto == null) return {F, X, alb, b0, falta: true};
-    const noRect = AS.causaTipo === 'ninguna', C = noRect ? F.base : r2(Math.min(F.base, Math.max(0, AS.correcto))), r = F.isp ? 0 : F.ivaPct / 100;
-    const sR = sim('B', F, X, {Bf: C}), sC = alb ? sim('C', F, X, {Bf: C}) : sR, v = viab(alb ? 'C' : 'B', F);
-    const dBase = r2(F.base - C), dIva = r2(dBase * r), newIva = r2(C * r);
-    return {F, X, alb, b0, C, noRect, v, sR, sC, dBase, dIva, dTot: r2(dBase + dIva), newIva, newTot: r2(C + newIva), R: sR.weOwe, A: alb ? sC.T2 : 0, P: sC.P,
-      ivaR: r2(sR.ivaNeta - b0.ivaNeta), irpfR: r2(sR.att - b0.att), ivaA: r2(sC.ivaNeta - sR.ivaNeta), irpfA: r2(sC.att - sR.att)};
+    const b0 = base0(F, X), r = F.isp ? 0 : F.ivaPct / 100, TOL = 0.015;
+    const fin = R => { R = r2(Math.min(F.base, Math.max(0, R))); return alb ? sim('C', F, X, {Bf: r2(F.base - R)}) : sim('B', F, X, {Bf: r2(F.base - R)}); };
+    const loss = R => r2(b0.neto - fin(R).neto);
+    let Rs = null;
+    if(loss(F.base) <= TOL) Rs = F.base;
+    else if(loss(0) <= TOL){ let lo = 0, hi = F.base; for(let i = 0; i < 60; i++){ const m = (lo + hi) / 2; if(loss(m) <= 0) lo = m; else hi = m; } Rs = r2(lo); }
+    const J = String(AS.just).trim() === '' ? null : Math.min(F.base, Math.max(0, numE(AS.just)));
+    const hasR = String(AS.rect).trim() !== '', R = hasR ? r2(Math.min(F.base, Math.max(0, numE(AS.rect)))) : null;
+    const out = {F, X, alb, b0, r, Rs, J, R, hasR, sEq: Rs != null ? fin(Rs) : null, lossEq: Rs != null ? loss(Rs) : null, lossJ: J != null ? loss(J) : null, ivaEq: Rs != null ? r2(Rs * r) : null};
+    if(!hasR) return out;
+    const sC = fin(R), v = viab(alb ? 'C' : 'B', F);
+    return Object.assign(out, {C: r2(F.base - R), sC, v, dBase: R, dIva: r2(R * r), dTot: r2(R * (1 + r)), newIva: sC.IVAf, newTot: sC.Tf, Rdev: sC.weOwe, A: alb ? sC.T2 : 0, P: sC.P, loss: loss(R),
+      ivaR: r2(fin(R).ivaNeta - fin(0).ivaNeta + (alb ? 0 : 0)), irpfR: r2(sC.att - b0.att)});
   }
   async function abrirAsesor(){
     css(); AS.on = true;
@@ -538,88 +545,98 @@
     const optF = L.map(d => '<option value="' + d.id + '"' + (AS.facturaId === d.id ? ' selected' : '') + '>' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 20) + ' · ' + eur(d.total)) + '</option>').join('');
     const optA = '<option value="">— ninguna —</option>' + AL.map(d => '<option value="' + d.id + '"' + (AS.albId === d.id ? ' selected' : '') + '>' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 20) + ' · ' + eur(baseAlb(d))) + '</option>').join('');
     if(!c.F) return '<div class="aju-warn">No sé a qué factura te refieres. ¿Cuál es?</div><select data-k="as.fac"><option value="">Elegir factura…</option>' + optF + '</select>';
-    const F = c.F; let h = '<div class="as-ent"><div><b>Factura ' + esc(F.num) + '</b> · ' + esc(nm(F.client)) + ' · ' + (F.cobrado >= F.total - 0.005 ? 'cobrada ' : 'cobrado ') + eur(F.cobrado) + ' de ' + eur(F.total) + '</div>'
+    const F = c.F; let h = '<div class="as-ent"><div><b>Factura ' + esc(F.num) + '</b> · ' + esc(nm(F.client)) + ' · ' + (F.cobrado >= F.total - 0.005 ? 'cobrada ' : 'cobrado ') + eur(F.cobrado) + ' de ' + eur(F.total) + ' (base ' + eur(F.base) + ' + IVA ' + eur(F.iva) + ')</div>'
       + (c.alb ? '<div><b>Albarán ' + esc(S.op.ref) + '</b> · ' + esc(nm(S.op.parte)) + ' · ' + eur(num(S.op.base)) + ' sin IVA</div>' : '<div class="aju-note" style="margin:0">Sin albarán ni otra factura.</div>') + '</div>';
     h += '<details class="aju-det"><summary>Cambiar factura o albarán</summary><label class="aju-f"><span>Factura</span><select data-k="as.fac">' + optF + '</select></label><label class="aju-f"><span>Albarán o trabajo pendiente de facturar</span><select data-k="as.alb">' + optA + '</select></label><label class="aju-f"><span>¿Quién debe ese trabajo?</span><select data-k="as.mismo"><option value=""' + (!AS.mismo ? ' selected' : '') + '>La persona del albarán</option><option value="1"' + (AS.mismo ? ' selected' : '') + '>La misma de la factura (' + esc(prim(F.client)) + ')</option></select></label></details>';
-    const q = [];
-    if(c.falta){
-      const ab = c.alb ? num(S.op.base) : 0;
-      q.push('<div class="as-q"><b>¿Qué importe sin IVA debería tener la factura de ' + esc(prim(F.client)) + '?</b><div class="as-bt">'
-        + (c.alb && ab > 0 && ab < F.base ? '<button type="button" class="btn" data-act="as-c" data-v="' + r2(F.base - ab) + '">Quitar los ' + eur(ab) + ' del trabajo de ' + esc(prim(S.op.parte)) + ' → ' + eur(F.base - ab) + '</button>' : '')
-        + (AS.sinAnular ? '' : '<button type="button" class="btn" data-act="as-c" data-v="0">Anularla entera → 0 €</button>') + '</div>'
-        + '<div class="aju-row" style="margin-top:6px"><label class="aju-f"><span>Otro importe (sin IVA)</span><input data-k="as.otro" inputmode="decimal" autocomplete="off"></label></div></div>');
-    }else{
-      q.push('<div class="aju-note" style="margin:6px 0">Importe correcto de la factura: <b>' + eur(c.C) + '</b> sin IVA <a href="#" data-act="as-reset" style="color:var(--ink,#222)">cambiar</a></div>');
-    }
-    q.push('<label class="aju-f"><span>¿Por qué es errónea? (causa real)</span><select data-k="as.causa"><option value="">Elegir causa…</option>' + CAUSAS.map(x => '<option value="' + x[0] + '"' + (AS.causaTipo === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label>'
-      + (AS.causaTipo && AS.causaTipo !== 'ninguna' ? '<label class="aju-f"><span>Detalle' + (AS.causaTipo === 'otro' ? '' : ' (opcional)') + '</span><input type="text" data-k="as.causaTxt" maxlength="120" value="' + esc(AS.causaTxt) + '" placeholder="Qué ocurrió"></label>' : ''));
-    return h + q.join('');
+    h += '<label class="aju-f"><span>Cuánto rectificar de la factura (sin IVA)</span><input data-k="as.rect" inputmode="decimal" autocomplete="off" value="' + esc(AS.rect) + '" placeholder="Ej.: 1.500,00"></label>'
+      + (c.Rs != null ? '<div class="aju-btns" style="margin:2px 0 6px"><button type="button" class="btn" data-act="as-eq">Poner el punto de equilibrio: ' + eur(c.Rs) + '</button></div>' : '')
+      + '<label class="aju-f"><span>Importe que podemos justificar por errores administrativos (sin IVA)</span><input data-k="as.just" inputmode="decimal" autocomplete="off" value="' + esc(AS.just) + '" placeholder="Si no lo sabes, déjalo vacío"></label>'
+      + '<label class="aju-f"><span>Causa real del error</span><select data-k="as.causa"><option value="">Elegir causa…</option>' + CAUSAS.map(x => '<option value="' + x[0] + '"' + (AS.causaTipo === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label>'
+      + (AS.causaTipo && AS.causaTipo !== 'ninguna' ? '<label class="aju-f"><span>Detalle' + (AS.causaTipo === 'otro' ? '' : ' (opcional)') + '</span><input type="text" data-k="as.causaTxt" maxlength="120" value="' + esc(AS.causaTxt) + '" placeholder="Qué ocurrió"></label>' : '');
+    return h;
   }
   function asSol(c){
     if(!c.F) return '<p class="aju-note">Primero dime de qué factura se trata.</p>';
-    if(c.falta) return '<p class="aju-note">Responde la pregunta de arriba y te digo qué hacer.</p>';
-    const F = c.F, cl = nm(F.client), pa = nm(S.op.parte), p = (n, t, b) => '<div class="as-paso"><div class="t"><span class="n">' + n + '</span>' + t + '</div>' + b + '</div>', l = (a, b) => '<div class="aju-l"><span>' + a + '</span><span>' + b + '</span></div>';
+    const F = c.F, pa = nm(S.op.parte), p = (n, t, b) => '<div class="as-paso"><div class="t"><span class="n">' + n + '</span>' + t + '</div>' + b + '</div>', l = (a, b) => '<div class="aju-l"><span>' + a + '</span><span>' + b + '</span></div>';
     let h = '';
-    if(c.noRect){
-      h += '<div class="aju-warn"><b>Sin causa real no se puede rectificar.</b> La factura de ' + esc(prim(F.client)) + ' se queda como está. Si hay un error real, documéntalo antes de rectificar.</div>';
-    }else{
-      h += p(1, 'Rectificativa a ' + esc(prim(F.client)), l('Rectificar de la factura ' + esc(F.num), 'base −' + eur(c.dBase) + ' · IVA −' + eur(c.dIva)) + l('Debe quedar facturado', '<b>' + eur(c.C) + '</b> + IVA ' + eur(c.newIva) + ' = <b>' + eur(c.newTot) + '</b>'));
+    // punto de equilibrio
+    let eq = '';
+    if(c.Rs == null) eq = '<div class="aju-warn"><b>No hay punto de equilibrio:</b> aunque no rectifiques nada, la empresa pierde dinero con estas cifras.</div>';
+    else {
+      eq += l('Rectificar como máximo sin perder', '<b>' + eur(c.Rs) + '</b> sin IVA · IVA ' + eur(c.ivaEq) + ' · ' + eur(r2(c.Rs + c.ivaEq)) + ' con IVA')
+        + l('Comprobado: pérdida con ese importe', '<b>' + (Math.abs(c.lossEq) <= 0.015 ? '0,00 €' : eur(c.lossEq)) + '</b>');
+      if(c.Rs >= F.base - 0.005) eq += '<div class="aju-note" style="margin:2px 0 0">Aunque se rectificara la factura entera la empresa no pierde.</div>';
+      if(c.J != null){
+        const d = r2(c.Rs - c.J);
+        eq += l('Justificable', '<b>' + eur(c.J) + '</b> sin IVA');
+        eq += c.J > c.Rs + 0.004
+          ? '<div class="aju-warn" style="margin-top:6px"><b>Pérdida si rectificas todo lo justificable:</b> ' + eur(c.lossJ) + ' netos. Rectificar más de ' + eur(c.Rs) + ' no sale a cuenta.</div>'
+          : '<div class="aju-note" style="margin-top:6px">' + (Math.abs(d) <= 0.004 ? 'Lo justificable coincide con el punto de equilibrio: pérdida exactamente 0 €.' : 'Con lo justificable (' + eur(c.J) + ') la empresa <b>no pierde</b>: gana ' + eur(-c.lossJ) + ' netos respecto a hoy. Llegar a pérdida exactamente 0 € exigiría rectificar ' + eur(d) + ' más, que no se puede justificar.') + '</div>';
+      }
     }
+    h += p('=', 'Punto de equilibrio', eq);
+    if(!c.hasR) return h + '<p class="aju-note">Escribe cuánto vas a rectificar y te digo cuánto facturar, devolver y cobrar.</p>';
+    if(AS.causaTipo === 'ninguna') return h + '<div class="aju-warn"><b>Sin causa real no se puede rectificar.</b> La factura se queda como está.</div>';
+    if(c.J != null && c.R > c.J + 0.004) h += '<div class="aju-warn"><b>Rectificas ' + eur(c.R) + ' pero solo puedes justificar ' + eur(c.J) + '.</b></div>';
+    h += p(1, 'Rectificativa a ' + esc(prim(F.client)), l('Rectificar de la factura ' + esc(F.num), 'base −' + eur(c.dBase) + ' · IVA −' + eur(c.dIva) + ' · total −' + eur(c.dTot)) + l('Debe quedar facturado', '<b>' + eur(c.C) + '</b> + IVA ' + eur(c.newIva) + ' = <b>' + eur(c.newTot) + '</b>'));
     if(c.alb){
-      h += p(c.noRect ? 1 : 2, 'Factura a ' + esc(prim(S.op.parte)), l('Por el albarán ' + esc(S.op.ref), '<b>' + eur(c.sC.B2) + '</b> + IVA ' + eur(c.sC.IVA2) + ' = <b>' + eur(c.sC.T2) + '</b>')
+      h += p(2, 'Factura a ' + esc(prim(S.op.parte)), l('Por el albarán ' + esc(S.op.ref), '<b>' + eur(c.sC.B2) + '</b> + IVA ' + eur(c.sC.IVA2) + ' = <b>' + eur(c.sC.T2) + '</b>')
         + '<div class="aju-note" style="margin:2px 0 0">IVA del ' + (AS.ivaEdit ? '<input data-k="op.iva" inputmode="decimal" value="' + esc(S.op.iva) + '" style="width:56px;padding:3px 6px;display:inline-block"> %' : esc(S.op.iva) + ' % (el del albarán) <a href="#" data-act="as-iva" style="color:var(--ink,#222)">cambiar</a>') + '</div>');
     }
-    const n = (c.noRect ? 1 : 1) + (c.noRect ? 0 : 1) + (c.alb ? 1 : 0);
     let din = '';
-    if(c.R > 0.004) din += l('Devolver a ' + esc(prim(F.client)), '<b class="r">' + eur(c.R) + '</b>');
-    if(c.sR.cobrar > 0.004) din += l(esc(prim(F.client)) + ' todavía debe', '<b class="g">' + eur(c.sR.cobrar) + '</b>');
-    if(c.A > 0.004) din += l(esc(prim(S.op.parte)) + ' debe pagar', '<b class="g">' + eur(c.A) + '</b>');
-    if(!din) din = '<div class="aju-note" style="margin:0">No hay dinero que devolver ni cobrar.</div>';
-    if(c.alb && c.R > 0.004 && c.A > 0.004){
+    din += l('Devolver por la rectificativa', '<b class="r">' + eur(c.Rdev - (c.alb ? 0 : 0)) + '</b>');
+    if(c.sC.cobrar > 0.004 && !c.alb) din += l(esc(prim(F.client)) + ' todavía debe', '<b class="g">' + eur(c.sC.cobrar) + '</b>');
+    if(c.alb) din += l('Cobrar por el trabajo', '<b class="g">' + eur(c.A) + '</b>');
+    if(c.alb){
       const mism = norm(S.op.parte) === norm(F.client);
-      din += '<div class="aju-note" style="margin-top:6px">' + (mism ? 'Es la misma persona: se puede compensar directamente una deuda con la otra.' : '<b>Compensación:</b> ' + esc(prim(F.client)) + ' y ' + esc(prim(S.op.parte)) + ' son personas distintas, así que la ley no compensa estas deudas por sí sola. Se puede hacer con un acuerdo escrito de los tres: la devolución de ' + esc(prim(F.client)) + ' se aplica a la deuda de ' + esc(prim(S.op.parte)) + '. Confírmalo con el gestor.') + '</div>'
-        + '<div class="aju-l"><span>' + (mism ? 'Compensando' : 'Con ese acuerdo') + '</span><span><b>' + (Math.abs(c.P) < 0.05 ? 'no hace falta mover dinero' : c.P > 0 ? esc(prim(S.op.parte)) + ' paga ' + eur(c.P) : 'devolvemos ' + eur(-c.P) + ' a ' + esc(prim(F.client))) + '</b></span></div>';
+      din += '<div class="aju-note" style="margin-top:6px">' + (mism ? 'Es la misma persona: se puede compensar directamente una deuda con la otra.' : '<b>Compensación:</b> son personas distintas; hace falta un acuerdo escrito de los tres. Confírmalo con el gestor.') + '</div>'
+        + l('Dinero que tiene que moverse', '<b>' + (Math.abs(c.P) < 0.05 ? 'ninguno (se compensa)' : c.P > 0 ? 'cobramos ' + eur(c.P) : 'devolvemos ' + eur(-c.P)) + '</b>');
     }
-    h += p(n, 'Dinero', din);
-    if(c.X && c.X.qAplica) h += '<p class="aju-note">Las facturas se declaran en el 303 y el 130 del ' + c.X.qAplica + 'T ' + F.anio + ' (el trimestre abierto en que se emiten).</p>';
+    h += p(c.alb ? 3 : 2, 'Dinero', din);
+    if(c.X && c.X.qAplica) h += '<p class="aju-note">Se declaran en el 303 y el 130 del ' + c.X.qAplica + 'T ' + F.anio + '.</p>';
     return h;
   }
   function asRes(c){
-    if(!c.F || c.falta) return '<p class="aju-note">Pendiente de calcular.</p>';
-    const F = c.F, X = c.X, dN = r2(c.sC.neto - c.b0.neto), ir = x => X.ok ? sgn(x) + eur(Math.abs(x)) : 'Pendiente';
-    const row = (a, b, cl, big) => '<div class="l' + (big ? ' big' : '') + '"><span>' + a + '</span><b class="' + (cl || '') + '">' + b + '</b></div>';
-    const efecto = r2(c.ivaR + c.ivaA + (X.ok ? c.irpfR + c.irpfA : 0));
+    if(!c.F) return '<p class="aju-note">Pendiente de calcular.</p>';
+    if(!c.hasR) return '<p class="aju-note">Pendiente de calcular: escribe cuánto rectificar.</p>';
+    const F = c.F, X = c.X, s = c.sC, b = c.b0, ok = X.ok;
+    const row = (a, x, y, cls) => '<div class="as-r ' + (cls || '') + '"><span>' + a + '</span><span>' + x + '</span><span>' + y + '</span></div>';
+    const dd = v => Math.abs(v) < 0.005 ? '0,00 €' : sgn(v) + eur(Math.abs(v));
+        const issued = c.alb ? s.T2 : 0;
+    const t = '<div class="as-tb"><div class="as-r h"><span></span><span>Hoy</span><span>Después</span></div>'
+      + row('Factura ' + esc(F.num) + ' que nos quedamos', eur(F.total), eur(s.Tf))
+      + (c.alb ? row('Trabajo ' + esc(S.op.ref) + ' (cobrado o compensado)', '—', eur(issued)) : '')
+      + row('= Dinero que entra', '<b>' + eur(F.total) + '</b>', '<b>' + eur(s.valor) + '</b>', 't')
+      + row('− IVA a pagar (303)', eur(b.ivaNeta), eur(s.ivaNeta))
+      + row('− IRPF adelantado (130)' + (ok ? '' : ' <small>sin datos</small>'), ok ? eur(b.att) : '—', ok ? eur(s.att) : '—')
+      + row('= Queda en la empresa', '<b>' + eur(b.neto) + '</b>', '<b>' + eur(s.neto) + '</b>', 't')
+      + '</div>';
+    const loss = c.loss;
     let h = '<div class="aju-v ' + c.v.k + '"><b>' + c.v.txt + '</b>' + (c.v.motivos.length ? ' · ' + esc(c.v.motivos.join(' · ')) : '') + '</div>';
-    h += '<div class="aju-cmpb">' + row('Queda en la empresa, tras impuestos', eur(c.sC.neto), '', true) + row('Hoy, lo cobrado de ' + esc(prim(F.client)) + ' tras impuestos', eur(c.b0.neto)) + row('Diferencia', Math.abs(dN) < 0.05 ? 'Sin pérdida' : sgn(dN) + eur(Math.abs(dN)), Math.abs(dN) < 0.05 ? 'g' : dN > 0 ? 'g' : 'r', true) + '</div>';
-    if(Math.abs(dN) >= 0.05) h += '<p class="aju-note">' + (dN < 0 ? 'La empresa deja de ingresar ' + eur(-dN) + ' netos: es la parte de la factura que no correspondía.' : 'La empresa gana ' + eur(dN) + ' netos más que hoy.') + '</p>';
-    h += '<div class="aju-grp">Impuestos <i class="aju-tag est">estimado</i></div><div class="aju-cmpb">'
-      + (c.noRect ? '' : row('Rectificativa · IVA / IRPF (130)', sgn(c.ivaR) + eur(Math.abs(c.ivaR)) + ' / ' + ir(c.irpfR)))
-      + (c.alb ? row('Factura de ' + esc(prim(S.op.parte)) + ' · IVA / IRPF', sgn(c.ivaA) + eur(Math.abs(c.ivaA)) + ' / ' + ir(c.irpfA)) : '')
-      + row('Efecto fiscal total', sgn(efecto) + eur(Math.abs(efecto)), '', true) + '</div>';
-    if(X.pend.length) h += '<p class="aju-note">Impuestos estimados: faltan datos (no hay 303 registrado, etc.). Detalle en «Ver cómo se ha calculado».</p>';
-    if(!X.ok) h += '<p class="aju-note">Sin IRPF: no hay trimestre abierto donde calcularlo.</p>';
+    h += t + '<div class="aju-cmpb"><div class="l big"><span>' + (loss > 0.015 ? 'Pérdida neta' : loss < -0.015 ? 'Ganancia neta' : 'Pérdida neta') + '</span><b class="' + (loss > 0.015 ? 'r' : 'g') + '">' + (Math.abs(loss) <= 0.015 ? '0,00 €' : eur(Math.abs(loss))) + '</b></div></div>';
+    h += '<p class="aju-note">Pérdida = lo que queda hoy (nos quedamos los ' + eur(F.total) + ' y no cobramos el trabajo) menos lo que queda después. Lo devuelto no se resta aparte: ya está en la fila de la factura. IVA e IRPF estimados.' + (X.pend.length ? ' Faltan datos fiscales (p. ej. no hay 303 registrado): ver «Ver cómo se ha calculado».' : '') + '</p>';
     return h;
   }
   function asDetalle(){
-    const c = asCalc(); if(!c.F || c.falta) return '<p class="aju-note">Falta información para calcular.</p>';
+    const c = asCalc(); if(!c.F || !c.hasR) return '<p class="aju-note">Falta información para calcular.</p>';
     return detalles(c.F, c.X, c.sC, c.b0);
   }
   function asCambia(k, el, fin){
     const v = el.type === 'checkbox' ? el.checked : el.value;
     if(k === 'as.texto'){ AS.texto = v; try{ localStorage.setItem('aju_texto', v); }catch(e){} clearTimeout(_asT); _asT = setTimeout(() => { asParse(); asRender(); }, 500); return; }
-    if(k === 'as.fac'){ if(!v) return; AS.facturaId = v; _fisc = null; AS.correcto = null; AS.corrSrc = ''; asRender(); return; }
+    if(k === 'as.fac'){ if(!v) return; AS.facturaId = v; _fisc = null; AS.rect = ''; AS.rSrc = ''; asRender(); return; }
     if(k === 'as.mismo'){ AS.mismo = v === '1' ? true : false; AS._mAuto = false; asRender(); return; }
     if(k === 'as.alb'){ AS.albId = v; AS.ivaEdit = false; asRender(); return; }
     if(k === 'as.causa'){ AS.causaTipo = v; asRender(); return; }
     if(k === 'as.causaTxt'){ AS.causaTxt = v; asRender(true); return; }
-    if(k === 'as.otro'){ if(fin && String(v).trim()){ AS.correcto = Math.max(0, num(v)); AS.corrSrc = 'boton'; asRender(); } return; }
+    if(k === 'as.rect'){ AS.rect = v; AS.rSrc = 'mano'; asRender(true); return; }
+    if(k === 'as.just'){ AS.just = v; asRender(true); return; }
     if(k === 'op.iva'){ S.op.iva = v; if(fin) asRender(true); else { const F = asF(); if(F){ const c = asCalc(); const r = document.getElementById('as-res'); if(r) r.innerHTML = asRes(c); } } return; }
     if(k === 'irpfAnual'){ S.irpfAnual = v; if(fin){ asRender(true); } return; }
   }
   function asAccion(a, b, ev){
     if(a === 'cerrar') cerrar();
-    else if(a === 'as-c'){ AS.correcto = num(b.getAttribute('data-v')); AS.corrSrc = 'boton'; asRender(); }
-    else if(a === 'as-reset'){ if(ev) ev.preventDefault(); AS.correcto = null; AS.corrSrc = ''; asRender(); }
+    else if(a === 'as-eq'){ const c = asCalc(); if(c.Rs != null){ AS.rect = fmtIn(c.Rs); AS.rSrc = 'mano'; asRender(); } }
     else if(a === 'as-iva'){ if(ev) ev.preventDefault(); AS.ivaEdit = true; asRender(true); }
     else if(a === 'det' || a === 'sav'){ sheet = a; pintarSheet(); }
     else if(a === 'sheet0'){ sheet = null; pintarSheet(); }
