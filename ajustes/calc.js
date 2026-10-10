@@ -28,6 +28,7 @@
   // ---------- datos reales ----------
   function docs(){ try{ return Object.values(documentosRealesById || {}); }catch(e){ return []; } }
   function facturas(){ return docs().filter(d => d.type === 'factura' && d.estado !== 'borrador' && d.status !== 'Borrador' && d.estado !== 'anulado' && d.estado_cobro !== 'nula').sort((a, b) => String(b.dateRaw || '').localeCompare(String(a.dateRaw || ''))).slice(0, 80); }
+  function baseAlb(d){ return d.type === 'albaran' ? d.total : (d.base != null ? d.base : d.total); } // el albarán no lleva IVA: su total son las líneas = base
   function albaranes(){ return docs().filter(d => (d.type === 'albaran' || d.type === 'proforma') && d.estado !== 'borrador' && d.status !== 'Borrador' && !['cobrado', 'cobrado_otra', 'anulado', 'nula'].includes(d.estado_cobro)).sort((a, b) => String(b.dateRaw || '').localeCompare(String(a.dateRaw || ''))).slice(0, 40); }
   function deDoc(d){
     const base = r2(d.base != null ? d.base : Number(d.total || 0) - Number(d.iva || 0)), iva = r2(d.iva), total = r2(d.total);
@@ -212,7 +213,7 @@
     if(t === 'A') h += '<p class="aju-note">Se anula la factura entera: base final 0 €.</p>' + causa;
     if(t === 'B' || t === 'C') h += '<div class="aju-row">' + fld('red', 'Reducir la base en (€)', S.red, ' data-lk="red"') + fld('baseFinal', 'Base final (€)', fmtIn(F.base - num(S.red)), ' data-lk="bf"') + '</div>' + causa;
     if(t === 'C' || t === 'D'){
-      const al = albaranes().map(d => '<option value="' + d.id + '">' + esc((d.num || d.numero || '—') + ' · ' + (d.client || '—') + ' · base ' + eur(d.base != null ? d.base : d.total)) + '</option>').join('');
+      const al = albaranes().map(d => '<option value="' + d.id + '">' + esc((d.num || d.numero || '—') + ' · ' + (d.client || '—') + ' · base ' + eur(baseAlb(d))) + '</option>').join('');
       h += '<h4>' + (t === 'C' ? 'Contrafactura' : 'Otra factura u operación') + '</h4><label class="aju-f"><span>Cargar un albarán o proforma sin facturar</span><select data-k="albaran"><option value="">— elegir —</option>' + al + '</select></label>'
         + '<label class="aju-f"><span>Quién la emite</span><select data-k="op.sentido"><option value="nosotros"' + (S.op.sentido === 'nosotros' ? ' selected' : '') + '>Nosotros al cliente (nos deben)</option><option value="cliente"' + (S.op.sentido === 'cliente' ? ' selected' : '') + '>El cliente a nosotros (le debemos)</option></select></label>'
         + '<div class="aju-row">' + fld('op.base', 'Base (€)', S.op.base, ' data-lk="b2"') + fld('op.iva', 'IVA %', S.op.iva) + '</div>'
@@ -235,7 +236,7 @@
     if(k.indexOf('m.') === 0){ S.manual[k.slice(2)] = v; _fisc = null; const f = document.getElementById('aju-fact'); if(f) f.innerHTML = resumenFactura(facturaCtx()); resultados(true); return; }
     if(k === 'causa'){ S.causa = v; resultados(true); return; }
     if(k === 'baseFinal'){ S.red = fmtIn(F.base - num(v)); resultados(true); return; }
-    if(k === 'albaran'){ if(!v) return; const d = (documentosRealesById || {})[v]; if(d){ S.op.base = fmtIn(d.base != null ? d.base : d.total); S.op.parte = d.client || ''; S.op.ref = d.num || d.numero || ''; S.op.sentido = 'nosotros'; S.op.iva = String(Number(d.ivaPct) || 21); }
+    if(k === 'albaran'){ if(!v) return; const d = (documentosRealesById || {})[v]; if(d){ S.op.base = fmtIn(baseAlb(d)); S.op.parte = d.client || ''; S.op.ref = d.num || d.numero || ''; S.op.sentido = 'nosotros'; S.op.iva = String(Number(d.ivaPct) || 21); }
       document.getElementById('aju-inputs').innerHTML = htmlInputs(); resultados(); return; }
     if(k.indexOf('op.') === 0){ const kk = k.slice(3); S.op[kk] = kk === 'real' ? !!v : v; }
     else if(k === 'realesD' || k === 'acuerdo' || k === 'inversa') S[k] = !!v;
