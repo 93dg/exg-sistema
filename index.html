@@ -412,17 +412,6 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 /* ======= LÍNEAS NUEVAS (motor de entradas, pendiente verificar) ======= */
 .ie-faltan{margin:0 0 10px;padding:10px 12px;border:1.5px solid var(--red,#B3261E);border-radius:8px;background:rgba(179,38,30,.08);color:var(--red,#B3261E);font-size:14px;line-height:1.45;font-weight:600;}
 .ie-faltan span{font-weight:500;color:var(--ink);}
-.fc-plegable{position:relative;}
-.fc-plegable .fc-estado-wrap{display:flex;align-items:center;width:100%;grid-column:1/-1;}
-.fc-plegable:not(.abierta) > .fte{display:none !important;}
-.factura-card-movil.fc-gasto.fc-plegable{row-gap:4px;}
-.fc-plegable .fc-total-block{margin-top:2px;}
-.fc-plegable .fc-meta{flex-wrap:wrap;min-width:0;}
-.fc-plegable .fc-meta .fc-meta-ico{min-width:0;overflow-wrap:anywhere;}
-.fc-pleg-btn{margin-left:auto;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer;flex:0 0 auto;}
-.fc-pleg-btn svg{width:18px;height:18px;transition:transform .15s;}
-.fc-plegable.abierta .fc-pleg-btn svg{transform:rotate(180deg);}
-.fc-plegable:not(.abierta) .fc-detalle{display:none;}
 .ie-portada-chk{display:inline-flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;white-space:nowrap;flex:0 0 auto;width:auto;}
 .ie-portada-chk input{width:20px;height:20px;}
 .ie-estado-modo .ie-portada-chk{display:inline-flex !important;align-items:center;width:auto !important;flex:0 0 auto !important;white-space:nowrap;margin:0;}
@@ -4609,7 +4598,7 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 <script src="rentabilidad/rent.js?v=V9.70" defer></script>
 <script src="costes/norm.js?v=V9.70" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.77</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V9.78</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4761,7 +4750,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V9.77</div>
+        <div class="sub" id="version-badge">V9.78</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5798,7 +5787,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
 
       <!-- RESUMEN -->
       <div class="sub-view" id="gpro-resumen" style="display:none;">
-        <!-- V9.77 (Daniel): Resumen y Control fusionados en una sola pantalla: lo mejor de cada una -->
+        <!-- V9.78 (Daniel): Resumen y Control fusionados en una sola pantalla: lo mejor de cada una -->
         <div class="filters" style="margin-bottom:12px;">
           <div class="chip-filter" data-per="mes">Mes</div>
           <div class="chip-filter active" data-per="trim">Trim.</div>
@@ -10707,14 +10696,15 @@ function gastoCardHtml(d, modo){
   if(modo === 'normal'){   // mismo diseño que las tarjetas de Facturas y Albaranes
     const enB = (d.contabilidad || 'oficial') === 'en_b', sinJust = (d.estado_justificante || 'pendiente') !== 'completo';
     const gestor = sinJust && !d.enviado_gestor ? '<span class="pill noadjudicado" title="Falta el justificante">Falta justificante</span>' : '';   // V7.21: sin envío al gestor en la tarjeta
-    const detalle = [motivo ? `<div class="gasto-motivo">${escHtml(motivo)}</div>` : '', consumoGastoHtml(d), adjuntosGastoHtml(d)].join('');
-    const tieneDetalle = !!(d.concepto || detalle.trim());
-    return `<div class="factura-card-movil fc-gasto fc-plegable" data-doc-id="${escHtml(d.id)}">
-      <div class="fc-estado-wrap"><span class="pill borrador">${escHtml(d.categoria || 'Gasto')}</span>${enB ? '<span class="pill mantenimiento" style="margin-left:6px;">En B</span>' : ''}${tieneDetalle ? '<button type="button" class="fc-pleg-btn" aria-label="Ver el detalle" title="Ver el detalle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>' : ''}</div>
+    const extra = [gestor, motivo ? `<div class="gasto-motivo">${escHtml(motivo)}</div>` : '', consumoGastoHtml(d), adjuntosGastoHtml(d)].join('');
+    const impCompacto = (typeof totalBlockHtml === 'function' ? Number(d.importe || d.total || 0) : 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+    return `<div class="factura-card-movil fc-gasto" data-doc-id="${escHtml(d.id)}">
+      <div class="cc-fila-compacta"><span class="fc-tipo-tag">${escHtml(d.categoria || 'Gasto')}</span><span class="cc-fc-cli">${escHtml(prov)}</span><span class="cc-fc-imp">${impCompacto}</span></div>
+      <div class="fc-estado-wrap"><span class="pill borrador">${escHtml(d.categoria || 'Gasto')}</span>${enB ? '<span class="pill mantenimiento" style="margin-left:6px;">En B</span>' : ''}</div>
       <div class="fc-cliente">${escHtml(prov)}</div>
+      <div class="fc-obra">${escHtml(d.concepto || '')}</div>
       <div class="fc-meta"><span class="fc-meta-ico">${ICO_CAL} ${escHtml(fecha)}</span><span class="fc-meta-sep">|</span><span class="fc-meta-ico">${ICO_DOC} Nº ${escHtml(d.numero || '—')}</span></div>
-      ${gestor ? `<div class="fc-extra" style="flex-direction:column;align-items:flex-start;">${gestor}</div>` : ''}
-      <div class="fc-detalle"><div class="fc-obra">${escHtml(d.concepto || '')}</div>${detalle.trim() ? `<div class="fc-extra" style="flex-direction:column;align-items:flex-start;">${detalle}</div>` : ''}</div>
+      ${extra.trim() ? `<div class="fc-extra" style="flex-direction:column;align-items:flex-start;">${extra}</div>` : ''}
       <div class="fc-total-block">${totalBlockHtml(d)}</div>
     </div>`;
   }
@@ -10731,7 +10721,6 @@ function gastoCardHtml(d, modo){
   </div>`;
 }
 function enlazarTarjetasGasto(cont){
-  cont.querySelectorAll('.fc-pleg-btn').forEach(b => { b.onclick = ev => { ev.stopPropagation(); b.closest('.fc-plegable').classList.toggle('abierta'); }; });   // V9.77: tarjetas de gasto plegadas; el chevron enseña el detalle
   cont.querySelectorAll('[data-url]').forEach(b => { b.onclick = ev => { ev.stopPropagation(); abrirVisorDesdeUrl(b.dataset.url); }; });
   cont.querySelectorAll('[data-decidir]').forEach(b => { b.onclick = () => decidirGastoDudoso(b.dataset.id, b.dataset.decidir); });
 }
@@ -11104,7 +11093,16 @@ function pleg2IniciarGastos(){
   ['anio', 'trim', 'tipo', 'cont', 'just', 'orden'].forEach(k => { const e = document.getElementById('gpro-f-' + k); if(e && !e.dataset.listo){ e.dataset.listo = '1'; e.addEventListener('click', ev => gproChipClick(k, ev)); } });
   gproPintarChips([String(new Date().getFullYear())]);
   pleg2Crear({id: 'gpro', despuesDe: '#gpro-panel-head', plegados: ['trim', 'tipo', 'cont', 'just', 'orden'],
-    grupos: [['anio', 'Año', 'gpro-f-anio'], ['trim', 'Trimestre', 'gpro-f-trim'], ['tipo', 'Tipo', 'gpro-f-tipo', 'unico'], ['cont', 'Contab.', 'gpro-f-cont', 'unico'], ['just', 'Justificante', 'gpro-f-just', 'unico'], ['orden', 'Orden', 'gpro-f-orden', 'unico']], cuenta: null});
+    grupos: [['anio', 'Año', 'gpro-f-anio'], ['trim', 'Trimestre', 'gpro-f-trim'], ['tipo', 'Tipo', 'gpro-f-tipo', 'unico'], ['cont', 'Contab.', 'gpro-f-cont', 'unico'], ['just', 'Justificante', 'gpro-f-just', 'unico'], ['orden', 'Orden', 'gpro-f-orden', 'unico']], cuenta: null,
+    extra: {id: 'gpro-vista-btn', titulo: 'Vista plegada de tarjetas', html: ICO_VISTA_PLEGADA, fn: 'gpVistaPlegada', activo: () => window._gpCompacto !== false}});
+}
+// V9.78 (Daniel: «tarjetas plegadas»): la lista de gastos usa la misma vista plegada que Documentos pendientes: una línea por gasto, tocar la despliega. Sale plegada y el botón de los filtros la cambia
+try{ window._gpCompacto = localStorage.getItem('gpro_compacto') !== '0'; }catch(e){ window._gpCompacto = true; }
+function gpVistaPlegada(){
+  window._gpCompacto = window._gpCompacto === false; try{ localStorage.setItem('gpro_compacto', window._gpCompacto ? '1' : '0'); }catch(e){}
+  const l = document.getElementById('gpro-lista-movil');
+  if(l){ l.classList.toggle('cc-compacto', window._gpCompacto); l.querySelectorAll('.cc-abierta').forEach(c => c.classList.remove('cc-abierta')); }
+  document.getElementById('gpro-vista-btn')?.classList.toggle('doc-cli-on', window._gpCompacto);
 }
 function renderGastosProLista(){
   const buscar = (document.getElementById('gpro-lista-buscar')?.value||'').toLowerCase();
@@ -11141,6 +11139,7 @@ function renderGastosProLista(){
   if(mov){
     mov.innerHTML = !esMovil ? '' : docs.length ? vis.map(d=>(!gastoCuentaControl(d) ? `<div style="font-size:11.5px;color:var(--orange);padding:4px 2px 0;">No incluido: ${escHtml(motivoNoIncluido(d))}</div>` : '') + gastoCardHtml(d, 'normal')).join('') + (faltan ? `<div style="padding:12px;text-align:center;">${masBtn}</div>` : '')
       : '<div class="empty" style="padding:16px;">Todavía no hay gastos registrados.</div>';
+    mov.classList.toggle('cc-compacto', window._gpCompacto !== false);
     enlazarTarjetasGasto(mov); autoMas(mov);
   }
 }
@@ -13614,7 +13613,7 @@ function ccDocsVistaPlegada(){
   document.getElementById('cc-docs-vista-btn')?.classList.toggle('doc-cli-on', window._ccCompacto);
 }
 document.addEventListener('click', ev => {   // en vista plegada, tocar una tarjeta la despliega (no abre el documento); ya desplegada, funciona como siempre
-  const card = ev.target.closest('#control-docs-lista-movil.cc-compacto .factura-card-movil');
+  const card = ev.target.closest('#control-docs-lista-movil.cc-compacto .factura-card-movil, #gpro-lista-movil.cc-compacto .factura-card-movil');
   if(!card) return;
   if(card.classList.contains('cc-abierta')){ const ctl = ev.target.closest('button, select, a, input, textarea, label, .pill, [onclick]'); if(ctl && ctl !== card) return; }   // V8.98: el estado, los botones y los menús de una tarjeta abierta funcionan sin plegarla
   if(!card.classList.contains('cc-abierta')){ ev.stopPropagation(); ev.preventDefault(); card.classList.add('cc-abierta'); return; }
