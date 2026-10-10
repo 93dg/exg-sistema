@@ -1256,7 +1256,9 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .c3-libre.finde{background:var(--concrete);color:var(--ink-soft);}
 .c3-nofinde{all:unset;cursor:pointer;display:inline-block;margin-top:6px;font-size:12px;font-weight:700;color:#791F1F;background:#fbeaea;border-radius:99px;padding:5px 11px;}
 /* V7.93 Calendario de mes; V7.95: días más altos (hasta 3 trabajos con sitio para cogerlos con el dedo) y sin «+ Trabajo» (se añade con el «+» de abajo) */
-.c3-pausa{display:block;height:4px;margin:2px 3px 0;border-radius:2px;background:repeating-linear-gradient(90deg,var(--jc) 0 4px,transparent 4px 7px);opacity:.9;}
+.c3-pausa{display:block;height:5px;margin:8px 3px 0;border-radius:3px;background:var(--jc);opacity:.5;}
+#cal3-app .c3-dia .c3-pausa.cont-izq{margin-left:-4px;border-top-left-radius:0;border-bottom-left-radius:0;}
+#cal3-app .c3-dia .c3-pausa.cont-der{margin-right:-4px;border-top-right-radius:0;border-bottom-right-radius:0;}
 .c3-chip{position:relative;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 .c3-chip.sigue{opacity:.8;border-radius:2px 5px 5px 2px;}
 .c3-chip.urg{box-shadow:inset 0 0 0 2px #fff;}
@@ -4618,10 +4620,10 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.01" defer></script>
-<script src="costes/norm.js?v=V10.01" defer></script>
+<script src="rentabilidad/rent.js?v=V10.02" defer></script>
+<script src="costes/norm.js?v=V10.02" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.01</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.02</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4773,7 +4775,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.01</div>
+        <div class="sub" id="version-badge">V10.02</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8897,7 +8899,8 @@ function c3Pausas(){ const m = {}, hoy = c2Iso(new Date());
     if(j.plan.pausa_desde){ const d = new Date(j.plan.pausa_desde + 'T00:00'); let g = 0; while(c2Iso(d) <= hoy && g++ < 400){ add(c2Iso(d)); d.setDate(d.getDate() + 1); } return; }
     if(!o.length) return; (j.plan.saltar || []).forEach(iso => { if(iso > o[0] && iso < o[o.length - 1]) add(iso); }); });
   return m; }
-function c3PausaHtml(iso, COL, PAU){ const L = (PAU[iso] || []).slice(0, 2); return L.map(j => `<span class="c3-pausa" data-c3-pausa="${j.id}" style="--jc:${COL[j.id] || '#2B5C8F'}" title="En pausa"></span>`).join(''); }
+function c3PausaHtml(iso, COL, PAU){ const d = new Date(iso + 'T00:00'), dw = d.getDay(), ant = new Date(d), sig = new Date(d); ant.setDate(d.getDate() - 1); sig.setDate(d.getDate() + 1);
+  return (PAU[iso] || []).slice(0, 2).map(j => { const ci = dw !== 1 && (PAU[c2Iso(ant)] || []).includes(j), cd = dw !== 0 && (PAU[c2Iso(sig)] || []).includes(j); return `<span class="c3-pausa${ci ? ' cont-izq' : ''}${cd ? ' cont-der' : ''}" data-c3-pausa="${j.id}" style="--jc:${COL[j.id] || '#2B5C8F'}" title="En pausa"></span>`; }).join(''); }
 function c3PorDia(){ const m = {}; c3Cola().forEach(j => c3Ocupa(j).forEach((iso, i) => { (m[iso] = m[iso] || []).push({j, i}); })); return m; }
 const c3Nom = j => tbMay(j.cliente || j.trabajo || 'Trabajo');
 const c3Corto = j => c3Nom(j).split(' ').slice(0, 2).join(' ');
@@ -8993,9 +8996,10 @@ function c3PonerPreguntando(j, iso){
   }
   if(!otros.length){ c3PonerDia(j, iso); return false; }
   const n = c3Dias(j), nom = otros.map(x => '«' + escHtml(c3Corto(x)) + '»').join(' y ');
-  c3Hoja(`<h2>${choque.length ? 'Ahí ya están ' + nom + ' y no queda ' + choque.map(m => ({mixta: 'mixta', giratoria: 'giratoria', niveladora: 'niveladora', camion: 'camión'})[m]).join(' ni ') + ' libre' : 'El ' + c2FechaTxt(iso) + ' ya está ' + nom}</h2><p style="font-size:14px;margin:0 0 12px;">¿Qué hacemos con ${escHtml(c3Nom(j))} (${n} día${n === 1 ? '' : 's'})?</p>
-    <div class="c2-acc"><button type="button" class="si" data-c3-meter="${j.id}" data-dia="${iso}">Meterlo aquí y mover hacia delante ${otros.length === 1 ? 'el que hay' : 'los que hay'} (y los de después) ${n} día${n === 1 ? '' : 's'}</button>
-    <button type="button" data-c3-juntos="${j.id}" data-dia="${iso}">Los dos el mismo día</button><button type="button" data-c2-cerrar="1">Cancelar</button></div>`);
+  // V10.02 (Daniel: «optimiza los textos»): título corto y dos botones cortos
+  c3Hoja(`<h2>${choque.length ? nom + ': sin ' + choque.map(m => ({mixta: 'mixta', giratoria: 'giratoria', niveladora: 'niveladora', camion: 'camión'})[m]).join(' ni ') : c2FechaTxt(iso).replace(/^./, c => c.toUpperCase()) + ': ' + nom}</h2>
+    <div class="c2-acc"><button type="button" class="si" data-c3-meter="${j.id}" data-dia="${iso}">Empujar lo de delante ${n} d</button>
+    <button type="button" data-c3-juntos="${j.id}" data-dia="${iso}">Mismo día</button><button type="button" data-c2-cerrar="1">Cancelar</button></div>`);
   return true;
 }
 function c3MeterYMover(j, iso){
