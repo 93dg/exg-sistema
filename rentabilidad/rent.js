@@ -528,9 +528,9 @@ R.vistaObra = function(r, P, b){
   // V9.90 (Daniel): tarjeta 1 = beneficio al ir restando costes; tarjeta 2 = lo que queda LIMPIO (tras impuestos): final frente a objetivo, aparte para compararlos; porcentaje de 1 a 100
   const m100 = Math.min(100, Math.max(1, num(R.param.margen) || 1));
   const cr = t => '<span style="color:' + G + ';">Benef.</span> <span style="color:' + RJ + ';">' + t + '</span>';
-  const filas1 = fil('Coste directo', '', r.ejecutado - nv.n1, '#2f8f5b', bdL(r.lineasD))
-    + fil('Directo y producción', '', r.ejecutado - nv.n2, '#2f6fb0', '<div class="rt-sim-r"><span>Costes directos</span><b>' + eur(nv.n1) + '</b></div>' + bdL(relL) + bdL(sociosL));
-  const niveles = '<div class="rt-c"><h3>Beneficio</h3><div style="font-size:11.5px;color:var(--ink-soft);margin:-4px 0 6px;">Del trabajo hecho: ' + eur(r.ejecutado) + ' (sin IVA)</div>' + filas1 + '</div>';
+  const filas1 = fil(cr('− costes directos'), '', r.ejecutado - nv.n1, '#2f8f5b', bdL(r.lineasD))
+    + fil(cr('− directos − producción'), '', r.ejecutado - nv.n2, '#2f6fb0', '<div class="rt-sim-r"><span>Costes directos</span><b>' + eur(nv.n1) + '</b></div>' + bdL(relL) + bdL(sociosL));
+  const niveles = '<div class="rt-c"><h3>Beneficio bruto</h3><div style="font-size:11.5px;color:var(--ink-soft);margin:-4px 0 6px;">Ingresos: <b>' + eur(r.ejecutado) + '</b> (sin IVA)</div>' + filas1 + '</div>';
   const limpioFin = r.neto, limpioObj = nv.mar, okLim = isFinite(limpioObj) && limpioFin >= limpioObj;
   const filaL = (tit, sub, v, pct, color, c, bd) => '<details class="rt-nd"><summary><div class="rt-n"><i style="background:' + color + ';"></i><div><b>' + tit + '</b><small>' + sub + '</small></div><div class="v"><b style="color:' + c + ';">' + (isFinite(v) ? eur(v) : 'sin dato') + '</b><small style="color:' + c + ';font-weight:700;">' + (hOk && isFinite(v) ? eur(v / r.H, 2) + '/h' : 'sin horas') + (pct != null ? ' (' + pct + ' %)' : '') + '</small></div></div></summary><div class="rt-bd">' + bd + '</div></details>';
   const comp = '<div class="rt-c"><h3>Beneficio final</h3>'
@@ -545,7 +545,7 @@ R.vistaObra = function(r, P, b){
   const avisos = (r.avisos.length ? '<div class="rt-an">' + r.avisos.map(a => '• ' + esc(a)).join('<br>') + '</div>' : '') + R.sinHorasAviso(r);
   const detalle = det('Ver detalle', avisos + detNiv + R.secDirecto(r) + R.secReal(r) + R.secOport(r) + R.secComp(r, P, b));
   const opObra = '<div class="rt-c"><h3>Coste de oportunidad</h3>' + R.opHtml(r, 2, b.margenH, r.socios.valor, (() => { const hh = R.horasSocios(R.baseObra(r, b)); return hh.rep + hh.ges; })()) + '</div>';
-  return resumen + niveles + comp + detalle;   // V10.47 (Daniel): sin tarjeta «Por máquina €/h» (no se usa); el coste de oportunidad va junto a Organización
+  return niveles + comp + detalle;   // V10.49 (Daniel): sin los tres cuadros de arriba; los ingresos van dentro de Beneficio bruto   // V10.47 (Daniel): sin tarjeta «Por máquina €/h» (no se usa); el coste de oportunidad va junto a Organización
 };
 
 R.escHtml2 = (b, lista) => {
@@ -591,7 +591,7 @@ R.simHtml = function(P, b){
   const xOp = b.obra && b.r ? R.perdidas(b.r, persSim, b.margenH, s.tr.rep + s.tr.ges) : null;
   const opSim = b.obra && b.r ? R.opHtml(b.r, persSim, b.margenH, b.socios, s.tr.rep + s.tr.ges) : '';
   const pagoHr = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : NaN, cMaqH = coste('maquinista');
-  const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small style="display:block;color:var(--ink-soft);font-size:11px;">cobra ' + eur(v, 2) + '/h' + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · cuesta ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h echada con lo perdido' : '') + '</small>' : '<small style="display:block;color:var(--ink-soft);font-size:11px;">fuera</small>'; };
+  const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small style="display:block;color:var(--ink-soft);font-size:11px;">cobra ' + eur(v, 2) + '/h' + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · coste real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : '<small style="display:block;color:var(--ink-soft);font-size:11px;">fuera</small>'; };
   const st = (k, t) => '<div class="rt-sim-r"><span>' + t + '</span><span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>';
   const controles = '<div class="rt-c"><h3>Organización</h3><div class="rt-sim-r"><span>Rafa' + cobH('rafa') + '</span>' + seg('rafa') + '</div><div class="rt-sim-r"><span>Manolo' + cobH('manolo') + '</span>' + seg('manolo') + '</div>' + st('maq', 'Maquinistas') + st('mec', 'Mecánicos') + st('cm', 'Conductor / mecánico') + '</div>';
   const bx = (t, v, d, n, hh) => '<div class="' + (n >= 0 ? 'g' : 'r') + '"><span style="color:' + (n >= 0 ? G : RJ) + ';">' + t + '</span><b style="color:' + (n >= 0 ? G : RJ) + ';">' + eur(n) + '</b><small>neto tras impuestos</small><small><b>' + hh + '</b>' + (b.obra ? ' en la obra' : ' al año') + '</small><small>' + cs(d, dEur(d)) + ' sobre hoy</small><small>antes de impuestos: ' + eur(v) + '</small></div>';
