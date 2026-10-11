@@ -564,15 +564,16 @@ R.perdidas = function(r, personas, margenH, carga){
   const dTr = Object.keys(r.hDia).length; hPerd = Math.max(0, pot * dTr - r.H);   // V10.55 (Daniel): solo cuentan los días trabajados en esta obra; los demás días de su periodo pudieron ser de otra obra
   return {pot, personas, carga, dLab, hPerd, dEq: pot > 0 ? hPerd / pot : 0, dFlojos, dVacios, dinero: isFinite(mH) ? hPerd * mH : NaN, margenH: mH};
 };
-R.opHtml = function(r, personas, margenH, socios, carga){
+R.opHtml = function(r, personas, margenH, socios, carga, quien){
+  quien = quien || 'Rafa y Manolo';
   const x = R.perdidas(r, personas, margenH, carga), dNec = x.pot > 0 ? (r.H + x.carga) / x.pot : NaN, dTr = Object.keys(r.hDia).length, media = dTr ? r.H / dTr : NaN, nw = 'white-space:nowrap;';
   const fl = (t, v, col, big) => '<div class="rt-sim-r"><span>' + t + '</span><b style="' + nw + 'color:' + col + ';' + (big ? 'font-size:18px;' : '') + '">' + v + '</b></div>';
   const mc = isFinite(media) && media >= x.pot * 0.8 ? G : isFinite(media) && media >= x.pot * 0.5 ? '#c58a1b' : RJ;
-  const real = isFinite(x.dinero) && socios > 0 ? '<div style="background:#fbeceb;border-radius:10px;padding:2px 10px;margin-top:6px;">' + fl('<b>Coste real de Rafa y Manolo</b>', eur(socios + x.dinero), '#c0392b', false) + '<div style="font-size:11px;color:var(--ink-soft);padding-bottom:6px;">' + eur((socios + x.dinero) / Math.max(1, r.H), 2) + ' por hora echada</div></div>' : '';
-  const como = '<div style="font-size:11.5px;color:var(--ink-soft);line-height:1.5;padding:4px 0 8px;"><b>Valor:</b> horas operativas desaprovechadas × ' + (isFinite(x.margenH) ? eur(x.margenH, 2) : '—') + '/h de margen de otra obra. <b>Coste real:</b> lo que cobran Rafa y Manolo + ese valor.</div>';
+  const real = isFinite(x.dinero) && socios > 0 ? '<div style="background:#fbeceb;border-radius:10px;padding:2px 10px;margin-top:6px;">' + fl('<b>Coste real de ' + quien + '</b>', eur(socios + x.dinero), '#c0392b', false) + '<div style="font-size:11px;color:var(--ink-soft);padding-bottom:6px;">' + eur((socios + x.dinero) / Math.max(1, r.H), 2) + ' por hora echada</div></div>' : '';
+  const como = '<div style="font-size:11.5px;color:var(--ink-soft);line-height:1.5;padding:4px 0 8px;"><b>Valor:</b> horas operativas desaprovechadas × ' + (isFinite(x.margenH) ? eur(x.margenH, 2) : '—') + '/h de margen de otra obra. <b>Coste real:</b> lo que ' + (quien.indexOf(' y ') > 0 ? 'cobran ' : 'cobra ') + quien + ' + ese valor.</div>';
   return ''
     + (isFinite(x.dinero) ? fl('Valor de ' + h1(x.hPerd) + ' h en otra obra', eur(x.dinero), '#c0392b') : '')
-    + (isFinite(x.dinero) && socios > 0 ? fl('Cobran Rafa y Manolo', eur(socios), '#2f6fb0') : '')
+    + (isFinite(x.dinero) && socios > 0 ? fl((quien.indexOf(' y ') > 0 ? 'Cobran ' : 'Cobra ') + quien, eur(socios), '#2f6fb0') : '')
     + real
     + '<details style="margin-top:6px;"><summary style="font-size:12px;color:var(--orange);font-weight:700;cursor:pointer;">Cómo se calcula</summary>' + como + '</details>';
 };
@@ -600,7 +601,8 @@ R.simHtml = function(P, b){
   const seg = (k) => '<div class="rt-seg">' + [['hoy', 'Como hoy'], ['empleado', 'Empleado']].map(([v, t]) => '<button type="button" class="' + (bd[k] === v ? 'on' : '') + '" onclick="RENT.setEsc2(\'' + k + '\',\'' + v + '\')">' + t + '</button>').join('') + '</div>';
   const persSim = (2 - (s.e.rafa === 'fuera' ? 1 : 0) - (s.e.manolo === 'fuera' ? 1 : 0)) + (s.e.maq | 0) + (s.e.cm | 0) * (num(R.param.condMecPct) / 100 || 0);
   const xOp = b.obra && b.r ? R.perdidas(b.r, persSim, b.margenH, s.tr.rep + s.tr.ges) : null;
-  const opSim = b.obra && b.r ? R.opHtml(b.r, persSim, b.margenH, b.socios, s.tr.rep + s.tr.ges) : '';
+  const quedan = ['rafa', 'manolo'].filter(k => s.e[k] === 'hoy'), sociosSim = b.socios * quedan.length / 2, quienSim = quedan.map(k => k === 'rafa' ? 'Rafa' : 'Manolo').join(' y ');   // V10.57 (Daniel): si uno sale (o pasa a empleado), se descuenta lo suyo
+  const opSim = b.obra && b.r ? R.opHtml(b.r, persSim, b.margenH, sociosSim, s.tr.rep + s.tr.ges, quienSim || undefined) : '';
   const pagoHr = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : NaN, cMaqH = coste('maquinista');
   const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small style="display:block;color:var(--ink-soft);font-size:11px;">cobra ' + eur(v, 2) + '/h' + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · coste real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : '<small style="display:block;color:var(--ink-soft);font-size:11px;">fuera</small>'; };
   const st = (k, t) => '<div class="rt-sim-r"><span>' + t + '</span><span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>';
