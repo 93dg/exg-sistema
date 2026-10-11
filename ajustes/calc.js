@@ -198,6 +198,7 @@
 #aju-app .as-ent{margin:8px 0;padding:8px 12px;border-radius:12px;background:#eef3ee;font-size:13.5px;line-height:1.45;}
 #aju-app .as-q{margin:10px 0;padding:10px 12px;border-radius:14px;background:#fff;border:2px solid var(--ink,#222);} #aju-app .as-bt{display:grid;gap:6px;margin-top:8px;} #aju-app .as-bt .btn{width:100%;padding:12px;text-align:left;}
 #aju-app .as-tb{margin:6px 0;background:#fff;border:1px solid var(--line,#ddd);border-radius:12px;overflow:hidden;} #aju-app .as-r{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:6px;padding:7px 10px;border-top:1px solid var(--line,#eee);font-size:13px;align-items:center;} #aju-app .as-r:first-child{border-top:none;} #aju-app .as-r span+span{text-align:right;} #aju-app .as-r.h{font-size:11.5px;text-transform:uppercase;color:var(--ink-soft);} #aju-app .as-r.t{background:#f4f1ea;}
+#aju-app .ce-sec{border:1px solid var(--line,#ddd);border-radius:14px;background:#fff;padding:10px 12px;margin:8px 0;} #aju-app .cz-h{display:flex;align-items:center;gap:8px;margin-bottom:4px;} #aju-app .cz-h b{flex:1;font-size:14.5px;} #aju-app .cz-h .n{display:inline-block;min-width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;border:2px solid var(--orange,#e85d04);font-size:12px;font-weight:700;} #aju-app .cz-h .aju-tag{font-style:normal;font-size:11px;white-space:nowrap;} #aju-app .as-sep{border-top:1px dashed var(--line,#ccc);margin:6px 0;} #aju-app .as-res{margin-top:8px;padding:12px;border-radius:12px;text-align:center;font-weight:800;font-size:20px;background:#fff;border:2px solid var(--orange,#e85d04);} #aju-app .as-res.mal{color:var(--red,#b3382c);} #aju-app .as-res.bien{color:var(--green,#2e7d4f);}
 #aju-app .as-paso{border:1px solid var(--line,#ddd);border-radius:14px;background:#fff;padding:10px 12px;margin:8px 0;} #aju-app .as-paso .t{font-weight:700;margin-bottom:4px;} #aju-app .as-paso .aju-l{display:block;padding:6px 0;} #aju-app .as-paso .aju-l span:first-child{display:block;font-size:12.5px;color:var(--ink-soft);} #aju-app .as-paso .aju-l span:last-child{display:block;text-align:left;font-size:15px;margin-top:1px;}
 #aju-app .as-paso .n{display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:var(--ink,#222);color:#fff;font-size:12px;margin-right:8px;}`;
     document.head.appendChild(s);
@@ -465,51 +466,41 @@
   function cargar(id){ const r = (_guardadas || []).find(x => x.id === id); if(!r || !(r.data || {}).estado_calc) return; S = Object.assign(nuevoEstado(), r.data.estado_calc); S.op = Object.assign(nuevoEstado().op, S.op); if(S.tipo === 'C' || S.tipo === 'D') S.tipo = 'K'; if(!S.causaTipo && S.causa) S.causaTipo = S.causa === 'justificada' ? 'error' : S.causa === 'sin' ? 'ninguna' : ''; if(!S.op.fuente && num(S.op.base) > 0) S.op.fuente = 'otra'; S.manual = Object.assign(nuevoEstado().manual, S.manual); _fisc = null; sheet = null; pintar(); root.scrollTo({top: 0}); }
   async function borrar(id){ if(!window.confirm('¿Borrar esta simulación?')) return; try{ const {error} = await sb.from('sistema').delete().eq('id', id); if(error) throw error; _guardadas = null; pintarGuardadas(); }catch(e){ if(typeof mostrarToast === 'function') mostrarToast('No se pudo borrar', 'err'); } }
 
-  // ---------- asesor: escribe el problema y propone la solución ----------
+  // ---------- calculadora de 11 apartados ----------
   const numE = v => { const t = String(v == null ? '' : v).trim(); return /^\d{1,3}\.\d{3}$/.test(t) ? num(t.replace('.', '')) : num(t); };
-  const AS = {on: false, texto: '', facturaId: null, albId: '', rect: '', just: '', rSrc: '', causaTipo: '', causaTxt: '', ivaEdit: false, mismo: null, sinAnular: false};
-  const TEXTO0 = 'Encarni nos pagó 11.243,07 € por la factura 5, que consideramos errónea. Alejandro nos debe 3.690,50 € por el albarán A22 (trabajos realizados). Quiero resolver las dos cosas sin perder dinero.';
+  const AS = {on: false, facturaId: null, albId: '', ovTotal: '', ovCobrado: '', dBase: '', dIva: '', sub: '', acred: ''};
   const nm = s => String(s || '').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
   const prim = s => nm(s).split(' ')[0];
-  const sgn = x => x > 0.004 ? '+' : x < -0.004 ? '−' : '';
   const asF = () => { const d = AS.facturaId ? (documentosRealesById || {})[AS.facturaId] : null; return d ? deDoc(d) : null; };
-  let _asT = null;
-  function asParse(){
-    const t = AS.texto || '', L = facturas(), AL = albaranes();
-    let m = /factura\s*(?:n[º°o.]*\s*)?([A-Za-z]{0,4}\d[\w\/-]*)/i.exec(t);
-    if(m){ let c = L.filter(d => norm(d.num || d.numero) === norm(m[1])); if(c.length > 1){ const w = norm(t).split(' '); const c2 = c.filter(d => norm(d.client).split(' ').some(x => x.length > 3 && w.indexOf(x) >= 0)); if(c2.length) c = c2; } if(c.length && AS.facturaId !== c[0].id){ AS.facturaId = c[0].id; _fisc = null; } }
-    const imp = (t.match(/\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}/g) || []).map(num);
-    if(!m && imp.length){ const c = L.filter(d => imp.some(x => Math.abs(x - Number(d.total)) < 0.015)); if(c.length === 1 && AS.facturaId !== c[0].id){ AS.facturaId = c[0].id; _fisc = null; } }
-    if(imp.length && !/albar[aá]n/i.test(t)){ const a2 = AL.filter(d => imp.some(x => Math.abs(x - r2(baseAlb(d) * 1.21)) < 0.02 || Math.abs(x - Number(d.total)) < 0.015)); if(a2.length === 1 && AS.albId !== a2[0].id){ AS.albId = a2[0].id; AS.ivaEdit = false; } }
-    m = /albar[aá]n\s*([A-Za-z]{0,3}\d+)/i.exec(t) || /\b(A\d{1,4})\b/.exec(t);
-    if(m){ const a = AL.find(d => norm(d.num || d.numero) === norm(m[1])); if(a && AS.albId !== a.id){ AS.albId = a.id; AS.ivaEdit = false; } }
-    if(AS.mismo !== false || AS._mAuto){ const mi = /(?:para\s+ell[ao]|(?:encarni|ella)[^.]{0,40}\bnos\s+debe|nos\s+debe[^.]{0,40}\bell[ao]\b)/i.test(t); if(mi){ AS.mismo = true; AS._mAuto = true; } else if(AS._mAuto){ AS.mismo = null; AS._mAuto = false; } }
-    AS.sinAnular = /no\s+(?:podemos|se\s+puede|hay)[^.]{0,40}anula/i.test(t);
-    if(!AS.causaTipo && /(error|equivoc)/i.test(t)){ AS.causaTipo = 'error'; AS._cAuto = true; } else if(AS._cAuto && !/(error|equivoc)/i.test(t)){ AS.causaTipo = ''; AS._cAuto = false; }
-    const F = asF(); let c = null, mm;
-    if((mm = /(?:rectific\w*|descontar|rebajar|restar|quitar|devolver)\s+(?:solo\s+|sólo\s+|unos\s+)?(?:los\s+|las\s+)?([\d.,]+\d)/i.exec(t))) c = num(mm[1]);
-    else if(!AS.sinAnular && F && /\banul(ar|a|ada|aci[oó]n)\b|\bentera\b/i.test(t)) c = F.base;
-    if(c != null){ AS.rect = fmtIn(c); AS.rSrc = 'texto'; } else if(AS.rSrc === 'texto'){ AS.rect = ''; AS.rSrc = ''; }
+  function asDefecto(){
+    const L = facturas(), AL = albaranes();
+    const f = L.find(d => Math.abs(Number(d.total) - 11243.07) < 0.015) || null; const cl = f ? norm(f.client) : '';
+    if(f){ AS.facturaId = f.id; const a = AL.find(d => Math.abs(baseAlb(d) - 3050) < 0.015) || AL.find(d => norm(d.num || d.numero) === 'A22'); if(a) AS.albId = a.id; }
   }
   function asCalc(){
-    S.facturaId = AS.facturaId; S.tipo = 'K'; S.causaTipo = AS.causaTipo; S.causaTxt = AS.causaTxt; S.red = '';
-    const F = AS.facturaId ? facturaCtx() : null; if(!F || F.manual) return {F: null};
+    S.facturaId = AS.facturaId; S.tipo = 'K'; S.causaTipo = 'error'; S.causaTxt = ''; S.red = '';
+    let F = AS.facturaId ? facturaCtx() : null; if(!F || F.manual) return {F: null};
+    const r = F.isp ? 0 : F.ivaPct / 100;
+    if(String(AS.ovTotal).trim() !== ''){ const t = r2(numE(AS.ovTotal)), b = r2(t / (1 + r)); F = Object.assign({}, F, {total: t, base: b, iva: r2(t - b)}); }
+    if(String(AS.ovCobrado).trim() !== '') F = Object.assign({}, F, {cobrado: r2(numE(AS.ovCobrado))});
     const X = fiscal(F), alb = AS.albId ? (documentosRealesById || {})[AS.albId] : null;
-    if(alb){ S.op.fuente = 'alb'; S.op.base = fmtIn(baseAlb(alb)); S.op.parte = AS.mismo ? F.client : (alb.client || ''); S.op.ref = alb.num || alb.numero || ''; S.op.sentido = 'nosotros'; S.op.real = true; if(!AS.ivaEdit) S.op.iva = String(Number(alb.ivaPct) || 21); }
-    else { S.op.base = ''; S.op.fuente = ''; S.op.parte = ''; S.op.ref = ''; }
-    const b0 = base0(F, X), r = F.isp ? 0 : F.ivaPct / 100, TOL = 0.015;
-    const fin = R => { R = r2(Math.min(F.base, Math.max(0, R))); return alb ? sim('C', F, X, {Bf: r2(F.base - R)}) : sim('B', F, X, {Bf: r2(F.base - R)}); };
+    const Db = String(AS.dBase).trim() !== '' ? r2(numE(AS.dBase)) : (alb ? baseAlb(alb) : 0);
+    const dIvaPct = String(AS.dIva).trim() !== '' ? numE(AS.dIva) : (alb ? (Number(alb.ivaPct) || 21) : 21);
+    S.op.fuente = 'alb'; S.op.base = fmtIn(Db); S.op.iva = String(dIvaPct); S.op.parte = F.client; S.op.ref = alb ? (alb.num || alb.numero || '') : ''; S.op.sentido = 'nosotros'; S.op.real = true;
+    const b0 = base0(F, X), TOL = 0.015;
+    const fin = R => sim('C', F, X, {Bf: r2(F.base - Math.min(F.base, Math.max(0, R)))});
     const loss = R => r2(b0.neto - fin(R).neto);
     let Rs = null;
     if(loss(F.base) <= TOL) Rs = F.base;
-    else if(loss(0) <= TOL){ let lo = 0, hi = F.base; for(let i = 0; i < 60; i++){ const m = (lo + hi) / 2; if(loss(m) <= 0) lo = m; else hi = m; } Rs = r2(lo); }
-    const J = String(AS.just).trim() === '' ? null : Math.min(F.base, Math.max(0, numE(AS.just)));
-    const hasR = String(AS.rect).trim() !== '', R = hasR ? r2(Math.min(F.base, Math.max(0, numE(AS.rect)))) : null;
-    const out = {F, X, alb, b0, r, Rs, J, R, hasR, sEq: Rs != null ? fin(Rs) : null, lossEq: Rs != null ? loss(Rs) : null, lossJ: J != null ? loss(J) : null, ivaEq: Rs != null ? r2(Rs * r) : null};
-    if(!hasR) return out;
-    const sC = fin(R), v = viab(alb ? 'C' : 'B', F);
-    return Object.assign(out, {C: r2(F.base - R), sC, v, dBase: R, dIva: r2(R * r), dTot: r2(R * (1 + r)), newIva: sC.IVAf, newTot: sC.Tf, Rdev: sC.weOwe, A: alb ? sC.T2 : 0, P: sC.P, loss: loss(R),
-      ivaR: r2(fin(R).ivaNeta - fin(0).ivaNeta + (alb ? 0 : 0)), irpfR: r2(sC.att - b0.att)});
+    else if(loss(0) <= TOL){ let lo = 0, hi = F.base; for(let i = 0; i < 60; i++){ const m = (lo + hi) / 2; if(loss(m) <= 0) lo = m; else hi = m; } Rs = r2(lo); for(let i = 0; i < 5 && Rs > 0 && loss(Rs) > 0.004; i++) Rs = r2(Rs - 0.01); }
+    const Sauto = Rs != null ? r2(F.base - Rs) : null;
+    const hasOv = String(AS.sub).trim() !== '';
+    const Sub = hasOv ? r2(Math.min(F.base, Math.max(0, numE(AS.sub)))) : Sauto;
+    const out = {F, X, alb, b0, r, Db, dIvaPct, Rs, Sauto, Sub, hasOv};
+    if(Sub == null) return out;
+    const R = r2(F.base - Sub), sC = fin(R), sB = sim('B', F, X, {Bf: Sub});
+    const acred = String(AS.acred).trim() === '' ? null : r2(Math.max(0, numE(AS.acred)));
+    return Object.assign(out, {R, sC, sB, acred, loss: loss(R), irpfD: X.ok ? r2(sC.att - sB.att) : null, irpfS: X.ok ? sB.att : null});
   }
   async function abrirAsesor(){
     css(); AS.on = true;
@@ -522,142 +513,68 @@
     root.innerHTML = '<div class="aju-in"><p style="padding:30px 0;color:var(--ink-soft)">Consultando facturas y datos fiscales…</p></div>';
     try{ if(typeof impCargarPagos === 'function' && !_impPagosCargados) await impCargarPagos(); }catch(e){}
     try{ if(typeof _docsListos !== 'undefined' && !_docsListos) await new Promise(res => { const t = setTimeout(res, 25000); document.addEventListener('exg-docs-listos', () => { clearTimeout(t); res(); }, {once: true}); }); }catch(e){}
-    if(!AS.texto){ try{ AS.texto = localStorage.getItem('aju_texto') || ''; }catch(e){} if(!AS.texto) AS.texto = TEXTO0; }
-    _fisc = null; asParse(); asPintar();
+    if(!AS.facturaId) asDefecto();
+    _fisc = null; asPintar();
   }
   A.abrir = abrirAsesor;
   function asPintar(){
-    root.innerHTML = '<div class="aju-top"><b>Asesor de ajustes</b><button type="button" class="btn sm" data-act="cerrar">Cerrar</button></div><div class="aju-in">'
-      + '<h4>Problema</h4><textarea data-k="as.texto" rows="5" class="as-tx">' + esc(AS.texto) + '</textarea><div id="as-chips"></div>'
-      + '<h4>Solución</h4><div id="as-sol"></div><h4>Resultado</h4><div id="as-res"></div>'
-      + '<div class="aju-btns"><button type="button" class="btn" data-act="det">Ver cómo se ha calculado</button></div><div class="aju-btns two"><button type="button" class="btn" data-act="guardar">Guardar</button><button type="button" class="btn" data-act="sav">Guardadas</button></div></div><div id="aju-sheet"></div>';
-    asRender();
+    const a = document.activeElement, k = a && a.getAttribute ? a.getAttribute('data-k') : null, pos = k && a.selectionStart != null ? a.selectionStart : null, top = root.querySelector('.aju-in') ? root.scrollTop : 0;
+    root.innerHTML = '<div class="aju-top"><b>Calculadora Encarni</b><button type="button" class="btn sm" data-act="cerrar">Cerrar</button></div><div class="aju-in">' + asHtml(asCalc()) + '</div>';
+    root.scrollTop = top;
+    if(k){ const e = root.querySelector('[data-k="' + k + '"]'); if(e){ e.focus(); try{ if(pos != null) e.setSelectionRange(pos, pos); }catch(x){} } }
   }
-  function asRender(sinChips){
-    const c = asCalc(), $ = id => document.getElementById(id);
-    if(!sinChips && $('as-chips')) $('as-chips').innerHTML = asChips(c);
-    if($('as-sol')) $('as-sol').innerHTML = asSol(c);
-    if($('as-res')) $('as-res').innerHTML = asRes(c);
-    if(sheet) pintarSheet();
-  }
-  function asChips(c){
-    const L = facturas(), AL = albaranes();
-    const optF = L.map(d => '<option value="' + d.id + '"' + (AS.facturaId === d.id ? ' selected' : '') + '>' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 20) + ' · ' + eur(d.total)) + '</option>').join('');
-    const optA = '<option value="">— ninguna —</option>' + AL.map(d => '<option value="' + d.id + '"' + (AS.albId === d.id ? ' selected' : '') + '>' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 20) + ' · ' + eur(baseAlb(d))) + '</option>').join('');
-    if(!c.F) return '<div class="aju-warn">No sé a qué factura te refieres. ¿Cuál es?</div><select data-k="as.fac"><option value="">Elegir factura…</option>' + optF + '</select>';
-    const F = c.F; let h = '<div class="as-ent"><div><b>Factura ' + esc(F.num) + '</b> · ' + esc(nm(F.client)) + ' · ' + (F.cobrado >= F.total - 0.005 ? 'cobrada ' : 'cobrado ') + eur(F.cobrado) + ' de ' + eur(F.total) + ' (base ' + eur(F.base) + ' + IVA ' + eur(F.iva) + ')</div>'
-      + (c.alb ? '<div><b>Albarán ' + esc(S.op.ref) + '</b> · ' + esc(nm(S.op.parte)) + ' · ' + eur(num(S.op.base)) + ' sin IVA</div>' : '<div class="aju-note" style="margin:0">Sin albarán ni otra factura.</div>') + '</div>';
-    h += '<details class="aju-det"><summary>Cambiar factura o albarán</summary><label class="aju-f"><span>Factura</span><select data-k="as.fac">' + optF + '</select></label><label class="aju-f"><span>Albarán o trabajo pendiente de facturar</span><select data-k="as.alb">' + optA + '</select></label><label class="aju-f"><span>¿Quién debe ese trabajo?</span><select data-k="as.mismo"><option value=""' + (!AS.mismo ? ' selected' : '') + '>La persona del albarán</option><option value="1"' + (AS.mismo ? ' selected' : '') + '>La misma de la factura (' + esc(prim(F.client)) + ')</option></select></label></details>';
-    h += '<label class="aju-f"><span>Cuánto rectificar de la factura (sin IVA)</span><input data-k="as.rect" inputmode="decimal" autocomplete="off" value="' + esc(AS.rect) + '" placeholder="Ej.: 1.500,00"></label>'
-      + (c.Rs != null ? '<div class="aju-btns" style="margin:2px 0 6px"><button type="button" class="btn" data-act="as-eq">Poner el punto de equilibrio: ' + eur(c.Rs) + '</button></div>' : '')
-      + '<label class="aju-f"><span>Importe que podemos justificar por errores administrativos (sin IVA)</span><input data-k="as.just" inputmode="decimal" autocomplete="off" value="' + esc(AS.just) + '" placeholder="Si no lo sabes, déjalo vacío"></label>'
-      + '<label class="aju-f"><span>Causa real del error</span><select data-k="as.causa"><option value="">Elegir causa…</option>' + CAUSAS.map(x => '<option value="' + x[0] + '"' + (AS.causaTipo === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label>'
-      + (AS.causaTipo && AS.causaTipo !== 'ninguna' ? '<label class="aju-f"><span>Detalle' + (AS.causaTipo === 'otro' ? '' : ' (opcional)') + '</span><input type="text" data-k="as.causaTxt" maxlength="120" value="' + esc(AS.causaTxt) + '" placeholder="Qué ocurrió"></label>' : '');
-    return h;
-  }
-  function asSol(c){
-    if(!c.F) return '<p class="aju-note">Primero dime de qué factura se trata.</p>';
-    const F = c.F, pa = nm(S.op.parte), p = (n, t, b) => '<div class="as-paso"><div class="t"><span class="n">' + n + '</span>' + t + '</div>' + b + '</div>', l = (a, b) => '<div class="aju-l"><span>' + a + '</span><span>' + b + '</span></div>';
+  const asRender = () => asPintar();
+  function asHtml(c){
+    const sec = (n, t, tag, body) => '<div class="ce-sec"><div class="cz-h"><span class="n">' + n + '</span><b>' + t + '</b>' + (tag ? '<i class="aju-tag ' + (tag[1] || '') + '">' + tag[0] + '</i>' : '') + '</div>' + body + '</div>';
+    const l = (a, b, cls) => '<div class="aju-l"><span>' + a + '</span><span class="' + (cls || '') + '">' + b + '</span></div>';
+    const inp = (k, lab, val, ph) => '<label class="aju-f"><span>' + lab + '</span><input data-k="' + k + '" inputmode="decimal" autocomplete="off" value="' + esc(val) + '" placeholder="' + esc(ph || '') + '"></label>';
+    if(!c.F){
+      const L = facturas();
+      return '<div class="aju-warn">No encuentro la factura de Encarni. Elige la factura:</div><select data-k="as.fac"><option value="">Elegir factura…</option>' + L.map(d => '<option value="' + d.id + '">' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 20) + ' · ' + eur(d.total)) + '</option>').join('') + '</select>';
+    }
+    const F = c.F, X = c.X, ok = X.ok, b = c.b0, E = v => ok ? eur(v) : 'Pendiente';
+    const pag = X.pago ? ['Pagado', 'ok'] : ['Estimado', 'est'], rec = X.qAplica ? ' · recuperable en el ' + X.qAplica + 'T' : '';
+    const L = facturas(), optF = L.map(d => '<option value="' + d.id + '"' + (AS.facturaId === d.id ? ' selected' : '') + '>' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 20) + ' · ' + eur(d.total)) + '</option>').join('');
+    const AL = albaranes(), optA = '<option value="">— ninguno —</option>' + AL.map(d => '<option value="' + d.id + '"' + (AS.albId === d.id ? ' selected' : '') + '>' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 18) + ' · ' + eur(baseAlb(d))) + '</option>').join('');
     let h = '';
-    // punto de equilibrio
-    let eq = '';
-    if(c.Rs == null) eq = '<div class="aju-warn"><b>No hay punto de equilibrio:</b> aunque no rectifiques nada, la empresa pierde dinero con estas cifras.</div>';
-    else {
-      eq += l('Rectificar como máximo sin perder', '<b>' + eur(c.Rs) + '</b> sin IVA · IVA ' + eur(c.ivaEq) + ' · ' + eur(r2(c.Rs + c.ivaEq)) + ' con IVA')
-        + l('Comprobado: pérdida con ese importe', '<b>' + (Math.abs(c.lossEq) <= 0.015 ? '0,00 €' : eur(c.lossEq)) + '</b>');
-      if(c.Rs >= F.base - 0.005) eq += '<div class="aju-note" style="margin:2px 0 0">Aunque se rectificara la factura entera la empresa no pierde.</div>';
-      if(c.J != null){
-        const d = r2(c.Rs - c.J);
-        eq += l('Justificable', '<b>' + eur(c.J) + '</b> sin IVA');
-        eq += c.J > c.Rs + 0.004
-          ? '<div class="aju-warn" style="margin-top:6px"><b>Pérdida si rectificas todo lo justificable:</b> ' + eur(c.lossJ) + ' netos. Rectificar más de ' + eur(c.Rs) + ' no sale a cuenta.</div>'
-          : '<div class="aju-note" style="margin-top:6px">' + (Math.abs(d) <= 0.004 ? 'Lo justificable coincide con el punto de equilibrio: pérdida exactamente 0 €.' : 'Con lo justificable (' + eur(c.J) + ') la empresa <b>no pierde</b>: gana ' + eur(-c.lossJ) + ' netos respecto a hoy. Llegar a pérdida exactamente 0 € exigiría rectificar ' + eur(d) + ' más, que no se puede justificar.') + '</div>';
-      }
+    h += sec(1, 'Factura errónea', null, '<label class="aju-f"><span>Factura</span><select data-k="as.fac">' + optF + '</select></label>'
+      + inp('as.ovTotal', 'Importe original (con IVA)', AS.ovTotal, fmtIn(Number(F.total))) + inp('as.ovCobrado', 'Dinero que nos transfirió ' + esc(prim(F.client)), AS.ovCobrado, fmtIn(Number(F.cobrado)))
+      + l('Sin IVA', eur(F.base)));
+    h += sec(2, 'IVA pagado por esa factura', [pag[0] + rec, pag[1]], l('IVA ' + F.ivaPct + ' %', '<b>' + eur(F.iva) + '</b>'));
+    h += sec(3, 'IRPF pagado por esa factura', [ok ? pag[0] + rec : 'Pendiente', ok ? pag[1] : 'no'], l('Pago fraccionado (130)', '<b>' + E(b.att) + '</b>'));
+    h += sec(4, 'Total de impuestos pagados', [ok ? pag[0] : 'Pendiente', ok ? pag[1] : 'no'], l('IVA + IRPF', '<b>' + (ok ? eur(r2(F.iva + b.att)) : 'Pendiente') + '</b>'));
+    h += sec(5, 'Dinero que nos debe ' + esc(prim(F.client)), null, '<label class="aju-f"><span>Trabajo pendiente (albarán)</span><select data-k="as.alb">' + optA + '</select></label>' + inp('as.dBase', 'Importe sin IVA', AS.dBase, fmtIn(c.Db)) + l('Con IVA', eur(r2(c.Db * (1 + c.dIvaPct / 100)))));
+    h += sec(6, 'IVA de lo que nos debe', ['Estimado', 'est'], inp('as.dIva', 'IVA %', AS.dIva, String(c.dIvaPct)) + l('IVA', '<b>' + eur(r2(c.Db * c.dIvaPct / 100)) + '</b>'));
+    h += sec(7, 'IRPF de lo que nos debe', [ok ? 'Estimado' : 'Pendiente', ok ? 'est' : 'no'], l('Pago fraccionado (130)', '<b>' + (c.irpfD == null ? 'Pendiente' : eur(c.irpfD)) + '</b>'));
+    if(c.Sub == null){
+      h += sec(8, 'Factura rectificada', ['Sin solución', 'no'], '<div class="aju-warn">Con estas cantidades no hay subtotal que evite la pérdida: incluso sin rectificar, la empresa pierde dinero.</div>' + inp('as.sub', 'Probar otro subtotal (sin IVA)', AS.sub, ''));
+      return h + '<p class="aju-note">Los apartados 9, 10 y 11 se calculan cuando hay subtotal.</p>';
     }
-    h += p('=', 'Punto de equilibrio', eq);
-    if(!c.hasR) return h + '<p class="aju-note">Escribe cuánto vas a rectificar y te digo cuánto facturar, devolver y cobrar.</p>';
-    if(AS.causaTipo === 'ninguna') return h + '<div class="aju-warn"><b>Sin causa real no se puede rectificar.</b> La factura se queda como está.</div>';
-    if(c.J != null && c.R > c.J + 0.004) h += '<div class="aju-warn"><b>Rectificas ' + eur(c.R) + ' pero solo puedes justificar ' + eur(c.J) + '.</b></div>';
-    h += p(1, 'Rectificativa a ' + esc(prim(F.client)), l('Rectificar de la factura ' + esc(F.num), 'base −' + eur(c.dBase) + ' · IVA −' + eur(c.dIva) + ' · total −' + eur(c.dTot)) + l('Debe quedar facturado', '<b>' + eur(c.C) + '</b> + IVA ' + eur(c.newIva) + ' = <b>' + eur(c.newTot) + '</b>'));
-    if(c.alb){
-      h += p(2, 'Factura a ' + esc(prim(S.op.parte)), l('Por el albarán ' + esc(S.op.ref), '<b>' + eur(c.sC.B2) + '</b> + IVA ' + eur(c.sC.IVA2) + ' = <b>' + eur(c.sC.T2) + '</b>')
-        + '<div class="aju-note" style="margin:2px 0 0">IVA del ' + (AS.ivaEdit ? '<input data-k="op.iva" inputmode="decimal" value="' + esc(S.op.iva) + '" style="width:56px;padding:3px 6px;display:inline-block"> %' : esc(S.op.iva) + ' % (el del albarán) <a href="#" data-act="as-iva" style="color:var(--ink,#222)">cambiar</a>') + '</div>');
-    }
-    let din = '';
-    din += l('Devolver por la rectificativa', '<b class="r">' + eur(c.Rdev - (c.alb ? 0 : 0)) + '</b>');
-    if(c.sC.cobrar > 0.004 && !c.alb) din += l(esc(prim(F.client)) + ' todavía debe', '<b class="g">' + eur(c.sC.cobrar) + '</b>');
-    if(c.alb) din += l('Cobrar por el trabajo', '<b class="g">' + eur(c.A) + '</b>');
-    if(c.alb){
-      const mism = norm(S.op.parte) === norm(F.client);
-      din += '<div class="aju-note" style="margin-top:6px">' + (mism ? 'Es la misma persona: se puede compensar directamente una deuda con la otra.' : '<b>Compensación:</b> son personas distintas; hace falta un acuerdo escrito de los tres. Confírmalo con el gestor.') + '</div>'
-        + l('Dinero que tiene que moverse', '<b>' + (Math.abs(c.P) < 0.05 ? 'ninguno (se compensa)' : c.P > 0 ? 'cobramos ' + eur(c.P) : 'devolvemos ' + eur(-c.P)) + '</b>');
-    }
-    h += p(c.alb ? 3 : 2, 'Dinero', din);
-    if(c.X && c.X.qAplica) h += '<p class="aju-note">Se declaran en el 303 y el 130 del ' + c.X.qAplica + 'T ' + F.anio + '.</p>';
+    const dif = c.acred == null ? null : r2(c.R - c.acred);
+    const est = c.acred == null ? '<div class="aju-warn" style="margin-top:6px"><b>Sin acreditar:</b> no presentar como justificable. Rectificar ' + eur(c.R) + ' exige acreditar errores administrativos por ese importe.</div>'
+      : dif <= 0.004 ? '<div class="aju-note" style="margin-top:6px;color:var(--green,#2e7d4f)"><b>Acreditado:</b> cubre la rectificación.</div>'
+      : '<div class="aju-warn" style="margin-top:6px"><b>Solo ' + eur(c.acred) + ' acreditados:</b> los otros ' + eur(dif) + ' no son justificables.</div>';
+    h += sec(8, 'Factura rectificada', [c.hasOv ? 'Manual' : 'Automático', c.hasOv ? 'est' : 'ok'], l('Subtotal que mantiene el neto de hoy', '<b>' + eur(c.Sauto == null ? 0 : c.Sauto) + '</b>')
+      + inp('as.sub', 'Otro subtotal (vacío = automático)', AS.sub, '') + l('Rectificar de la original', '−' + eur(c.R) + ' (' + eur(r2(c.R * (1 + c.r))) + ' con IVA)') + inp('as.acred', 'Acreditado como error administrativo (sin IVA)', AS.acred, 'Vacío = sin acreditar') + est);
+    h += sec(9, 'IVA de la factura rectificada', ['Estimado', 'est'], l('Subtotal ' + eur(c.Sub) + ' · IVA ' + F.ivaPct + ' %', '<b>' + eur(c.sC.IVAf) + '</b>') + l('Total rectificada', eur(c.sC.Tf)));
+    h += sec(10, 'IRPF de la factura rectificada', [ok ? 'Estimado' : 'Pendiente', ok ? 'est' : 'no'], l('Pago fraccionado (130)', '<b>' + (c.irpfS == null ? 'Pendiente' : eur(c.irpfS)) + '</b>'));
+    const dev = c.sC.weOwe, cobr = c.sC.T2, P = c.sC.P, loss = c.loss, mism = true;
+    h += sec(11, 'Resultado final', null,
+      l('Devolución bruta a ' + esc(prim(F.client)), eur(dev)) + l('Menos lo que nos debe (compensado)', '−' + eur(Math.min(dev, cobr)))
+      + l('<b>' + (P > 0.004 ? 'Nos tiene que pagar' : 'Transferir a ' + esc(prim(F.client))) + '</b>', '<b class="' + (P > 0.004 ? 'g' : 'r') + '">' + eur(Math.abs(P)) + '</b>')
+      + '<div class="as-sep"></div>' + l('Impuestos que quedan (6+7+9+10)', ok ? eur(r2(c.sC.IVA2 + c.irpfD + c.sC.IVAf + c.irpfS)) : 'Pendiente')
+      + l('<b>Neto en la empresa</b>', '<b>' + eur(c.sC.neto) + '</b>') + l('Neto de hoy', eur(b.neto))
+      + '<div class="as-res ' + (loss > 0.015 ? 'mal' : 'bien') + '">' + (loss > 0.015 ? 'Pérdida ' + eur(loss) : loss < -0.015 ? 'Ganancia ' + eur(-loss) : 'Pérdida 0,00 €') + '</div>');
     return h;
-  }
-  function asRes(c){
-    if(!c.F) return '<p class="aju-note">Pendiente de calcular.</p>';
-    if(!c.hasR) return '<p class="aju-note">Pendiente de calcular: escribe cuánto rectificar.</p>';
-    const F = c.F, X = c.X, s = c.sC, b = c.b0, ok = X.ok;
-    const row = (a, x, y, cls) => '<div class="as-r ' + (cls || '') + '"><span>' + a + '</span><span>' + x + '</span><span>' + y + '</span></div>';
-    const dd = v => Math.abs(v) < 0.005 ? '0,00 €' : sgn(v) + eur(Math.abs(v));
-        const issued = c.alb ? s.T2 : 0;
-    const t = '<div class="as-tb"><div class="as-r h"><span></span><span>Hoy</span><span>Después</span></div>'
-      + row('Factura ' + esc(F.num) + ' que nos quedamos', eur(F.total), eur(s.Tf))
-      + (c.alb ? row('Trabajo ' + esc(S.op.ref) + ' (cobrado o compensado)', '—', eur(issued)) : '')
-      + row('= Dinero que entra', '<b>' + eur(F.total) + '</b>', '<b>' + eur(s.valor) + '</b>', 't')
-      + row('− IVA a pagar (303)', eur(b.ivaNeta), eur(s.ivaNeta))
-      + row('− IRPF adelantado (130)' + (ok ? '' : ' <small>sin datos</small>'), ok ? eur(b.att) : '—', ok ? eur(s.att) : '—')
-      + row('= Queda en la empresa', '<b>' + eur(b.neto) + '</b>', '<b>' + eur(s.neto) + '</b>', 't')
-      + '</div>';
-    const loss = c.loss;
-    let h = '<div class="aju-v ' + c.v.k + '"><b>' + c.v.txt + '</b>' + (c.v.motivos.length ? ' · ' + esc(c.v.motivos.join(' · ')) : '') + '</div>';
-    h += t + '<div class="aju-cmpb"><div class="l big"><span>' + (loss > 0.015 ? 'Pérdida neta' : loss < -0.015 ? 'Ganancia neta' : 'Pérdida neta') + '</span><b class="' + (loss > 0.015 ? 'r' : 'g') + '">' + (Math.abs(loss) <= 0.015 ? '0,00 €' : eur(Math.abs(loss))) + '</b></div></div>';
-    h += '<p class="aju-note">Pérdida = lo que queda hoy (nos quedamos los ' + eur(F.total) + ' y no cobramos el trabajo) menos lo que queda después. Lo devuelto no se resta aparte: ya está en la fila de la factura. IVA e IRPF estimados.' + (X.pend.length ? ' Faltan datos fiscales (p. ej. no hay 303 registrado): ver «Ver cómo se ha calculado».' : '') + '</p>';
-    return h;
-  }
-  function asDetalle(){
-    const c = asCalc(); if(!c.F || !c.hasR) return '<p class="aju-note">Falta información para calcular.</p>';
-    return detalles(c.F, c.X, c.sC, c.b0);
   }
   function asCambia(k, el, fin){
-    const v = el.type === 'checkbox' ? el.checked : el.value;
-    if(k === 'as.texto'){ AS.texto = v; try{ localStorage.setItem('aju_texto', v); }catch(e){} clearTimeout(_asT); _asT = setTimeout(() => { asParse(); asRender(); }, 500); return; }
-    if(k === 'as.fac'){ if(!v) return; AS.facturaId = v; _fisc = null; AS.rect = ''; AS.rSrc = ''; asRender(); return; }
-    if(k === 'as.mismo'){ AS.mismo = v === '1' ? true : false; AS._mAuto = false; asRender(); return; }
-    if(k === 'as.alb'){ AS.albId = v; AS.ivaEdit = false; asRender(); return; }
-    if(k === 'as.causa'){ AS.causaTipo = v; asRender(); return; }
-    if(k === 'as.causaTxt'){ AS.causaTxt = v; asRender(true); return; }
-    if(k === 'as.rect'){ AS.rect = v; AS.rSrc = 'mano'; asRender(true); return; }
-    if(k === 'as.just'){ AS.just = v; asRender(true); return; }
-    if(k === 'op.iva'){ S.op.iva = v; if(fin) asRender(true); else { const F = asF(); if(F){ const c = asCalc(); const r = document.getElementById('as-res'); if(r) r.innerHTML = asRes(c); } } return; }
-    if(k === 'irpfAnual'){ S.irpfAnual = v; if(fin){ asRender(true); } return; }
+    const v = el.value;
+    if(k === 'as.fac'){ if(!v) return; AS.facturaId = v; AS.ovTotal = ''; AS.ovCobrado = ''; AS.dBase = ''; AS.dIva = ''; AS.sub = ''; AS.acred = ''; _fisc = null; asRender(); return; }
+    if(k === 'as.alb'){ AS.albId = v; AS.dBase = ''; AS.dIva = ''; asRender(); return; }
+    const m = /^as\.(ovTotal|ovCobrado|dBase|dIva|sub|acred)$/.exec(k);
+    if(m){ AS[m[1]] = v; if(m[1] === 'ovTotal' || m[1] === 'ovCobrado') _fisc = null; asRender(); }
   }
-  function asAccion(a, b, ev){
-    if(a === 'cerrar') cerrar();
-    else if(a === 'as-eq'){ const c = asCalc(); if(c.Rs != null){ AS.rect = fmtIn(c.Rs); AS.rSrc = 'mano'; asRender(); } }
-    else if(a === 'as-iva'){ if(ev) ev.preventDefault(); AS.ivaEdit = true; asRender(true); }
-    else if(a === 'det' || a === 'sav'){ sheet = a; pintarSheet(); }
-    else if(a === 'sheet0'){ sheet = null; pintarSheet(); }
-    else if(a === 'guardar') asGuardar();
-    else if(a === 'cargar') asCargar(b.getAttribute('data-id'));
-    else if(a === 'borrar') borrar(b.getAttribute('data-id'));
-  }
-  function asSheet(sh){
-    if(!sheet){ sh.style.display = 'none'; sh.innerHTML = ''; return; }
-    const tit = sheet === 'det' ? 'Cómo se ha calculado' : 'Casos guardados';
-    const body = sheet === 'det' ? asDetalle() : '<button type="button" class="btn" style="width:100%;padding:14px;margin:12px 0" data-act="guardar">Guardar este caso</button><div id="aju-guardadas"></div>';
-    sh.innerHTML = '<div class="aju-top"><b>' + tit + '</b><button type="button" class="btn sm" data-act="sheet0">Volver</button></div><div class="aju-in">' + body + '</div>';
-    sh.style.display = 'block'; if(sheet === 'sav') pintarGuardadas();
-  }
-  async function asGuardar(){
-    const F = asF(), nombre = (window.prompt('Nombre del caso', F ? F.client + ' · factura ' + F.num : 'Caso') || '').trim(); if(!nombre) return;
-    const st = JSON.parse(JSON.stringify(AS)); delete st.on;
-    try{ const {error} = await sb.from('sistema').insert({tipo: 'simulacion_ajuste', data: {nombre, estado: 'guardada', estado_calc: {asesor: st}}}); if(error) throw error; _guardadas = null; if(sheet === 'sav') pintarGuardadas(); if(typeof mostrarToast === 'function') mostrarToast('Caso guardado', 'ok'); }
-    catch(e){ if(typeof mostrarToast === 'function') mostrarToast('No se pudo guardar', 'err'); }
-  }
-  function asCargar(id){ const r = (_guardadas || []).find(x => x.id === id), st = r && r.data && r.data.estado_calc && r.data.estado_calc.asesor; if(!st) return; Object.assign(AS, st, {on: true}); _fisc = null; sheet = null; asPintar(); root.scrollTo({top: 0}); }
-
+  function asAccion(a){ if(a === 'cerrar') cerrar(); }
+  function asSheet(sh){ sh.style.display = 'none'; sh.innerHTML = ''; }
   A._test = {sim, base0, viab, resolver, fiscal, facturaCtx, get S(){ return S; }, set S(v){ S = v; }, nuevoEstado, num};
 })();
