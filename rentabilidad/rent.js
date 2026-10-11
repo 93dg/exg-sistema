@@ -435,7 +435,9 @@ R.simular2 = function(b, e){
   const capHired = nMaq * contrato + nCM * contrato * cmP, costeHired = nMaq * ok(cMaq) + (nMec + nCM) * ok(cMec), costePers = costeHired + costeEmp;
   const ind0 = num(prm.indisponibilidad) / 100, ind1 = Math.max(0, num(prm.indisponibilidad) - red * num(prm.reduccionAverias) * num(prm.indisponibilidad) / 100) / 100;
   const capMaq0 = Math.max(b.horas, b.maquinas * (num(prm.horasDia) || 7) * jorn * (1 - ind0)), capMaq = capMaq0 * (1 - ind1) / (1 - ind0);
-  const capPers = capSoc + capHired, cap = Math.min(capMaq, capPers);
+  const capPers = capSoc + capHired; let cap = Math.min(capMaq, capPers);
+  // V10.43 (Daniel): una sola cuenta, la hecha día por día: lo que se echó + lo que cada día se podía haber echado (7 h por persona, L-V), menos reparar y gestionar
+  if(b.obra && b.r){ const persE = (2 - nFuera) + nMaq + nCM * cmP, x = R.perdidas(b.r, persE, NaN, hs.rep * (1 - red) + hs.ges); cap = Math.min(capMaq, b.r.H + x.hPerd); }
   const ahorro = red * num(prm.ahorroTaller) / 100 * b.taller, mH = isFinite(b.margenH) ? b.margenH : 0, ingH = isFinite(b.ingH) ? b.ingH : 0;
   const horasAseg = Math.min(b.horas, cap), dPot = cap - b.horas, dAseg = horasAseg - b.horas, base = b.beneficio - b.socios;
   const pagoH = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : 0, retribDe = pro => pagoH * ((capPers > 0 ? pro * capHoy / capPers : 0) + (nAv ? carga * nHoy / nAv : 0));
@@ -556,14 +558,14 @@ R.escHtml2 = (b, lista) => {
 R.perdidas = function(r, personas, margenH, carga){
   const pot = 7 * personas, mH = isFinite(margenH) ? margenH : NaN; let dLab = 0, hPerd = 0, dFlojos = 0, dVacios = 0;
   for(let f = r.desde; f <= r.hasta; f = addDays(f, 1)){ const dow = new Date(f + 'T12:00:00').getDay(); if(dow === 0 || dow === 6) continue; dLab++; const h = r.hDia[f] || 0, p = Math.max(0, pot - h); hPerd += p; if(!h) dVacios++; else if(p > 0) dFlojos++; }
-  carga = Math.max(0, carga || 0); hPerd = Math.max(0, Math.min(hPerd, pot * dLab - r.H) - carga);   // reparar y gestionar también ocupan su tiempo: no es tiempo perdido
+  carga = Math.max(0, carga || 0); hPerd = Math.max(0, hPerd - carga);   // reparar y gestionar también ocupan su tiempo: no es tiempo perdido
   return {pot, personas, carga, dLab, hPerd, dEq: pot > 0 ? hPerd / pot : 0, dFlojos, dVacios, dinero: isFinite(mH) ? hPerd * mH : NaN, margenH: mH};
 };
 R.opHtml = function(r, personas, margenH, socios, carga){
   const x = R.perdidas(r, personas, margenH, carga);
   const dTr = Object.keys(r.hDia).length, media = dTr ? r.H / dTr : NaN;
   return '<div class="rt-sim-r"><span>Media real por día trabajado<small style="display:block;color:var(--ink-soft);font-size:11px;">' + h1(r.H) + ' h en ' + dTr + ' días · podían ser ' + h1(x.pot) + ' h/día</small></span><b style="color:' + (isFinite(media) && media >= x.pot * 0.8 ? G : isFinite(media) && media >= x.pot * 0.5 ? '#c58a1b' : RJ) + ';">' + (isFinite(media) ? h1(media) + ' h/día' : '—') + '</b></div>'
-    + '<div class="rt-sim-r"><span>Horas sin aprovechar<small style="display:block;color:var(--ink-soft);font-size:11px;">' + x.dLab + ' días L-V de la obra · ' + x.personas + ' personas × 7 h = ' + h1(x.pot) + ' h/día · se echaron ' + h1(r.H) + ' h' + (x.carga ? ' · menos ' + h1(x.carga) + ' h de reparar y gestionar' : '') + '</small></span><b style="color:#c58a1b;">' + h1(x.hPerd) + ' h</b></div>'
+    + '<div class="rt-sim-r"><span>Horas sin aprovechar<small style="display:block;color:var(--ink-soft);font-size:11px;">' + x.dLab + ' días L-V de la obra · ' + x.personas + ' personas × 7 h = ' + h1(x.pot) + ' h/día · se echaron ' + h1(r.H) + ' h' + (x.carga ? ' · menos ' + h1(x.carga) + ' h de reparar y gestionar (' + h1(num(R.param.repSemana) + num(R.param.gesSemana)) + ' h/semana de Hipótesis × ' + h1(x.dLab / 5) + ' semanas)' : '') + '</small></span><b style="color:#c58a1b;">' + h1(x.hPerd) + ' h</b></div>'
     + '<div class="rt-sim-r"><span>Días que se podían usar en otra obra<small style="display:block;color:var(--ink-soft);font-size:11px;">' + x.dFlojos + ' días a medias · ' + x.dVacios + ' sin trabajo</small></span><b style="color:#c58a1b;">' + h1(x.dEq) + ' días</b></div>'
     + (isFinite(x.dinero) ? '<div class="rt-sim-r"><span>Coste de oportunidad<small style="display:block;color:var(--ink-soft);font-size:11px;">' + h1(x.hPerd) + ' h × ' + eur(x.margenH, 2) + '/h de otra obra</small></span><b style="color:#c0392b;">' + eur(x.dinero) + '</b></div>' : '')
     + (isFinite(x.dinero) && socios > 0 ? '<div class="rt-sim-r"><span>Lo que cobran Rafa y Manolo<small style="display:block;color:var(--ink-soft);font-size:11px;">retribución de la obra</small></span><b style="color:#2f6fb0;">' + eur(socios) + '</b></div><div class="rt-sim-r" style="background:#fbeceb;border-radius:10px;padding:8px 10px;margin-top:6px;"><span><b>Coste real de Rafa y Manolo</b><small style="display:block;color:var(--ink-soft);font-size:11px;">lo que cobran + lo que se pierde · ' + eur((socios + x.dinero) / Math.max(1, r.H), 2) + ' por hora echada</small></span><b style="color:#c0392b;font-size:18px;">' + eur(socios + x.dinero) + '</b></div>' : '');
