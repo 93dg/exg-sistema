@@ -562,13 +562,21 @@ R.perdidas = function(r, personas, margenH, carga){
   return {pot, personas, carga, dLab, hPerd, dEq: pot > 0 ? hPerd / pot : 0, dFlojos, dVacios, dinero: isFinite(mH) ? hPerd * mH : NaN, margenH: mH};
 };
 R.opHtml = function(r, personas, margenH, socios, carga){
-  const x = R.perdidas(r, personas, margenH, carga);
-  const dTr = Object.keys(r.hDia).length, media = dTr ? r.H / dTr : NaN;
-  return '<div class="rt-sim-r"><span>Media real por día trabajado<small style="display:block;color:var(--ink-soft);font-size:11px;">' + h1(r.H) + ' h en ' + dTr + ' días · podían ser ' + h1(x.pot) + ' h/día</small></span><b style="color:' + (isFinite(media) && media >= x.pot * 0.8 ? G : isFinite(media) && media >= x.pot * 0.5 ? '#c58a1b' : RJ) + ';">' + (isFinite(media) ? h1(media) + ' h/día' : '—') + '</b></div>'
-    + '<div class="rt-sim-r"><span>Horas sin aprovechar<small style="display:block;color:var(--ink-soft);font-size:11px;">' + x.dLab + ' días L-V de la obra · ' + x.personas + ' personas × 7 h = ' + h1(x.pot) + ' h/día · se echaron ' + h1(r.H) + ' h' + (x.carga ? ' · menos ' + h1(x.carga) + ' h de reparar y gestionar (' + h1(num(R.param.repSemana) + num(R.param.gesSemana)) + ' h/semana de Hipótesis × ' + h1(x.dLab / 5) + ' semanas)' : '') + '</small></span><b style="color:#c58a1b;">' + h1(x.hPerd) + ' h</b></div>'
-    + '<div class="rt-sim-r"><span>Días que se podían usar en otra obra<small style="display:block;color:var(--ink-soft);font-size:11px;">' + x.dFlojos + ' días a medias · ' + x.dVacios + ' sin trabajo</small></span><b style="color:#c58a1b;">' + h1(x.dEq) + ' días</b></div>'
-    + (isFinite(x.dinero) ? '<div class="rt-sim-r"><span>Coste de oportunidad<small style="display:block;color:var(--ink-soft);font-size:11px;">' + h1(x.hPerd) + ' h × ' + eur(x.margenH, 2) + '/h de otra obra</small></span><b style="color:#c0392b;">' + eur(x.dinero) + '</b></div>' : '')
-    + (isFinite(x.dinero) && socios > 0 ? '<div class="rt-sim-r"><span>Lo que cobran Rafa y Manolo<small style="display:block;color:var(--ink-soft);font-size:11px;">retribución de la obra</small></span><b style="color:#2f6fb0;">' + eur(socios) + '</b></div><div class="rt-sim-r" style="background:#fbeceb;border-radius:10px;padding:8px 10px;margin-top:6px;"><span><b>Coste real de Rafa y Manolo</b><small style="display:block;color:var(--ink-soft);font-size:11px;">lo que cobran + lo que se pierde · ' + eur((socios + x.dinero) / Math.max(1, r.H), 2) + ' por hora echada</small></span><b style="color:#c0392b;font-size:18px;">' + eur(socios + x.dinero) + '</b></div>' : '');
+  const x = R.perdidas(r, personas, margenH, carga), dTr = Object.keys(r.hDia).length, media = dTr ? r.H / dTr : NaN, nw = 'white-space:nowrap;';
+  const fl = (t, v, col, big) => '<div class="rt-sim-r"><span>' + t + '</span><b style="' + nw + 'color:' + col + ';' + (big ? 'font-size:18px;' : '') + '">' + v + '</b></div>';
+  const mc = isFinite(media) && media >= x.pot * 0.8 ? G : isFinite(media) && media >= x.pot * 0.5 ? '#c58a1b' : RJ;
+  const real = isFinite(x.dinero) && socios > 0 ? '<div style="background:#fbeceb;border-radius:10px;padding:2px 10px;margin-top:6px;">' + fl('<b>Coste real de Rafa y Manolo</b>', eur(socios + x.dinero), '#c0392b', true) + '<div style="font-size:11px;color:var(--ink-soft);padding-bottom:6px;">' + eur((socios + x.dinero) / Math.max(1, r.H), 2) + ' por hora echada</div></div>' : '';
+  const como = '<div style="font-size:11.5px;color:var(--ink-soft);line-height:1.5;padding:4px 0 8px;">'
+    + '<b>Días:</b> ' + x.dLab + ' de lunes a viernes, del ' + r.desde.split('-').reverse().join('/') + ' al ' + r.hasta.split('-').reverse().join('/') + '. Se trabajó en ' + dTr + '; ' + x.dFlojos + ' a medias y ' + x.dVacios + ' sin trabajo.<br>'
+    + '<b>Posible:</b> ' + x.personas + ' personas × 7 h = ' + h1(x.pot) + ' h por día. Cada día cuenta por separado: un día con 4 h pierde 10 h y uno con 20 h no compensa otro.<br>'
+    + (x.carga ? '<b>Reparar y gestionar:</b> ' + h1(x.carga) + ' h que ocupan a Rafa y Manolo (' + h1(num(R.param.repSemana) + num(R.param.gesSemana)) + ' h por semana × ' + h1(x.dLab / 5) + ' semanas). Es una cifra de Hipótesis, no medida: se cambia en Hipótesis.<br>' : '')
+    + '<b>Valor:</b> horas sin aprovechar × ' + (isFinite(x.margenH) ? eur(x.margenH, 2) : '—') + ' €/h de margen de otra obra.</div>';
+  return fl('Media diaria real', h1(media) + ' h de ' + h1(x.pot), mc)
+    + fl('Horas sin aprovechar', h1(x.hPerd) + ' h ≈ ' + h1(x.dEq) + ' días', '#c58a1b')
+    + (isFinite(x.dinero) ? fl('Valor en otra obra', eur(x.dinero), '#c0392b') : '')
+    + (isFinite(x.dinero) && socios > 0 ? fl('Cobran Rafa y Manolo', eur(socios), '#2f6fb0') : '')
+    + real
+    + '<details style="margin-top:6px;"><summary style="font-size:12px;color:var(--orange);font-weight:700;cursor:pointer;">Cómo se calcula</summary>' + como + '</details>';
 };
 R.baseObra = function(r, b){   // V10.38 (Daniel): el simulador parte de la obra elegida (su trabajo hecho, horas y costes), no de toda la empresa
   if(!r || r.vacio) return b;
