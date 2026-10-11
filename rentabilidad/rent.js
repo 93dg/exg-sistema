@@ -577,11 +577,11 @@ R.opHtml = function(r, personas, margenH, socios, carga){
 };
 R.datosReales = function(r, b){   // V10.51 (Daniel): datos reales sobre la hora, arriba de todo
   const e = R.build2, cmP = num(R.param.condMecPct) / 100 || 0, pers = (2 - (e.rafa === 'fuera' ? 1 : 0) - (e.manolo === 'fuera' ? 1 : 0)) + (e.maq | 0) + (e.cm | 0) * cmP;
-  const x = R.perdidas(r, pers, b.margenH, 0), dTr = Object.keys(r.hDia).length, media = dTr ? r.H / dTr : NaN, dEmp = x.pot > 0 ? r.H / x.pot : NaN;
+  const x = R.perdidas(r, pers, b.margenH, 0), dTr = Object.keys(r.hDia).length, dFin = Object.keys(r.hDia).filter(f => { const w = new Date(f + 'T12:00:00').getDay(); return w === 0 || w === 6; }).length, media = dTr ? r.H / dTr : NaN, dEmp = x.pot > 0 ? r.H / x.pot : NaN;
   const f = (t, v, col) => '<div class="rt-sim-r"><span>' + t + '</span><b style="white-space:nowrap;' + (col ? 'color:' + col + ';' : '') + '">' + v + '</b></div>';
   const mq = (r.maq || []).slice().sort((a, c2) => c2.horas - a.horas);
   return '<div class="rt-c"><h3>Datos reales</h3><div style="font-size:11.5px;color:var(--ink-soft);margin:-4px 0 6px;">Jornada de 8 h; 1 h se reserva para mantenimiento, reparaciones y preparativos: quedan 7 h operativas.</div>'
-    + f('Días de la obra (L-V)', x.dLab) + f('Días trabajados', dTr) + f('Horas operativas trabajadas', h1(r.H) + ' h') + f('Media por día trabajado', isFinite(media) ? h1(media) + ' h/día' : '—')
+    + f('Días de la obra (L-V)', x.dLab) + f('Días trabajados' + (dFin ? ' (' + dFin + ' en fin de semana)' : ''), dTr) + f('Días laborables no trabajados', x.dVacios) + f('Horas operativas trabajadas', h1(r.H) + ' h') + f('Media: ' + h1(r.H) + ' h ÷ ' + dTr + ' días trabajados', isFinite(media) ? h1(media) + ' h/día' : '—')
     + f('Días a 7 h por empleado', isFinite(dEmp) ? h1(dEmp) + ' días' : '—', G)
     + f('Días operativos desaprovechados', h1(x.dEq) + ' días', '#c58a1b') + f('Horas operativas desaprovechadas', h1(x.hPerd) + ' h', '#c58a1b')
     + f('Empleados', h1(x.personas))
