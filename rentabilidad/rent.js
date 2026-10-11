@@ -545,7 +545,7 @@ R.vistaObra = function(r, P, b){
   const avisos = (r.avisos.length ? '<div class="rt-an">' + r.avisos.map(a => '• ' + esc(a)).join('<br>') + '</div>' : '') + R.sinHorasAviso(r);
   const detalle = det('Ver detalle', avisos + detNiv + R.secDirecto(r) + R.secReal(r) + R.secOport(r) + R.secComp(r, P, b));
   const opObra = '<div class="rt-c"><h3>Coste de oportunidad</h3>' + R.opHtml(r, 2, b.margenH, r.socios.valor, (() => { const hh = R.horasSocios(R.baseObra(r, b)); return hh.rep + hh.ges; })()) + '</div>';
-  return resumen + niveles + comp + opObra + maq + detalle;
+  return resumen + niveles + comp + detalle;   // V10.47 (Daniel): sin tarjeta «Por máquina €/h» (no se usa); el coste de oportunidad va junto a Organización
 };
 
 R.escHtml2 = (b, lista) => {
@@ -601,7 +601,6 @@ R.simHtml = function(P, b){
     + '<div class="rt-sim-r"><span>Coste de personal nuevo</span><b>' + (costeNuevo > 0 ? cR(eur(costeNuevo)) : cG(eur(-costeNuevo) + ' menos')) + '</b></div>'
     + (s.ahorro ? '<div class="rt-sim-r"><span>Ahorro en taller <small style="color:var(--orange);">estimado</small></span><b>' + cG(eur(s.ahorro)) + '</b></div>' : '')
     + '<div class="rt-sim-r"><span>Trabajo de Rafa y Manolo</span><b>' + cs(hoy.tr.total - s.tr.total, h1(s.tr.total) + ' h') + ' <small style="font-weight:600;color:var(--ink-soft);">(hoy ' + h1(hs.total) + ')</small></b></div>'
-    + opSim
     + '<div class="rt-ch"><button type="button" onclick="RENT.escAdd2()">Guardar para comparar</button></div></div>';
   const comp = (P.esc2 || []).length ? '<div class="rt-c"><h3>Comparar</h3>' + R.escHtml2(b, P.esc2) + '</div>' : '';
   const act = (n, a, c) => '<tr><td>' + n + '</td><td>' + h1(a) + ' h</td><td>' + cs(a - c, h1(c) + ' h') + '</td></tr>';
@@ -612,7 +611,8 @@ R.simHtml = function(P, b){
     + (s.notas.length ? s.notas.map(n => '<div class="rt-an">• ' + esc(n) + '</div>').join('') : '')
     + '<div style="font-size:11.5px;color:var(--ink-soft);margin:8px 0;"><b>Cómo se calcula.</b> Asegurado: las horas que ya se facturan hoy (o menos, si falta gente), más los ahorros, menos el coste de personal. Si se ocupa todo: igual, pero facturando las horas que cabrían, a lo que deja cada hora hoy. No se limita por falta de trabajo. Los sueldos salen del convenio. El empleado trabaja 8 h, lunes a viernes, menos el tiempo de reparar y gestionar. El mecánico no suma horas de máquina: quita reparaciones externas, paradas y trabajo físico a Rafa y Manolo. Los ahorros son estimaciones de Hipótesis.</div>'
     + R.hipHtml(P) + '</div>');
-  return controles + res + comp + detalle;
+  const opCard = opSim ? '<div class="rt-c"><h3>Coste de oportunidad</h3>' + opSim + '</div>' : '';
+  return controles + opCard + res + comp + detalle;
 };
 R.hipHtml = P => { const prm = R.param, inp = (k, l, u) => '<label style="font-size:11.5px;display:flex;flex-direction:column;gap:2px;">' + l + '<input type="number" value="' + prm[k] + '" onchange="RENT.setParam(\'' + k + '\',this.value)" style="width:90px;"><span style="color:var(--ink-soft);">' + (u || '') + '</span></label>';
   return '<div style="font-weight:800;font-size:13px;margin:8px 0 4px;">Hipótesis</div><div style="display:flex;flex-wrap:wrap;gap:10px;">' + inp('jornadas', 'Jornadas al año', 'd') + inp('horasDia', 'Horas de facturación al día', 'h por jornada (1 h es de mantenimiento)') + inp('indisponibilidad', 'Averías / paradas', '% de tiempo') + inp('reduccionAverias', 'Reducción con mecánico', '% de las averías') + inp('ahorroTaller', 'Ahorro en taller con mecánico', '%') + inp('condMecPct', 'Conductor/mecánico conduce', '% del tiempo') + inp('repSemana', 'Rafa y Manolo reparan', 'h/semana entre los dos') + inp('gesSemana', 'Rafa y Manolo gestionan', 'h/semana entre los dos') + inp('impuesto', 'Impuestos', '% sobre beneficio') + inp('vidaUtil', 'Vida útil maquinaria', 'años') + inp('residualPct', 'Valor residual', '%') + '</div>'
