@@ -4626,11 +4626,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.67" defer></script>
-<script src="costes/norm.js?v=V10.67" defer></script>
-<script src="ajustes/calc.js?v=V10.67" defer></script>
+<script src="rentabilidad/rent.js?v=V10.68" defer></script>
+<script src="costes/norm.js?v=V10.68" defer></script>
+<script src="ajustes/calc.js?v=V10.68" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.67</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.68</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4782,7 +4782,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.67</div>
+        <div class="sub" id="version-badge">V10.68</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -15252,6 +15252,12 @@ async function cargarConocimientoEXG(){
   renderConocimientoEXG();
 }
 
+async function quitarConocimientoEXG(id){   // V10.68 (Daniel): quitar una regla desde la propia web
+  if(!sb || !confirm('¿Quitar esta regla?')) return;
+  const {error} = await sb.from('conocimiento_exg').delete().eq('id', id);
+  if(error){ alert('No se pudo quitar: ' + error.message); return; }
+  _conocimientoEXGCache = _conocimientoEXGCache.filter(k => k.id !== id); renderConocimientoEXG();
+}
 function renderConocimientoEXG(){
   const filtroAlcance = document.getElementById('conocimiento-exg-alcance')?.value || '';
   const lista = _conocimientoEXGCache.filter(k=> !filtroAlcance || k.alcance===filtroAlcance);
@@ -15274,7 +15280,7 @@ function renderConocimientoEXG(){
       ${pendienteEn}${aplicadoEn}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
         <div style="font-size:11px;color:var(--ink-soft);">v${k.version_regla||1} · ${k.veces_reutilizado||0} usos · ${k.seccion_origen||'—'}</div>
-        ${!k.puede_autoaplicarse&&k.descripcion?`<button class="btn sm" style="font-size:10px;padding:2px 8px;" onclick="copiarTexto(${JSON.stringify(k.descripcion||'')})">📋</button>`:''}
+        <span>${!k.puede_autoaplicarse&&k.descripcion?`<button class="btn sm" style="font-size:10px;padding:2px 8px;" onclick="copiarTexto(${JSON.stringify(k.descripcion||'')})">📋</button>`:''}${k.sagrada?'':` <a href="#" onclick="quitarConocimientoEXG('${k.id}');return false" style="color:var(--orange);font-weight:800;font-size:12px;">Quitar</a>`}</span>
       </div>
     </div>`;
   }).join('');
