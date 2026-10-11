@@ -561,7 +561,7 @@ R.perdidas = function(r, personas, margenH, carga){
   const pot = 7 * personas, mH = isFinite(margenH) ? margenH : NaN; let dLab = 0, hPerd = 0, dFlojos = 0, dVacios = 0;
   for(let f = r.desde; f <= r.hasta; f = addDays(f, 1)){ const dow = new Date(f + 'T12:00:00').getDay(); if(dow === 0 || dow === 6) continue; dLab++; const h = r.hDia[f] || 0, p = Math.max(0, pot - h); hPerd += p; if(!h) dVacios++; else if(p > 0) dFlojos++; }
   carga = 0;   // V10.51 (Daniel): de 8 h de jornada, 1 h se reserva a mantenimiento/reparaciones/preparativos: las 7 h operativas ya la excluyen
-  hPerd = Math.max(0, pot * dLab - r.H - carga);   // lo mismo trabajo en menos días: días de la obra × 14 h − lo echado − reparar/gestionar   // reparar y gestionar también ocupan su tiempo: no es tiempo perdido
+  const dTr = Object.keys(r.hDia).length; hPerd = Math.max(0, pot * dTr - r.H);   // V10.55 (Daniel): solo cuentan los días trabajados en esta obra; los demás días de su periodo pudieron ser de otra obra
   return {pot, personas, carga, dLab, hPerd, dEq: pot > 0 ? hPerd / pot : 0, dFlojos, dVacios, dinero: isFinite(mH) ? hPerd * mH : NaN, margenH: mH};
 };
 R.opHtml = function(r, personas, margenH, socios, carga){
