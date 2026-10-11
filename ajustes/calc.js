@@ -198,7 +198,11 @@
 #aju-app .as-ent{margin:8px 0;padding:8px 12px;border-radius:12px;background:#eef3ee;font-size:13.5px;line-height:1.45;}
 #aju-app .as-q{margin:10px 0;padding:10px 12px;border-radius:14px;background:#fff;border:2px solid var(--ink,#222);} #aju-app .as-bt{display:grid;gap:6px;margin-top:8px;} #aju-app .as-bt .btn{width:100%;padding:12px;text-align:left;}
 #aju-app .as-tb{margin:6px 0;background:#fff;border:1px solid var(--line,#ddd);border-radius:12px;overflow:hidden;} #aju-app .as-r{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:6px;padding:7px 10px;border-top:1px solid var(--line,#eee);font-size:13px;align-items:center;} #aju-app .as-r:first-child{border-top:none;} #aju-app .as-r span+span{text-align:right;} #aju-app .as-r.h{font-size:11.5px;text-transform:uppercase;color:var(--ink-soft);} #aju-app .as-r.t{background:#f4f1ea;}
-#aju-app .ce-sec{border:1px solid var(--line,#ddd);border-radius:14px;background:#fff;padding:10px 12px;margin:8px 0;} #aju-app .cz-h{display:flex;align-items:center;gap:8px;margin-bottom:4px;} #aju-app .cz-h b{flex:1;font-size:14.5px;} #aju-app .cz-h .n{display:inline-block;min-width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;border:2px solid var(--orange,#e85d04);font-size:12px;font-weight:700;} #aju-app .cz-h .aju-tag{font-style:normal;font-size:11px;white-space:nowrap;} #aju-app .as-sep{border-top:1px dashed var(--line,#ccc);margin:6px 0;} #aju-app .as-res{margin-top:8px;padding:12px;border-radius:12px;text-align:center;font-weight:800;font-size:20px;background:#fff;border:2px solid var(--orange,#e85d04);} #aju-app .as-res.mal{color:var(--red,#b3382c);} #aju-app .as-res.bien{color:var(--green,#2e7d4f);}
+#aju-app .ce-sec-old{border:1px solid var(--line,#ddd);border-radius:14px;background:#fff;padding:10px 12px;margin:8px 0;} #aju-app .cz-h{display:flex;align-items:center;gap:8px;margin-bottom:4px;} #aju-app .cz-h b{flex:1;font-size:14.5px;} #aju-app .cz-h .n{display:inline-block;min-width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;border:2px solid var(--orange,#e85d04);font-size:12px;font-weight:700;} #aju-app .cz-h .aju-tag{font-style:normal;font-size:11px;white-space:nowrap;} #aju-app .as-sep{border-top:1px dashed var(--line,#ccc);margin:6px 0;} #aju-app .as-res{margin-top:8px;padding:12px;border-radius:12px;text-align:center;font-weight:800;font-size:20px;background:#fff;border:2px solid var(--orange,#e85d04);} #aju-app .as-res.mal{color:var(--red,#b3382c);} #aju-app .as-res.bien{color:var(--green,#2e7d4f);}
+#aju-app .aju-in.cz{padding:6px 12px 10px;} #aju-app .cz-sel{flex:1;min-width:0;padding:7px 8px;font-size:13px;border-radius:10px;} #aju-app .aju-top{padding:8px 12px;}
+#aju-app .cz-r{display:grid;grid-template-columns:24px 1fr auto;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line,#e6e2d8);min-height:32px;} #aju-app .cz-r .n{width:20px;height:20px;line-height:17px;text-align:center;border-radius:50%;border:2px solid var(--orange,#e85d04);font-size:11px;font-weight:700;box-sizing:border-box;} #aju-app .cz-r:has(.n:empty) .n{border:none;} #aju-app .cz-r .t{font-size:13.5px;line-height:1.15;} #aju-app .cz-r .t small{display:block;font-size:10.5px;color:var(--ink-soft);} #aju-app .cz-r .v{display:flex;align-items:center;gap:6px;justify-content:flex-end;font-size:14px;} #aju-app .cz-r .sub{font-size:12px;color:var(--ink-soft);}
+#aju-app input.cz-i{width:98px;padding:4px 6px;font-size:13.5px;text-align:right;border:1px solid var(--line,#ccc);border-radius:8px;background:#fff;box-sizing:border-box;margin:0;height:30px;} #aju-app input.cz-i.sm{width:56px;} #aju-app input.cz-i.w{width:78px;} #aju-app input.cz-i.b{font-weight:700;border-color:var(--orange,#e85d04);} #aju-app .pc{display:flex;align-items:center;gap:2px;font-size:12px;} #aju-app .mal{color:var(--red,#b3382c);font-size:11px;} #aju-app .bien{color:var(--green,#2e7d4f);font-size:11px;}
+#aju-app .cz-fin{margin-top:2px;} #aju-app .cz-fin .as-res{margin-top:6px;padding:8px;font-size:18px;} #aju-app .cz-pie{margin:6px 0 0;font-size:11px;color:var(--ink-soft);text-align:center;}
 #aju-app .as-paso{border:1px solid var(--line,#ddd);border-radius:14px;background:#fff;padding:10px 12px;margin:8px 0;} #aju-app .as-paso .t{font-weight:700;margin-bottom:4px;} #aju-app .as-paso .aju-l{display:block;padding:6px 0;} #aju-app .as-paso .aju-l span:first-child{display:block;font-size:12.5px;color:var(--ink-soft);} #aju-app .as-paso .aju-l span:last-child{display:block;text-align:left;font-size:15px;margin-top:1px;}
 #aju-app .as-paso .n{display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:var(--ink,#222);color:#fff;font-size:12px;margin-right:8px;}`;
     document.head.appendChild(s);
@@ -519,52 +523,42 @@
   A.abrir = abrirAsesor;
   function asPintar(){
     const a = document.activeElement, k = a && a.getAttribute ? a.getAttribute('data-k') : null, pos = k && a.selectionStart != null ? a.selectionStart : null, top = root.querySelector('.aju-in') ? root.scrollTop : 0;
-    root.innerHTML = '<div class="aju-top"><b>Calculadora Encarni</b><button type="button" class="btn sm" data-act="cerrar">Cerrar</button></div><div class="aju-in">' + asHtml(asCalc()) + '</div>';
+    const FL = facturas(), optF = FL.map(d => '<option value="' + d.id + '"' + (AS.facturaId === d.id ? ' selected' : '') + '>' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 16) + ' · ' + eur(d.total)) + '</option>').join('');
+    root.innerHTML = '<div class="aju-top"><select data-k="as.fac" class="cz-sel">' + (AS.facturaId ? '' : '<option value="">Elegir factura…</option>') + optF + '</select><button type="button" class="btn sm" data-act="cerrar">Cerrar</button></div><div class="aju-in cz">' + asHtml(asCalc()) + '</div>';
     root.scrollTop = top;
     if(k){ const e = root.querySelector('[data-k="' + k + '"]'); if(e){ e.focus(); try{ if(pos != null) e.setSelectionRange(pos, pos); }catch(x){} } }
   }
   const asRender = () => asPintar();
   function asHtml(c){
-    const sec = (n, t, tag, body) => '<div class="ce-sec"><div class="cz-h"><span class="n">' + n + '</span><b>' + t + '</b>' + (tag ? '<i class="aju-tag ' + (tag[1] || '') + '">' + tag[0] + '</i>' : '') + '</div>' + body + '</div>';
-    const l = (a, b, cls) => '<div class="aju-l"><span>' + a + '</span><span class="' + (cls || '') + '">' + b + '</span></div>';
-    const inp = (k, lab, val, ph) => '<label class="aju-f"><span>' + lab + '</span><input data-k="' + k + '" inputmode="decimal" autocomplete="off" value="' + esc(val) + '" placeholder="' + esc(ph || '') + '"></label>';
+    const row = (n, t, val, sub) => '<div class="cz-r"><span class="n">' + n + '</span><span class="t">' + t + (sub ? '<small>' + sub + '</small>' : '') + '</span><span class="v">' + val + '</span></div>';
+    const inp = (k, val, ph, cls) => '<input class="cz-i ' + (cls || '') + '" data-k="' + k + '" inputmode="decimal" autocomplete="off" value="' + esc(val) + '" placeholder="' + esc(ph || '') + '">';
     if(!c.F){
-      const L = facturas();
-      return '<div class="aju-warn">No encuentro la factura de Encarni. Elige la factura:</div><select data-k="as.fac"><option value="">Elegir factura…</option>' + L.map(d => '<option value="' + d.id + '">' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 20) + ' · ' + eur(d.total)) + '</option>').join('') + '</select>';
+      return '<div class="aju-warn">No encuentro la factura de Encarni. Elígela arriba.</div>';
     }
     const F = c.F, X = c.X, ok = X.ok, b = c.b0, E = v => ok ? eur(v) : 'Pendiente';
-    const pag = X.pago ? ['Pagado', 'ok'] : ['Estimado', 'est'], rec = X.qAplica ? ' · recuperable en el ' + X.qAplica + 'T' : '';
-    const L = facturas(), optF = L.map(d => '<option value="' + d.id + '"' + (AS.facturaId === d.id ? ' selected' : '') + '>' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 20) + ' · ' + eur(d.total)) + '</option>').join('');
-    const AL = albaranes(), optA = '<option value="">— ninguno —</option>' + AL.map(d => '<option value="' + d.id + '"' + (AS.albId === d.id ? ' selected' : '') + '>' + esc((d.num || d.numero || '—') + ' · ' + String(d.client || '—').slice(0, 18) + ' · ' + eur(baseAlb(d))) + '</option>').join('');
     let h = '';
-    h += sec(1, 'Factura errónea', null, '<label class="aju-f"><span>Factura</span><select data-k="as.fac">' + optF + '</select></label>'
-      + inp('as.ovTotal', 'Importe original (con IVA)', AS.ovTotal, fmtIn(Number(F.total))) + inp('as.ovCobrado', 'Dinero que nos transfirió ' + esc(prim(F.client)), AS.ovCobrado, fmtIn(Number(F.cobrado)))
-      + l('Sin IVA', eur(F.base)));
-    h += sec(2, 'IVA pagado por esa factura', [pag[0] + rec, pag[1]], l('IVA ' + F.ivaPct + ' %', '<b>' + eur(F.iva) + '</b>'));
-    h += sec(3, 'IRPF pagado por esa factura', [ok ? pag[0] + rec : 'Pendiente', ok ? pag[1] : 'no'], l('Pago fraccionado (130)', '<b>' + E(b.att) + '</b>'));
-    h += sec(4, 'Total de impuestos pagados', [ok ? pag[0] : 'Pendiente', ok ? pag[1] : 'no'], l('IVA + IRPF', '<b>' + (ok ? eur(r2(F.iva + b.att)) : 'Pendiente') + '</b>'));
-    h += sec(5, 'Dinero que nos debe ' + esc(prim(F.client)), null, '<label class="aju-f"><span>Trabajo pendiente (albarán)</span><select data-k="as.alb">' + optA + '</select></label>' + inp('as.dBase', 'Importe sin IVA', AS.dBase, fmtIn(c.Db)) + l('Con IVA', eur(r2(c.Db * (1 + c.dIvaPct / 100)))));
-    h += sec(6, 'IVA de lo que nos debe', ['Estimado', 'est'], inp('as.dIva', 'IVA %', AS.dIva, String(c.dIvaPct)) + l('IVA', '<b>' + eur(r2(c.Db * c.dIvaPct / 100)) + '</b>'));
-    h += sec(7, 'IRPF de lo que nos debe', [ok ? 'Estimado' : 'Pendiente', ok ? 'est' : 'no'], l('Pago fraccionado (130)', '<b>' + (c.irpfD == null ? 'Pendiente' : eur(c.irpfD)) + '</b>'));
+    h += '<div class="cz-r"><span class="n">1</span><span class="t">Factura errónea<small>original · transferido</small></span><span class="v">' + inp('as.ovTotal', AS.ovTotal, fmtIn(Number(F.total))) + inp('as.ovCobrado', AS.ovCobrado, fmtIn(Number(F.cobrado))) + '</span></div>';
+    h += row(2, 'IVA pagado', '<b>' + eur(F.iva) + '</b>', 'IVA ' + F.ivaPct + ' %');
+    h += row(3, 'IRPF pagado', '<b>' + E(b.att) + '</b>', 'pago fraccionado 130');
+    h += row(4, 'Total impuestos', '<b>' + (ok ? eur(r2(F.iva + b.att)) : 'Pendiente') + '</b>');
+    h += row(5, 'Nos debe ' + esc(prim(F.client)), inp('as.dBase', AS.dBase, fmtIn(c.Db)), 'sin IVA');
+    h += row(6, 'IVA de lo que debe', '<span class="pc">' + inp('as.dIva', AS.dIva, String(c.dIvaPct), 'sm') + '%</span><b>' + eur(r2(c.Db * c.dIvaPct / 100)) + '</b>');
+    h += row(7, 'IRPF de lo que debe', '<b>' + (c.irpfD == null ? 'Pendiente' : eur(c.irpfD)) + '</b>');
     if(c.Sub == null){
-      h += sec(8, 'Factura rectificada', ['Sin solución', 'no'], '<div class="aju-warn">Con estas cantidades no hay subtotal que evite la pérdida: incluso sin rectificar, la empresa pierde dinero.</div>' + inp('as.sub', 'Probar otro subtotal (sin IVA)', AS.sub, ''));
-      return h + '<p class="aju-note">Los apartados 9, 10 y 11 se calculan cuando hay subtotal.</p>';
+      h += row(8, 'Factura rectificada', inp('as.sub', AS.sub, ''), 'sin solución');
+      return h + '<p class="aju-note" style="margin:4px 0">Con estas cantidades no hay subtotal sin pérdida.</p>';
     }
     const dif = c.acred == null ? null : r2(c.R - c.acred);
-    const est = c.acred == null ? '<div class="aju-warn" style="margin-top:6px"><b>Sin acreditar:</b> no presentar como justificable. Rectificar ' + eur(c.R) + ' exige acreditar errores administrativos por ese importe.</div>'
-      : dif <= 0.004 ? '<div class="aju-note" style="margin-top:6px;color:var(--green,#2e7d4f)"><b>Acreditado:</b> cubre la rectificación.</div>'
-      : '<div class="aju-warn" style="margin-top:6px"><b>Solo ' + eur(c.acred) + ' acreditados:</b> los otros ' + eur(dif) + ' no son justificables.</div>';
-    h += sec(8, 'Factura rectificada', [c.hasOv ? 'Manual' : 'Automático', c.hasOv ? 'est' : 'ok'], l('Subtotal que mantiene el neto de hoy', '<b>' + eur(c.Sauto == null ? 0 : c.Sauto) + '</b>')
-      + inp('as.sub', 'Otro subtotal (vacío = automático)', AS.sub, '') + l('Rectificar de la original', '−' + eur(c.R) + ' (' + eur(r2(c.R * (1 + c.r))) + ' con IVA)') + inp('as.acred', 'Acreditado como error administrativo (sin IVA)', AS.acred, 'Vacío = sin acreditar') + est);
-    h += sec(9, 'IVA de la factura rectificada', ['Estimado', 'est'], l('Subtotal ' + eur(c.Sub) + ' · IVA ' + F.ivaPct + ' %', '<b>' + eur(c.sC.IVAf) + '</b>') + l('Total rectificada', eur(c.sC.Tf)));
-    h += sec(10, 'IRPF de la factura rectificada', [ok ? 'Estimado' : 'Pendiente', ok ? 'est' : 'no'], l('Pago fraccionado (130)', '<b>' + (c.irpfS == null ? 'Pendiente' : eur(c.irpfS)) + '</b>'));
-    const dev = c.sC.weOwe, cobr = c.sC.T2, P = c.sC.P, loss = c.loss, mism = true;
-    h += sec(11, 'Resultado final', null,
-      l('Devolución bruta a ' + esc(prim(F.client)), eur(dev)) + l('Menos lo que nos debe (compensado)', '−' + eur(Math.min(dev, cobr)))
-      + l('<b>' + (P > 0.004 ? 'Nos tiene que pagar' : 'Transferir a ' + esc(prim(F.client))) + '</b>', '<b class="' + (P > 0.004 ? 'g' : 'r') + '">' + eur(Math.abs(P)) + '</b>')
-      + '<div class="as-sep"></div>' + l('Impuestos que quedan (6+7+9+10)', ok ? eur(r2(c.sC.IVA2 + c.irpfD + c.sC.IVAf + c.irpfS)) : 'Pendiente')
-      + l('<b>Neto en la empresa</b>', '<b>' + eur(c.sC.neto) + '</b>') + l('Neto de hoy', eur(b.neto))
-      + '<div class="as-res ' + (loss > 0.015 ? 'mal' : 'bien') + '">' + (loss > 0.015 ? 'Pérdida ' + eur(loss) : loss < -0.015 ? 'Ganancia ' + eur(-loss) : 'Pérdida 0,00 €') + '</div>');
+    const est = c.acred == null ? '<span class="mal">sin acreditar</span>' : dif <= 0.004 ? '<span class="bien">acreditado</span>' : '<span class="mal">faltan ' + eur(dif) + '</span>';
+    h += row(8, 'Factura rectificada', inp('as.sub', AS.sub, fmtIn(c.Sub), 'b'), (c.hasOv ? 'manual' : 'automático') + ' · rectifica −' + eur(c.R));
+    h += row('', '<span class="sub">Acreditado como error</span>', inp('as.acred', AS.acred, '0,00', 'sm w') + est);
+    h += row(9, 'IVA rectificada', '<b>' + eur(c.sC.IVAf) + '</b>');
+    h += row(10, 'IRPF rectificada', '<b>' + (c.irpfS == null ? 'Pendiente' : eur(c.irpfS)) + '</b>');
+    const dev = c.sC.weOwe, cobr = c.sC.T2, P = c.sC.P, loss = c.loss;
+    h += '<div class="cz-fin"><div class="cz-r"><span class="n">11</span><span class="t"><b>' + (P > 0.004 ? 'Nos paga ' + esc(prim(F.client)) : 'Transferir a ' + esc(prim(F.client))) + '</b><small>devuelto ' + eur(dev) + ' − deuda ' + eur(Math.min(dev, cobr)) + '</small></span><span class="v"><b class="' + (P > 0.004 ? 'g' : 'r') + '">' + eur(Math.abs(P)) + '</b></span></div>'
+      + '<div class="cz-r"><span class="n"></span><span class="t">Neto en la empresa<small>hoy ' + eur(b.neto) + '</small></span><span class="v"><b>' + eur(c.sC.neto) + '</b></span></div>'
+      + '<div class="as-res ' + (loss > 0.015 ? 'mal' : 'bien') + '">' + (loss > 0.015 ? 'Pérdida ' + eur(loss) : loss < -0.015 ? 'Ganancia ' + eur(-loss) : 'Pérdida 0,00 €') + '</div></div>';
+    h += '<p class="cz-pie">IVA e IRPF ' + (X.pago ? 'pagados' : 'estimados') + (X.qAplica ? ' · recuperables en el ' + X.qAplica + 'T' : '') + '</p>';
     return h;
   }
   function asCambia(k, el, fin){
