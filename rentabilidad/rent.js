@@ -425,15 +425,15 @@ R.nombreEsc2 = e => { const p = [], pl = (n, s) => '+' + n + ' ' + s + (n > 1 ? 
 // Simulador: capacidad (lo que se podría producir) separada de lo asegurado (lo que ya se factura). La demanda NO limita: hay trabajo de sobra y conseguirlo es gestión comercial aparte.
 R.simular2 = function(b, e){
   const prm = R.param, jorn = b.jornadas || num(prm.jornadas) || 250, cmP = num(prm.condMecPct) / 100, t = num(prm.impuesto) / 100, contrato = (num(prm.horasDia) || 7) * jorn, hs = R.horasSocios(b);   // V9.84 (Daniel): 7 h de facturación por jornada (1 h es de mantenimiento de la maquinaria), sin recorte por ocupación
-  const cMaq = coste('maquinista'), cMec = coste('oficial1'), faltan = [], nMaq = e.maq | 0, nMec = e.mec | 0, nCM = e.cm | 0, ok = x => isFinite(x) ? x : 0;
+  const cMaq = coste('maquinista'), cMec = coste('oficial1'), faltan = [], nMaq = e.maq | 0, nMec = e.mec | 0, nCM = e.cm | 0, ok = x => isFinite(x) ? x : 0, prorr = b.obra ? jorn / (num(prm.jornadas) || 250) : 1;   // V10.58: el sueldo es anual; en una obra solo cuenta la parte de los días de esa obra
   if((nMaq || e.rafa === 'empleado' || e.manolo === 'empleado') && !isFinite(cMaq)) faltan.push('convenio de maquinista'); if((nMec || nCM) && !isFinite(cMec)) faltan.push('convenio de mecánico');
   const red = Math.min(1, nMec + nCM * (1 - cmP));
   // V9.86 (Daniel): una persona tiene tope de horas; reparar y gestionar lo hacen los que se quedan (si uno sale, el otro asume su parte), y a Rafa y Manolo se les paga por las horas que echan
   const mods = [e.rafa, e.manolo], nFuera = mods.filter(m => m === 'fuera').length, nAv = 2 - nFuera, nHoy = mods.filter(m => m === 'hoy').length;
   const carga = hs.rep * (1 - red) + hs.ges, capUno = nAv ? Math.max(0, contrato - carga / nAv) : 0;
   let capSoc = 0, capHoy = 0, costeEmp = 0;
-  mods.forEach(m => { if(m === 'hoy'){ capSoc += capUno; capHoy += capUno; } else if(m === 'empleado'){ costeEmp += ok(cMaq); capSoc += capUno; } });
-  const capHired = nMaq * contrato + nCM * contrato * cmP, costeHired = nMaq * ok(cMaq) + (nMec + nCM) * ok(cMec), costePers = costeHired + costeEmp;
+  mods.forEach(m => { if(m === 'hoy'){ capSoc += capUno; capHoy += capUno; } else if(m === 'empleado'){ costeEmp += ok(cMaq) * prorr; capSoc += capUno; } });
+  const capHired = nMaq * contrato + nCM * contrato * cmP, costeHired = (nMaq * ok(cMaq) + (nMec + nCM) * ok(cMec)) * prorr, costePers = costeHired + costeEmp;
   const ind0 = num(prm.indisponibilidad) / 100, ind1 = Math.max(0, num(prm.indisponibilidad) - red * num(prm.reduccionAverias) * num(prm.indisponibilidad) / 100) / 100;
   const capMaq0 = Math.max(b.horas, b.maquinas * (num(prm.horasDia) || 7) * jorn * (1 - ind0)), capMaq = capMaq0 * (1 - ind1) / (1 - ind0);
   const capPers = capSoc + capHired; let cap = Math.min(capMaq, capPers);
