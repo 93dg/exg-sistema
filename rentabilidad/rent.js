@@ -583,7 +583,7 @@ R.datosReales = function(r, b){   // V10.51 (Daniel): datos reales sobre la hora
   const mq = (r.maq || []).slice().sort((a, c2) => c2.horas - a.horas);
   return '<div class="rt-c"><h3>Datos reales</h3><div style="font-size:11.5px;color:var(--ink-soft);margin:-4px 0 6px;">Jornada de 8 h; 1 h se reserva para mantenimiento, reparaciones y preparativos: quedan 7 h operativas.</div>'
     + f('Días de la obra (L-V)', x.dLab) + f('Días trabajados' + (dFin ? ' (' + dFin + ' en fin de semana)' : ''), dTr) + f('Días laborables no trabajados', x.dVacios) + f('Horas operativas trabajadas', h1(r.H) + ' h') + f('Media: ' + h1(r.H) + ' h ÷ ' + dTr + ' días trabajados', isFinite(media) ? h1(media) + ' h/día' : '—')
-    + f('Días a 7 h por empleado', isFinite(dEmp) ? h1(dEmp) + ' días' : '—', G)
+    + f('Días ideales con jornada completa', isFinite(dEmp) ? h1(dEmp) + ' días' : '—', G)
     + f('Días operativos desaprovechados', h1(x.dEq) + ' días', '#c58a1b') + f('Horas operativas desaprovechadas', h1(x.hPerd) + ' h', '#c58a1b') + f('H/día operativas desaprovechadas · ' + h1(x.pot) + ' − ' + (isFinite(media) ? h1(media) : '—'), isFinite(media) ? h1(Math.max(0, x.pot - media)) + ' h/día' : '—', '#c58a1b')
     + f('Empleados', h1(x.personas))
     + f('Maquinaria usada', mq.length + ' · ' + mq.map(m => esc(m.nombre)).join(', '))
