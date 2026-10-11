@@ -530,6 +530,8 @@ R.simular2 = function(b, e){
 .rt-big{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:2px 0 4px}
 .rt-w .tb-cos{margin-bottom:0!important;padding:8px 10px}
 #te-subtabs{margin:0 0 6px!important;gap:6px}#te-subtabs .docs-tab{padding:5px 8px;font-size:12px}
+.rt-pp{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:2px 0 6px}.rt-pp>div{display:flex;flex-direction:column;align-items:center;gap:2px}.rt-pp small{text-align:center}
+.rt-pp button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:5px 22px;font-size:13px;font-weight:800;color:inherit}.rt-pp button.on{background:var(--orange);border-color:var(--orange);color:#fff}
 .rt-g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 6px}
 .rt-tl{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;font-size:10.5px;line-height:1.2;color:var(--ink-soft);padding:4px 2px;border-top:1px solid var(--line)}
 .rt-tl b{font-size:14.5px;font-weight:800;color:var(--ink);white-space:nowrap;margin-top:1px}.rt-tl small{font-size:10px}
@@ -636,10 +638,10 @@ R.simHtml = function(P, b){
   const quedan = ['rafa', 'manolo'].filter(k => s.e[k] === 'hoy'), sociosSim = s.obra ? s.retrib : b.socios * quedan.length / 2, quienSim = quedan.map(k => k === 'rafa' ? 'Rafa' : 'Manolo').join(' y ');   // V10.57 (Daniel): si uno sale (o pasa a empleado), se descuenta lo suyo
   const opSim = b.obra && b.r ? R.opHtml(b.r, persSim, b.margenH, sociosSim, s.tr.rep + s.tr.ges, quienSim || undefined) : '';
   const pagoHr = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : NaN, cMaqH = coste('maquinista');
-  const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small style="display:block;color:var(--ink-soft);font-size:10.5px;white-space:nowrap;">cobra ' + eur(v, 2) + '/h' + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : ''; };
+  const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small style="display:block;color:var(--ink-soft);font-size:10px;white-space:nowrap;letter-spacing:-.2px;">cobra ' + eur(v, 2) + (m === 'hoy' && xOp ? '' : '/h') + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : ''; };
   const st = (k, t) => '<div><span>' + t + '</span><span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>';
-  const rowS = (k, n) => '<div class="rt-sim-r"><span>' + n + cobH(k) + '</span>' + seg(k) + '</div>';
-  const controles = '<div class="rt-c"><h3>Organización</h3>' + rowS('rafa', 'Rafa') + rowS('manolo', 'Manolo') + '<div class="rt-stg">' + st('maq', 'Maquinistas') + st('mec', 'Mecánicos') + st('cm', 'Conduc./mecánico') + '</div>' + (opSim ? '<div style="margin-top:4px;">' + opSim + '</div>' : '') + '</div>';
+  const pp = (k, n) => '<div><button type="button" class="' + (bd[k] === 'fuera' ? '' : 'on') + '" onclick="RENT.setEsc2(\'' + k + '\',\'hoy\')">' + n + '</button>' + (cobH(k) || '<small style="font-size:10.5px;color:var(--ink-soft);">fuera</small>') + '</div>';   // V10.67: el nombre es la pastilla
+  const controles = '<div class="rt-c"><h3>Organización</h3><div class="rt-pp">' + pp('rafa', 'Rafa') + pp('manolo', 'Manolo') + '</div>' + '<div class="rt-stg">' + st('maq', 'Maquinistas') + st('mec', 'Mecánicos') + st('cm', 'Conduc./mecánico') + '</div>' + (opSim ? '<div style="margin-top:4px;">' + opSim + '</div>' : '') + '</div>';
   const bx = (t, v, d, n, hh) => '<div class="' + (n >= 0 ? 'g' : 'r') + '"><span style="color:' + (n >= 0 ? G : RJ) + ';">' + t + '</span><b style="color:' + (n >= 0 ? G : RJ) + ';">' + eur(n) + '</b><small>' + hh + ' · ' + cs(d, dEur(d)) + ' vs hoy</small></div>';
   const costeNuevo = s.costePers + s.retrib - b.socios;
   const tl2 = (l, v) => '<div class="rt-tl"><span>' + l + '</span><b>' + v + '</b></div>';
