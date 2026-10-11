@@ -1263,6 +1263,9 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 #cal3-app .c3-dia .c3-pausa.cont-der{margin-right:-4px;border-top-right-radius:0;border-bottom-right-radius:0;}
 .c3-chip{position:relative;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 .c3-chip.c3-sp{visibility:hidden;}
+.c3-dia span.c3-chip.c3-pz{background:transparent !important;border:0 !important;color:transparent;position:relative;box-shadow:none;}
+.c3-dia span.c3-chip.c3-pz::after{content:'';position:absolute;left:0;right:0;top:50%;height:5px;margin-top:-2.5px;background:var(--jc);opacity:.55;border-radius:3px;}
+.c3-dia span.c3-chip.c3-pz.cont-izq::after{border-top-left-radius:0;border-bottom-left-radius:0;} .c3-dia span.c3-chip.c3-pz.cont-der::after{border-top-right-radius:0;border-bottom-right-radius:0;}
 .c3-chip.c3-alb{display:block;max-width:100%;box-sizing:border-box;padding:0 2px;color:#fff;font-size:9px;font-weight:700;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
 .c3-albmas{font-size:9px;color:var(--ink-soft);}
 .c3-chip.sigue{opacity:.8;border-radius:2px 5px 5px 2px;}
@@ -4623,11 +4626,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.31" defer></script>
-<script src="costes/norm.js?v=V10.31" defer></script>
-<script src="ajustes/calc.js?v=V10.31" defer></script>
+<script src="rentabilidad/rent.js?v=V10.32" defer></script>
+<script src="costes/norm.js?v=V10.32" defer></script>
+<script src="ajustes/calc.js?v=V10.32" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.31</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.32</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4779,7 +4782,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.31</div>
+        <div class="sub" id="version-badge">V10.32</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8987,14 +8990,14 @@ function c3Pintar(){
   const PD = c3PorDiaV(), COL = Object.assign(c3Colores(), _c3PCol), ALB = c3AlbPorDia(), semanas = [];
   for(let w = 0; w < 6; w++){ const fila = []; for(let k = 0; k < 7; k++){ const d = new Date(ini); d.setDate(ini.getDate() + w * 7 + k); fila.push(d); } if(w > 3 && fila.every(d => d.getMonth() !== base.getMonth())) break; semanas.push(fila); }
   const preg = null;   // V10.24 (Daniel): fuera la «Pregunta del día»; un trabajo se termina cuando tú lo marcas
-  // V10.27: cada trabajo/albarán ocupa la MISMA fila en todos los días de su semana (si no, la barra se descuadra y el texto se sale)
-  const LANE = {}; semanas.forEach((fila, wi) => { const jobs = {}; fila.forEach((d, k) => (PD[c2Iso(d)] || []).forEach(x => { (jobs[x.j.id] = jobs[x.j.id] || {k0: k, dias: new Set()}).dias.add(k); })); const lane = {}; Object.entries(jobs).sort((a, b) => a[1].k0 - b[1].k0).forEach(([id, o]) => { let l = 0; while(Object.entries(lane).some(([id2, l2]) => l2 === l && [...jobs[id2].dias].some(k => o.dias.has(k)))) l++; lane[id] = l; }); LANE[wi] = lane; });
-  const SL = (L, lane) => { const s = []; L.forEach(x => { s[lane[x.j.id]] = x; }); const out = []; for(let q = 0; q < Math.min(s.length, 3); q++) out.push(s[q] || null); return out; };
   const sinTodos = c3Sin(), sin = tbFiltrar(sinTodos);   // V8.32: «Sin día» con los mismos filtros que la Lista
   const libresMes = semanas.flat().filter(d => d.getMonth() === base.getMonth() && c2Laborable(d) && c2Iso(d) >= hoyIso && !PD[c2Iso(d)]).length;
   const PAU = c3Pausas(); Object.keys(PAU).forEach(iso => { PAU[iso] = PAU[iso].filter(j => !(ALB[iso] || []).some(a => c3AlbCasa(j, a, iso))); });   // V10.25: un día con albarán se trabajó: no hay pausa
   // V10.30 (Daniel): si un trabajo está el viernes y sigue el lunes, los días sin trabajar de en medio llevan la línea de pausa que lo conecta
   Object.keys(_c3VS).forEach(id => { const j = _c3VJ[id]; if(!j) return; const ds = [..._c3VS[id]].sort(); for(let q = 1; q < ds.length; q++){ const a0 = new Date(ds[q - 1] + 'T00:00'), b0 = new Date(ds[q] + 'T00:00'), gap = Math.round((b0 - a0) / 86400000) - 1; if(gap < 1 || gap > 10) continue; const d0 = new Date(a0); for(let g = 0; g < gap; g++){ d0.setDate(d0.getDate() + 1); const iso0 = c2Iso(d0), arr = PAU[iso0] = PAU[iso0] || []; if(!arr.includes(j)) arr.push(j); } } });
+  // V10.27/V10.32: cada trabajo/albarán ocupa la MISMA fila en toda su semana, y su línea de pausa va en esa misma fila, pegada a la barra (sin separación)
+  const LANE = {}; semanas.forEach((fila, wi) => { const jobs = {}, mete = (j, k) => { (jobs[j.id] = jobs[j.id] || {k0: k, dias: new Set()}).dias.add(k); }; fila.forEach((d, k) => { const iso = c2Iso(d); (PD[iso] || []).forEach(x => mete(x.j, k)); (PAU[iso] || []).forEach(j => mete(j, k)); }); const lane = {}; Object.entries(jobs).sort((a, b) => a[1].k0 - b[1].k0).forEach(([id, o]) => { let l = 0; while(Object.entries(lane).some(([id2, l2]) => l2 === l && [...jobs[id2].dias].some(k => o.dias.has(k)))) l++; lane[id] = l; }); LANE[wi] = lane; });
+  const SL = (L, P, lane) => { const s = []; L.forEach(x => { s[lane[x.j.id]] = x; }); P.forEach(j => { if(lane[j.id] !== undefined && !s[lane[j.id]]) s[lane[j.id]] = {j, pausa: true}; }); const out = []; for(let q = 0; q < Math.min(s.length, 3); q++) out.push(s[q] || null); return out; };
   app.innerHTML = `
     ${preg ? `<div class="c3-q"><small>Pregunta del día</small><h2>¿Terminasteis ${escHtml(c3Nom(preg))}${preg.trabajo && preg.cliente ? ' · ' + escHtml(tbMay(preg.trabajo)) : ''}?</h2>
       <div class="c2-bt"><button type="button" class="si" data-c3-fin="${preg.id}">Sí, terminado</button>${[[1, '+1 día'], [2, '+2 días'], [5, '+1 semana']].map(([n, t]) => `<button type="button" data-c3-mas="${n}" data-id="${preg.id}">${t}</button>`).join('')}</div></div>` : ''}
@@ -9005,8 +9008,8 @@ function c3Pintar(){
     <div class="c3-mes" style="--filas:${semanas.length}">${semanas.flat().map((d, ix) => { const iso = c2Iso(d), fuera = d.getMonth() !== base.getMonth(), lab = c2Laborable(d), L = PD[iso] || [], A = ALB[iso] || [], pasado = iso < hoyIso;
       const finde = d.getDay() === 0 || d.getDay() === 6, festivo = C2_FESTIVOS.includes(iso), sab = d.getDay() === 6 && !festivo;   // V8.21: el sábado se trabaja por la mañana
       const cls = ['c3-dia', fuera ? 'fuera' : '', pasado && !fuera ? 'pasado' : '', festivo ? 'fest' : '', finde && !sab ? 'finde' : '', sab ? 'sab' : '', sab && !L.length && !pasado && !fuera ? 'libre' : '', iso === hoyIso ? 'hoy' : '', lab && !L.length && !pasado ? 'libre' : '', _c3Colocar ? 'diana' : ''].filter(Boolean).join(' ');
-      return `<div role="button" tabindex="0" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}${festivo ? ' <em>festivo</em>' : sab ? '<em class="sab">mañ.</em>' : ''}</i>${c3PausaHtml(iso, COL, PAU)}${SL(L, LANE[Math.floor(ix / 7)]).map(x => { if(!x) return '<span class="c3-chip c3-sp" aria-hidden="true">&nbsp;</span>'; const O = _c3VS[x.j.id] || c3OcupaSet(x.j), dw = d.getDay(), ant = new Date(d), sig = new Date(d); ant.setDate(d.getDate() - 1); sig.setDate(d.getDate() + 1);
-        const ci = dw !== 1 && O.has(c2Iso(ant)), cd = dw !== 0 && O.has(c2Iso(sig));   // V8.27: si sigue el día de al lado (misma semana), la barra continúa
+      return `<div role="button" tabindex="0" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}${festivo ? ' <em>festivo</em>' : sab ? '<em class="sab">mañ.</em>' : ''}</i>${SL(L, PAU[iso] || [], LANE[Math.floor(ix / 7)]).map(x => { if(!x) return '<span class="c3-chip c3-sp" aria-hidden="true">&nbsp;</span>'; if(x.pausa){ const j = x.j, hay = q => (_c3VS[j.id] && _c3VS[j.id].has(q)) || (PAU[q] || []).includes(j), dw0 = d.getDay(), a0 = new Date(d), s0 = new Date(d); a0.setDate(d.getDate() - 1); s0.setDate(d.getDate() + 1); return `<span class="c3-chip c3-pz${dw0 !== 1 && hay(c2Iso(a0)) ? ' cont-izq' : ''}${dw0 !== 0 && hay(c2Iso(s0)) ? ' cont-der' : ''}" data-c3-pausa="${j.id}" style="--jc:${COL[j.id] || '#2B5C8F'}" title="Sin trabajar"></span>`; } const O = _c3VS[x.j.id] || c3OcupaSet(x.j), dw = d.getDay(), ant = new Date(d), sig = new Date(d); ant.setDate(d.getDate() - 1); sig.setDate(d.getDate() + 1);
+        const ci = dw !== 1 && (O.has(c2Iso(ant)) || (PAU[c2Iso(ant)] || []).includes(x.j)), cd = dw !== 0 && (O.has(c2Iso(sig)) || (PAU[c2Iso(sig)] || []).includes(x.j));   // V8.27: si sigue el día de al lado (misma semana), la barra continúa
         let n = 1; if(!ci){ const q = new Date(d); while(q.getDay() !== 0){ q.setDate(q.getDate() + 1); if(O.has(c2Iso(q))) n++; else break; } }   // V8.29: días seguidos del tramo
         let lun = new Date(d); while(lun.getDay() !== 1){ const pv = new Date(lun); pv.setDate(lun.getDate() - 1); if(O.has(c2Iso(pv))) lun = pv; else break; }   // V10.26: el texto va por tramo continuo (si hay un día vacío en medio, el texto no lo cruza)
         return `<span data-run="${x.j.id}|${c2Iso(lun)}" class="c3-chip${C3_COL[x.j.prioridad] ? ' pr' : ''}${x.i === 0 ? '' : ' sigue'}${ci ? ' cont-izq' : ''}${cd ? ' cont-der' : ''}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}${C3_COL[x.j.prioridad] ? ';--pc:' + C3_COL[x.j.prioridad] : ''}">${ci ? '&nbsp;' : `<i class="c3-txt" style="--n:${n}">${escHtml(c3Texto(x.j))}</i>`}</span>`; }).join('') + (L.filter(x => LANE[Math.floor(ix / 7)][x.j.id] >= 3).length ? `<b>+${L.filter(x => LANE[Math.floor(ix / 7)][x.j.id] >= 3).length}</b>` : '') + ''}</div>`; }).join('')}</div>
