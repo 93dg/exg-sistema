@@ -528,8 +528,9 @@ R.vistaObra = function(r, P, b){
   // V9.90 (Daniel): tarjeta 1 = beneficio al ir restando costes; tarjeta 2 = lo que queda LIMPIO (tras impuestos): final frente a objetivo, aparte para compararlos; porcentaje de 1 a 100
   const m100 = Math.min(100, Math.max(1, num(R.param.margen) || 1));
   const cr = t => '<span style="color:' + G + ';">Benef.</span> <span style="color:' + RJ + ';">' + t + '</span>';
+  const hd = (t, v) => '<div class="rt-sim-r" style="font-weight:800;border-top:1px solid var(--line,#ddd);margin-top:4px;"><span>' + t + '</span><b>' + eur(v) + '</b></div>';
   const filas1 = fil(cr('− costes directos'), '', r.ejecutado - nv.n1, '#2f8f5b', bdL(r.lineasD))
-    + fil(cr('− directos − producción'), '', r.ejecutado - nv.n2, '#2f6fb0', '<div class="rt-sim-r"><span>Costes directos</span><b>' + eur(nv.n1) + '</b></div>' + bdL(relL) + bdL(sociosL));
+    + fil(cr('− directos − producción'), '', r.ejecutado - nv.n2, '#2f6fb0', hd('Costes directos', nv.n1) + bdL(r.lineasD) + hd('Producción', nv.n2 - nv.n1) + bdL(relL) + bdL(sociosL));
   const niveles = '<div class="rt-c"><h3>Beneficio bruto</h3><div style="font-size:11.5px;color:var(--ink-soft);margin:-4px 0 6px;">Ingresos: <b>' + eur(r.ejecutado) + '</b> (sin IVA)</div>' + filas1 + '</div>';
   const limpioFin = r.neto, limpioObj = nv.mar, okLim = isFinite(limpioObj) && limpioFin >= limpioObj;
   const filaL = (tit, sub, v, pct, color, c, bd) => '<details class="rt-nd"><summary><div class="rt-n"><i style="background:' + color + ';"></i><div><b>' + tit + '</b><small>' + sub + '</small></div><div class="v"><b style="color:' + c + ';">' + (isFinite(v) ? eur(v) : 'sin dato') + '</b><small style="color:' + c + ';font-weight:700;">' + (hOk && isFinite(v) ? eur(v / r.H, 2) + '/h' : 'sin horas') + (pct != null ? ' (' + pct + ' %)' : '') + '</small></div></div></summary><div class="rt-bd">' + bd + '</div></details>';
