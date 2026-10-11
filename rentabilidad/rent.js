@@ -571,7 +571,9 @@ R.opHtml = function(r, personas, margenH, socios, carga){
     + '<b>Posible:</b> ' + x.personas + ' personas × 7 h = ' + h1(x.pot) + ' h por día. Cada día cuenta por separado: un día con 4 h pierde 10 h y uno con 20 h no compensa otro.<br>'
     + (x.carga ? '<b>Reparar y gestionar:</b> ' + h1(x.carga) + ' h que ocupan a Rafa y Manolo (' + h1(num(R.param.repSemana) + num(R.param.gesSemana)) + ' h por semana × ' + h1(x.dLab / 5) + ' semanas). Es una cifra de Hipótesis, no medida: se cambia en Hipótesis.<br>' : '')
     + '<b>Valor:</b> horas sin aprovechar × ' + (isFinite(x.margenH) ? eur(x.margenH, 2) : '—') + ' €/h de margen de otra obra.</div>';
-  return fl('Media diaria real', h1(media) + ' h de ' + h1(x.pot), mc)
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 8px;">'
+      + '<div style="border:1.5px solid ' + mc + ';border-radius:12px;padding:8px 10px;"><div style="font-size:11px;color:var(--ink-soft);font-weight:700;">REAL</div><div style="font-size:20px;font-weight:800;color:' + mc + ';' + nw + '">' + h1(r.H) + ' h</div><div style="font-size:11.5px;color:var(--ink-soft);">' + dTr + ' días · ' + (isFinite(media) ? h1(media) : '—') + ' h/día</div></div>'
+      + '<div style="border:1.5px solid ' + G + ';border-radius:12px;padding:8px 10px;"><div style="font-size:11px;color:var(--ink-soft);font-weight:700;">POSIBLE</div><div style="font-size:20px;font-weight:800;color:' + G + ';' + nw + '">' + h1(r.H + x.hPerd) + ' h</div><div style="font-size:11.5px;color:var(--ink-soft);">' + x.dLab + ' días · ' + h1(x.pot) + ' h/día</div></div></div>'
     + fl('Horas sin aprovechar', h1(x.hPerd) + ' h ≈ ' + h1(x.dEq) + ' días', '#c58a1b')
     + (isFinite(x.dinero) ? fl('Valor en otra obra', eur(x.dinero), '#c0392b') : '')
     + (isFinite(x.dinero) && socios > 0 ? fl('Cobran Rafa y Manolo', eur(socios), '#2f6fb0') : '')
