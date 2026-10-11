@@ -4619,11 +4619,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.20" defer></script>
-<script src="costes/norm.js?v=V10.20" defer></script>
-<script src="ajustes/calc.js?v=V10.20" defer></script>
+<script src="rentabilidad/rent.js?v=V10.21" defer></script>
+<script src="costes/norm.js?v=V10.21" defer></script>
+<script src="ajustes/calc.js?v=V10.21" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.20</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.21</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4775,7 +4775,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.20</div>
+        <div class="sub" id="version-badge">V10.21</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14681,8 +14681,23 @@ function perSeguros(k){   // seguros de los que es titular (Asistencia), con su 
 async function abrirFichaPersona(k){
   if(!_flAsis) await flAsisCargar(); if(typeof _eq !== 'undefined' && !_eq){ try{ const {data} = await sb.from('sistema').select('id, data').eq('tipo', 'equipo').eq('data->>clave', 'equipo:niveles').limit(1).maybeSingle(); if(data){ _eq = data.data; _eqId = data.id; } }catch(e){} }
   _perFicha = k; _perTab = 'resumen';
+  if(k === 'daniel') await perHorasCargar();   // V10.21 (Daniel): pestaña Administrador en su ficha
   let ov = document.getElementById('per-overlay'); if(!ov){ ov = document.createElement('div'); ov.id = 'per-overlay'; ov.className = 'fl-overlay'; document.body.appendChild(ov); }
   ov.classList.add('abierto'); perPintarFicha();
+}
+let _perHoras = null;
+async function perHorasCargar(){ try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'horas_admin').eq('data->>persona', 'daniel').limit(1).maybeSingle(); _perHoras = data ? data.data : null; }catch(e){ _perHoras = null; } }
+function perHm(m){ m = Math.round(Number(m) || 0); return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0'); }
+function perHorasHtml(){   // V10.21 (Daniel): horas como administrador (Tiempo de uso). No es gasto ni coste.
+  const H = _perHoras; if(!H || !Array.isArray(H.dias) || !H.dias.length) return '<div class="fl-sec"><div class="fl-vacio">Todavía no hay horas registradas.</div></div>';
+  const dias = H.dias.slice().sort((a, b) => b.f < a.f ? -1 : 1), T = {claude: 0, chatgpt: 0, safari: 0, io: 0};
+  dias.forEach(d => Object.keys(T).forEach(k => { T[k] += Number(d[k]) || 0; }));
+  const tot = d => (Number(d.claude) || 0) + (Number(d.chatgpt) || 0) + (Number(d.safari) || 0) + (Number(d.io) || 0), total = Object.values(T).reduce((a, b) => a + b, 0);
+  const fm = f => f.split('-').reverse().join('/');
+  let h = `<div class="fl-sec"><h4>Horas como administrador</h4>${flKvHtml([['Total', perHm(total) + ' h (' + dias.length + ' días)'], ['Media por día', perHm(total / dias.length) + ' h'], ['Claude', perHm(T.claude) + ' h'], ['ChatGPT', perHm(T.chatgpt) + ' h'], ['Safari', perHm(T.safari) + ' h'], ['93dg.github.io', perHm(T.io) + ' h']])}<div style="font-size:12px;color:var(--ink-soft);margin-top:8px;">No es gasto ni coste: solo para saber cuánto tiempo dedicas.</div></div>`;
+  h += `<div class="fl-sec"><h4>Por día</h4>${dias.map(d => `<div class="fl-kv" style="margin-bottom:8px;"><div class="fl-kv-i ancho"><span>${fm(d.f)}</span><b>${perHm(tot(d))} h · Claude ${perHm(d.claude)} · ChatGPT ${perHm(d.chatgpt)} · Safari ${perHm(d.safari)} · .io ${perHm(d.io)}</b></div></div>`).join('')}</div>`;
+  h += `<div class="fl-sec"><div style="font-size:12px;color:var(--ink-soft);">${flE(H.nota || '')}${(H.faltan || []).length ? ' Sin datos: ' + H.faltan.map(fm).join(', ') + '.' : ''}</div></div>`;
+  return h;
 }
 function perTabFicha(t){ _perTab = t; perPintarFicha(); }
 function perCerrarFicha(){ document.getElementById('per-overlay')?.classList.remove('abierto'); _perFicha = null; }
@@ -14692,7 +14707,7 @@ function perPintarFicha(){
   const veh = perVehiculos(k), seg = perSeguros(k), docs = perDocs(p), fotos = [];
   docs.forEach(d => { (Array.isArray(d.archivos) && d.archivos.length ? d.archivos : (d.archivo_url ? [{url: d.archivo_url, nombre: d.nombre}] : [])).forEach(a => fotos.push({u: a.url, t: d.nombre + (a.nombre && a.nombre !== d.nombre ? ' · ' + a.nombre : '')})); });
   const F = v => v || 'Falta';
-  const tabs = [['resumen', 'Resumen'], ['docs', 'Documentos'], ['veh', 'Vehículos'], ['seg', 'Seguros']], cnt = {docs: fotos.length, veh: veh.length, seg: seg.length};
+  const tabs = [['resumen', 'Resumen'], ['docs', 'Documentos'], ['veh', 'Vehículos'], ['seg', 'Seguros']].concat(k === 'daniel' ? [['admin', 'Administrador']] : []), cnt = {docs: fotos.length, veh: veh.length, seg: seg.length};
   let h = '';
   if(_perTab === 'resumen'){
     h += `<div class="fl-sec"><h4>Datos personales</h4>${flKvHtml([['Nombre', F(p.nombre)], ['DNI', perDocLink(p, 'dni', F(p.dni))], ['Nacimiento', F(p.nacimiento)], ['Domicilio', F(p.domicilio)], ['Papel en la empresa', F(p.rol)]].concat(p.firma ? [['Firma', p.firma]] : []))}</div>`;   // V8.56: constancia de que la firma está guardada (en privado, no se enseña el archivo)
@@ -14701,6 +14716,8 @@ function perPintarFicha(){
     h += `<div class="fl-sec"><h4>Resumen</h4>${flKvHtml([['Vehículos a su nombre', String(veh.length)], ['Seguros a su nombre', String(seg.length)], ['Coste de sus seguros', seg.some(x => x.coste) ? seg.reduce((a, x) => a + (Number(x.coste) || 0), 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' € al año' : '—'], ['Documentos', String(fotos.length)]])}</div>`;
   } else if(_perTab === 'docs'){
     h += fotos.length ? `<div class="fl-sec"><h4>Documentos · ${fotos.length}</h4><div class="per-docs">${fotos.map(f => `<a href="${escHtml(f.u)}" target="_blank" rel="noopener" class="per-doc"><span class="nm">${escHtml(f.t)}</span></a>`).join('')}</div></div>` : '<div class="fl-sec"><div class="fl-falta" style="margin-top:0;">Falta: ningún documento suyo (DNI, carnet…)</div></div>';
+  } else if(_perTab === 'admin'){
+    h += perHorasHtml();
   } else if(_perTab === 'veh'){
     h += veh.length ? veh.map(m => `<button type="button" class="fl-card" onclick="perCerrarFicha();abrirFichaMaquina('${m.id}')"><div class="fl-ico ${flIcoClase(m)}">${flIcono(m)}</div><div style="flex:1;min-width:0;"><div class="fl-nombre">${flE(m.modelo || m.name)}</div><div class="fl-fila">${m.matricula ? `<span class="fl-placa">${flE(m.matricula)}</span>` : ''}<span class="fl-chip">${flE(m.clase || m.type || '')}</span></div></div></button>`).join('') : '<div class="fl-sec"><div class="fl-vacio">No consta como titular de ningún vehículo.</div></div>';
   } else {
