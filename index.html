@@ -4621,11 +4621,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.24" defer></script>
-<script src="costes/norm.js?v=V10.24" defer></script>
-<script src="ajustes/calc.js?v=V10.24" defer></script>
+<script src="rentabilidad/rent.js?v=V10.25" defer></script>
+<script src="costes/norm.js?v=V10.25" defer></script>
+<script src="ajustes/calc.js?v=V10.25" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.24</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.25</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4777,7 +4777,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.24</div>
+        <div class="sub" id="version-badge">V10.25</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8936,7 +8936,7 @@ const C3_COL = {Alta: '#A32D2D', Media: '#BA7517', Baja: '#2B5C8F'};
 // la prioridad va aparte: los urgentes llevan una marca blanca «!» y en la bandeja la franja de la izquierda
 const C3_PALETA = ['#2B5C8F', '#1E8A8A', '#7B4FA0', '#BA7517', '#3B6D11', '#D9541E', '#534AB7', '#0F6E56', '#993556', '#5A6B7D', '#A32D2D', '#854F0B'];
 function c3Colores(){ const m = {}; c3Cola().forEach(j => { let h = 0; for(const ch of String(j.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; m[j.id] = C3_PALETA[h % C3_PALETA.length]; }); return m; }   // fijo por trabajo: no cambia al moverlo
-// V10.22 (Daniel): los albaranes (y facturas y proformas: «te digo albarán como te digo factura») de 2026 salen solos en el calendario, en el día en que se trabajó (la fecha de cada línea; los albaranes sin fechas de línea, la suya). Solo días pasados.
+// V10.22 (Daniel): los albaranes (y facturas y proformas: «te digo albarán como te digo factura») de 2026 salen solos en el calendario, en el día en que se trabajó (la fecha de cada línea/concepto; nunca la de emisión del documento). Solo días pasados.
 // V10.24: los documentos enlazados (albarán → proforma → factura, o el mismo expediente) son UNO: no se cuentan doble y se ven fusionados con el trabajo.
 let _c3Alb = null;
 async function c3AlbCargar(){ try{ const {data, error} = await sb.from('documentos_economicos').select('id,tipo,numero,fecha_devengo,importe,obra_texto,conceptos,expediente_id,documento_relacionado_id,documento_anterior_id,documento_siguiente_id,entidades(nombre)').in('tipo', ['albaran', 'factura', 'proforma']).gte('fecha_devengo', '2026-01-01').is('deleted_at', null); if(error) throw error; _c3Alb = data || []; }catch(e){ _c3Alb = _c3Alb || []; } }
@@ -8949,7 +8949,7 @@ function c3AlbPorDia(){ const hoy = c2Iso(new Date()), D0 = '2026-01-01', docs =
     L.forEach(l => { const f = l && typeof l.fecha === 'string' ? l.fecha.slice(0, 10) : ''; if(f >= D0 && f <= hoy) (por[f] = por[f] || []).push(l); });
     const fs = Object.keys(por), cli = (a.entidades && a.entidades.nombre) || '', g = raiz(a.id), add = (iso, lineas, imp) => { ((grupos[g] = grupos[g] || {})[iso] = (grupos[g][iso] || [])).push({id: a.id, tipo: a.tipo, numero: a.numero, cliente: cli, obra: a.obra_texto || '', importe: imp, lineas}); };
     if(fs.length){ fs.forEach(f => add(f, por[f], por[f].reduce((s, l) => s + (Number(l.importe) || 0), 0))); return; }
-    const f = (a.fecha_devengo || '').slice(0, 10); if(a.tipo === 'albaran' && f >= D0 && f <= hoy) add(f, L, Number(a.importe) || 0); });   // una factura o proforma sin fechas en las líneas lleva su fecha de emisión, no el día de trabajo: no cuenta
+    });   // V10.25 (Daniel): solo cuentan las fechas de los conceptos; la fecha en que se emite el documento NO es un día de trabajo
   const ROT = {albaran: 'Albarán', factura: 'Factura', proforma: 'Proforma'}, ORD = {albaran: 0, proforma: 1, factura: 2};
   Object.values(grupos).forEach(dias => Object.keys(dias).forEach(iso => { const d = dias[iso].sort((x, y) => ORD[x.tipo] - ORD[y.tipo]), p = d[0];
     (m[iso] = m[iso] || []).push({id: p.id, ids: d.map(x => x.id), tipos: d.map(x => ROT[x.tipo] + (x.numero ? ' ' + x.numero : '')), numero: p.numero, cliente: d.map(x => x.cliente).find(Boolean) || '', obra: d.map(x => x.obra).find(Boolean) || '', importe: Math.max(...d.map(x => x.importe)), lineas: p.lineas}); }));
@@ -8957,7 +8957,11 @@ function c3AlbPorDia(){ const hoy = c2Iso(new Date()), D0 = '2026-01-01', docs =
   return m; }
 const c3Toks = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !['EXCMO', 'AYUNTAMIENTO', 'CONSTRUCCIONES', 'OBRAS'].includes(w));
 const c3MismoCliente = (j, a) => { const tj = c3Toks(j.cliente), ta = c3Toks(a.cliente); return !!tj.length && tj.every(w => ta.includes(w)); };   // V10.22b (Daniel): si el trabajo del mismo cliente ya cubre ese día, el albarán no sale otra vez
-const c3AlbColor = a => { const j = c3Cola().find(x => c3MismoCliente(x, a)); if(j) return c3Colores()[j.id] || '#2B5C8F'; let h = 0; for(const ch of String(a.cliente || a.obra || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return C3_PALETA[h % C3_PALETA.length]; };   // V10.24 (Daniel): el albarán de un trabajo es ese trabajo: mismo color, sólido
+const c3AlbColor = a => { let h = 0; for(const ch of String(a.cliente || a.obra || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return C3_PALETA[h % C3_PALETA.length]; };
+const c3AlbCasa = (j, a, iso) => { if(!c3MismoCliente(j, a)) return false; const o = c3Ocupa(j); if(!o.length) return false; const lim = 60 * 86400000, t = new Date(iso + 'T00:00').getTime(); if(t < new Date(o[0] + 'T00:00').getTime() - lim || t > new Date(o[o.length - 1] + 'T00:00').getTime() + lim) return false; const to = c3Toks((j.trabajo || '') + ' ' + (j.lugar || '')), ta = c3Toks(a.obra); return !(to.length && ta.length && !to.some(w => ta.includes(w))); };   // V10.25: el albarán es del trabajo si es del mismo cliente, cae cerca de sus fechas y la obra no lo contradice
+let _c3VS = {};
+function c3PorDiaV(){ const m = {}, ALB = c3AlbPorDia(); _c3VS = {}; c3Cola().forEach(j => { const set = new Set(c3Ocupa(j)); Object.keys(ALB).forEach(iso => { if(ALB[iso].some(a => c3AlbCasa(j, a, iso))) set.add(iso); }); _c3VS[j.id] = set; [...set].sort().forEach((iso, i) => { (m[iso] = m[iso] || []).push({j, i}); }); }); return m; }   // lo que se ve: los días planeados + los días con albarán, todo un solo trabajo
+let _c3Poner = null;
 const c3AlbCorto = a => { const n = String(a.cliente || a.obra || 'Albarán'); if(/AYUNTAMIENTO/i.test(n)) return 'Ayto.'; return tbMay(n.replace(/^(CONSTRUCCIONES|EXCMO\.?)\s+/i, '')).split(' ')[0]; };
 async function c3Cargar(){
   const app = document.getElementById('cal3-app'); if(!app) return;
@@ -8972,12 +8976,12 @@ function c3Pintar(){
   const app = document.getElementById('cal3-app'); if(!app) return;
   const hoy = c2Hoy(), hoyIso = c2Iso(hoy), base = new Date(hoy.getFullYear(), hoy.getMonth() + _c3Mes, 1);
   const ini = new Date(base); ini.setDate(1 - ((base.getDay() + 6) % 7));
-  const PD = c3PorDia(), COL = c3Colores(), ALB = c3AlbPorDia(), semanas = [];
+  const PD = c3PorDiaV(), COL = c3Colores(), ALB = c3AlbPorDia(), semanas = [];
   for(let w = 0; w < 6; w++){ const fila = []; for(let k = 0; k < 7; k++){ const d = new Date(ini); d.setDate(ini.getDate() + w * 7 + k); fila.push(d); } if(w > 3 && fila.every(d => d.getMonth() !== base.getMonth())) break; semanas.push(fila); }
   const preg = null;   // V10.24 (Daniel): fuera la «Pregunta del día»; un trabajo se termina cuando tú lo marcas
   const sinTodos = c3Sin(), sin = tbFiltrar(sinTodos);   // V8.32: «Sin día» con los mismos filtros que la Lista
   const libresMes = semanas.flat().filter(d => d.getMonth() === base.getMonth() && c2Laborable(d) && c2Iso(d) >= hoyIso && !PD[c2Iso(d)]).length;
-  const PAU = c3Pausas();
+  const PAU = c3Pausas(); Object.keys(PAU).forEach(iso => { PAU[iso] = PAU[iso].filter(j => !(ALB[iso] || []).some(a => c3AlbCasa(j, a, iso))); });   // V10.25: un día con albarán se trabajó: no hay pausa
   app.innerHTML = `
     ${preg ? `<div class="c3-q"><small>Pregunta del día</small><h2>¿Terminasteis ${escHtml(c3Nom(preg))}${preg.trabajo && preg.cliente ? ' · ' + escHtml(tbMay(preg.trabajo)) : ''}?</h2>
       <div class="c2-bt"><button type="button" class="si" data-c3-fin="${preg.id}">Sí, terminado</button>${[[1, '+1 día'], [2, '+2 días'], [5, '+1 semana']].map(([n, t]) => `<button type="button" data-c3-mas="${n}" data-id="${preg.id}">${t}</button>`).join('')}</div></div>` : ''}
@@ -8988,11 +8992,11 @@ function c3Pintar(){
     <div class="c3-mes" style="--filas:${semanas.length}">${semanas.flat().map(d => { const iso = c2Iso(d), fuera = d.getMonth() !== base.getMonth(), lab = c2Laborable(d), L = PD[iso] || [], A = ALB[iso] || [], pasado = iso < hoyIso;
       const finde = d.getDay() === 0 || d.getDay() === 6, festivo = C2_FESTIVOS.includes(iso), sab = d.getDay() === 6 && !festivo;   // V8.21: el sábado se trabaja por la mañana
       const cls = ['c3-dia', fuera ? 'fuera' : '', pasado && !fuera ? 'pasado' : '', festivo ? 'fest' : '', finde && !sab ? 'finde' : '', sab ? 'sab' : '', sab && !L.length && !pasado && !fuera ? 'libre' : '', iso === hoyIso ? 'hoy' : '', lab && !L.length && !pasado ? 'libre' : '', _c3Colocar ? 'diana' : ''].filter(Boolean).join(' ');
-      return `<div role="button" tabindex="0" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}${festivo ? ' <em>festivo</em>' : sab ? '<em class="sab">mañ.</em>' : ''}</i>${c3PausaHtml(iso, COL, PAU)}${L.slice(0, 3).map(x => { const O = c3OcupaSet(x.j), dw = d.getDay(), ant = new Date(d), sig = new Date(d); ant.setDate(d.getDate() - 1); sig.setDate(d.getDate() + 1);
+      return `<div role="button" tabindex="0" class="${cls}" data-c3-dia="${iso}"><i>${d.getDate()}${festivo ? ' <em>festivo</em>' : sab ? '<em class="sab">mañ.</em>' : ''}</i>${c3PausaHtml(iso, COL, PAU)}${L.slice(0, 3).map(x => { const O = _c3VS[x.j.id] || c3OcupaSet(x.j), dw = d.getDay(), ant = new Date(d), sig = new Date(d); ant.setDate(d.getDate() - 1); sig.setDate(d.getDate() + 1);
         const ci = dw !== 1 && O.has(c2Iso(ant)), cd = dw !== 0 && O.has(c2Iso(sig));   // V8.27: si sigue el día de al lado (misma semana), la barra continúa
         let n = 1; if(!ci){ const q = new Date(d); while(q.getDay() !== 0){ q.setDate(q.getDate() + 1); if(O.has(c2Iso(q))) n++; else break; } }   // V8.29: días seguidos del tramo
         const lun = new Date(d); lun.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-        return `<span data-run="${x.j.id}|${c2Iso(lun)}" class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}${ci ? ' cont-izq' : ''}${cd ? ' cont-der' : ''}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${ci ? '&nbsp;' : `<i class="c3-txt" style="--n:${n}">${escHtml(c3Texto(x.j))}</i>`}</span>`; }).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '') + (() => { const room = Math.max(0, 3 - Math.min(L.length, 3)); const AF = A.filter(a => !L.some(x => c3MismoCliente(x.j, a))); return AF.slice(0, room).map(a => `<span class="c3-chip c3-alb" data-c3-alb="${a.id}" title="${escHtml(a.tipos.join(' · '))}" style="background:${c3AlbColor(a)}">${escHtml(c3AlbCorto(a))}</span>`).join('') + (AF.length > room ? `<b class="c3-albmas">+${AF.length - room}</b>` : ''); })()}</div>`; }).join('')}</div>
+        return `<span data-run="${x.j.id}|${c2Iso(lun)}" class="c3-chip${x.j.prioridad === 'Alta' && x.i === 0 ? ' urg' : ''}${x.i === 0 ? '' : ' sigue'}${ci ? ' cont-izq' : ''}${cd ? ' cont-der' : ''}" data-c3-chip="${x.j.id}" data-dia="${iso}" style="background:${COL[x.j.id] || '#2B5C8F'}">${ci ? '&nbsp;' : `<i class="c3-txt" style="--n:${n}">${escHtml(c3Texto(x.j))}</i>`}</span>`; }).join('') + (L.length > 3 ? `<b>+${L.length - 3}</b>` : '') + (() => { const room = Math.max(0, 3 - Math.min(L.length, 3)); const AF = A.filter(a => !c3Cola().some(j => c3AlbCasa(j, a, iso))); return AF.slice(0, room).map(a => `<span class="c3-chip c3-alb" data-c3-alb="${a.id}" title="${escHtml(a.tipos.join(' · '))}" style="background:${c3AlbColor(a)}">${escHtml(c3AlbCorto(a))}</span>`).join('') + (AF.length > room ? `<b class="c3-albmas">+${AF.length - room}</b>` : ''); })()}</div>`; }).join('')}</div>
     <div class="c3-nav-ab"><div class="c3-mes-ab"><b>${MESES_LARGOS[base.getMonth()].replace(/^./, c => c.toUpperCase())} ${base.getFullYear()}</b><span>${libresMes} día${libresMes === 1 ? '' : 's'} libre${libresMes === 1 ? '' : 's'}</span></div>${_c3Mes ? '<button type="button" class="hoy" data-c3-mes="0">Hoy</button>' : ''}<button type="button" data-c3-mes="-1" aria-label="Mes anterior">‹</button><button type="button" data-c3-mes="1" aria-label="Mes siguiente">›</button></div>
     <div class="c3-tray-zona"><div class="c3-tray-cab"><b>Sin día</b><span>${sin.length} trabajo${sin.length === 1 ? '' : 's'}</span></div>
     <div class="tb-filtros2" id="c3-filtros"></div>
@@ -9048,20 +9052,20 @@ function c3PonerDia(j, iso){
   c2Aviso(`${escHtml(c3Nom(j))}: <b>${c2FechaTxt(o[0])}${o.length > 1 ? ' → ' + c2FechaTxt(o[o.length - 1]) : ''}</b>${ch.length ? '. Ojo: esos días no queda ' + ch.map(m => ({mixta: 'mixta', giratoria: 'giratoria', niveladora: 'niveladora', camion: 'camión'})[m] + ' libre').join(' ni ') + '.' : ''}`);
 }
 function c3HojaDia(iso){   // V7.99 (Daniel): un día con trabajos = sus tarjetas, cada una con − / +, y nada más. Un día libre = lo que se puede poner
-  const L = (c3PorDia()[iso] || []).filter((x, k, a) => a.findIndex(y => y.j === x.j) === k), sin = c3Sin(), COL = c3Colores();
+  const L = (c3PorDiaV()[iso] || []).filter((x, k, a) => a.findIndex(y => y.j === x.j) === k), sin = c3Sin(), COL = c3Colores(), pasadoD = iso < c2Iso(c2Hoy());
   const dd = new Date(iso + 'T00:00'), finde = dd.getDay() === 0 || dd.getDay() === 6 || C2_FESTIVOS.includes(iso);   // V8.14: los festivos, como los fines de semana
   const alrededor = finde ? c3Cola().filter(j => { const o = c3Ocupa(j); return o.length && o[0] < iso && o[o.length - 1] > iso && !L.some(x => x.j === j); }) : [];
   const AL0 = c3AlbPorDia()[iso] || [], eur = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
-  const docsDe = j => AL0.filter(a => c3MismoCliente(j, a)), AL = AL0.filter(a => !L.some(x => c3MismoCliente(x.j, a)));
+  const docsDe = j => AL0.filter(a => c3AlbCasa(j, a, iso)), AL = AL0.filter(a => !c3Cola().some(j => c3AlbCasa(j, a, iso)));
   const albBtn = a => `<button type="button" data-c3-albdoc="${a.id}" style="border-left-color:#8a8f98"><b>${escHtml(a.tipos.join(' · '))}</b><span>${escHtml([tbMay(a.cliente || ''), a.obra, ...a.lineas.slice(0, 2).map(l => l.descripcion)].filter(Boolean).join(' · ').slice(0, 90))}${a.importe ? ' · ' + eur(a.importe) : ''}</span></button>`;
   const albBloque = AL.length ? `<div class="c2-lbl">Albaranes de este día · ${AL.length}</div><div class="c3-poner">${AL.map(albBtn).join('')}</div>` : '';
-  const extraHtml = alrededor.length ? `<div class="c2-lbl">Trabajar este día en</div><div class="c3-poner">${alrededor.map(j => `<button type="button" data-c3-finde="${j.id}" data-dia="${iso}" style="border-left-color:${COL[j.id] || '#2B5C8F'}"><b>${escHtml(c3Corto(j))}</b><span>cuenta como 1 día</span></button>`).join('')}</div>` : '';
+  const abierto = _c3Poner === iso, extraHtml = alrededor.length && abierto ? `<div class="c2-lbl">Trabajar este día en</div><div class="c3-poner">${alrededor.map(j => `<button type="button" data-c3-finde="${j.id}" data-dia="${iso}" style="border-left-color:${COL[j.id] || '#2B5C8F'}"><b>${escHtml(c3Corto(j))}</b><span>cuenta como 1 día</span></button>`).join('')}</div>` : '';
   c3Hoja(`<h2>${c2FechaTxt(iso).replace(/^./, c => c.toUpperCase())}</h2>
-    ${L.length ? `<div class="c3-dcards">${L.map(({j, i}) => { const o = c3Ocupa(j);
+    ${L.length ? `<div class="c3-dcards">${L.map(({j, i}) => { const o = c3Ocupa(j), ip = o.indexOf(iso);
         const paso = `<div class="c3-mini"><button type="button" data-c3-dias="-1" data-id="${j.id}" data-dia="${iso}" ${c3Dias(j) <= 1 ? 'disabled' : ''} aria-label="Un día menos">−</button><b>${c3Dias(j)}<small>día${c3Dias(j) === 1 ? '' : 's'}</small></b><button type="button" data-c3-dias="1" data-id="${j.id}" data-dia="${iso}" aria-label="Un día más">+</button></div>`;
         const quitarFinde = finde && (j.plan.findes || []).includes(iso) ? `<button type="button" class="c3-nofinde" data-c3-nofinde="${j.id}" data-dia="${iso}">No trabajar este día</button>` : '';
-        const docs = docsDe(j); return tbCartaHtml(j, false, '', quitarFinde + (docs.length ? `<div class="c2-lbl" style="margin-top:6px;">Documentos de este día</div><div class="c3-poner">${docs.map(albBtn).join('')}</div>` : '') + `<div class="c3-dc-pie"><div class="c3-dc-fechas" style="--jc:${COL[j.id] || '#2B5C8F'}">Día ${i + 1} de ${c3Dias(j)}<br>${c2FechaTxt(o[0])} → ${c2FechaTxt(o[o.length - 1])}</div>${paso}</div>`); }).join('')}</div>`
-    : `${extraHtml}<div class="c3-libre${finde ? ' finde' : ''}">${C2_FESTIVOS.includes(iso) ? 'Festivo' : finde ? 'Fin de semana' : 'Día libre'}</div>${sin.length ? `<div class="c2-lbl">Poner aquí</div><div class="c3-poner">${sin.map(j => `<button type="button" data-c3-poner="${j.id}" data-dia="${iso}" style="border-left-color:${C3_COL[j.prioridad] || '#2B5C8F'}"><b>${escHtml(c3Corto(j))}</b><span>${tbN(c3Dias(j))} d</span></button>`).join('')}</div>` : ''}`}
+        const docs = docsDe(j); return tbCartaHtml(j, false, '', quitarFinde + (docs.length ? `<div class="c2-lbl" style="margin-top:6px;">Documentos de este día</div><div class="c3-poner">${docs.map(albBtn).join('')}</div>` : '') + `<div class="c3-dc-pie"><div class="c3-dc-fechas" style="--jc:${COL[j.id] || '#2B5C8F'}">${ip >= 0 ? `Día ${ip + 1} de ${c3Dias(j)}<br>${c2FechaTxt(o[0])} → ${c2FechaTxt(o[o.length - 1])}` : 'Trabajado este día'}</div>${ip >= 0 ? paso : ''}</div>`); }).join('')}</div>`
+    : `${extraHtml}<div class="c3-libre${finde ? ' finde' : ''}">${C2_FESTIVOS.includes(iso) ? 'Festivo' : finde ? 'Fin de semana' : pasadoD ? 'Sin trabajo' : 'Día libre'}</div>${(sin.length || alrededor.length) && !abierto ? `<button type="button" class="c2-ok gris" data-c3-mostrar="${iso}">+ Añadir trabajo a este día</button>` : ''}${sin.length && abierto ? `<div class="c2-lbl">Poner aquí</div><div class="c3-poner">${sin.map(j => `<button type="button" data-c3-poner="${j.id}" data-dia="${iso}" style="border-left-color:${C3_COL[j.prioridad] || '#2B5C8F'}"><b>${escHtml(c3Corto(j))}</b><span>${tbN(c3Dias(j))} d</span></button>`).join('')}</div>` : ''}`}
     ${albBloque}<button type="button" class="c2-ok gris" data-c2-cerrar="1">Cerrar</button>`);
 }
 // V7.96 (Daniel: «seleccionar uno que ya está en el calendario para añadir o quitar días, súper sencillo, más/menos»): tocar un trabajo
@@ -9194,8 +9198,9 @@ document.addEventListener('click', e => {
   const c = t.closest('[data-c3-card]'); if(c){ _c3Colocar = _c3Colocar === c.dataset.c3Card ? null : c.dataset.c3Card; c3Pintar(); if(_c3Colocar) window.scrollTo({top: 0, behavior: 'smooth'}); return; }
   const pau = t.closest('[data-c3-pausa]'); if(pau && !_c3Colocar && !_c3Reanud){ const j = jOf(pau.dataset.c3Pausa); if(j) c3HojaTrabajo(j); return; }
   const chip = t.closest('[data-c3-chip]'); if(chip && !_c3Colocar && !_c3Reanud){ const j = jOf(chip.dataset.c3Chip); if(j) c3HojaTrabajo(j); return; }
+  const mos = t.closest('[data-c3-mostrar]'); if(mos){ _c3Poner = mos.dataset.c3Mostrar; c3HojaDia(_c3Poner); return; }
   const alb = t.closest('[data-c3-albdoc]'); if(alb){ try{ c2Cerrar(); }catch(e){} abrirDocumentoParaVerlo(alb.dataset.c3Albdoc); return; }
-  const d = t.closest('[data-c3-dia]'); if(d){ if(_c3Reanud){ const j = jOf(_c3Reanud); if(j) c3ReanudarEn(j, d.dataset.c3Dia); return; } if(_c3Colocar){ const j = jOf(_c3Colocar); if(j) c3PonerPreguntando(j, d.dataset.c3Dia); return; } c3HojaDia(d.dataset.c3Dia); }
+  const d = t.closest('[data-c3-dia]'); if(d){ if(_c3Reanud){ const j = jOf(_c3Reanud); if(j) c3ReanudarEn(j, d.dataset.c3Dia); return; } if(_c3Colocar){ const j = jOf(_c3Colocar); if(j) c3PonerPreguntando(j, d.dataset.c3Dia); return; } _c3Poner = null; c3HojaDia(d.dataset.c3Dia); }
 }, true);
 // ===== V8.01 FLOTA › ASISTENCIA (Daniel 04/10/2026: «el teléfono de asistencia en carretera de cada seguro, para una avería o lo que sea»)
 // Datos en Sistema (tipo=asistencia_seguros): teléfonos de cada aseguradora y qué seguro lleva cada vehículo (con fechas si cambia). Un toque llama
