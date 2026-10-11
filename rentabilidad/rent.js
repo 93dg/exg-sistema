@@ -558,22 +558,22 @@ R.escHtml2 = (b, lista) => {
 R.perdidas = function(r, personas, margenH, carga){
   const pot = 7 * personas, mH = isFinite(margenH) ? margenH : NaN; let dLab = 0, hPerd = 0, dFlojos = 0, dVacios = 0;
   for(let f = r.desde; f <= r.hasta; f = addDays(f, 1)){ const dow = new Date(f + 'T12:00:00').getDay(); if(dow === 0 || dow === 6) continue; dLab++; const h = r.hDia[f] || 0, p = Math.max(0, pot - h); hPerd += p; if(!h) dVacios++; else if(p > 0) dFlojos++; }
-  carga = Math.max(0, carga || 0); hPerd = Math.max(0, hPerd - carga);   // reparar y gestionar también ocupan su tiempo: no es tiempo perdido
+  carga = Math.max(0, carga || 0); hPerd = Math.max(0, pot * dLab - r.H - carga);   // lo mismo trabajo en menos días: días de la obra × 14 h − lo echado − reparar/gestionar   // reparar y gestionar también ocupan su tiempo: no es tiempo perdido
   return {pot, personas, carga, dLab, hPerd, dEq: pot > 0 ? hPerd / pot : 0, dFlojos, dVacios, dinero: isFinite(mH) ? hPerd * mH : NaN, margenH: mH};
 };
 R.opHtml = function(r, personas, margenH, socios, carga){
-  const x = R.perdidas(r, personas, margenH, carga), dTr = Object.keys(r.hDia).length, media = dTr ? r.H / dTr : NaN, nw = 'white-space:nowrap;';
+  const x = R.perdidas(r, personas, margenH, carga), dNec = x.pot > 0 ? (r.H + x.carga) / x.pot : NaN, dTr = Object.keys(r.hDia).length, media = dTr ? r.H / dTr : NaN, nw = 'white-space:nowrap;';
   const fl = (t, v, col, big) => '<div class="rt-sim-r"><span>' + t + '</span><b style="' + nw + 'color:' + col + ';' + (big ? 'font-size:18px;' : '') + '">' + v + '</b></div>';
   const mc = isFinite(media) && media >= x.pot * 0.8 ? G : isFinite(media) && media >= x.pot * 0.5 ? '#c58a1b' : RJ;
   const real = isFinite(x.dinero) && socios > 0 ? '<div style="background:#fbeceb;border-radius:10px;padding:2px 10px;margin-top:6px;">' + fl('<b>Coste real de Rafa y Manolo</b>', eur(socios + x.dinero), '#c0392b', false) + '<div style="font-size:11px;color:var(--ink-soft);padding-bottom:6px;">' + eur((socios + x.dinero) / Math.max(1, r.H), 2) + ' por hora echada</div></div>' : '';
   const como = '<div style="font-size:11.5px;color:var(--ink-soft);line-height:1.5;padding:4px 0 8px;">'
-    + '<b>Días:</b> ' + x.dLab + ' de lunes a viernes, del ' + r.desde.split('-').reverse().join('/') + ' al ' + r.hasta.split('-').reverse().join('/') + '. Se trabajó en ' + dTr + '; ' + x.dFlojos + ' a medias y ' + x.dVacios + ' sin trabajo.<br>'
-    + '<b>Posible:</b> ' + x.personas + ' personas × 7 h = ' + h1(x.pot) + ' h por día. Cada día cuenta por separado: un día con 4 h pierde 10 h y uno con 20 h no compensa otro.<br>'
+    + '<b>Real:</b> ' + x.dLab + ' días de lunes a viernes, del ' + r.desde.split('-').reverse().join('/') + ' al ' + r.hasta.split('-').reverse().join('/') + '. Se trabajó en ' + dTr + '; ' + x.dFlojos + ' a medias y ' + x.dVacios + ' sin trabajo.<br>'
+    + '<b>Posible:</b> con ' + x.personas + ' personas × 7 h = ' + h1(x.pot) + ' h por día, las mismas ' + h1(r.H) + ' h' + (x.carga ? ' (más ' + h1(x.carga) + ' h de reparar y gestionar)' : '') + ' salen en ' + h1(dNec) + ' días. La diferencia son días libres para otra obra.<br>'
     + (x.carga ? '<b>Reparar y gestionar:</b> ' + h1(x.carga) + ' h que ocupan a Rafa y Manolo (' + h1(num(R.param.repSemana) + num(R.param.gesSemana)) + ' h por semana × ' + h1(x.dLab / 5) + ' semanas). Es una cifra de Hipótesis, no medida: se cambia en Hipótesis.<br>' : '')
-    + '<b>Valor:</b> horas sin aprovechar × ' + (isFinite(x.margenH) ? eur(x.margenH, 2) : '—') + ' €/h de margen de otra obra.</div>';
-  return fl('Real: ' + dTr + ' días', h1(r.H) + ' h · ' + (isFinite(media) ? h1(media) : '—') + ' h/día', mc)
-    + fl('Posible: ' + x.dLab + ' días', h1(r.H + x.hPerd) + ' h · ' + h1(x.pot) + ' h/día', G)
-    + fl('Horas sin aprovechar', h1(x.hPerd) + ' h ≈ ' + h1(x.dEq) + ' días', '#c58a1b')
+    + '<b>Valor:</b> horas sin aprovechar × ' + (isFinite(x.margenH) ? eur(x.margenH, 2) : '—') + '/h de margen de otra obra.</div>';
+  return fl('Real · ' + (isFinite(media) ? h1(media) : '—') + ' h/día · ' + h1(r.H) + ' h', x.dLab + ' días', mc)
+    + fl('Posible · ' + h1(x.pot) + ' h/día · mismas horas', h1(dNec) + ' días', G)
+    + fl('Días libres para otra obra', h1(x.dEq) + ' días ≈ ' + h1(x.hPerd) + ' h', '#c58a1b')
     + (isFinite(x.dinero) ? fl('Valor en otra obra', eur(x.dinero), '#c0392b') : '')
     + (isFinite(x.dinero) && socios > 0 ? fl('Cobran Rafa y Manolo', eur(socios), '#2f6fb0') : '')
     + real
