@@ -438,17 +438,18 @@ R.simular2 = function(b, e){
   const capMaq0 = Math.max(b.horas, b.maquinas * (num(prm.horasDia) || 7) * jorn * (1 - ind0)), capMaq = capMaq0 * (1 - ind1) / (1 - ind0);
   const capPers = capSoc + capHired; let cap = Math.min(capMaq, capPers);
   // V10.43 (Daniel): una sola cuenta, la hecha día por día: lo que se echó + lo que cada día se podía haber echado (7 h por persona, L-V), menos reparar y gestionar
-  if(b.obra && b.r){ const persE = (2 - nFuera) + nMaq + nCM * cmP, x = R.perdidas(b.r, persE, NaN, hs.rep * (1 - red) + hs.ges); cap = Math.min(capMaq, b.r.H + x.hPerd); }
+  if(b.obra && b.r){ const persE = (2 - nFuera) + nMaq + nCM * cmP, x = R.perdidas(b.r, persE, NaN, hs.rep * (1 - red) + hs.ges); cap = persE <= 0 ? 0 : Math.min(capMaq, b.r.H + x.hPerd); }
+  const sinGente = !!(b.obra && b.r && (2 - nFuera) + nMaq + nCM * cmP <= 0);   // V10.61 (Daniel): sin nadie trabajando no hay obra: ni horas ni ingresos; solo quedan los costes fijos
   const ahorro = red * num(prm.ahorroTaller) / 100 * b.taller, mH = isFinite(b.margenH) ? b.margenH : 0, ingH = isFinite(b.ingH) ? b.ingH : 0;
   const horasAseg = Math.min(b.horas, cap), dPot = cap - b.horas, dAseg = horasAseg - b.horas, base = b.beneficio - b.socios;
   const pagoH = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : 0, retribDe = pro => pagoH * ((capPers > 0 ? pro * capHoy / capPers : 0) + (nAv ? carga * nHoy / nAv : 0));
   const costeUso = pro => b.obra ? costePers * Math.min(1, capPers > 0 ? pro / capPers : 0) : costePers, costeAseg = costeUso(horasAseg), costePot = b.obra ? costeAseg : costeUso(cap);   // V10.60 (Daniel): se paga solo a los días que la obra necesita; los días que sobran no se pagan aquí y se aprovechan en otra obra   // V10.59 (Daniel): en una obra los contratados cuestan solo la parte de su tiempo que la obra necesita (la duración ideal), no todos los días
   const retrib = retribDe(horasAseg), retribPot = retribDe(cap), cambio = costeAseg + retrib - b.socios, cambioPot = costePot + retribPot - b.socios;
-  const benAseg = base + dAseg * mH + ahorro - cambio, benPot = base + dPot * mH + ahorro - cambioPot, imp = x => t * Math.max(0, x + retrib), impP = x => t * Math.max(0, x + retribPot);
+  const benAseg = sinGente ? -b.r.indirecto : base + dAseg * mH + ahorro - cambio, benPot = sinGente ? -b.r.indirecto : base + dPot * mH + ahorro - cambioPot, imp = x => t * Math.max(0, x + retrib), impP = x => t * Math.max(0, x + retribPot);
   const falta = Math.max(0, cambio - ahorro), eqH = mH > 0 ? falta / mH : NaN;
   // trabajo de Rafa y Manolo (h/año) por actividad
   const nP = 2 - nFuera, maqSoc = capPers > 0 ? horasAseg * capSoc / capPers : 0, shareC = (hs.maq + hs.cond) ? hs.cond / (hs.maq + hs.cond) : 0;
-  const tr = {maq: maqSoc * (1 - shareC), cond: maqSoc * shareC, rep: hs.rep * (1 - red), ges: hs.ges}; tr.total = tr.maq + tr.cond + tr.rep + tr.ges;
+  const tr = {maq: maqSoc * (1 - shareC), cond: maqSoc * shareC, rep: hs.rep * (1 - red), ges: hs.ges}; if(nP === 0){ tr.rep = 0; tr.ges = 0; } tr.total = tr.maq + tr.cond + tr.rep + tr.ges;
   const notas = []; if(nFuera && hs.ges > 0) notas.push('Con ' + (nFuera === 2 ? 'los dos fuera' : 'uno fuera') + ' la gestión de la empresa queda sin cubrir.'); if(nFuera === 2 && !nMaq && !nCM) notas.push('Sin Rafa ni Manolo y sin nadie que maneje máquinas, no se produce.');
   if(capPers > capMaq + 1) notas.push('El límite son las máquinas, no las personas.'); if(faltan.length) notas.push('Falta dato: ' + faltan.join(', ') + '.'); if(!hs.ges) notas.push('Las horas de gestión de Rafa y Manolo están a 0: ponlas en Hipótesis para que cuenten.');
   return {e, nombre: R.nombreEsc2(e), costePers: costeAseg, retrib, capacidad: cap, horasAseg0: horasAseg, capPers, capMaq, dPot, dAseg, horasAseg, ahorro, benAseg, benPot, netAseg: benAseg - imp(benAseg), netPot: benPot - impP(benPot), dBenAseg: benAseg - base, dBenPot: benPot - base, eqH, eqFact: eqH * ingH, ingPot: Math.max(0, dPot) * ingH, tr, nP, red, notas};
