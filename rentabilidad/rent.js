@@ -458,7 +458,7 @@ R.simular2 = function(b, e){
 // ---------- presentación ----------
 // Colores: verde = bien / ingreso, rojo = mal / coste. Cada cifra dice qué es (ingreso, coste, beneficio). Sin fondos grises: papel con borde, como el resto de la app.
 { const old = document.getElementById('rt-css'); if(old) old.remove(); const st = document.createElement('style'); st.id = 'rt-css'; st.textContent = `
-.rt-w{display:flex;flex-direction:column;gap:12px;min-width:0;max-width:100%}
+.rt-w{display:flex;flex-direction:column;gap:8px;min-width:0;max-width:100%}
 .rt-w *{min-width:0;box-sizing:border-box}
 .rt-sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .rt-t{border-radius:14px;padding:10px;text-align:left;background:var(--paper);border:1px solid var(--line)}
@@ -466,8 +466,8 @@ R.simular2 = function(b, e){
 .rt-t span{display:block;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
 .rt-t b{display:block;font-size:18px;font-weight:900;margin-top:3px;white-space:nowrap}
 .rt-t small{display:block;font-size:11px;color:var(--ink-soft);margin-top:1px}
-.rt-c{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:12px}
-.rt-c>h3{margin:0 0 8px;font-size:14px;font-weight:800}
+.rt-c{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:8px 12px}
+.rt-c>h3{margin:0 0 2px;font-size:14px;font-weight:800}
 .rt-k{display:inline-block;font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;text-transform:uppercase;letter-spacing:.03em}
 .rt-k.g{background:var(--green-soft);color:var(--green)}.rt-k.r{background:var(--red-soft);color:var(--red)}
 .rt-n{display:grid;grid-template-columns:5px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
@@ -481,7 +481,7 @@ R.simular2 = function(b, e){
 .rt-sel{background:#fff;border:1.5px solid var(--orange);border-radius:12px;padding:10px 12px;font-weight:700;color:var(--ink);font-size:13px}
 .rt-nd>summary{list-style:none;cursor:pointer}.rt-nd>summary::-webkit-details-marker{display:none}.rt-nd .rt-bd{padding:2px 0 10px 14px;font-size:12px;border-bottom:1px solid var(--line)}
 .rt-ch{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;font-size:12px}
-.rt-ch button,.rt-seg button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:5px 9px;font-size:12.5px;font-weight:700;color:inherit}
+.rt-ch button,.rt-seg button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700;color:inherit}
 .rt-ch button.on,.rt-seg button.on{background:var(--orange);border-color:var(--orange);color:#fff}
 .rt-tb{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}.rt-tb th:first-child,.rt-tb td:first-child{width:34%}
 .rt-tb.rt-fit{min-width:0 !important;width:100%}   /* V9.84: la regla global table{min-width:600px} desbordaba la tabla por máquina en el móvil */
@@ -494,17 +494,19 @@ R.simular2 = function(b, e){
 .rt-d>summary{padding:11px 0;font-weight:800;font-size:13px;color:var(--orange);cursor:pointer}
 .rt-d[open]>summary{margin-bottom:6px}
 .rt-d .tb-cos{margin-left:0;margin-right:0}
-.rt-sim-r{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.rt-sim-r{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid var(--line);font-size:13px;line-height:1.25}
 .rt-sim-r:first-of-type{border-top:0}
 .rt-sim-r>b{text-align:right}
 .rt-st{display:inline-flex;align-items:center;gap:8px}
-.rt-st button{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--line);background:transparent;font-size:18px;font-weight:800;color:inherit;line-height:1}
+.rt-st button{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line);background:transparent;font-size:18px;font-weight:800;color:inherit;line-height:1}
 .rt-st b{min-width:20px;text-align:center;font-size:16px}
-.rt-seg{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
-.rt-big{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:2px 0 8px}
-.rt-big div{border-radius:14px;padding:10px;text-align:left}
+.rt-seg{display:flex;gap:4px;flex-wrap:nowrap;justify-content:flex-end;flex-shrink:0}
+.rt-big{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:2px 0 4px}
+.rt-big small b{display:inline;font-size:11px;margin:0;white-space:normal}
+.rt-stg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding-top:4px;border-top:1px solid var(--line)}.rt-stg>div{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;text-align:center}
+.rt-big div{border-radius:12px;padding:6px 10px;text-align:left}
 .rt-big div.g{background:var(--green-soft)}.rt-big div.r{background:var(--red-soft)}
-.rt-big span{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em}.rt-big b{display:block;font-size:20px;font-weight:900;margin-top:3px;white-space:nowrap}.rt-big small{display:block;font-size:11px;color:var(--ink-soft);margin-top:1px}
+.rt-big span{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em}.rt-big b{display:block;font-size:20px;font-weight:900;margin-top:0;white-space:nowrap}.rt-big small{display:block;font-size:11px;color:var(--ink-soft);margin-top:1px}
 .rt-an{font-size:11.5px;color:var(--orange);margin-top:4px}
 `; document.head.appendChild(st); }
 
@@ -607,10 +609,10 @@ R.simHtml = function(P, b){
   const quedan = ['rafa', 'manolo'].filter(k => s.e[k] === 'hoy'), sociosSim = b.socios * quedan.length / 2, quienSim = quedan.map(k => k === 'rafa' ? 'Rafa' : 'Manolo').join(' y ');   // V10.57 (Daniel): si uno sale (o pasa a empleado), se descuenta lo suyo
   const opSim = b.obra && b.r ? R.opHtml(b.r, persSim, b.margenH, sociosSim, s.tr.rep + s.tr.ges, quienSim || undefined) : '';
   const pagoHr = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : NaN, cMaqH = coste('maquinista');
-  const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small style="display:block;color:var(--ink-soft);font-size:11px;">cobra ' + eur(v, 2) + '/h' + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · coste real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : '<small style="display:block;color:var(--ink-soft);font-size:11px;">fuera</small>'; };
-  const st = (k, t) => '<div class="rt-sim-r"><span>' + t + '</span><span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>';
-  const controles = '<div class="rt-c"><h3>Organización</h3><div class="rt-sim-r"><span>Rafa' + cobH('rafa') + '</span>' + seg('rafa') + '</div><div class="rt-sim-r"><span>Manolo' + cobH('manolo') + '</span>' + seg('manolo') + '</div>' + st('maq', 'Maquinistas') + st('mec', 'Mecánicos') + st('cm', 'Conductor / mecánico') + '</div>';
-  const bx = (t, v, d, n, hh) => '<div class="' + (n >= 0 ? 'g' : 'r') + '"><span style="color:' + (n >= 0 ? G : RJ) + ';">' + t + '</span><b style="color:' + (n >= 0 ? G : RJ) + ';">' + eur(n) + '</b><small>neto tras impuestos</small><small><b>' + hh + '</b>' + (b.obra ? ' en la obra' : ' al año') + '</small><small>' + cs(d, dEur(d)) + ' sobre hoy</small><small>antes de impuestos: ' + eur(v) + '</small></div>';
+  const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small style="display:block;color:var(--ink-soft);font-size:10.5px;white-space:nowrap;">cobra ' + eur(v, 2) + '/h' + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : '<small style="display:block;color:var(--ink-soft);font-size:11px;">fuera</small>'; };
+  const st = (k, t) => '<div><span>' + t + '</span><span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>';
+  const controles = '<div class="rt-c"><h3>Organización</h3><div class="rt-sim-r"><span>Rafa' + cobH('rafa') + '</span>' + seg('rafa') + '</div><div class="rt-sim-r"><span>Manolo' + cobH('manolo') + '</span>' + seg('manolo') + '</div>' + '<div class="rt-stg">' + st('maq', 'Maquinistas') + st('mec', 'Mecánicos') + st('cm', 'Conduc./mecánico') + '</div></div>';
+  const bx = (t, v, d, n, hh) => '<div class="' + (n >= 0 ? 'g' : 'r') + '"><span style="color:' + (n >= 0 ? G : RJ) + ';">' + t + '</span><b style="color:' + (n >= 0 ? G : RJ) + ';">' + eur(n) + '</b><small><b style="display:inline;font-size:11px;margin:0;">' + hh + '</b> · ' + cs(d, dEur(d)) + ' vs hoy</small><small>antes de imp.: ' + eur(v) + '</small></div>';
   const costeNuevo = s.costePers + s.retrib - b.socios;
   const res = '<div class="rt-c"><h3>' + esc(s.nombre) + '</h3><div class="rt-big">' + bx('Beneficio neto con las horas de hoy', s.benAseg, s.netAseg - hoy.netAseg, s.netAseg, h1(s.horasAseg) + ' h') + bx('Beneficio neto a ' + (num(R.param.horasDia) || 7) + ' h operativas al día', s.benPot, s.netPot - hoy.netAseg, s.netPot, h1(s.capacidad) + ' h') + '</div>'
     + '<div class="rt-sim-r"><span>Se podría producir</span><b>' + h1(s.capacidad) + ' h <small style="font-weight:700;">' + cs(s.dPot, '(' + (s.dPot >= 0 ? '+' : '') + h1(s.dPot) + ' h)') + '</small></b></div>'
