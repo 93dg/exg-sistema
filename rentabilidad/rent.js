@@ -423,7 +423,32 @@ R.ESC2 = {rafa: 'hoy', manolo: 'hoy', mec: 0, cm: 0, maq: 0};
 R.build2 = {...R.ESC2};
 R.nombreEsc2 = e => { const p = [], pl = (n, s) => '+' + n + ' ' + s + (n > 1 ? 's' : ''); if(e.rafa !== 'hoy') p.push('Rafa ' + e.rafa); if(e.manolo !== 'hoy') p.push('Manolo ' + e.manolo); if(e.maq) p.push(pl(e.maq, 'maquinista')); if(e.mec) p.push(pl(e.mec, 'mecánico')); if(e.cm) p.push(pl(e.cm, 'conductor/mecánico')); return p.length ? p.join(', ') : 'Como hoy'; };
 // Simulador: capacidad (lo que se podría producir) separada de lo asegurado (lo que ya se factura). La demanda NO limita: hay trabajo de sobra y conseguirlo es gestión comercial aparte.
+// V10.64 (Daniel): simulador de UNA obra, todo por días. Las mismas horas (las de la obra) hechas por la gente elegida a 7 h operativas al día.
+// Caja 1: al ritmo de hoy (Rafa y Manolo con sus horas reales por día; contratados y «empleado» a 7 h). Caja 2: todos a 7 h/día; los días que sobran se trabajan en otra obra.
+// Costes por día: generales (gestoría, estructura, SS, coches) × días; Rafa y Manolo: su parte diaria × días; contratados y «empleado»: sueldo de convenio ÷ jornadas del año × días.
+// Directos y fijos de máquina no cambian: son las mismas horas de máquina.
+R.simObra = function(b, e){
+  const r = b.r, prm = R.param, hd = num(prm.horasDia) || 7, jA = num(prm.jornadas) || 250, cmP = num(prm.condMecPct) / 100 || 0, t = num(prm.impuesto) / 100, hs = R.horasSocios(b);
+  const cMaq = coste('maquinista'), cMec = coste('oficial1'), ok = x => isFinite(x) ? x : 0, nMaq = e.maq | 0, nMec = e.mec | 0, nCM = e.cm | 0, faltan = [];
+  const mods = [e.rafa, e.manolo], nHoy = mods.filter(m => m === 'hoy').length, nEmp = mods.filter(m => m === 'empleado').length, nFuera = 2 - nHoy - nEmp, nP = nHoy + nEmp;
+  if((nMaq || nEmp) && !isFinite(cMaq)) faltan.push('convenio de maquinista'); if((nMec || nCM) && !isFinite(cMec)) faltan.push('convenio de mecánico');
+  const persE = nP + nMaq + nCM * cmP, H = r.H, Dtr = Math.max(1, Object.keys(r.hDia).length), mH = isFinite(b.margenH) ? b.margenH : 0, ingH = isFinite(b.ingH) ? b.ingH : 0;
+  const gen = sum(r.lineasI.filter(x => /^gen:/.test(x.clave)), x => x.valor), socDia = b.socios / 2 / Dtr, salDia = ((nMaq + nEmp) * ok(cMaq) + (nMec + nCM) * ok(cMec)) / jA;
+  const red = Math.min(1, nMec + nCM * (1 - cmP)), ahorro = red * num(prm.ahorroTaller) / 100 * b.taller;
+  const sinGente = persE <= 0, dIdeal = sinGente ? 0 : H / (hd * persE), hSocDia = H / Dtr / 2, ritmo1 = nHoy * hSocDia + (persE - nHoy) * hd, d1 = sinGente ? 0 : H / ritmo1, d2 = dIdeal, hLibre = sinGente ? 0 : Math.max(0, hd * persE * Dtr - H);
+  const caja = (d, libre) => { const k = d / Dtr, soc = socDia * nHoy * d, sal = salDia * d, ben = sinGente ? -r.indirecto : b.beneficio - gen * (k - 1) - soc - sal + ahorro + libre * mH, imp = t * Math.max(0, ben + soc); return {d, soc, sal, gen: gen * k, ben, imp, net: ben - imp}; };
+  const c1 = caja(d1, 0), c2 = caja(d2, hLibre), hoy1 = b.beneficio - b.socios;
+  // horas de Rafa y Manolo: su parte de las horas de máquina + reparar y gestionar (si queda alguno)
+  const shareC = (hs.maq + hs.cond) ? hs.cond / (hs.maq + hs.cond) : 0, hSoc = persE > 0 ? H * nP / persE : 0;
+  const tr = {maq: hSoc * (1 - shareC), cond: hSoc * shareC, rep: nP ? hs.rep * (1 - red) : 0, ges: nP ? hs.ges : 0}; tr.total = tr.maq + tr.cond + tr.rep + tr.ges;
+  const cambio = c1.sal + c1.soc - b.socios, falta = Math.max(0, cambio - ahorro), eqH = mH > 0 ? falta / mH : NaN;
+  const notas = []; if(sinGente) notas.push('Sin nadie que maneje máquinas no se hace la obra: no hay ingresos y quedan los costes fijos.'); if(nFuera && hs.ges > 0) notas.push('Con ' + (nFuera === 2 ? 'los dos fuera' : 'uno fuera') + ' la gestión de la empresa queda sin cubrir.'); if(faltan.length) notas.push('Falta dato: ' + faltan.join(', ') + '.');
+  if(nHoy) notas.push('Al ritmo de hoy Rafa y Manolo echan ' + h1(hSocDia) + ' h por persona y día trabajado (' + h1(H) + ' h ÷ ' + Dtr + ' días ÷ 2).'); if(d1 > Dtr + 0.05) notas.push('Con esta gente la obra dura ' + h1(d1) + ' días, más que los ' + Dtr + ' reales: los costes por día suben.');
+  return {e, nombre: R.nombreEsc2(e), obra: true, c1, c2, d1, d2, Dtr, persE, hLibre, costePers: c1.sal, retrib: c1.soc, capacidad: sinGente ? 0 : H + hLibre, horasAseg0: sinGente ? 0 : H, horasAseg: sinGente ? 0 : H, dPot: sinGente ? -H : hLibre, dAseg: sinGente ? -H : 0, ahorro,
+    benAseg: c1.ben, benPot: c2.ben, netAseg: c1.net, netPot: c2.net, dBenAseg: c1.ben - hoy1, dBenPot: c2.ben - hoy1, eqH, eqFact: eqH * ingH, ingPot: hLibre * ingH, tr, nP, red, notas};
+};
 R.simular2 = function(b, e){
+  if(b.obra && b.r) return R.simObra(b, e);
   const prm = R.param, jorn = b.jornadas || num(prm.jornadas) || 250, cmP = num(prm.condMecPct) / 100, t = num(prm.impuesto) / 100, contrato = (num(prm.horasDia) || 7) * jorn, hs = R.horasSocios(b);   // V9.84 (Daniel): 7 h de facturación por jornada (1 h es de mantenimiento de la maquinaria), sin recorte por ocupación
   const cMaq = coste('maquinista'), cMec = coste('oficial1'), faltan = [], nMaq = e.maq | 0, nMec = e.mec | 0, nCM = e.cm | 0, ok = x => isFinite(x) ? x : 0, prorr = b.obra ? jorn / (num(prm.jornadas) || 250) : 1;   // V10.58: el sueldo es anual; en una obra solo cuenta la parte de los días de esa obra
   if((nMaq || e.rafa === 'empleado' || e.manolo === 'empleado') && !isFinite(cMaq)) faltan.push('convenio de maquinista'); if((nMec || nCM) && !isFinite(cMec)) faltan.push('convenio de mecánico');
@@ -470,15 +495,15 @@ R.simular2 = function(b, e){
 .rt-c>h3{margin:0 0 2px;font-size:14px;font-weight:800}
 .rt-k{display:inline-block;font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;text-transform:uppercase;letter-spacing:.03em}
 .rt-k.g{background:var(--green-soft);color:var(--green)}.rt-k.r{background:var(--red-soft);color:var(--red)}
-.rt-n{display:grid;grid-template-columns:5px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.rt-n{display:grid;grid-template-columns:5px minmax(0,1fr) auto;gap:10px;align-items:center;padding:4px 0;border-top:1px solid var(--line)}
 .rt-n.p1{border-top:0}
 .rt-n i{align-self:stretch;border-radius:3px}
 .rt-n b{font-size:13.5px}.rt-n small{display:block;font-size:11px;color:var(--ink-soft)}
-.rt-n .v{text-align:right}.rt-n .v b{font-size:17px;font-weight:900;display:block;white-space:nowrap}
+.rt-n .v{text-align:right}.rt-n .v b{font-size:15px;font-weight:900;display:block;white-space:nowrap}
 .rt-n .v small{white-space:nowrap}
 .rt-n .x{grid-column:2/4;font-size:12.5px;display:flex;flex-direction:column;gap:4px;align-items:flex-start}.rt-n .x em{display:block;font-style:normal;font-size:12px;font-weight:800;border-radius:8px;padding:3px 9px}
 .rt-n .x em.g{background:var(--green-soft);color:var(--green)}.rt-n .x em.r{background:var(--red-soft);color:var(--red)}
-.rt-sel{background:#fff;border:1.5px solid var(--orange);border-radius:12px;padding:10px 12px;font-weight:700;color:var(--ink);font-size:13px}
+.rt-sel{background:#fff;border:1.5px solid var(--orange);border-radius:10px;padding:5px 10px;font-weight:700;color:var(--ink);font-size:13px}
 .rt-nd>summary{list-style:none;cursor:pointer}.rt-nd>summary::-webkit-details-marker{display:none}.rt-nd .rt-bd{padding:2px 0 10px 14px;font-size:12px;border-bottom:1px solid var(--line)}
 .rt-ch{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;font-size:12px}
 .rt-ch button,.rt-seg button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700;color:inherit}
@@ -490,8 +515,8 @@ R.simular2 = function(b, e){
 .rt-tb th:first-child,.rt-tb td:first-child{text-align:left}
 .rt-tb td{padding:7px 3px;text-align:right;border-top:1px solid var(--line);white-space:nowrap;font-size:12.5px}
 .rt-tb td:first-child{white-space:normal}
-.rt-d{border-radius:14px;border:1.5px solid var(--line);padding:0 12px;background:var(--paper)}
-.rt-d>summary{padding:11px 0;font-weight:800;font-size:13px;color:var(--orange);cursor:pointer}
+.rt-d{border-radius:10px;border:1px solid var(--line);padding:0 10px;background:var(--paper)}
+.rt-d>summary{padding:6px 0;font-weight:800;font-size:13px;color:var(--orange);cursor:pointer}
 .rt-d[open]>summary{margin-bottom:6px}
 .rt-d .tb-cos{margin-left:0;margin-right:0}
 .rt-sim-r{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid var(--line);font-size:13px;line-height:1.25}
@@ -502,6 +527,8 @@ R.simular2 = function(b, e){
 .rt-st b{min-width:20px;text-align:center;font-size:16px}
 .rt-seg{display:flex;gap:4px;flex-wrap:nowrap;justify-content:flex-end;flex-shrink:0}
 .rt-big{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:2px 0 4px}
+.rt-w .tb-cos{margin-bottom:0!important;padding:8px 10px}
+#te-subtabs{margin:0 0 6px!important;gap:6px}#te-subtabs .docs-tab{padding:5px 8px;font-size:12px}
 .rt-g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 6px}
 .rt-tl{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;font-size:10.5px;line-height:1.2;color:var(--ink-soft);padding:4px 2px;border-top:1px solid var(--line)}
 .rt-tl b{font-size:14.5px;font-weight:800;color:var(--ink);white-space:nowrap;margin-top:1px}.rt-tl small{font-size:10px}
@@ -580,17 +607,19 @@ R.opHtml = function(r, personas, margenH, socios, carga, quien){
   return '<div class="rt-g3">' + tl('Valor de ' + h1(x.hPerd) + ' h en otra obra', eur(x.dinero), '#c0392b') + (socios > 0 ? tl((quien.indexOf(' y ') > 0 ? 'Cobran ' : 'Cobra ') + quien, eur(socios), '#2f6fb0') + tl('Coste real', eur(socios + x.dinero), '#c0392b', eur((socios + x.dinero) / Math.max(1, r.H), 2) + ' por hora') : '') + '</div>'
     + '<details><summary style="font-size:11.5px;color:var(--orange);font-weight:700;cursor:pointer;">Cómo se calcula</summary>' + como + '</details>';
 };
-R.datosReales = function(r, b){   // V10.51 (Daniel): datos reales sobre la hora, arriba de todo. V10.63: en rejilla para ocupar poca altura
+R.datosReales = function(r, b){   // V10.51 (Daniel): datos reales sobre la hora, arriba de todo
   const e = R.build2, cmP = num(R.param.condMecPct) / 100 || 0, pers = (2 - (e.rafa === 'fuera' ? 1 : 0) - (e.manolo === 'fuera' ? 1 : 0)) + (e.maq | 0) + (e.cm | 0) * cmP;
   const x = R.perdidas(r, pers, b.margenH, 0), dTr = Object.keys(r.hDia).length, dFin = Object.keys(r.hDia).filter(f => { const w = new Date(f + 'T12:00:00').getDay(); return w === 0 || w === 6; }).length, media = dTr ? r.H / dTr : NaN, dEmp = x.pot > 0 ? r.H / x.pot : NaN;
-  const t = (l, v, col) => '<div class="rt-tl"><span>' + l + '</span><b' + (col ? ' style="color:' + col + ';"' : '') + '>' + v + '</b></div>', A = '#c58a1b';
+  const f = (t, v, col) => '<div class="rt-sim-r"><span>' + t + '</span><b style="white-space:nowrap;' + (col ? 'color:' + col + ';' : '') + '">' + v + '</b></div>';
   const mq = (r.maq || []).slice().sort((a, c2) => c2.horas - a.horas);
-  return '<div class="rt-c"><h3>Datos reales</h3><div style="font-size:11px;color:var(--ink-soft);margin:0 0 4px;">Jornada de 8 h; 1 h para mantenimiento, reparaciones y preparativos: quedan 7 h operativas.</div><div class="rt-g3">'
-    + t('Días de la obra (L-V)', x.dLab) + t('Días trabajados' + (dFin ? ' (' + dFin + ' en fin de semana)' : ''), dTr) + t('Laborables no trabajados', x.dVacios)
-    + t('Horas operativas trabajadas', h1(r.H) + ' h') + t('Media por día trabajado', isFinite(media) ? h1(media) + ' h/día' : '—') + t('€/h operativas (ingreso ÷ horas)', r.H > 0 ? eur(r.ejecutado / r.H, 2) : '—', G)
-    + t('Duración ideal (7 h/día × empleado)', isFinite(dEmp) ? h1(dEmp) + ' días' : '—', G) + t('Días operativos desaprovechados', h1(x.dEq) + ' días', A) + t('Horas operativas desaprovechadas', h1(x.hPerd) + ' h', A)
-    + t('H/día desaprovechadas (' + h1(x.pot) + ' − ' + (isFinite(media) ? h1(media) : '—') + ')', isFinite(media) ? h1(Math.max(0, x.pot - media)) + ' h/día' : '—', A) + t('Empleados', h1(x.personas)) + t('Maquinaria usada', mq.length)
-    + '</div>' + (mq.length ? '<div style="font-size:11.5px;color:var(--ink-soft);line-height:1.45;margin-top:4px;border-top:1px solid var(--line);padding-top:4px;">' + mq.map(m => '<b style="color:var(--ink);">' + esc(m.nombre) + '</b> ' + h1(m.horas) + ' h · ' + m.dias + ' d').join('  ·  ') + '</div>' : '')
+  return '<div class="rt-c"><h3>Datos reales</h3><div style="font-size:11.5px;color:var(--ink-soft);margin:-4px 0 6px;">Jornada de 8 h; 1 h se reserva para mantenimiento, reparaciones y preparativos: quedan 7 h operativas.</div>'
+    + f('Días de la obra (L-V)', x.dLab) + f('Días trabajados' + (dFin ? ' (' + dFin + ' en fin de semana)' : ''), dTr) + f('Días laborables no trabajados', x.dVacios) + f('Horas operativas trabajadas', h1(r.H) + ' h') + f('Media: ' + h1(r.H) + ' h ÷ ' + dTr + ' días trabajados', isFinite(media) ? h1(media) + ' h/día' : '—')
+    + f('€/h operativas (ingreso ÷ horas)', r.H > 0 ? eur(r.ejecutado / r.H, 2) : '—', G)
+    + f('Duración ideal (7 h/día × empleado)', isFinite(dEmp) ? h1(dEmp) + ' días' : '—', G)
+    + f('Días operativos desaprovechados', h1(x.dEq) + ' días', '#c58a1b') + f('Horas operativas desaprovechadas', h1(x.hPerd) + ' h', '#c58a1b') + f('H/día operativas desaprovechadas · ' + h1(x.pot) + ' − ' + (isFinite(media) ? h1(media) : '—'), isFinite(media) ? h1(Math.max(0, x.pot - media)) + ' h/día' : '—', '#c58a1b')
+    + f('Empleados', h1(x.personas))
+    + f('Maquinaria usada', mq.length)
+    + (mq.length ? '<div style="font-weight:800;font-size:12.5px;margin:4px 0 0;">Horas por máquina</div>' + mq.map(m => f(esc(m.nombre), h1(m.horas) + ' h · ' + m.dias + ' días')).join('') : '')
     + '</div>';
 };
 R.baseObra = function(r, b){   // V10.38 (Daniel): el simulador parte de la obra elegida (su trabajo hecho, horas y costes), no de toda la empresa
@@ -603,7 +632,7 @@ R.simHtml = function(P, b){
   const seg = (k) => '<div class="rt-seg">' + [['hoy', 'Como hoy'], ['empleado', 'Empleado']].map(([v, t]) => '<button type="button" class="' + (bd[k] === v ? 'on' : '') + '" onclick="RENT.setEsc2(\'' + k + '\',\'' + v + '\')">' + t + '</button>').join('') + '</div>';
   const persSim = (2 - (s.e.rafa === 'fuera' ? 1 : 0) - (s.e.manolo === 'fuera' ? 1 : 0)) + (s.e.maq | 0) + (s.e.cm | 0) * (num(R.param.condMecPct) / 100 || 0);
   const xOp = b.obra && b.r ? R.perdidas(b.r, persSim, b.margenH, s.tr.rep + s.tr.ges) : null;
-  const quedan = ['rafa', 'manolo'].filter(k => s.e[k] === 'hoy'), sociosSim = b.socios * quedan.length / 2, quienSim = quedan.map(k => k === 'rafa' ? 'Rafa' : 'Manolo').join(' y ');   // V10.57 (Daniel): si uno sale (o pasa a empleado), se descuenta lo suyo
+  const quedan = ['rafa', 'manolo'].filter(k => s.e[k] === 'hoy'), sociosSim = s.obra ? s.retrib : b.socios * quedan.length / 2, quienSim = quedan.map(k => k === 'rafa' ? 'Rafa' : 'Manolo').join(' y ');   // V10.57 (Daniel): si uno sale (o pasa a empleado), se descuenta lo suyo
   const opSim = b.obra && b.r ? R.opHtml(b.r, persSim, b.margenH, sociosSim, s.tr.rep + s.tr.ges, quienSim || undefined) : '';
   const pagoHr = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : NaN, cMaqH = coste('maquinista');
   const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small style="display:block;color:var(--ink-soft);font-size:10.5px;white-space:nowrap;">cobra ' + eur(v, 2) + '/h' + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : '<small style="display:block;color:var(--ink-soft);font-size:11px;">fuera</small>'; };
@@ -613,16 +642,23 @@ R.simHtml = function(P, b){
   const bx = (t, v, d, n, hh) => '<div class="' + (n >= 0 ? 'g' : 'r') + '"><span style="color:' + (n >= 0 ? G : RJ) + ';">' + t + '</span><b style="color:' + (n >= 0 ? G : RJ) + ';">' + eur(n) + '</b><small>' + hh + ' · ' + cs(d, dEur(d)) + ' vs hoy</small></div>';
   const costeNuevo = s.costePers + s.retrib - b.socios;
   const tl2 = (l, v) => '<div class="rt-tl"><span>' + l + '</span><b>' + v + '</b></div>';
-  const res = '<div class="rt-c"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><h3 style="margin:0;">' + esc(s.nombre) + '</h3><span class="rt-ch" style="margin:0;"><button type="button" onclick="RENT.escAdd2()">Guardar</button></span></div><div class="rt-big">' + bx('Neto con las horas de hoy', s.benAseg, s.netAseg - hoy.netAseg, s.netAseg, h1(s.horasAseg) + ' h') + bx('Neto a ' + (num(R.param.horasDia) || 7) + ' h operativas/día', s.benPot, s.netPot - hoy.netAseg, s.netPot, h1(s.capacidad) + ' h') + '</div>'
-    + '<div class="rt-g3">' + tl2('Se podría producir', h1(s.capacidad) + ' h ' + cs(s.dPot, '(' + (s.dPot >= 0 ? '+' : '') + h1(s.dPot) + ')')) + tl2('Personal nuevo', costeNuevo > 0 ? cR(eur(costeNuevo)) : cG(eur(-costeNuevo) + ' menos')) + tl2('Trabajo Rafa y Manolo', cs(hoy.tr.total - s.tr.total, h1(s.tr.total) + ' h')) + (s.ahorro ? tl2('Ahorro taller (est.)', cG(eur(s.ahorro))) : '') + '</div></div>';
+  const res = '<div class="rt-c"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><h3 style="margin:0;">' + esc(s.nombre) + '</h3><span class="rt-ch" style="margin:0;"><button type="button" onclick="RENT.escAdd2()">Guardar</button></span></div><div class="rt-big">' + bx(s.obra ? 'Neto en ' + h1(s.d1) + ' días al ritmo de hoy' : 'Neto con las horas de hoy', s.benAseg, s.netAseg - hoy.netAseg, s.netAseg, h1(s.horasAseg) + ' h') + bx(s.obra ? 'Neto en ' + h1(s.d2) + ' días a ' + (num(R.param.horasDia) || 7) + ' h/día' : 'Neto a ' + (num(R.param.horasDia) || 7) + ' h operativas/día', s.benPot, s.netPot - hoy.netAseg, s.netPot, h1(s.capacidad) + ' h') + '</div>'
+    + '<div class="rt-g3">' + tl2('Se podría producir', h1(s.capacidad) + ' h ' + cs(s.dPot, '(' + (s.dPot >= 0 ? '+' : '') + h1(s.dPot) + ')')) + tl2('Coste de personal vs hoy', costeNuevo > 0 ? cR('+' + eur(costeNuevo)) : costeNuevo < 0 ? cG(eur(costeNuevo)) : '0 €') + tl2('Trabajo Rafa y Manolo', cs(hoy.tr.total - s.tr.total, h1(s.tr.total) + ' h')) + (s.ahorro ? tl2('Ahorro taller (est.)', cG(eur(s.ahorro))) : '') + '</div></div>';
+  const cuentas = s.obra ? (() => { const r = b.r, c1 = s.c1, c2 = s.c2, fx = (t, f1, f2, neg) => '<tr><td>' + t + '</td><td>' + f1 + '</td><td>' + f2 + '</td></tr>', m = v => v ? cR('− ' + eur(v)) : '—', p = v => v ? cG('+ ' + eur(v)) : '—';
+    return '<table class="rt-tb"><tr><th>Cuenta de la obra</th><th>' + h1(c1.d) + ' días</th><th>' + h1(c2.d) + ' días</th></tr>'
+      + fx('Ingresos (trabajo hecho)', eur(s.horasAseg ? r.ejecutado : 0), eur(s.horasAseg ? r.ejecutado : 0)) + fx('− Directos y fijos de máquina', m(s.horasAseg ? r.ejecutado - b.beneficio - sum(r.lineasI.filter(x => /^gen:/.test(x.clave)), x => x.valor) : 0), m(s.horasAseg ? r.ejecutado - b.beneficio - sum(r.lineasI.filter(x => /^gen:/.test(x.clave)), x => x.valor) : 0))
+      + fx('− Generales (gestoría, estructura, SS…) por días', m(s.horasAseg ? c1.gen : 0), m(s.horasAseg ? c2.gen : 0)) + fx('− Rafa y Manolo por días', m(c1.soc), m(c2.soc)) + fx('− Sueldos contratados por días', m(c1.sal), m(c2.sal))
+      + (s.ahorro ? fx('+ Ahorro en taller (estimado)', p(s.ahorro), p(s.ahorro)) : '') + fx('+ Días libres en otra obra', '—', p(s.hLibre * (isFinite(b.margenH) ? b.margenH : 0)) + (s.hLibre ? ' <small>(' + h1(s.hLibre) + ' h)</small>' : ''))
+      + fx('<b>Antes de impuestos</b>', '<b>' + eur(c1.ben) + '</b>', '<b>' + eur(c2.ben) + '</b>') + fx('− Impuestos (' + R.param.impuesto + ' %; lo de Rafa y Manolo no desgrava)', m(c1.imp), m(c2.imp)) + fx('<b>Neto</b>', '<b>' + cs(c1.net, eur(c1.net)) + '</b>', '<b>' + cs(c2.net, eur(c2.net)) + '</b>') + '</table>'; })() : '';
   const comp = (P.esc2 || []).length ? '<div class="rt-c"><h3>Comparar</h3>' + R.escHtml2(b, P.esc2) + '</div>' : '';
   const act = (n, a, c) => '<tr><td>' + n + '</td><td>' + h1(a) + ' h</td><td>' + cs(a - c, h1(c) + ' h') + '</td></tr>';
-  const detalle = det('Ver detalle', '<div><div class="rt-sim-r"><span>Antes de impuestos (horas de hoy / a 7 h)</span><b>' + eur(s.benAseg) + ' / ' + eur(s.benPot) + '</b></div><table class="rt-tb"><tr><th>Rafa y Manolo, al año</th><th>Hoy</th><th>Con esto</th></tr>' + act('Manejar máquinas', hs.maq, s.tr.maq) + act('Conducir', hs.cond, s.tr.cond) + act('Reparar', hs.rep, s.tr.rep) + act('Gestionar la empresa', hs.ges, s.tr.ges) + '<tr style="font-weight:800;"><td>Total</td><td>' + h1(hs.total) + ' h</td><td>' + cs(hs.total - s.tr.total, h1(s.tr.total) + ' h') + '</td></tr></table>'
+  const detalle = det('Ver detalle', '<div>' + cuentas + '<table class="rt-tb"><tr><th>Rafa y Manolo, al año</th><th>Hoy</th><th>Con esto</th></tr>' + act('Manejar máquinas', hs.maq, s.tr.maq) + act('Conducir', hs.cond, s.tr.cond) + act('Reparar', hs.rep, s.tr.rep) + act('Gestionar la empresa', hs.ges, s.tr.ges) + '<tr style="font-weight:800;"><td>Total</td><td>' + h1(hs.total) + ' h</td><td>' + cs(hs.total - s.tr.total, h1(s.tr.total) + ' h') + '</td></tr></table>'
     + '<div style="font-size:11.5px;color:var(--ink-soft);margin:6px 0;">Hoy trabajan de media ' + h1(hs.porDia) + ' h de máquina por día de trabajo, de 16 posibles (8 h cada uno, lunes a viernes). Manejar y conducir salen de las horas de los albaranes (12 meses); reparar y gestionar son horas por semana de Hipótesis.</div>'
     + '<div class="rt-sim-r"><span>Ingreso extra posible ' + kg + '</span><b>' + cG(eur(s.ingPot)) + '</b></div><div class="rt-sim-r"><span>Para cubrir el coste nuevo habría que facturar</span><b>' + (s.eqH > 0 && isFinite(s.eqH) ? h1(s.eqH) + ' h ≈ ' + cG(eur(s.eqFact)) + ' al año' : '—') + '</b></div>'
     + '<div class="rt-sim-r"><span>Trabajos pendientes ya conocidos</span><b>' + (b.backlog ? h1(b.backlog) + ' h en ' + b.nBack + ' trabajos' : '—') + '</b></div>'
     + (s.notas.length ? s.notas.map(n => '<div class="rt-an">• ' + esc(n) + '</div>').join('') : '')
-    + '<div style="font-size:11.5px;color:var(--ink-soft);margin:8px 0;"><b>Cómo se calcula.</b> Asegurado: las horas que ya se facturan hoy (o menos, si falta gente), más los ahorros, menos el coste de personal. Si se ocupa todo: igual, pero facturando las horas que cabrían, a lo que deja cada hora hoy. No se limita por falta de trabajo. Los sueldos salen del convenio. El empleado trabaja 8 h, lunes a viernes, menos el tiempo de reparar y gestionar. El mecánico no suma horas de máquina: quita reparaciones externas, paradas y trabajo físico a Rafa y Manolo. Los ahorros son estimaciones de Hipótesis.</div>'
+    + (b.obra ? '<div style="font-size:11.5px;color:var(--ink-soft);margin:8px 0;"><b>Cómo se calcula.</b> Se hacen las mismas ' + h1(b.r.H) + ' h de esta obra con la gente elegida. <b>Al ritmo de hoy:</b> Rafa y Manolo echan sus horas reales por día; contratados y «empleado», 7 h. <b>A 7 h/día:</b> todos 7 h, y las horas que sobran de los ' + s.Dtr + ' días reales se trabajan en otra obra al margen por hora de la obra de referencia. Los ingresos, los directos y los fijos de máquina no cambian (son las mismas horas). Cambian con los días: gastos generales, lo que cuestan Rafa y Manolo (su parte por día) y los sueldos de convenio (÷ ' + (num(R.param.jornadas) || 250) + ' jornadas del año). Impuestos: ' + R.param.impuesto + ' % del beneficio sin restar lo de Rafa y Manolo (no desgrava); los sueldos sí desgravan.</div>' : '')
+    + (b.obra ? '' : '<div style="font-size:11.5px;color:var(--ink-soft);margin:8px 0;"><b>Cómo se calcula.</b> Asegurado: las horas que ya se facturan hoy (o menos, si falta gente), más los ahorros, menos el coste de personal. Si se ocupa todo: igual, pero facturando las horas que cabrían, a lo que deja cada hora hoy. No se limita por falta de trabajo. Los sueldos salen del convenio. El empleado trabaja 8 h, lunes a viernes, menos el tiempo de reparar y gestionar. El mecánico no suma horas de máquina: quita reparaciones externas, paradas y trabajo físico a Rafa y Manolo. Los ahorros son estimaciones de Hipótesis.</div>')
     + R.hipHtml(P) + '</div>');
   return controles + res + comp + detalle;
 };
