@@ -106,12 +106,12 @@ R.empresaVentana = function(P, hasta){
   const k = hasta; P._ev = P._ev || {}; if(P._ev[k]) return P._ev[k];
   const W0 = addDays(hasta, -364);
   const indep = R.efectivos(P).lista;
-  const horasDia = {}, horasClase = {}, dias = new Set(); let ingresos = 0, horas = 0, ingConHoras = 0;
-  indep.forEach(d => { const ls = R.lineas(d).filter(l => l.f >= W0 && l.f <= hasta); if(!ls.length) return; const fl = R.factorLineas(d); ingresos += sum(ls, l => l.imp) * fl; ingConHoras += sum(ls.filter(l => l.h > 0), l => l.imp) * fl;
+  const horasDia = {}, horasClase = {}, dias = new Set(); let ingresos = 0, horas = 0, ingConHoras = 0, cobrado = 0;
+  indep.forEach(d => { const ls = R.lineas(d).filter(l => l.f >= W0 && l.f <= hasta); if(!ls.length) return; const fl = R.factorLineas(d); ingresos += sum(ls, l => l.imp) * fl; ingConHoras += sum(ls.filter(l => l.h > 0), l => l.imp) * fl; { const imp = num(d.importe); if(imp) cobrado += Math.min(1, num(d.cobrado_importe) / imp) * sum(ls, l => l.imp) * fl; }
     ls.forEach(l => { horasDia[l.f] = (horasDia[l.f] || 0) + l.h; horasClase[l.clase] = (horasClase[l.clase] || 0) + l.h; horas += l.h; if(l.h > 0 || l.imp > 0) dias.add(l.f); }); });
   const gW = (P.gastos || []).filter(g => g.fecha_devengo >= W0 && g.fecha_devengo <= hasta && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada'));
   const comb = sum(gW.filter(g => /combust/i.test(g.categoria || '')), R.baseGasto);
-  return P._ev[k] = {W0, hasta, horasDia, horasClase, horas, dias: dias.size, ingresos, ingConHoras, gW, comb};
+  return P._ev[k] = {W0, hasta, horasDia, horasClase, horas, dias: dias.size, ingresos, cobrado, ingConHoras, gW, comb};
 };
 
 // ---------- obra de referencia: precio actual por hora y mezcla de horas por máquina ----------
@@ -265,7 +265,7 @@ R.base12 = function(P){
   const pend = (P.jobs || []).filter(j => j.estado === 'Pendiente'); let backlog = 0, nBack = 0;
   pend.forEach(j => { const h = typeof tbDurHoras === 'function' ? num(tbDurHoras(j.duracion)) : 0; if(h > 0){ backlog += h; nBack++; } });
   const ref = R.referencia(P), margenH = ref ? ref.margenH : NaN, ingH = ref ? ref.ingH : NaN;
-  return {ev, ingresos: ev.ingresos, horas: ev.horas, dias: ev.dias, comb: ev.comb, costesOp, socios, taller, maquinas, backlog, nBack, pendientes: pend.length, margenH, ingH, cobHoras: ev.ingresos > 0 ? ev.ingConHoras / ev.ingresos : NaN, ref, margenPct: ref && ref.ingH > 0 ? ref.margenH / ref.ingH : NaN, beneficio: ev.ingresos - costesOp, beneficioTrasSocios: ev.ingresos - costesOp - socios};
+  return {ev, ingresos: ev.ingresos, cobrado: ev.cobrado, horas: ev.horas, dias: ev.dias, comb: ev.comb, costesOp, socios, taller, maquinas, backlog, nBack, pendientes: pend.length, margenH, ingH, cobHoras: ev.ingresos > 0 ? ev.ingConHoras / ev.ingresos : NaN, ref, margenPct: ref && ref.ingH > 0 ? ref.margenH / ref.ingH : NaN, beneficio: ev.ingresos - costesOp, beneficioTrasSocios: ev.ingresos - costesOp - socios};
 };
 R.ESC0 = {socios8: false, operarios: 0, mecanico: false, mecCond: false};
 R.nombreEsc = e => { const p = []; if(e.socios8) p.push('Rafa y Manolo 8 h L-V'); if(e.operarios) p.push(e.operarios + ' operario' + (e.operarios > 1 ? 's' : '')); if(e.mecanico) p.push('mecánico'); if(e.mecCond) p.push('mecánico-conductor'); return p.length ? p.join(' + ') : 'Situación actual real'; };
@@ -559,7 +559,7 @@ R.simHtml = function(P, b){
   const controles = '<div class="rt-c"><h3>Organización</h3><div class="rt-sim-r"><span>Rafa' + cobH('rafa') + '</span>' + seg('rafa') + '</div><div class="rt-sim-r"><span>Manolo' + cobH('manolo') + '</span>' + seg('manolo') + '</div>' + st('maq', 'Maquinistas') + st('mec', 'Mecánicos') + st('cm', 'Conductor / mecánico') + '</div>';
   const bx = (t, v, d, n, hh) => '<div class="' + (n >= 0 ? 'g' : 'r') + '"><span style="color:' + (n >= 0 ? G : RJ) + ';">' + t + '</span><b style="color:' + (n >= 0 ? G : RJ) + ';">' + eur(n) + '</b><small>neto tras impuestos</small><small><b>' + hh + '</b> al año</small><small>' + cs(d, dEur(d)) + ' sobre hoy</small><small>antes de impuestos: ' + eur(v) + '</small></div>';
   const costeNuevo = s.costePers + s.retrib - b.socios;
-  const res = '<div class="rt-c"><h3>' + esc(s.nombre) + '</h3><div class="rt-big">' + bx('Beneficio neto con las horas de hoy', s.benAseg, s.netAseg - hoy.netAseg, s.netAseg, h1(s.horasAseg) + ' h') + bx('Beneficio neto a ' + (num(R.param.horasDia) || 7) + ' h operativas al día', s.benPot, s.netPot - hoy.netAseg, s.netPot, h1(s.capacidad) + ' h') + '</div>'
+  const res = '<div class="rt-c"><h3>' + esc(s.nombre) + '</h3><div class="rt-sim-r"><span>Últimos 12 meses (sin IVA)</span><b>Trabajo hecho ' + eur(b.ingresos) + ' · cobrado ' + eur(b.cobrado) + ' · por cobrar ' + eur(Math.max(0, b.ingresos - b.cobrado)) + '</b></div><div class="rt-big">' + bx('Beneficio neto con las horas de hoy', s.benAseg, s.netAseg - hoy.netAseg, s.netAseg, h1(s.horasAseg) + ' h') + bx('Beneficio neto a ' + (num(R.param.horasDia) || 7) + ' h operativas al día', s.benPot, s.netPot - hoy.netAseg, s.netPot, h1(s.capacidad) + ' h') + '</div>'
     + '<div class="rt-sim-r"><span>Se podría producir</span><b>' + h1(s.capacidad) + ' h <small style="font-weight:700;">' + cs(s.dPot, '(' + (s.dPot >= 0 ? '+' : '') + h1(s.dPot) + ' h)') + '</small></b></div>'
     + '<div class="rt-sim-r"><span>Coste de personal nuevo</span><b>' + (costeNuevo > 0 ? cR(eur(costeNuevo)) : cG(eur(-costeNuevo) + ' menos')) + '</b></div>'
     + (s.ahorro ? '<div class="rt-sim-r"><span>Ahorro en taller <small style="color:var(--orange);">estimado</small></span><b>' + cG(eur(s.ahorro)) + '</b></div>' : '')
