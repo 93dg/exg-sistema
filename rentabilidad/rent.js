@@ -442,7 +442,7 @@ R.simular2 = function(b, e){
   const ahorro = red * num(prm.ahorroTaller) / 100 * b.taller, mH = isFinite(b.margenH) ? b.margenH : 0, ingH = isFinite(b.ingH) ? b.ingH : 0;
   const horasAseg = Math.min(b.horas, cap), dPot = cap - b.horas, dAseg = horasAseg - b.horas, base = b.beneficio - b.socios;
   const pagoH = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : 0, retribDe = pro => pagoH * ((capPers > 0 ? pro * capHoy / capPers : 0) + (nAv ? carga * nHoy / nAv : 0));
-  const costeUso = pro => b.obra ? costePers * Math.min(1, capPers > 0 ? pro / capPers : 0) : costePers, costeAseg = costeUso(horasAseg), costePot = costeUso(cap);   // V10.59 (Daniel): en una obra los contratados cuestan solo la parte de su tiempo que la obra necesita (la duración ideal), no todos los días
+  const costeUso = pro => b.obra ? costePers * Math.min(1, capPers > 0 ? pro / capPers : 0) : costePers, costeAseg = costeUso(horasAseg), costePot = b.obra ? costeAseg : costeUso(cap);   // V10.60 (Daniel): se paga solo a los días que la obra necesita; los días que sobran no se pagan aquí y se aprovechan en otra obra   // V10.59 (Daniel): en una obra los contratados cuestan solo la parte de su tiempo que la obra necesita (la duración ideal), no todos los días
   const retrib = retribDe(horasAseg), retribPot = retribDe(cap), cambio = costeAseg + retrib - b.socios, cambioPot = costePot + retribPot - b.socios;
   const benAseg = base + dAseg * mH + ahorro - cambio, benPot = base + dPot * mH + ahorro - cambioPot, imp = x => t * Math.max(0, x + retrib), impP = x => t * Math.max(0, x + retribPot);
   const falta = Math.max(0, cambio - ahorro), eqH = mH > 0 ? falta / mH : NaN;
@@ -585,6 +585,7 @@ R.datosReales = function(r, b){   // V10.51 (Daniel): datos reales sobre la hora
   const mq = (r.maq || []).slice().sort((a, c2) => c2.horas - a.horas);
   return '<div class="rt-c"><h3>Datos reales</h3><div style="font-size:11.5px;color:var(--ink-soft);margin:-4px 0 6px;">Jornada de 8 h; 1 h se reserva para mantenimiento, reparaciones y preparativos: quedan 7 h operativas.</div>'
     + f('Días de la obra (L-V)', x.dLab) + f('Días trabajados' + (dFin ? ' (' + dFin + ' en fin de semana)' : ''), dTr) + f('Días laborables no trabajados', x.dVacios) + f('Horas operativas trabajadas', h1(r.H) + ' h') + f('Media: ' + h1(r.H) + ' h ÷ ' + dTr + ' días trabajados', isFinite(media) ? h1(media) + ' h/día' : '—')
+    + f('€/h operativas (ingreso ÷ horas)', r.H > 0 ? eur(r.ejecutado / r.H, 2) : '—', G)
     + f('Duración ideal (7 h/día × empleado)', isFinite(dEmp) ? h1(dEmp) + ' días' : '—', G)
     + f('Días operativos desaprovechados', h1(x.dEq) + ' días', '#c58a1b') + f('Horas operativas desaprovechadas', h1(x.hPerd) + ' h', '#c58a1b') + f('H/día operativas desaprovechadas · ' + h1(x.pot) + ' − ' + (isFinite(media) ? h1(media) : '—'), isFinite(media) ? h1(Math.max(0, x.pot - media)) + ' h/día' : '—', '#c58a1b')
     + f('Empleados', h1(x.personas))
