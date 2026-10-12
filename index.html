@@ -4647,11 +4647,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.89" defer></script>
-<script src="costes/norm.js?v=V10.89" defer></script>
-<script src="ajustes/calc.js?v=V10.89" defer></script>
+<script src="rentabilidad/rent.js?v=V10.90" defer></script>
+<script src="costes/norm.js?v=V10.90" defer></script>
+<script src="ajustes/calc.js?v=V10.90" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.89</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.90</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4803,7 +4803,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.89</div>
+        <div class="sub" id="version-badge">V10.90</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4929,6 +4929,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
             <div id="rec-filtro-ancla"></div>
             <div class="filters" id="rec-filtro-plazo-chips"><div class="chip-filter" data-plazo="7">1 semana</div><div class="chip-filter active" data-plazo="30">1 mes</div><div class="chip-filter" data-plazo="365">1 año</div><div class="chip-filter" data-plazo="0">Todos</div></div>
             <div class="filters" id="rec-filtro-tema-chips"></div>
+            <div class="filters" id="rec-filtro-donde-chips"></div>
             <div id="alertas-list-atencion"></div>
             <div id="alertas-list-bd"></div>
             <div class="empty" id="alertas-empty" style="display:none;">Sin tareas pendientes</div>
@@ -13917,7 +13918,8 @@ function tpPintar(raiz){ try{
   const arrancar = () => { tpPintar(document.body); obs.observe(document.body, {childList: true, subtree: true, characterData: true}); };
   if(document.body) arrancar(); else document.addEventListener('DOMContentLoaded', arrancar);
 })();
-function recMontarFiltro(){ try{ if(!PLEG2.rec) pleg2Crear({id: 'rec', despuesDe: '#rec-filtro-ancla', plegados: ['plazo', 'tema'], grupos: [['plazo', 'Plazo', 'rec-filtro-plazo-chips', 'unico'], ['tema', 'Tipo', 'rec-filtro-tema-chips']]}); }catch(e){} }
+function recMontarFiltro(){ try{ if(!PLEG2.rec) pleg2Crear({id: 'rec', despuesDe: '#rec-filtro-ancla', plegados: ['plazo', 'tema', 'donde'], grupos: [['plazo', 'Plazo', 'rec-filtro-plazo-chips', 'unico'], ['tema', 'Tipo', 'rec-filtro-tema-chips'], ['donde', 'Dónde', 'rec-filtro-donde-chips']]});
+    if(PLEG2.rec && !localStorage.getItem('rec_donde_v1')){ localStorage.setItem('rec_donde_v1', '1'); if(!PLEG2.rec.plegados.includes('donde')){ PLEG2.rec.plegados.push('donde'); pleg2Guardar('rec'); pleg2Render('rec'); } } }catch(e){} }
 document.addEventListener('DOMContentLoaded', () => setTimeout(recMontarFiltro, 0));
 function recVence(d){ const v = d.vence || d.fecha_limite || null; if(v) return String(v).slice(0, 10); const f = d.fecha ? String(d.fecha).slice(0, 10) : null; return f && f > new Date().toISOString().slice(0, 10) ? f : null; }
 function recPlazo(){ const a = document.querySelector('#rec-filtro-plazo-chips .chip-filter.active'); return a ? Number(a.dataset.plazo) : 30; }
@@ -13959,13 +13961,20 @@ function recCambiarEstado(id){
     r.data = nd; cerrarModalGenerico(); recRender(); mostrarToast('Estado guardado', 'ok');
   };
 }
+// V10.90 (Daniel 12/10/2026: «cosas que solo se pueden hacer desde el PC»): filtro «Dónde» con «Desde el PC» (recordatorios con lugar = PC); se recuerda en el servidor
+let _recPC = (() => { try{ return localStorage.getItem('rec-donde') === 'pc'; }catch(e){ return false; } })(), _recPCLeido = false;
+function recPCGuardar(){ const v = _recPC ? 'pc' : ''; try{ localStorage.setItem('rec-donde', v); }catch(e){} try{ if(sb) sb.from('filtros_persistentes').upsert({container_id: 'rec-donde', valor: v}, {onConflict: 'container_id'}).then(() => {}); }catch(e){} }
+function recPCToggle(){ _recPC = !_recPC; recPCGuardar(); recRender(); try{ if(PLEG2.rec) pleg2Refrescar('rec'); }catch(e){} }
 function recRender(){
+  if(!_recPCLeido && typeof sb !== 'undefined' && sb){ _recPCLeido = true; try{ sb.from('filtros_persistentes').select('valor').eq('container_id', 'rec-donde').maybeSingle().then(({data}) => { if(data){ const n = data.valor === 'pc'; if(n !== _recPC){ _recPC = n; try{ localStorage.setItem('rec-donde', data.valor || ''); }catch(e){} recRender(); } } }); }catch(e){} }
   const cont = document.getElementById('alertas-list-bd'); if(!cont) return;
   const plazo0 = recPlazo(), enPlazo = _recItems.filter(r => recVisible(r.data || {}, plazo0));
   const temasSel = new Set([...document.querySelectorAll('#rec-filtro-tema-chips .chip-filter.active')].map(c => c.dataset.tema));
   { const cuenta = {}; enPlazo.forEach(r => { const k = recTema(r); cuenta[k] = (cuenta[k] || 0) + 1; }); const ch = document.getElementById('rec-filtro-tema-chips');
     if(ch) ch.innerHTML = REC_TEMAS.filter(([k]) => cuenta[k] || temasSel.has(k)).map(([k, l]) => `<div class="chip-filter${temasSel.has(k) ? ' active' : ''}" data-tema="${k}" onclick="this.classList.toggle('active');recRender()">${l} <b class="cf-n">${cuenta[k] || 0}</b></div>`).join(''); }
-  const plazo = plazo0, items = enPlazo.filter(r => !temasSel.size || temasSel.has(recTema(r)))
+  { const nPC = enPlazo.filter(r => ((r.data || {}).lugar || '') === 'PC').length, dc = document.getElementById('rec-filtro-donde-chips');
+    if(dc) dc.innerHTML = (nPC || _recPC) ? `<div class="chip-filter${_recPC ? ' active' : ''}" onclick="recPCToggle()">Desde el PC <b class="cf-n">${nPC}</b></div>` : ''; }
+  const plazo = plazo0, items = enPlazo.filter(r => !temasSel.size || temasSel.has(recTema(r))).filter(r => !_recPC || ((r.data || {}).lugar || '') === 'PC')
     .sort((a, b) => { const pa = (a.data||{}).anclado ? 1 : 0, pb = (b.data||{}).anclado ? 1 : 0; if(pa !== pb) return pb - pa;   // V7.61: los anclados, siempre arriba
       const va = recVence(a.data || {}), vb = recVence(b.data || {}); if(va && vb) return va.localeCompare(vb); if(va) return -1; if(vb) return 1; return String(b.created_at).localeCompare(String(a.created_at)); });   // V7.29: lo que vence primero, arriba
   const pinta = r=>{
