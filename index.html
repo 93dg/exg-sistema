@@ -1855,7 +1855,7 @@ button.e2-fila{cursor:pointer;}
 .te-l b{font-size:13px;}
 .te-l span{font-size:11.5px;color:var(--ink-soft);}
 
-.pleg-cols .doc-cli-btn, .pleg-cols .doc-ord-btn{width:34px !important;height:34px !important;align-self:center;padding:0 !important;background:var(--paper) !important;border:1px solid var(--line) !important;color:var(--ink) !important;}
+.pleg-cols .doc-cli-btn, .pleg-cols .doc-ord-btn, .pleg-cols .doc-vista-btn{width:34px !important;height:34px !important;align-self:center;padding:0 !important;background:var(--paper) !important;border:1px solid var(--line) !important;color:var(--ink) !important;}
 .cc-fila-compacta{display:none;}
 #pleg-gpro .pleg-cols{display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;gap:8px;align-items:center;}
 #pleg-gpro .pleg-cols .doc-cli-btn{justify-self:start;}   /* V9.82: con el botón de vista plegada, los filtros de Gastos siguen en 2 columnas y sin cortarse */
@@ -1880,7 +1880,7 @@ button.e2-fila{cursor:pointer;}
 .cc-fc-bloque .cc-fc-cli{flex:none;font-size:12.5px;}
 .cc-fc-obra{font-size:10.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cc-fc-imp{flex:none;font-weight:800;}
-.pleg-cols .doc-cli-btn.doc-cli-on, .pleg-cols .doc-ord-btn.doc-cli-on{border-color:var(--orange) !important;color:var(--orange) !important;}
+.pleg-cols .doc-cli-btn.doc-cli-on, .pleg-cols .doc-ord-btn.doc-cli-on, .pleg-cols .doc-vista-btn.doc-cli-on{border-color:var(--orange) !important;color:var(--orange) !important;}
 .pleg-cols .doc-cli-btn.doc-cli-on{border-color:var(--orange) !important;color:var(--orange) !important;}
 
 @media(max-width:768px){#view-calcempleado .topbar .desc{display:none;} #view-calcempleado .topbar h1{font-size:20px;margin:0;}}
@@ -4637,11 +4637,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.75" defer></script>
-<script src="costes/norm.js?v=V10.75" defer></script>
-<script src="ajustes/calc.js?v=V10.75" defer></script>
+<script src="rentabilidad/rent.js?v=V10.76" defer></script>
+<script src="costes/norm.js?v=V10.76" defer></script>
+<script src="ajustes/calc.js?v=V10.76" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.75</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.76</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4793,7 +4793,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.75</div>
+        <div class="sub" id="version-badge">V10.76</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12108,7 +12108,7 @@ function renderizarFilaYCardFactura(doc, entidad, trabajo, alPrincipio){
     card.id = 'mcard-'+doc.id;
     card.dataset.docId = doc.id;
     card.onclick = () => openDocumentViewer(doc.id);
-    card.innerHTML = `
+    card.innerHTML = filaCompactaDocHtml(doc, doc.type || 'factura', estadoHtml, entidad ? entidad.name : 'Falta cliente', nombreObra) + `
       <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${doc.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
       <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
       <input type="checkbox" class="fc-check fact-sel-chk-espejo" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="sincCheckMovilFactura('${doc.id}', this.checked)">
@@ -13779,7 +13779,7 @@ function ccDocsVistaPlegada(guardar){
   if(guardar !== false) ccDocsGuardar();
 }
 document.addEventListener('click', ev => {   // en vista plegada, tocar una tarjeta la despliega (no abre el documento); ya desplegada, funciona como siempre
-  const card = ev.target.closest('#control-docs-lista-movil.cc-compacto .factura-card-movil, #gpro-lista-movil.cc-compacto .factura-card-movil');
+  const card = ev.target.closest('#control-docs-lista-movil.cc-compacto .factura-card-movil, #gpro-lista-movil.cc-compacto .factura-card-movil, #econ-facturas-lista-movil.cc-compacto .factura-card-movil, #alb-lista-movil.cc-compacto .factura-card-movil, #pres-lista-movil.cc-compacto .factura-card-movil');
   if(!card) return;
   if(card.classList.contains('cc-abierta')){ const ctl = ev.target.closest('button, select, a, input, textarea, label, .pill, [onclick]'); if(ctl && ctl !== card) return; }   // V8.98: el estado, los botones y los menús de una tarjeta abierta funcionan sin plegarla
   if(!card.classList.contains('cc-abierta')){ ev.stopPropagation(); ev.preventDefault(); card.classList.add('cc-abierta'); return; }
@@ -21019,7 +21019,9 @@ function docCabecera(p, cab){
   const mk = (cls, ico, titulo, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'cli-icon-btn ' + cls; b.title = titulo; b.setAttribute('aria-label', titulo); b.innerHTML = ico; b.onclick = fn; return b; };
   const bCli = mk('doc-cli-btn', ICO_PERSONA, 'Filtrar por cliente', () => docMenuCliente(p, bCli));
   const bOrd = mk('doc-ord-btn', ICO_ORDEN, 'Ordenar', () => docMenuOrden(p, bOrd));
-  fila.insertBefore(bOrd, fila.firstChild); fila.insertBefore(bCli, bOrd);
+  const bVista = mk('doc-vista-btn', ICO_VISTA_PLEGADA, 'Vista plegada o desplegada', () => docsVistaPlegada());
+  fila.insertBefore(bOrd, fila.firstChild); fila.insertBefore(bCli, bOrd); fila.insertBefore(bVista, bOrd.nextSibling);
+  docsAplicarVista();
 }
 function docMenuOrden(p, ancla){
   const chips = [...(plegCont(p, 'orden')?.querySelectorAll('.chip-filter') || [])]; if(!chips.length) return;
@@ -21092,9 +21094,9 @@ function plegRender(p){
   cols.innerHTML = claves.map((k, i) => { const ab = abiertos.includes(k); return `<button type="button" class="tb-ftit tb-plegado ${sel[k].size ? 'con' : ''} ${ab ? 'abierto' : ''}" data-pl="${k}" style="grid-column:${i + 1};" title="${ab ? 'Plegar' : 'Desplegar'} ${tit[k]}">${plegTextoPlegado(p, k, sel)} <i>${ab ? '▾' : '▸'}</i></button>`; }).join('');
   // V7.72 (Daniel: «Cliente y Ordenar en la misma línea que los otros filtros, Ordenar siempre a la derecha del todo»): en las listas de documentos
   // la fila de pastillas es Año · Trim. · Estado · [Cliente] · [Ordenar]; la pastilla Orden se sustituye por el icono
-  if(!caja._iconos){ const cabD = caja.previousElementSibling; const bc = cabD && cabD.querySelector('.doc-cli-btn'), bo = cabD && cabD.querySelector('.doc-ord-btn'); if(bc && bo) caja._iconos = [bc, bo]; }
+  if(!caja._iconos){ const cabD = caja.previousElementSibling; const bc = cabD && cabD.querySelector('.doc-cli-btn'), bo = cabD && cabD.querySelector('.doc-ord-btn'), bv = cabD && cabD.querySelector('.doc-vista-btn'); if(bc && bo) caja._iconos = bv ? [bc, bo, bv] : [bc, bo]; }
   if(caja._iconos){ cols.querySelector('[data-pl="orden"]')?.remove(); const vis = cols.children.length;
-    cols.style.gridTemplateColumns = 'repeat(' + vis + ', minmax(0, 1fr)) auto auto'; caja._iconos.forEach(b => { b.style.gridColumn = ''; cols.appendChild(b); }); }
+    cols.style.gridTemplateColumns = 'repeat(' + vis + ', minmax(0, 1fr))' + ' auto'.repeat(caja._iconos.length); caja._iconos.forEach(b => { b.style.gridColumn = ''; cols.appendChild(b); }); }
   claves.forEach(k => { const f = plegCont(p, k); if(f) guard.appendChild(f); });   // todas atrás, y ahora salen las abiertas en su fila
   filas.innerHTML = '';
   abiertos.forEach(k => {   // ABAJO: cada filtro abierto repite su cabecera a la izquierda de sus opciones
@@ -29605,6 +29607,25 @@ function ivaLineHtml(doc){
   const ivaLabel = ivaImporte.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   return `<div class="fc-iva-info">% IVA ${Number(pct)}% · IVA ${ivaLabel} · Subtotal ${baseLabel} · Total ${totalLabel}</div>`;
 }
+// V10.76 (Daniel: «en Documentos las tarjetas y el botón de vista como en Documentos pendientes»): las listas de Facturas, Albaranes y Presupuestos/Proformas usan la misma tarjeta plegada (una línea por documento; tocarla la despliega) y el mismo botón de vista
+function filaCompactaDocHtml(doc, tipo, estadoHtml, cliente, obra){
+  const t = tipo || doc.type || 'factura', imp = Number(doc.importe || doc.total || 0);
+  const falta = (['parcial','parcial_otra'].includes(doc.estado_cobro) && imp) ? Math.max(0, imp - Number(doc.cobrado_importe || 0) - (doc.estado_cobro === 'parcial_otra' && typeof enOtraSuma === 'function' ? enOtraSuma(doc) : 0)) : imp;
+  const lbl = falta.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  const cli = cliente || 'Sin cliente', ob = obra && obra !== '—' ? `<span class="cc-fc-obra">${svgEsc(obra)}</span>` : '';
+  return `<div class="cc-fila-compacta"><span class="cc-fc-te"><span class="cc-fc-est" onclick="event.stopPropagation();">${estadoHtml}</span><span class="cc-fc-l1"><span class="fc-tipo-tag tp-${t}">${TIPO_DOC_NOMBRE[t] || t}</span><span class="cc-fc-num">${svgEsc(doc.numero || doc.num || '—')}</span></span></span><span class="cc-fc-bloque"><span class="cc-fc-cli" data-cli="${escHtml(cli)}">${svgEsc(cli)}</span>${ob}</span><span class="cc-fc-imp">${lbl}</span></div>`;
+}
+const DOC_LISTAS_MOVIL = ['econ-facturas-lista-movil', 'alb-lista-movil', 'pres-lista-movil'];
+try{ window._docCompacto = localStorage.getItem('docs_compacto') !== '0'; }catch(e){ window._docCompacto = true; }
+function docsAplicarVista(){
+  DOC_LISTAS_MOVIL.forEach(id => { const l = document.getElementById(id); if(l){ l.classList.toggle('cc-compacto', window._docCompacto); if(!window._docCompacto) l.querySelectorAll('.cc-abierta').forEach(c => c.classList.remove('cc-abierta')); } });
+  document.querySelectorAll('.doc-vista-btn').forEach(b => b.classList.toggle('doc-cli-on', window._docCompacto));
+}
+function docsVistaPlegada(){
+  window._docCompacto = !window._docCompacto; try{ localStorage.setItem('docs_compacto', window._docCompacto ? '1' : '0'); }catch(e){}
+  DOC_LISTAS_MOVIL.forEach(id => document.getElementById(id)?.querySelectorAll('.cc-abierta').forEach(c => c.classList.remove('cc-abierta')));
+  docsAplicarVista();
+}
 function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta, entidad, trabajo, archivoUrl, calidadInfo){
   const lista = document.getElementById(listaId);
   if(!lista) return;
@@ -29621,7 +29642,7 @@ function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta
   card.id = 'mcard-'+doc.id;
   card.dataset.docId = doc.id;
   card.onclick = () => openDocumentViewer(doc.id);
-  card.innerHTML = `
+  card.innerHTML = filaCompactaDocHtml(doc, tipo, estadoHtml, entidad ? entidad.name : 'Falta cliente', nombreObra) + `
     <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${doc.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
     <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
     <input type="checkbox" class="fc-check ${cbClass}" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="actualizarSeleccionDoc('${cbClass}', '${cbClass}'.replace('-chk','-borrar-sel-btn'), '${cbClass}'.replace('-chk','-sel-count'))">
