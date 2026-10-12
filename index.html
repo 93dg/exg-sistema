@@ -4637,11 +4637,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.76" defer></script>
-<script src="costes/norm.js?v=V10.76" defer></script>
-<script src="ajustes/calc.js?v=V10.76" defer></script>
+<script src="rentabilidad/rent.js?v=V10.77" defer></script>
+<script src="costes/norm.js?v=V10.77" defer></script>
+<script src="ajustes/calc.js?v=V10.77" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.76</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.77</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4793,7 +4793,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.76</div>
+        <div class="sub" id="version-badge">V10.77</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -4817,6 +4817,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
       <!-- Proyectos, Expedientes (antes Ayuntamiento), Presupuestos, Proformas, Albaranes, Facturas y Tarifas: todos son pestañas de Documentos. Los botones siguen existiendo, ocultos, porque las pestañas y abrirUltimoTipoDocumento() los activan vía .click() -->
       <button data-view="proyectos" class="nav-miembro"><span class="ico">✎</span><span class="label"> Proyectos</span></button>
       <button class="nav-miembro" data-view="ayuntamiento"><span class="ico">⌂</span><span class="label"> Expedientes</span></button>
+      <button class="nav-miembro" data-view="documentos"><span class="ico">🗂</span><span class="label"> Documentos</span></button>
       <button class="nav-miembro" data-view="facturas"><span class="ico">🧾</span><span class="label"> Facturas</span></button>
       <button class="nav-miembro" data-view="presupuestos"><span class="ico">📋</span><span class="label"> Presupuestos</span></button>
       <button class="nav-miembro" data-view="proformas"><span class="ico">📑</span><span class="label"> Proformas</span></button>
@@ -5291,6 +5292,46 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
       <div class="sub-view" id="flota-particulares" style="display:none;">
         <div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">Vehículos que no son de la empresa pero tienen algún gasto que se paga desde su cuenta (seguro, impuesto…). No cuentan en la flota, ni en sus avisos, ni como gasto de la empresa.</div>
         <div id="flota-particulares-cards"></div>
+      </div>
+    </div>
+
+    <!-- ================= DOCUMENTOS (lista única: los botones Presupuesto, Albarán, Proforma y Factura se combinan como filtros) ================= -->
+    <div class="view" id="view-documentos">
+      <div class="docs-tabs" data-docs-tabs="1">
+        <button class="docs-tab" data-tab="proyectos" onclick="document.querySelector('.nav button[data-view=proyectos]').click()">Proyecto</button>
+        <button class="docs-tab" data-tab="ayuntamiento" onclick="document.querySelector('.nav button[data-view=ayuntamiento]').click()">Expedientes</button>
+        <button class="docs-tab" data-tab="presupuestos" onclick="document.querySelector('.nav button[data-view=presupuestos]').click()">Presupuesto</button>
+        <button class="docs-tab" data-tab="albaranes" onclick="document.querySelector('.nav button[data-view=albaranes]').click()">Albarán</button>
+        <button class="docs-tab" data-tab="proformas" onclick="document.querySelector('.nav button[data-view=proformas]').click()">Proforma</button>
+        <button class="docs-tab" data-tab="facturas" onclick="document.querySelector('.nav button[data-view=facturas]').click()">Factura</button>
+        <button class="docs-tab" data-tab="tarifas" onclick="document.querySelector('.nav button[data-view=tarifas]').click()">Tarifas</button>
+        <button class="docs-tab" data-tab="clientes" onclick="document.querySelector('.nav button[data-view=clientes]').click()">Clientes</button>
+      </div>
+      <div class="topbar">
+        <div><h1>Documentos</h1><div class="desc" id="docm-desc">Todos los documentos</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head doc-cab" id="docm-panel-head" style="flex-direction:column;align-items:stretch;gap:0;padding:10px 14px;">
+          <div class="dd-filter-row dd-filter-row-compacta" style="align-items:center;">
+            <button type="button" class="cli-icon-btn" onclick="toggleBuscadorDocumentos('docm')" title="Buscar" aria-label="Buscar"><svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="4.5" stroke="currentColor" stroke-width="1.7"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+            <button type="button" class="cli-icon-btn" onclick="docmRestablecer()" title="Quitar los filtros" aria-label="Quitar los filtros"><svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M2 3h13l-5 6v4.5L7 15V9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 11l3 3M15 11l-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+          </div>
+          <div id="docm-bar-buscar" style="display:none;gap:8px;align-items:center;margin-top:8px;">
+            <input class="search-box" id="docm-search" style="flex:1;" placeholder="Buscar cliente, nº…" oninput="docmBuscar()">
+            <button type="button" class="cli-icon-btn" onclick="toggleBuscadorDocumentos('docm')" title="Cerrar" aria-label="Cerrar">✕</button>
+          </div>
+        </div>
+        <div class="pleg" id="docm-pleg"><div class="pleg-cols"></div><div class="pleg-filas"></div></div>
+        <div id="docm-aviso" style="margin:2px 14px 8px;font-size:13px;color:var(--ink-soft);"></div>
+        <div class="panel-body" style="padding:0;">
+          <div class="tabla-escritorio-solo" style="overflow-x:auto;">
+            <table class="tbl">
+              <thead><tr><th>Fecha</th><th>Tipo</th><th>Nº</th><th>Cliente</th><th>Trabajo</th><th class="num">Total</th><th>Estado</th></tr></thead>
+              <tbody id="docm-tbody"></tbody>
+            </table>
+          </div>
+          <div class="lista-movil-solo"><div id="docm-lista-movil"></div></div>
+        </div>
       </div>
     </div>
 
@@ -8085,14 +8126,14 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     document.getElementById('view-'+(VISTA_ALIAS[btn.dataset.view]||btn.dataset.view)).classList.add('active');
     if(btn.dataset.view==='presupuestos' || btn.dataset.view==='proformas') setModoPresProf(btn.dataset.view==='proformas' ? 'proforma' : 'presupuesto');
-    if(['presupuestos','proformas','albaranes','facturas','proyectos','ayuntamiento','tarifas','clientes'].includes(btn.dataset.view)) actualizarTabsDocumentos(btn.dataset.view);
-    if(['presupuestos','proformas','albaranes','facturas','proyectos','clientes'].includes(btn.dataset.view)) localStorage.setItem('ultimo_tipo_documento', btn.dataset.view);
+    if(['documentos','presupuestos','proformas','albaranes','facturas','proyectos','ayuntamiento','tarifas','clientes'].includes(btn.dataset.view)) actualizarTabsDocumentos(btn.dataset.view);
+    if(['documentos','presupuestos','proformas','albaranes','facturas','proyectos','clientes'].includes(btn.dataset.view)) localStorage.setItem('ultimo_tipo_documento', btn.dataset.view);
     document.getElementById('app').classList.remove('mobile-nav-open');
     localStorage.setItem('vista_activa', btn.dataset.view);
     aiRegistrarEvento('navegacion', btn.dataset.view);
     document.querySelectorAll('.mobile-tab-btn[data-view]').forEach(b=>b.classList.remove('active'));
     // V7.49 (Daniel: «Documentos no se ilumina cuando estoy dentro»): todas las secciones de Documentos encienden la pestaña Documentos
-    const DOCS_VISTAS = ['presupuestos','proformas','albaranes','facturas','proyectos','ayuntamiento','tarifas','expedientes','clientes'];
+    const DOCS_VISTAS = ['documentos','presupuestos','proformas','albaranes','facturas','proyectos','ayuntamiento','tarifas','expedientes','clientes'];
     const tabBtn = document.querySelector(`.mobile-tab-btn[data-view="${DOCS_VISTAS.includes(btn.dataset.view) ? 'facturas' : btn.dataset.view}"]`);
     if(tabBtn) tabBtn.classList.add('active');
     if(btn.dataset.view==='mapa' && typeof realMap!=='undefined' && realMap){
@@ -8109,6 +8150,7 @@ document.querySelectorAll('.nav button[data-view]').forEach(btn=>{
     if(btn.dataset.view==='facturas'){
       renderFacturasKPIs();
     }
+    if(btn.dataset.view==='documentos') docmMostrar();
     if(btn.dataset.view==='personal'){ perSub(perSubActual()); }
     if(btn.dataset.view==='archivos'){
       loadExplorer(typeof explorerPath!=='undefined' ? explorerPath : '');
@@ -8139,7 +8181,7 @@ document.querySelectorAll('.mobile-tab-btn[data-view]').forEach(btn=>{
     // no la clase .active del propio icono: esa solo se marca cuando la vista activa es
     // literalmente "facturas", nunca para las otras 3, así que comprobarla ahí perdía el
     // desplegable al tocar el icono estando en Proforma/Presupuesto/Albarán.
-    const yaEnDocumentos = ['view-facturas','view-albaranes','view-presupuestos','view-proyectos'].some(id=>document.getElementById(id)?.classList.contains('active'));
+    const yaEnDocumentos = ['view-documentos','view-facturas','view-albaranes','view-presupuestos','view-proyectos'].some(id=>document.getElementById(id)?.classList.contains('active'));
     if(btn.dataset.view==='facturas' && yaEnDocumentos){
       toggleSelectorDocumentos();
       return;
@@ -8177,7 +8219,7 @@ const NAV_GRUPOS = {
   flota: [['flota', 'Maquinaria'], ['personal', 'Personal']],   // V8.43 (Daniel): Personal va en Flota
   ajustes: [['config', 'Permisos'], ['backup', 'Copias'], ['sistema', 'Sistema']],
 };
-const NAV_DOCS_VISTAS = ['proyectos', 'ayuntamiento', 'presupuestos', 'albaranes', 'proformas', 'facturas', 'tarifas', 'clientes'];   // V8.24: Clientes es una pestaña de Documentos
+const NAV_DOCS_VISTAS = ['documentos', 'proyectos', 'ayuntamiento', 'presupuestos', 'albaranes', 'proformas', 'facturas', 'tarifas', 'clientes'];   // V8.24: Clientes es una pestaña de Documentos
 function navVistaPermitida(v){
   const btn = document.querySelector(`.nav button[data-view="${v}"]`); if(!btn) return false;
   if(typeof vistasBloqueadas !== 'undefined' && vistasBloqueadas.has(v)) return false;
@@ -11634,7 +11676,7 @@ var presModo = 'presupuesto';
 // clic del menú lateral, de una pestaña, o de código (ej. abrir desde IA).
 function actualizarTabsDocumentos(vista){
   document.querySelectorAll('[data-docs-tabs] .docs-tab').forEach(b=>{
-    b.classList.toggle('active', b.dataset.tab === vista);
+    b.classList.toggle('active', vista === 'documentos' ? (!!DOCM_TAB_TIPO[b.dataset.tab] && _docm.tipos.has(DOCM_TAB_TIPO[b.dataset.tab])) : b.dataset.tab === vista);   // en la lista única se iluminan todos los tipos marcados
   });
 }
 // El menú lateral y el icono de la barra inferior son el mismo punto de
@@ -13779,7 +13821,7 @@ function ccDocsVistaPlegada(guardar){
   if(guardar !== false) ccDocsGuardar();
 }
 document.addEventListener('click', ev => {   // en vista plegada, tocar una tarjeta la despliega (no abre el documento); ya desplegada, funciona como siempre
-  const card = ev.target.closest('#control-docs-lista-movil.cc-compacto .factura-card-movil, #gpro-lista-movil.cc-compacto .factura-card-movil, #econ-facturas-lista-movil.cc-compacto .factura-card-movil, #alb-lista-movil.cc-compacto .factura-card-movil, #pres-lista-movil.cc-compacto .factura-card-movil');
+  const card = ev.target.closest('#control-docs-lista-movil.cc-compacto .factura-card-movil, #gpro-lista-movil.cc-compacto .factura-card-movil, #econ-facturas-lista-movil.cc-compacto .factura-card-movil, #alb-lista-movil.cc-compacto .factura-card-movil, #pres-lista-movil.cc-compacto .factura-card-movil, #docm-lista-movil.cc-compacto .factura-card-movil');
   if(!card) return;
   if(card.classList.contains('cc-abierta')){ const ctl = ev.target.closest('button, select, a, input, textarea, label, .pill, [onclick]'); if(ctl && ctl !== card) return; }   // V8.98: el estado, los botones y los menús de una tarjeta abierta funcionan sin plegarla
   if(!card.classList.contains('cc-abierta')){ ev.stopPropagation(); ev.preventDefault(); card.classList.add('cc-abierta'); return; }
@@ -29615,7 +29657,7 @@ function filaCompactaDocHtml(doc, tipo, estadoHtml, cliente, obra){
   const cli = cliente || 'Sin cliente', ob = obra && obra !== '—' ? `<span class="cc-fc-obra">${svgEsc(obra)}</span>` : '';
   return `<div class="cc-fila-compacta"><span class="cc-fc-te"><span class="cc-fc-est" onclick="event.stopPropagation();">${estadoHtml}</span><span class="cc-fc-l1"><span class="fc-tipo-tag tp-${t}">${TIPO_DOC_NOMBRE[t] || t}</span><span class="cc-fc-num">${svgEsc(doc.numero || doc.num || '—')}</span></span></span><span class="cc-fc-bloque"><span class="cc-fc-cli" data-cli="${escHtml(cli)}">${svgEsc(cli)}</span>${ob}</span><span class="cc-fc-imp">${lbl}</span></div>`;
 }
-const DOC_LISTAS_MOVIL = ['econ-facturas-lista-movil', 'alb-lista-movil', 'pres-lista-movil'];
+const DOC_LISTAS_MOVIL = ['econ-facturas-lista-movil', 'alb-lista-movil', 'pres-lista-movil', 'docm-lista-movil'];
 try{ window._docCompacto = localStorage.getItem('docs_compacto') !== '0'; }catch(e){ window._docCompacto = true; }
 function docsAplicarVista(){
   DOC_LISTAS_MOVIL.forEach(id => { const l = document.getElementById(id); if(l){ l.classList.toggle('cc-compacto', window._docCompacto); if(!window._docCompacto) l.querySelectorAll('.cc-abierta').forEach(c => c.classList.remove('cc-abierta')); } });
@@ -29626,6 +29668,174 @@ function docsVistaPlegada(){
   DOC_LISTAS_MOVIL.forEach(id => document.getElementById(id)?.querySelectorAll('.cc-abierta').forEach(c => c.classList.remove('cc-abierta')));
   docsAplicarVista();
 }
+// V10.77 (Daniel: «que los botones Proyecto hasta Factura hagan la función de filtros múltiples»): lista única de Documentos.
+// Los botones Presupuesto, Albarán, Proforma y Factura se marcan y desmarcan; la lista mezcla los tipos marcados (ninguno marcado = todos).
+// Las tarjetas son las de siempre (las construyen las filas de cada tipo); aquí solo se eligen, ordenan y colocan en una lista.
+var DOCM_TAB_TIPO = {presupuestos: 'presupuesto', albaranes: 'albaran', proformas: 'proforma', facturas: 'factura'};
+var DOCM_TIPO_VISTA = {presupuesto: 'presupuestos', albaran: 'albaranes', proforma: 'proformas', factura: 'facturas'};
+var DOCM_TIPOS = ['presupuesto', 'albaran', 'proforma', 'factura'];   // orden del proceso
+var DOCM_TBODYS = ['presupuestos-tbody-standalone', 'albaranes-tbody-standalone', 'econ-facturas-tbody'];
+var _docm = {tipos: new Set(), anios: new Set(), trims: new Set(), estados: new Set(), q: '', orden: 'fecha_desc', limite: 40, abiertos: ['anio'], aniosTocado: false};
+function docmActiva(){ return !!document.getElementById('view-documentos')?.classList.contains('active'); }
+function docmPermitidos(){ return DOCM_TIPOS.filter(t => !(typeof vistasBloqueadas !== 'undefined' && vistasBloqueadas.has(DOCM_TIPO_VISTA[t]))); }
+function docmTiposActivos(){ const p = docmPermitidos(), s = p.filter(t => _docm.tipos.has(t)); return new Set(s.length ? s : p); }   // siempre en el orden del proceso
+function docmTiposVistaActual(){   // qué tipos están marcados ahora mismo, según la pantalla que se ve
+  const act = (document.querySelector('.view.active')?.id || '').replace(/^view-/, '');
+  if(act === 'documentos') return new Set(_docm.tipos);
+  if(act === 'presupuestos') return new Set([presModo === 'proforma' ? 'proforma' : 'presupuesto']);
+  if(act === 'albaranes') return new Set(['albaran']);
+  if(act === 'facturas') return new Set(['factura']);
+  return new Set();
+}
+function docmTab(tab){
+  const t = DOCM_TAB_TIPO[tab], s = docmTiposVistaActual();
+  if(s.has(t)) s.delete(t); else s.add(t);
+  docmAbrir(s);
+}
+function docmAbrir(s){
+  _docm.tipos = new Set(s);
+  if(s.size === 1){ document.querySelector('.nav button[data-view="' + DOCM_TIPO_VISTA[[...s][0]] + '"]')?.click(); return; }   // un solo tipo: su pantalla de siempre, con todo lo suyo
+  document.querySelector('.nav button[data-view="documentos"]')?.click();
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('.docs-tab'); if(!b || !DOCM_TAB_TIPO[b.dataset.tab]) return;
+  ev.stopImmediatePropagation(); ev.preventDefault(); docmTab(b.dataset.tab);
+}, true);
+function docmMostrar(){ _docm.limite = 40; try{ docsAplicarVista(); }catch(e){} docmSync(); }
+function docmEstadoDe(d){
+  const act = d.estado_cobro || 'pendiente_enviar';
+  let txt = act; try{ txt = (estadosDeTipo(d.type, d).concat(ESTADOS_DOCUMENTO).find(o => o[0] === act) || [])[1] || stateLabels[act] || act; }catch(e){}
+  return [act, txt];
+}
+function docmFilas(){   // todos los documentos de los tipos marcados, sin filtrar por año, estado ni texto
+  const tipos = docmTiposActivos(), out = [];
+  DOCM_TBODYS.forEach(id => {
+    const tb = document.getElementById(id); if(!tb) return;
+    tb.querySelectorAll('tr').forEach(tr => {
+      const did = docIdDeFila(tr); if(!did) return;
+      const d = documentosRealesById[did]; if(!d || !tipos.has(d.type)) return;
+      const fecha = d.fecha_devengo || tr.dataset.fechaIso || '', [est, estTxt] = docmEstadoDe(d);
+      if(tr._busqM === undefined) tr._busqM = [d.client, d.num || d.numero, d.job, d.obra_texto, d.amountLabel, d.dateLabel].filter(Boolean).join(' ').toLowerCase();
+      out.push({id: did, tr, d, tipo: d.type, fecha, anio: fecha ? fecha.slice(0, 4) : '', trim: fecha ? String(Math.floor((Number(fecha.slice(5, 7)) - 1) / 3) + 1) : '', estado: est, estadoTxt: estTxt, busq: tr._busqM, imp: Number(d.importe || 0), cli: d.client || ''});
+    });
+  });
+  return out;
+}
+function docmPasa(f, salvo){
+  if(salvo !== 'anio' && _docm.anios.size && !_docm.anios.has(f.anio)) return false;
+  if(salvo !== 'trim' && _docm.trims.size && !_docm.trims.has(f.trim)) return false;
+  if(salvo !== 'estado' && _docm.estados.size && !_docm.estados.has(f.estado)) return false;
+  return !_docm.q || f.busq.includes(_docm.q);
+}
+function docmBuscar(){ _docm.q = (document.getElementById('docm-search')?.value || '').trim().toLowerCase(); deb(docmSync, 220); }
+function docmRestablecer(){
+  _docm.q = ''; const s = document.getElementById('docm-search'); if(s) s.value = '';
+  _docm.trims.clear(); _docm.estados.clear(); _docm.anios.clear(); _docm.aniosTocado = false; docmSync();
+}
+function docmCmp(a, b){
+  const o = _docm.orden;
+  if(o === 'importe_desc') return b.imp - a.imp;
+  if(o === 'cliente') return a.cli.localeCompare(b.cli, 'es', {sensitivity: 'base'});
+  if(!a.fecha && b.fecha) return 1; if(a.fecha && !b.fecha) return -1;
+  const r = a.fecha.localeCompare(b.fecha) || String(a.d.numero || '').localeCompare(String(b.d.numero || ''), 'es', {numeric: true});
+  return o === 'fecha_asc' ? r : -r;
+}
+var DOCM_GRUPOS = [['anio', 'Año'], ['trim', 'Trim.'], ['estado', 'Estado']];
+function docmPintarFiltros(filas){
+  const caja = document.getElementById('docm-pleg'); if(!caja) return;
+  if(!caja._listo){
+    caja._listo = true;
+    const mk = (cls, ico, titulo, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'cli-icon-btn ' + cls; b.title = titulo; b.setAttribute('aria-label', titulo); b.innerHTML = ico; b.onclick = fn; return b; };
+    const bCli = mk('doc-cli-btn', ICO_PERSONA, 'Filtrar por cliente', () => docmMenuCliente(bCli));
+    const bOrd = mk('doc-ord-btn', ICO_ORDEN, 'Ordenar', () => docmMenuOrden(bOrd));
+    const bVista = mk('doc-vista-btn', ICO_VISTA_PLEGADA, 'Vista plegada o desplegada', () => docsVistaPlegada());
+    caja._iconos = [bCli, bOrd, bVista];
+    caja.addEventListener('click', ev => {
+      const t = ev.target.closest('button[data-pl]');
+      if(t){ const k = t.dataset.pl, l = _docm.abiertos; if(l.includes(k)) _docm.abiertos = l.filter(x => x !== k); else l.push(k); docmSync(); return; }
+      const c = ev.target.closest('.chip-filter[data-g]'); if(!c) return;
+      const k = c.dataset.g, S = k === 'anio' ? _docm.anios : k === 'trim' ? _docm.trims : _docm.estados, v = c.dataset.v;
+      if(k === 'anio') _docm.aniosTocado = true;
+      if(!v) S.clear(); else if(S.has(v)) S.delete(v); else S.add(v);
+      if(k === 'anio' && _historico.pendientes.size){ if(!_docm.anios.size) asegurarHistorico(); else { const hoy = String(new Date().getFullYear()), ant = [..._docm.anios].filter(a => a < hoy); if(ant.length) asegurarHistorico(ant); } }
+      docmSync();
+    });
+  }
+  const opc = {anio: new Map(), trim: new Map([['1', '1º trimestre'], ['2', '2º trimestre'], ['3', '3º trimestre'], ['4', '4º trimestre']]), estado: new Map()};
+  filas.forEach(f => { if(f.anio) opc.anio.set(f.anio, f.anio); if(!opc.estado.has(f.estado)) opc.estado.set(f.estado, f.estadoTxt); });
+  docmTiposActivos().forEach(t => histAniosPendientes(t).forEach(a => opc.anio.set(a, a)));
+  if(!_docm.aniosTocado && !_docm.anios.size){   // como en el resto de listas: arranca con el año actual (o el último que haya)
+    const hoy = String(new Date().getFullYear()), anios = [...opc.anio.keys()].sort().reverse();
+    const a = opc.anio.has(hoy) ? hoy : anios[0]; if(a) _docm.anios.add(a);
+  }
+  const SEL = {anio: _docm.anios, trim: _docm.trims, estado: _docm.estados};
+  const cuenta = (k, v) => filas.filter(f => docmPasa(f, k) && (v == null || f[k] === v)).length;
+  const cols = caja.querySelector('.pleg-cols'), fil = caja.querySelector('.pleg-filas');
+  cols.style.cssText = 'display:grid;gap:6px;margin-bottom:6px;grid-template-columns:repeat(3, minmax(0, 1fr))' + ' auto'.repeat(caja._iconos.length) + ';';
+  cols.innerHTML = DOCM_GRUPOS.map(([k, tit], i) => { const ab = _docm.abiertos.includes(k), n = SEL[k].size; return `<button type="button" class="tb-ftit tb-plegado ${n ? 'con' : ''} ${ab ? 'abierto' : ''}" data-pl="${k}" style="grid-column:${i + 1};" title="${ab ? 'Plegar' : 'Desplegar'} ${tit}">${k === 'anio' && n === 1 ? '<b>' + [...SEL[k]][0] + '</b>' : tit + (n ? ' <b>' + n + '</b>' : '')} <i>${ab ? '▾' : '▸'}</i></button>`; }).join('');
+  caja._iconos.forEach(b => cols.appendChild(b));
+  fil.innerHTML = '';
+  DOCM_GRUPOS.filter(([k]) => _docm.abiertos.includes(k)).forEach(([k, tit]) => {
+    const claves = [...opc[k].keys()]; if(k === 'anio' || k === 'trim') claves.sort(); if(k === 'anio') claves.reverse();
+    const chips = [`<div class="chip-filter ${SEL[k].size ? '' : 'active'}" data-g="${k}" data-v="" data-n="${cuenta(k)}">${k === 'anio' ? 'Todos los años' : k === 'trim' ? 'Todos' : 'Todos los estados'}</div>`]
+      .concat(claves.map(v => `<div class="chip-filter ${SEL[k].has(v) ? 'active' : ''}" data-g="${k}" data-v="${v}" ${k === 'anio' ? 'data-anio="' + v + '"' : ''} data-n="${cuenta(k, v)}">${opc[k].get(v)}</div>`));
+    const row = document.createElement('div'); row.className = 'tb-frow';
+    row.innerHTML = `<button type="button" class="tb-ftit" data-pl="${k}" title="Plegar ${tit}">${tit} <i>▾</i></button><div class="filters" data-g="${k}" style="margin:0;">${chips.join('')}</div>`;
+    fil.appendChild(row);
+  });
+}
+function docmMenuOrden(ancla){
+  const ops = [['fecha_desc', 'Fecha: más reciente primero'], ['fecha_asc', 'Fecha: más antigua primero'], ['importe_desc', 'Importe: mayor primero'], ['cliente', 'Cliente: A–Z']];
+  ancla.value = _docm.orden;
+  psMenuAbrir(ancla, ops, false, v => { _docm.orden = v; docmSync(); });
+}
+function docmMenuCliente(ancla){
+  const cuenta = {};
+  docmFilas().forEach(f => { if(f.cli && f.cli !== '—') cuenta[f.cli] = (cuenta[f.cli] || 0) + 1; });
+  const lista = Object.entries(cuenta).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 40);
+  const buscar = document.getElementById('docm-search'), actual = buscar ? buscar.value : '';
+  ancla.value = actual || '__todos';
+  psMenuAbrir(ancla, [['__todos', 'Todos los clientes']].concat(lista.map(([n, c]) => [n, n + ' · ' + c])), false, v => {
+    if(!buscar) return; buscar.value = v === '__todos' ? '' : v; docmBuscar(); ancla.classList.toggle('doc-cli-on', v !== '__todos');
+  });
+}
+function docmSync(){
+  if(!docmActiva()) return;
+  window.__docmEnSync = true;
+  try{
+    const filas = docmFilas();
+    docmPintarFiltros(filas);
+    const vis = filas.filter(f => docmPasa(f)).sort(docmCmp);
+    const nombres = [...docmTiposActivos()].map(t => TIPO_DOC_NOMBRE[t]);
+    const desc = document.getElementById('docm-desc'); if(desc) desc.textContent = _docm.tipos.size ? nombres.join(' + ') : 'Todos los documentos';
+    const aviso = document.getElementById('docm-aviso'), pend = _historico.pendientes.size;
+    if(aviso) aviso.innerHTML = '<b style="color:var(--ink);">' + vis.length.toLocaleString('es-ES') + '</b> ' + (vis.length === 1 ? 'documento' : 'documentos') + (vis.length < filas.length ? ' de ' + filas.length.toLocaleString('es-ES') : '') + (_historico.enCurso ? ' · cargando los antiguos…' : '');
+    const lista = document.getElementById('docm-lista-movil'), tb = document.getElementById('docm-tbody');
+    const sig = [_docm.q, [..._docm.anios], [..._docm.trims], [..._docm.estados], _docm.orden, [..._docm.tipos]].join('|');
+    if(lista.dataset.sig !== sig){ lista.dataset.sig = sig; _docm.limite = 40; }
+    const lim = _docm.limite, mostrar = vis.slice(0, lim), quedan = new Set(mostrar.map(f => String(f.id))), filaDe = new Map(filas.map(f => [String(f.id), f]));
+    lista.querySelector(':scope > .mostrar-mas-movil')?.remove();
+    Array.from(lista.children).forEach(c => { const id = String(c.dataset.docId || ''); if(!id || quedan.has(id)) return; const f = filaDe.get(id); if(!f || f.tr._mkCard) c.remove(); else c.style.display = 'none'; });   // las que ya no tocan salen de esta lista
+    let pos = 0;
+    mostrar.forEach(f => {
+      let card = document.getElementById('mcard-' + f.id);
+      if(!card && f.tr._mkCard) card = f.tr._mkCard();
+      if(card){ if(card.style.display) card.style.display = ''; if(lista.children[pos] !== card) lista.insertBefore(card, lista.children[pos] || null); pos++; }
+    });
+    if(vis.length > lim){
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn mostrar-mas-movil'; b.textContent = `Mostrar más (${vis.length - lim} restantes)`;
+      b.onclick = () => { _docm.limite = lim + CARDS_POR_PAGINA; docmSync(); }; lista.appendChild(b); autoMas(lista);
+    }
+    if(!vis.length && !lista.querySelector('.docm-vacio')){ const v = document.createElement('div'); v.className = 'docm-vacio sub-t'; v.style.cssText = 'padding:18px 14px;'; v.textContent = 'No hay documentos con estos filtros.'; lista.appendChild(v); }
+    if(vis.length) lista.querySelector('.docm-vacio')?.remove();
+    if(tb) tb.innerHTML = mostrar.map(f => {
+      const d = f.d, imp = f.imp.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+      return `<tr onclick="openDocumentViewer('${f.id}')" style="cursor:pointer;"><td class="mono">${f.fecha ? formatFechaCorta(f.fecha) : '—'}</td><td><span class="fc-tipo-tag tp-${f.tipo}">${TIPO_DOC_NOMBRE[f.tipo] || f.tipo}</span></td><td class="mono">${svgEsc(d.num || d.numero || '—')}</td><td>${svgEsc(f.cli || '—')}</td><td>${svgEsc(d.job && d.job !== '—' ? d.job : (d.obra_texto || '—'))}</td><td class="num mono">${imp}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect(f.tipo, f.id, d.estado_cobro, 'dm-')}</td></tr>`;
+    }).join('');
+  }catch(e){ console.error('Documentos', e); }
+  window.__docmEnSync = false;
+}
+{ const _stp = sincronizarTarjetasPaginadas; sincronizarTarjetasPaginadas = function(){ const r = _stp.apply(this, arguments); try{ if(!window.__docmEnSync && docmActiva()) deb(docmSync, 60); }catch(e){} return r; }; }   // si una lista de tipo recoloca tarjetas mientras se ve Documentos, esta vuelve a ponerlas en su sitio
 function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta, entidad, trabajo, archivoUrl, calidadInfo){
   const lista = document.getElementById(listaId);
   if(!lista) return;
