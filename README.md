@@ -1,3 +1,5 @@
+> **Claude: antes de nada lee [ARRANQUE-EXG.md](ARRANQUE-EXG.md).** La memoria de EXG está en la base de datos, no en el chat.
+
 # exg-sistema
 Sistema operativo EXG - Excavaciones Gomez
 

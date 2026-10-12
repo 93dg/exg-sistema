@@ -37,6 +37,11 @@ if ! python3 herramientas/lint_diseno.py; then
   echo "❌ Deploy bloqueado: corrige lo anterior (o, si Daniel lo ha aprobado expresamente, ajusta la guía y el lint)"
   exit 1
 fi
+# Auditoría de pantallas con la web REAL y datos reales a 390 px: minúsculas al principio, textos partidos, textos que se salen
+if ! python3 herramientas/auditoria_pantallas.py; then
+  echo "❌ Deploy bloqueado por la auditoría de pantallas: arregla lo nuevo que aparece arriba antes de publicar"
+  exit 1
+fi
 
 # Actualizar versión en HTML
 # cache-buster de los scripts externos (rent.js, norm.js) para que el móvil cargue siempre el último
