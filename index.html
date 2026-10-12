@@ -4639,11 +4639,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.79" defer></script>
-<script src="costes/norm.js?v=V10.79" defer></script>
-<script src="ajustes/calc.js?v=V10.79" defer></script>
+<script src="rentabilidad/rent.js?v=V10.80" defer></script>
+<script src="costes/norm.js?v=V10.80" defer></script>
+<script src="ajustes/calc.js?v=V10.80" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.79</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.80</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4795,7 +4795,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.79</div>
+        <div class="sub" id="version-badge">V10.80</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -29679,6 +29679,19 @@ var DOCM_TIPO_VISTA = {proyecto: 'proyectos', expediente: 'ayuntamiento', presup
 var DOCM_TIPOS = ['proyecto', 'expediente', 'presupuesto', 'albaran', 'proforma', 'factura'];   // orden del proceso
 var DOCM_TBODYS = ['presupuestos-tbody-standalone', 'albaranes-tbody-standalone', 'econ-facturas-tbody'];
 var _docm = {tipos: new Set(), anios: new Set(), trims: new Set(), estados: new Set(), q: '', orden: 'fecha_desc', limite: 40, abiertos: ['anio'], aniosTocado: false};
+function docmGuardar(){   // lo elegido se recuerda en el servidor, como en el resto de listas (el año no: arranca siempre con el actual)
+  try{ const j = JSON.stringify({t: [..._docm.tipos], tr: [..._docm.trims], e: [..._docm.estados], o: _docm.orden, a: _docm.abiertos});
+    try{ localStorage.setItem('docm-sel', j); }catch(e){}
+    if(typeof sb !== 'undefined' && sb) sb.from('filtros_persistentes').upsert({container_id: 'docm-sel', valor: j}, {onConflict: 'container_id'}).then(() => {});
+  }catch(e){ console.warn(e); }
+}
+function docmAplicarGuardado(v){ _docm.tipos = new Set(v.t || []); _docm.trims = new Set(v.tr || []); _docm.estados = new Set(v.e || []); _docm.orden = v.o || 'fecha_desc'; if(Array.isArray(v.a)) _docm.abiertos = v.a; }
+(function docmRecordar(){
+  try{ const l = localStorage.getItem('docm-sel'); if(l) docmAplicarGuardado(JSON.parse(l)); }catch(e){}
+  const servidor = () => { if(typeof sb === 'undefined' || !sb) return setTimeout(servidor, 800);
+    sb.from('filtros_persistentes').select('valor').eq('container_id', 'docm-sel').maybeSingle().then(({data}) => { try{ if(data && data.valor && data.valor !== localStorage.getItem('docm-sel')){ localStorage.setItem('docm-sel', data.valor); docmAplicarGuardado(JSON.parse(data.valor)); if(docmActiva()) docmSync(); } }catch(e){} }); };
+  setTimeout(servidor, 1200);
+})();
 function docmActiva(){ return !!document.getElementById('view-documentos')?.classList.contains('active'); }
 function docmPermitidos(){ return DOCM_TIPOS.filter(t => !(typeof vistasBloqueadas !== 'undefined' && vistasBloqueadas.has(DOCM_TIPO_VISTA[t]))); }
 function docmTiposActivos(){ const p = docmPermitidos(), s = p.filter(t => _docm.tipos.has(t)); return new Set(s.length ? s : p); }   // siempre en el orden del proceso
@@ -29698,7 +29711,7 @@ function docmTab(tab){
   docmAbrir(s);
 }
 function docmAbrir(s){
-  _docm.tipos = new Set(s);
+  _docm.tipos = new Set(s); docmGuardar();
   if(s.size === 1){ document.querySelector('.nav button[data-view="' + DOCM_TIPO_VISTA[[...s][0]] + '"]')?.click(); return; }   // un solo tipo: su pantalla de siempre, con todo lo suyo
   document.querySelector('.nav button[data-view="documentos"]')?.click();
 }
@@ -29754,7 +29767,7 @@ function docmPasa(f, salvo){
 function docmBuscar(){ _docm.q = (document.getElementById('docm-search')?.value || '').trim().toLowerCase(); deb(docmSync, 220); }
 function docmRestablecer(){
   _docm.q = ''; const s = document.getElementById('docm-search'); if(s) s.value = '';
-  _docm.trims.clear(); _docm.estados.clear(); _docm.anios.clear(); _docm.aniosTocado = false; docmSync();
+  _docm.trims.clear(); _docm.estados.clear(); _docm.anios.clear(); _docm.aniosTocado = false; docmGuardar(); docmSync();
 }
 function docmCmp(a, b){
   const o = _docm.orden;
@@ -29776,11 +29789,12 @@ function docmPintarFiltros(filas){
     caja._iconos = [bCli, bOrd, bVista];
     caja.addEventListener('click', ev => {
       const t = ev.target.closest('button[data-pl]');
-      if(t){ const k = t.dataset.pl, l = _docm.abiertos; if(l.includes(k)) _docm.abiertos = l.filter(x => x !== k); else l.push(k); docmSync(); return; }
+      if(t){ const k = t.dataset.pl, l = _docm.abiertos; if(l.includes(k)) _docm.abiertos = l.filter(x => x !== k); else l.push(k); docmGuardar(); docmSync(); return; }
       const c = ev.target.closest('.chip-filter[data-g]'); if(!c) return;
       const k = c.dataset.g, S = k === 'anio' ? _docm.anios : k === 'trim' ? _docm.trims : _docm.estados, v = c.dataset.v;
       if(k === 'anio') _docm.aniosTocado = true;
       if(!v) S.clear(); else if(S.has(v)) S.delete(v); else S.add(v);
+      if(k !== 'anio') docmGuardar();
       if(k === 'anio' && _historico.pendientes.size){ if(!_docm.anios.size) asegurarHistorico(); else { const hoy = String(new Date().getFullYear()), ant = [..._docm.anios].filter(a => a < hoy); if(ant.length) asegurarHistorico(ant); } }
       docmSync();
     });
@@ -29811,7 +29825,7 @@ function docmPintarFiltros(filas){
 function docmMenuOrden(ancla){
   const ops = [['fecha_desc', 'Fecha: más reciente primero'], ['fecha_asc', 'Fecha: más antigua primero'], ['importe_desc', 'Importe: mayor primero'], ['cliente', 'Cliente: A–Z']];
   ancla.value = _docm.orden;
-  psMenuAbrir(ancla, ops, false, v => { _docm.orden = v; docmSync(); });
+  psMenuAbrir(ancla, ops, false, v => { _docm.orden = v; docmGuardar(); docmSync(); });
 }
 function docmMenuCliente(ancla){
   const cuenta = {};
