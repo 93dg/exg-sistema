@@ -486,12 +486,12 @@ R.simular2 = function(b, e){
 { const old = document.getElementById('rt-css'); if(old) old.remove(); const st = document.createElement('style'); st.id = 'rt-css'; st.textContent = `
 .rt-w{display:flex;flex-direction:column;gap:8px;min-width:0;max-width:100%}
 .rt-w *{min-width:0;box-sizing:border-box}
-.rt-sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.rt-t{border-radius:14px;padding:10px;text-align:left;background:var(--paper);border:1px solid var(--line)}
-.rt-t.g{background:var(--green-soft);border-color:transparent}.rt-t.r{background:var(--red-soft);border-color:transparent}
-.rt-t span{display:block;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
-.rt-t b{display:block;font-size:18px;font-weight:900;margin-top:3px;white-space:nowrap}
-.rt-t small{display:block;font-size:11px;color:var(--ink-soft);margin-top:1px}
+.rt-sum{display:flex;flex-direction:column}
+.rt-t{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.rt-t:first-child{border-top:0}
+.rt-t span{grid-column:1;display:block;font-size:12.5px;font-weight:800}
+.rt-t b{grid-column:2;grid-row:1/span 2;display:block;font-size:16px;font-weight:900;white-space:nowrap;text-align:right}
+.rt-t small{grid-column:1;display:block;font-size:11px;color:var(--ink-soft)}
 .rt-c{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:8px 12px}
 .rt-c>h3{margin:0 0 2px;font-size:14px;font-weight:800}
 .rt-k{display:inline-block;font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;text-transform:uppercase;letter-spacing:.03em}
@@ -527,20 +527,21 @@ R.simular2 = function(b, e){
 .rt-st button{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line);background:transparent;font-size:18px;font-weight:800;color:inherit;line-height:1}
 .rt-st b{min-width:20px;text-align:center;font-size:16px}
 .rt-seg{display:flex;gap:4px;flex-wrap:nowrap;justify-content:flex-end;flex-shrink:0}
-.rt-big{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:2px 0 4px}
+.rt-big{display:flex;flex-direction:column;margin:2px 0 4px}
 .rt-w .tb-cos{margin-bottom:0!important;padding:8px 10px}
 #te-subtabs{margin:0 0 6px!important;gap:6px}#te-subtabs .docs-tab{padding:5px 8px;font-size:12px}
 .rt-pp{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:2px 0 6px}.rt-pp>div{display:flex;flex-direction:column;align-items:center;gap:2px}.rt-pp small{text-align:center}
 .rt-pp button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:5px 22px;font-size:13px;font-weight:800;color:inherit}.rt-pp button.on{background:var(--orange);border-color:var(--orange);color:#fff}
-.rt-g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 6px}
-.rt-tl{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;font-size:10.5px;line-height:1.2;color:var(--ink-soft);padding:4px 2px;border-top:1px solid var(--line)}
-.rt-tl b{font-size:14.5px;font-weight:800;color:var(--ink);white-space:nowrap;margin-top:1px}.rt-tl small{font-size:10px}
+.rt-g3{display:flex;flex-direction:column}
+.rt-tl{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:center;text-align:left;font-size:12.5px;line-height:1.25;color:var(--ink);padding:6px 0;border-top:1px solid var(--line)}
+.rt-tl span{grid-column:1}
+.rt-tl b{grid-column:2;grid-row:1/span 2;font-size:14.5px;font-weight:800;white-space:nowrap;text-align:right}
+.rt-tl small{grid-column:1;font-size:11px;color:var(--ink-soft)}
 .rt-big small *{display:inline!important;font-size:11px!important;margin:0!important}
 .rt-big small b{display:inline;font-size:11px;margin:0;white-space:normal}
-.rt-stg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding-top:4px;border-top:1px solid var(--line)}.rt-stg>div{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;text-align:center}
-.rt-big div{border-radius:12px;padding:6px 10px;text-align:left}
-.rt-big div.g{background:var(--green-soft)}.rt-big div.r{background:var(--red-soft)}
-.rt-big span{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em}.rt-big b{display:block;font-size:20px;font-weight:900;margin-top:0;white-space:nowrap}.rt-big small{display:block;font-size:11px;color:var(--ink-soft);margin-top:1px}
+.rt-stg{display:flex;flex-direction:column;border-top:1px solid var(--line)}.rt-stg>div{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;padding:5px 0}.rt-stg>div+div{border-top:1px solid var(--line)}
+.rt-big div{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line);text-align:left}
+.rt-big span{grid-column:1;display:block;font-size:12.5px;font-weight:800}.rt-big b{grid-column:2;grid-row:1/span 2;display:block;font-size:16px;font-weight:900;white-space:nowrap;text-align:right}.rt-big small{grid-column:1;display:block;font-size:11px;color:var(--ink-soft)}
 .rt-an{font-size:11.5px;color:var(--orange);margin-top:4px}
 `; document.head.appendChild(st); }
 
@@ -562,8 +563,8 @@ R.vistaObra = function(r, P, b){
   const sociosL = [{label: 'Salario de Rafa y Manolo', valor: r.socios.valor}];
   const fil = (titulo, sub, v, color, bd, cOver, base) => { const ok = v >= 0, c = cOver || (ok ? G : RJ), mg = base > 0 && isFinite(v) ? Math.round(v / base * 100) : mgPct(v);
     return '<details class="rt-nd"><summary><div class="rt-n"><i style="background:' + color + ';"></i><div><b>' + titulo + '</b><small>' + sub + '</small></div><div class="v"><b style="color:' + c + ';">' + (isFinite(v) ? eur(v) : 'sin dato') + (mg != null ? ' <span style="font-size:.72em;font-weight:700;">' + mg + ' %</span>' : '') + '</b><small style="color:' + c + ';font-weight:700;">' + (hOk && isFinite(v) ? eur(v / r.H, 2) + '/h' : 'sin horas') + '</small></div></div></summary><div class="rt-bd">' + bd + '</div></details>'; };
-  const sg = v => v >= 0 ? G : RJ, tile = (cl2, t, v, sm, c) => '<div class="rt-t ' + cl2 + '"><span style="color:' + c + ';">' + t + '</span><b style="color:' + c + ';">' + v + '</b><small>' + sm + '</small></div>';
-  const resumen = '<div class="rt-sum">' + tile('g', 'Ingreso', eur(r.ejecutado), (hOk ? h1(r.H) + ' h' : 'sin horas'), G)
+  const sg = v => v >= 0 ? G : RJ, tile = (cl2, t, v, sm, c) => '<div class="rt-t"><span style="color:' + c + ';">' + t + '</span><b style="color:' + c + ';">' + v + '</b><small>' + sm + '</small></div>';
+  const resumen = '<div class="rt-c rt-sum">' + tile('g', 'Ingreso', eur(r.ejecutado), (hOk ? h1(r.H) + ' h' : 'sin horas'), G)
     + tile(r.beneficioReal >= 0 ? 'g' : 'r', 'Beneficio', eur(r.beneficioReal), 'antes de impuestos', sg(r.beneficioReal))
     + tile(r.neto >= 0 ? 'g' : 'r', 'Beneficio neto', eur(r.neto), 'tras impuestos', sg(r.neto)) + '</div>';
   // V9.90 (Daniel): tarjeta 1 = beneficio al ir restando costes; tarjeta 2 = lo que queda LIMPIO (tras impuestos): final frente a objetivo, aparte para compararlos; porcentaje de 1 a 100
