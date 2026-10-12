@@ -4647,11 +4647,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.90" defer></script>
-<script src="costes/norm.js?v=V10.90" defer></script>
-<script src="ajustes/calc.js?v=V10.90" defer></script>
+<script src="rentabilidad/rent.js?v=V10.91" defer></script>
+<script src="costes/norm.js?v=V10.91" defer></script>
+<script src="ajustes/calc.js?v=V10.91" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.90</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.91</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4803,7 +4803,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.90</div>
+        <div class="sub" id="version-badge">V10.91</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -22180,10 +22180,11 @@ function openClientDrawer(name){
   clientDrawerAbiertoId = c.id; _cuentaSoloPend = null;
   const euro = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   const cDocs = Object.values(documentosRealesById).filter(d=>d.entidad_id === c.id);
+  const cDocsCuenta = cDocs.filter(d => d.estado_cobro !== 'revisar');   // V10.91 (Daniel 12/10/2026): lo que está en Revisar no cuenta en ninguna cifra hasta que se decida
 
   // totales por contabilidad, de todo el historial
-  const totalOficial = cDocs.filter(d=>(d.contabilidad||'oficial')==='oficial' && d.type!=='gasto').reduce((s,d)=>s+(d.total||d.importe||0),0);
-  const totalEnB = cDocs.filter(d=>d.contabilidad==='en_b' && d.type!=='gasto').reduce((s,d)=>s+(d.total||d.importe||0)*factorSubtotal(d),0);
+  const totalOficial = cDocsCuenta.filter(d=>(d.contabilidad||'oficial')==='oficial' && d.type!=='gasto').reduce((s,d)=>s+(d.total||d.importe||0),0);
+  const totalEnB = cDocsCuenta.filter(d=>d.contabilidad==='en_b' && d.type!=='gasto').reduce((s,d)=>s+(d.total||d.importe||0)*factorSubtotal(d),0);
   document.getElementById('c-total-oficial').textContent = euro(totalOficial);
   document.getElementById('c-total-enb').textContent = euro(totalEnB);
   document.getElementById('c-total-global').innerHTML = '<b>'+euro(totalOficial+totalEnB)+'</b>';
@@ -22195,7 +22196,7 @@ function openClientDrawer(name){
 
   // actividad por a\u00f1o
   const porAnio = {};
-  cDocs.forEach(d=>{
+  cDocsCuenta.forEach(d=>{
     const a = d.dateRaw ? new Date(d.dateRaw).getFullYear() : 's/f';
     porAnio[a] = porAnio[a] || {n:0, total:0};
     porAnio[a].n++;
@@ -30544,7 +30545,7 @@ function costesTrabajoCalcular(j, tarifas){
   const neto = d => { const b = d.base != null && !isNaN(Number(d.base)) ? Number(d.base) : Number(d.importe || d.total || 0) / (1 + (d.iva_pct != null ? Number(d.iva_pct) : 21) / 100); return b || 0; };
   const lineas = d => (Array.isArray(d.conceptos) ? d.conceptos : []).map(c => ({f: dia(c.fecha) || dia(d.fecha_devengo || d.dateRaw), h: (c.unidad === 'h' || c.horas != null) ? (Number(c.horas != null ? c.horas : c.cantidad) || 0) : 0})).filter(l => l.f);
   const albs = docs.filter(d => (d.tipo || d.type) === 'albaran');
-  const conHoras = docs.filter(d => ['albaran', 'proforma', 'factura'].includes(d.tipo || d.type) && d.estado_cobro !== 'nula');   // V9.08: las horas de los demás trabajos (aunque ya sean proforma o factura) también reparten el combustible
+  const conHoras = docs.filter(d => ['albaran', 'proforma', 'factura'].includes(d.tipo || d.type) && d.estado_cobro !== 'nula' && d.estado_cobro !== 'revisar');   // V9.08: las horas de los demás trabajos (aunque ya sean proforma o factura) también reparten el combustible
   const ini = j.scheduledDate || '', fin = j.fechaFin || '';
   const mios = albs.filter(d => { if(d.trabajo_id) return d.trabajo_id === j.id; const nj = tbNorm(j.nombre || ''), porTexto = nj.length >= 4 && d.obra_texto && tbNorm(d.obra_texto).includes(nj);   // V9.07: también por el nombre de la obra
     if(!porTexto && (!j.entidadId || d.entidad_id !== j.entidadId)) return false; const fs = lineas(d).map(l => l.f).sort(); if(!fs.length) return false; return fs[fs.length - 1] >= ini && (!fin || fs[0] <= fin); });

@@ -65,7 +65,7 @@ R.invalidar = () => { R.P = null; };
 // ---------- documentos que cuentan como ingreso: una factura sustituye a los albaranes con los que está enlazada (no se suma dos veces) ----------
 R.efectivos = function(P){
   if(P._ef) return P._ef;
-  const docs = (P.docs || []).filter(d => d.estado_cobro !== 'nula' && ['albaran', 'factura', 'proforma'].includes(d.tipo)), byId = new Map(docs.map(d => [d.id, d])), ady = new Map();
+  const docs = (P.docs || []).filter(d => d.estado_cobro !== 'nula' && d.estado_cobro !== 'revisar' && ['albaran', 'factura', 'proforma'].includes(d.tipo)), byId = new Map(docs.map(d => [d.id, d])), ady = new Map();
   const une = (a, b) => { if(!a || !b || !byId.has(a) || !byId.has(b) || a === b) return; (ady.get(a) || ady.set(a, new Set()).get(a)).add(b); (ady.get(b) || ady.set(b, new Set()).get(b)).add(a); };
   docs.forEach(d => { une(d.id, d.documento_relacionado_id); une(d.id, d.documento_anterior_id); une(d.id, d.documento_siguiente_id); });
   const tieneLin = d => R.lineas(d).length > 0, cubiertos = new Set(), cubrePor = {};
