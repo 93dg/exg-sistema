@@ -4626,11 +4626,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.71" defer></script>
-<script src="costes/norm.js?v=V10.71" defer></script>
-<script src="ajustes/calc.js?v=V10.71" defer></script>
+<script src="rentabilidad/rent.js?v=V10.72" defer></script>
+<script src="costes/norm.js?v=V10.72" defer></script>
+<script src="ajustes/calc.js?v=V10.72" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.71</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.72</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4782,7 +4782,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.71</div>
+        <div class="sub" id="version-badge">V10.72</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13671,37 +13671,7 @@ function togglePanelCC(panel){
   setTimeout(servidor, 500);
 })();
 
-// V10.05 (Daniel: «botón de plegar en Documentos · Facturas, igual que en el Centro de control»): facturas, albaranes, presupuestos y gastos
-// se pliegan dejando solo la fila de Revisar/Buscar/Filtros; el estado se recuerda en el móvil y en la base, como los paneles del Centro de control
-(function docPanelesPlegar(){
-  const css = document.createElement('style');
-  css.textContent = '.panel.pleg-doc > :not(.panel-head){display:none !important}.panel.pleg-doc > .panel-head > :not(.dd-filter-row-compacta){display:none !important}.pleg-doc-btn{font-size:15px;line-height:1;padding:0 9px;min-width:34px}';
-  document.head.appendChild(css);
-  const claveDe = h => h.id ? h.id.replace('-panel-head', '') : ((h.parentElement.parentElement.closest('[id]') || {}).id || null);
-  const claves = [];
-  const poner = (panel, plegado, btn) => { panel.classList.toggle('pleg-doc', plegado); if(btn) btn.textContent = plegado ? '▸' : '▾'; };
-  const iniciar = () => document.querySelectorAll('.panel > .panel-head').forEach(head => {
-    const fila = head.querySelector(':scope > .dd-filter-row-compacta'); if(!fila || fila.querySelector('.pleg-doc-btn')) return;
-    const clave = claveDe(head); if(!clave) return;
-    const panel = head.parentElement, btn = document.createElement('button');
-    btn.type = 'button'; btn.className = 'cli-icon-btn pleg-doc-btn'; btn.title = 'Plegar o desplegar'; btn.setAttribute('aria-label', 'Plegar o desplegar');
-    fila.insertBefore(btn, fila.firstChild); claves.push(clave);
-    let v = null; try{ v = localStorage.getItem('doc-panel-' + clave); }catch(e){}
-    poner(panel, v === '0', btn);
-    btn.addEventListener('click', () => {
-      const plegar = !panel.classList.contains('pleg-doc'); poner(panel, plegar, btn);
-      try{ localStorage.setItem('doc-panel-' + clave, plegar ? '0' : '1'); }catch(e){}
-      try{ if(sb) sb.from('filtros_persistentes').upsert({container_id: 'doc-panel-' + clave, valor: plegar ? '0' : '1'}, {onConflict: 'container_id'}).then(()=>{}); }catch(e){}
-    });
-  });
-  const servidor = () => { if(typeof sb === 'undefined' || !sb) return setTimeout(servidor, 800);
-    sb.from('filtros_persistentes').select('container_id,valor').like('container_id', 'doc-panel-%').then(({data}) => (data || []).forEach(f => {
-      const clave = f.container_id.replace('doc-panel-', ''); try{ localStorage.setItem(f.container_id, f.valor); }catch(e){}
-      document.querySelectorAll('.panel > .panel-head').forEach(h => { const b = h.querySelector('.pleg-doc-btn'); if(!b) return; if(claveDe(h) === clave) poner(h.parentElement, f.valor === '0', b); });
-    })); };
-  const arrancar = () => { iniciar(); setTimeout(servidor, 500); };
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancar); else arrancar();
-})();
+// V10.72: el botón de plegar de las listas de Documentos (V10.05) se quita de Facturas, Albaranes, Presupuestos y Gastos: plegar la lista no sirve en ninguna
 
 // Avisos automáticos de ITV (flota.itv_vence = fecha hasta la que vale la última ITV favorable):
 // saltan 15 días antes del vencimiento y siguen mientras esté vencida. Se calculan cada vez, no se guardan.
