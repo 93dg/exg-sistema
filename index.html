@@ -1959,6 +1959,11 @@ details.ce-pleg[open] > summary{margin-bottom:10px;}
 .panel-head .cli-icon-btn, .factura-card-movil .fc-mas-btn{background:var(--paper) !important;border:1px solid var(--line) !important;color:var(--ink) !important;}
 .panel-head .doc-rev{margin-right:10px;order:-1;}
 @media(max-width:768px){
+  /* V10.73: buscador de las listas = una sola caja redonda que ocupa todo el cabecero */
+  .buscando > :not([id$="-bar-buscar"]){display:none !important;}
+  .buscando > [id$="-bar-buscar"]{display:flex !important;align-items:center;gap:8px;width:100%;margin:0 !important;padding:6px 0 !important;box-sizing:border-box;}
+  .buscando > [id$="-bar-buscar"] input{flex:1 1 auto;min-width:0;width:auto !important;height:42px;border-radius:999px;padding:0 18px;font-size:16px;border:1.5px solid var(--orange);background:var(--paper);box-sizing:border-box;}
+  .buscando > [id$="-bar-buscar"] button{flex:0 0 auto;}
   .doc-cab{display:flex !important;flex-direction:row !important;flex-wrap:nowrap !important;align-items:center !important;justify-content:flex-start !important;gap:6px !important;}
   .doc-cab .doc-rev{flex:0 0 auto !important;width:auto !important;margin:0 !important;padding:7px 10px !important;font-size:12.5px !important;}
   .doc-cab > *:not(.doc-rev):not(.dd-filter-row){flex:1 1 auto;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -4626,11 +4631,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.72" defer></script>
-<script src="costes/norm.js?v=V10.72" defer></script>
-<script src="ajustes/calc.js?v=V10.72" defer></script>
+<script src="rentabilidad/rent.js?v=V10.73" defer></script>
+<script src="costes/norm.js?v=V10.73" defer></script>
+<script src="ajustes/calc.js?v=V10.73" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.72</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.73</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4782,7 +4787,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.72</div>
+        <div class="sub" id="version-badge">V10.73</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11238,7 +11243,7 @@ function renderGastosProProveedores(){
   el.innerHTML = lista.length ? lista.map(c => `<button type="button" class="gr-fila" onclick="gproVerDeProveedor('${c.id}')"><div class="c"><b>${escHtml(c.name)}</b><div style="font-size:12px;color:var(--ink-soft);">${[c.nif, c.poblacion, c.telefono].filter(Boolean).map(escHtml).join(' · ') || 'Sin datos de contacto'}${c.esCli ? ' · también cliente' : ''}</div></div><div style="text-align:right;flex:none;"><b>${euro(tot[c.id])}</b><div style="font-size:11.5px;color:var(--ink-soft);">${num[c.id] || 0} gasto${(num[c.id] || 0) === 1 ? '' : 's'}</div></div></button>`).join('') : '<div class="empty" style="padding:16px;">Sin proveedores.</div>';
 }
 function gproVerDeProveedor(id){ const c = clientes.find(x => x.id === id); if(!c) return; const t = document.querySelector('#gpro-subtabs .docs-tab[data-sub="lista"]'); if(t) t.click(); const q = document.getElementById('gpro-lista-buscar'); if(q){ q.value = c.name; const b = document.getElementById('gpro-bar-buscar'); if(b) b.style.display = 'block'; } if(typeof GPF !== 'undefined'){ GPF.anio = new Set(); GPF.trim = new Set(); _gpAnios = ''; } renderGastosProLista(); }
-function gproToggleBuscar(){ const b = document.getElementById('gpro-bar-buscar'); if(!b) return; const ver = b.style.display === 'none'; b.style.display = ver ? 'block' : 'none'; if(ver) document.getElementById('gpro-lista-buscar')?.focus(); }
+function gproToggleBuscar(){ const b = document.getElementById('gpro-bar-buscar'); if(!b) return; const ver = b.style.display === 'none'; b.style.display = ver ? 'block' : 'none'; busqCabecero(b, ver, document.getElementById('gpro-lista-buscar')); }
 function gproRestablecer(){ GPF.anio = new Set([String(new Date().getFullYear())]); GPF.trim = new Set(); GPF.tipo = ''; GPF.cont = ''; GPF.just = ''; GPF.orden = 'fecha'; GPF.dir = 'desc'; const q = document.getElementById('gpro-lista-buscar'); if(q) q.value = ''; gproGuardarFiltros(); _gpAnios = ''; renderGastosProLista(); }
 function pleg2IniciarGastos(){
   ['anio', 'trim', 'tipo', 'cont', 'just', 'orden'].forEach(k => { const e = document.getElementById('gpro-f-' + k); if(e && !e.dataset.listo){ e.dataset.listo = '1'; e.addEventListener('click', ev => gproChipClick(k, ev)); } });
@@ -14103,7 +14108,7 @@ function setTrabOrden(el){
 function toggleTrabBuscador(){
   const b=document.getElementById('trab-bar-buscar');
   b.style.display=b.style.display==='none'?'flex':'none';
-  if(b.style.display==='flex') document.getElementById('trab-search')?.focus();
+  busqCabecero(b, b.style.display==='flex', document.getElementById('trab-search'), () => renderTrabajosMovil());   // V10.73
 }
 
 function renderJobs(filter){
@@ -20883,6 +20888,7 @@ function toggleBuscadorClientes(){
   const main = document.getElementById('cli-bar-main');
   const abierto = bar.classList.contains('visible');
   bar.classList.toggle('visible', !abierto);
+  bar.parentElement.classList.toggle('buscando', !abierto);   // V10.73
   btn?.classList.toggle('activo', !abierto);
   if(!abierto){
     const inp = document.getElementById('clientes-search');
@@ -20902,12 +20908,19 @@ function cancelarSeleccionClientes(){
 }
 // ===== Buscador/Restablecer genéricos para las cabeceras unificadas de
 // Facturas/Albaranes/Presupuestos-Proformas (mismo estilo que Clientes) =====
+// V10.73: el buscador de TODAS las listas (Facturas, Albaranes, Presupuestos, Gastos, Clientes, Trabajos) ocupa el cabecero entero con una caja redonda, sin el resto de elementos; al cerrarlo se borra lo escrito y vuelve el cabecero
+function busqCabecero(barra, abrir, input, alCerrar){
+  const cab = barra.closest('.panel-head') || barra.parentElement; if(!cab) return;
+  cab.classList.toggle('buscando', abrir);
+  if(abrir){ if(input) setTimeout(() => input.focus(), 50); }
+  else if(input && input.value !== ''){ input.value = ''; try{ input.dispatchEvent(new Event('input')); if(alCerrar) alCerrar(); }catch(e){} }
+}
 function toggleBuscadorDocumentos(prefijo){
   const barra = document.getElementById(prefijo+'-bar-buscar');
   if(!barra) return;
   const abrir = barra.style.display==='none' || !barra.style.display;
   barra.style.display = abrir ? 'flex' : 'none';
-  if(abrir) setTimeout(()=>document.getElementById(prefijo+'-search')?.focus(),50);
+  busqCabecero(barra, abrir, document.getElementById(prefijo+'-search'));
 }
 /* ===== FILTROS PLEGABLES (el estilo de los de Trabajos, para Facturas, Albaranes y Presupuestos) =====
    Las pastillas de siempre (.chip-filter dentro de .filters[id]) son las que mandan: se MUEVEN aquí, no se copian ni se esconden, así el filtrado y lo que se recuerda de cada una
