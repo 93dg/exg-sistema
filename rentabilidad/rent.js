@@ -504,7 +504,7 @@ R.simular2 = function(b, e){
 .rt-n .v small{white-space:nowrap}
 .rt-n .x{grid-column:2/4;font-size:12.5px;display:flex;flex-direction:column;gap:4px;align-items:flex-start}.rt-n .x em{display:block;font-style:normal;font-size:12px;font-weight:800;border-radius:8px;padding:3px 9px}
 .rt-n .x em.g{background:var(--green-soft);color:var(--green)}.rt-n .x em.r{background:var(--red-soft);color:var(--red)}
-.rt-sel{background:#fff;border:1.5px solid var(--orange);border-radius:10px;padding:5px 10px;font-weight:700;color:var(--ink);font-size:13px}
+.rt-sel{background:#fff;border:1.5px solid var(--orange);border-radius:10px;padding:3px 8px;font-weight:700;color:var(--ink);font-size:13px}
 .rt-nd>summary{list-style:none;cursor:pointer}.rt-nd>summary::-webkit-details-marker{display:none}.rt-nd .rt-bd{padding:2px 0 10px 14px;font-size:12px;border-bottom:1px solid var(--line)}
 .rt-ch{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;font-size:12px}
 .rt-ch button,.rt-seg button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700;color:inherit}
@@ -618,8 +618,9 @@ R.datosReales = function(r, b){   // V10.51 (Daniel): datos reales sobre la hora
   return '<div class="rt-c"><h3>Datos reales</h3><div style="font-size:11.5px;color:var(--ink-soft);margin:-4px 0 6px;">Jornada de 8 h; 1 h se reserva para mantenimiento, reparaciones y preparativos: quedan 7 h operativas.</div>'
     + f('Días de la obra (L-V)', x.dLab) + f('Días trabajados' + (dFin ? ' (' + dFin + ' en fin de semana)' : ''), dTr) + f('Días laborables no trabajados', x.dVacios) + f('Horas operativas trabajadas', h1(r.H) + ' h') + f('Media: ' + h1(r.H) + ' h ÷ ' + dTr + ' días trabajados', isFinite(media) ? h1(media) + ' h/día' : '—')
     + f('€/h operativas (ingreso ÷ horas)', r.H > 0 ? eur(r.ejecutado / r.H, 2) : '—', G)
+    + f('€/día operativo (ingreso ÷ días trabajados)', dTr > 0 ? eur(r.ejecutado / dTr) : '—', G)
     + f('Duración ideal (7 h/día × empleado)', isFinite(dEmp) ? h1(dEmp) + ' días' : '—', G)
-    + f('Días operativos desaprovechados', h1(x.dEq) + ' días', '#c58a1b') + f('Horas operativas desaprovechadas', h1(x.hPerd) + ' h', '#c58a1b') + f('H/día operativas desaprovechadas · ' + h1(x.pot) + ' − ' + (isFinite(media) ? h1(media) : '—'), isFinite(media) ? h1(Math.max(0, x.pot - media)) + ' h/día' : '—', '#c58a1b')
+    + f('Días operativos desaprovechados', h1(x.dEq) + ' días', '#c58a1b') + f('Horas operativas desaprovechadas', h1(x.hPerd) + ' h', '#c58a1b') + f('€ de las horas desaprovechadas (× ' + (isFinite(x.margenH) ? eur(x.margenH, 2) : '—') + '/h de margen)', isFinite(x.dinero) ? eur(x.dinero) : '—', '#c0392b') + f('H/día operativas desaprovechadas · ' + h1(x.pot) + ' − ' + (isFinite(media) ? h1(media) : '—'), isFinite(media) ? h1(Math.max(0, x.pot - media)) + ' h/día' : '—', '#c58a1b')
     + f('Empleados', h1(x.personas))
     + f('Maquinaria usada', mq.length)
     + (mq.length ? '<div style="font-weight:800;font-size:12.5px;margin:4px 0 0;">Horas por máquina</div>' + mq.map(m => f(esc(m.nombre), h1(m.horas) + ' h · ' + m.dias + ' días')).join('') : '')
@@ -676,7 +677,7 @@ R.vista = function(P){
   if(!R.sel || !con.some(x => x.job.id === R.sel)) R.sel = con[0] ? con[0].job.id : null;
   const r = con.find(x => x.job.id === R.sel) || {vacio: true}; R._r = r; R._asig = asig;
   const dep = (P.jobs || []).filter(j => j.estado !== 'Cancelado' && !asig.porJob[j.id].length).length;
-  const selTxt = x => (x.job.trabajo || 'Obra') + ' · ' + (x.job.cliente || '') + ' · ' + eur(x.beneficioReal), selAct = con.find(x => x.job.id === R.sel), selFs = selAct ? Math.max(8.5, Math.min(11, 230 / (selTxt(selAct).length * 0.6))).toFixed(1) : 11;   // V9.86: si el texto no cabe, la letra se hace más pequeña
+  const selTxt = x => (x.job.trabajo || 'Obra') + ' · ' + (x.job.cliente || '') + ' · ' + eur(x.beneficioReal), selAct = con.find(x => x.job.id === R.sel), selFs = selAct ? Math.max(8.5, Math.min(10.5, 230 / (selTxt(selAct).length * 0.6))).toFixed(1) : 10.5;   // V9.86: si el texto no cabe, la letra se hace más pequeña
   const selector = '<select class="rt-sel" onchange="RENT.setSel(this.value)" style="width:100%;font-size:' + selFs + 'px;padding-left:8px;padding-right:4px;">' + con.map(x => '<option value="' + x.job.id + '" ' + (x.job.id === R.sel ? 'selected' : '') + '>' + esc((x.job.trabajo || 'Obra') + ' · ' + (x.job.cliente || '') + ' · ' + eur(x.beneficioReal)) + '</option>').join('') + '</select>';
   const amb = asig.ambiguos.length ? card('Albaranes por asignar (' + asig.ambiguos.length + ')', '<div style="font-size:11.5px;color:var(--ink-soft);margin-bottom:6px;">El mismo cliente tiene varias obras abiertas en esas fechas. No se reparten solos para no mezclar obras.</div>' + asig.ambiguos.slice(0, 8).map(a => '<div style="font-size:12px;padding:3px 0;">' + esc((a.doc.numero || 'albarán') + ' · ' + R.fechaRef(a.doc) + ' · ' + eur(R.baseIngreso(a.doc))) + ' <select onchange="if(this.value)RENT.asignarAlb(\'' + a.doc.id + '\',this.value)"><option value="">asignar a…</option>' + a.candidatos.map(id => { const j = jobs.find(x => x.id === id); return '<option value="' + id + '">' + esc(j ? j.trabajo : id) + '</option>'; }).join('') + '</select></div>').join('')) : '';
   let obra;
