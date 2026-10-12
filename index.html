@@ -4639,11 +4639,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.82" defer></script>
-<script src="costes/norm.js?v=V10.82" defer></script>
-<script src="ajustes/calc.js?v=V10.82" defer></script>
+<script src="rentabilidad/rent.js?v=V10.83" defer></script>
+<script src="costes/norm.js?v=V10.83" defer></script>
+<script src="ajustes/calc.js?v=V10.83" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.82</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.83</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4795,7 +4795,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.82</div>
+        <div class="sub" id="version-badge">V10.83</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9402,13 +9402,13 @@ async function econ2Cargar(){
   e2DeudaCargar();
   if(!_e2){ box.innerHTML = '<div class="dir-cargando">Cargando…</div>';
     const docs = []; let desde = 0;
-    while(true){ const {data, error} = await sb.from('documentos_economicos').select('id, tipo, numero, importe, cobrado_importe, cobrado_en, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'proforma', 'albaran', 'gasto']).range(desde, desde + 999);
+    while(true){ const {data, error} = await sb.from('documentos_economicos').select('id, tipo, numero, importe, iva_pct, cobrado_importe, cobrado_en, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'proforma', 'albaran', 'gasto']).range(desde, desde + 999);
       if(error || !data || !data.length) break; docs.push(...data); if(data.length < 1000) break; desde += 1000; }
     const {data: ents} = await sb.from('entidades').select('id, nombre'); const E = {}; (ents || []).forEach(x => { E[x.id] = x.nombre; });
     const enl = new Set(); docs.forEach(d => { if(d.tipo !== 'factura') return; if(d.documento_anterior_id) enl.add(d.documento_anterior_id); (d.origen_albaran_ids || []).forEach(x => enl.add(x)); });
     _e2 = docs.filter(d => d.fecha_devengo).map(d => { const f = d.fecha_devengo, an = Number(f.slice(0, 4)), tr = Math.floor((Number(f.slice(5, 7)) - 1) / 3) + 1, imp = Number(d.importe || 0);
       const legal = d.tipo === 'factura' && !['nula', 'rectificativa'].includes(d.estado_cobro) ? imp : 0;
-      const sinF = econImporteSinFactura({type: d.tipo === 'albaran' ? 'albaran' : d.tipo, id: d.id, documento_siguiente_id: d.documento_siguiente_id, client: E[d.entidad_id] || '', estado_cobro: d.estado_cobro, total: imp, cobrado_importe: d.cobrado_importe}, enl);
+      const sinF = econImporteSinFactura({type: d.tipo === 'albaran' ? 'albaran' : d.tipo, id: d.id, documento_siguiente_id: d.documento_siguiente_id, client: E[d.entidad_id] || '', estado_cobro: d.estado_cobro, total: imp, iva_pct: d.iva_pct, cobrado_importe: d.cobrado_importe}, enl);
       // V8.13: cada fila guarda lo necesario para enseñar el detalle al tocar un dato
       const est = d.estado_cobro || '', admin = esAdministracion(E[d.entidad_id] || ''), falta = Math.max(0, imp - Number(d.cobrado_importe || 0) - (est === 'parcial_otra' ? enOtraSuma(d) : 0));
       let pend = 0, sinFact = 0;
@@ -12900,7 +12900,7 @@ function calcularKPIsReales(){
   const facturasEmitidasMes = docs.filter(d=>d.type==='factura' && d.status!=='Borrador' && esDelMes(d));
   const facturadoMes = facturasEmitidasMes.reduce((s,d)=>s+(d.total||0),0);
   const cobradoLegalMes = facturasEmitidasMes.reduce((s,d)=>s+Number(d.cobrado_importe||0),0);
-  const cobradoEnBMes = docs.filter(d=>d.type==='albaran' && d.estado_cobro==='cobrado' && esDelMes(d)).reduce((s,d)=>s+(d.total||0),0);
+  const cobradoEnBMes = docs.filter(d=>d.type==='albaran' && d.estado_cobro==='cobrado' && esDelMes(d)).reduce((s,d)=>s+(d.total||0)*factorSubtotal(d),0);
   const cobradoMes = cobradoLegalMes + cobradoEnBMes;
 
   const gastosMes = docs.filter(d=>d.type==='gasto' && gastoCuentaControl(d) && esDelMes(d)).reduce((s,d)=>s+(d.total||0),0);
@@ -22151,7 +22151,7 @@ function openClientDrawer(name){
 
   // totales por contabilidad, de todo el historial
   const totalOficial = cDocs.filter(d=>(d.contabilidad||'oficial')==='oficial' && d.type!=='gasto').reduce((s,d)=>s+(d.total||d.importe||0),0);
-  const totalEnB = cDocs.filter(d=>d.contabilidad==='en_b' && d.type!=='gasto').reduce((s,d)=>s+(d.total||d.importe||0),0);
+  const totalEnB = cDocs.filter(d=>d.contabilidad==='en_b' && d.type!=='gasto').reduce((s,d)=>s+(d.total||d.importe||0)*factorSubtotal(d),0);
   document.getElementById('c-total-oficial').textContent = euro(totalOficial);
   document.getElementById('c-total-enb').textContent = euro(totalEnB);
   document.getElementById('c-total-global').innerHTML = '<b>'+euro(totalOficial+totalEnB)+'</b>';
@@ -29022,12 +29022,15 @@ function econEnlazadosAFactura(docs){
   docs.forEach(d => { if(d.type !== 'factura') return; if(d.documento_anterior_id) s.add(d.documento_anterior_id); (d.origen_albaran_ids || []).forEach(x => s.add(x)); });
   return s;
 }
+// V10.83 (Daniel): lo cobrado sin factura (en B) cuenta SOLO el subtotal; el IVA no se suma ni se resta en ningún sitio
+function factorSubtotal(d){ if(d.base != null && d.total) return Number(d.base) / Number(d.total); const p = d.iva_pct != null ? d.iva_pct : d.ivaPct; return 1 / (1 + (p != null ? Number(p) : 21) / 100); }
 function econImporteSinFactura(d, enlazados){
   if(d.type !== 'proforma' && d.type !== 'albaran') return 0;
   if(d.deleted_at || d.documento_siguiente_id || (enlazados && enlazados.has(d.id))) return 0;
   if(esAdministracion(d.client)) return 0;
-  if(d.estado_cobro === 'cobrado') return Number(d.total || 0);
-  if(d.estado_cobro === 'parcial') return Math.min(Number(d.total || 0), Number(d.cobrado_importe || 0));
+  const f = factorSubtotal(d);
+  if(d.estado_cobro === 'cobrado') return Number(d.total || 0) * f;
+  if(d.estado_cobro === 'parcial') return Math.min(Number(d.total || 0), Number(d.cobrado_importe || 0)) * f;
   return 0;
 }
 const esAdministracion = nombre => /(AYUNTAMIENTO|AYTO\.|DIPUTACI|JUNTA DE ANDALUC|CONSEJER|MINISTERIO|MANCOMUNIDAD|CONFEDERACI)/i.test(String(nombre || ''));
