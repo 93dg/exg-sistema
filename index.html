@@ -4626,11 +4626,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.70" defer></script>
-<script src="costes/norm.js?v=V10.70" defer></script>
-<script src="ajustes/calc.js?v=V10.70" defer></script>
+<script src="rentabilidad/rent.js?v=V10.71" defer></script>
+<script src="costes/norm.js?v=V10.71" defer></script>
+<script src="ajustes/calc.js?v=V10.71" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.70</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.71</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4782,7 +4782,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.70</div>
+        <div class="sub" id="version-badge">V10.71</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9546,7 +9546,7 @@ let _dirDatos = null, _dirId = null, _dirVivo = null, _dirVerDiag = false, _dirP
 const dirEur = n => tbN(Math.round(n || 0), 0) + ' €';
 // V7.82 datos en vivo de EXG para el semáforo: saldo del banco, por cobrar, por facturar a la Administración, meses de trabajo en cola
 async function dirVivo(){
-  const v = {saldo: null, cobrar: 0, nCobrar: 0, facturar: 0, nFacturar: 0, facturarDias: 0, meses: null, nTrab: 0};
+  const v = {saldo: null, cobrar: 0, nCobrar: 0, facturar: 0, nFacturar: 0, facturarDias: 0, meses: null, nTrab: 0, sf: [], acuenta: [], parc: []};   // V10.71: sf/acuenta/parc alimentan las tareas de «Qué hacer ahora» con fórmulas
   try{
     const {data: mov} = await sb.from('movimientos_banco').select('fecha, orden, importe, saldo').order('fecha', {ascending: false}).order('orden', {ascending: false}).limit(200);
     const iS = (mov || []).findIndex(m => m.saldo != null);
@@ -9554,7 +9554,7 @@ async function dirVivo(){
   }catch(e){}
   try{
     const [{data: docs}, {data: ents}] = await Promise.all([
-      sb.from('documentos_economicos').select('id, tipo, importe, cobrado_importe, cobrado_en, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'albaran', 'proforma']).gte('anio', new Date().getFullYear() - 2),
+      sb.from('documentos_economicos').select('id, tipo, importe, cobrado_importe, cobrado_en, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id, numero').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'albaran', 'proforma']).gte('anio', new Date().getFullYear() - 2),
       sb.from('entidades').select('id, nombre, es_administracion')]);
     const E = {}; (ents || []).forEach(x => { E[x.id] = x; });
     const enl = new Set(); (docs || []).forEach(d => { if(d.tipo === 'factura'){ if(d.documento_anterior_id) enl.add(d.documento_anterior_id); (d.origen_albaran_ids || []).forEach(x => enl.add(x)); } });
@@ -9562,8 +9562,10 @@ async function dirVivo(){
     (docs || []).forEach(d => {
       const est = d.estado_cobro || '', ent = E[d.entidad_id] || {}, admin = ent.es_administracion || esAdministracion(ent.nombre);
       if(['cobrado', 'nula', 'rectificativa', 'cobrado_otra'].includes(est)) return;
-      if(d.tipo === 'factura'){ if(['pendiente_cobrar', 'parcial'].includes(est)){ v.cobrar += falta(d); v.nCobrar++; } else if(['entregado', 'por_cobrar_otra'].includes(est)){ const x = Math.max(0, falta(d) - enOtraSuma(d)); if(x){ v.cobrar += x; v.nCobrar++; } } return; }
+      if(d.tipo === 'factura'){ if(est === 'parcial' && falta(d)) v.parc.push({falta: falta(d)}); if(['pendiente_cobrar', 'parcial'].includes(est)){ v.cobrar += falta(d); v.nCobrar++; } else if(['entregado', 'por_cobrar_otra'].includes(est)){ const x = Math.max(0, falta(d) - enOtraSuma(d)); if(x){ v.cobrar += x; v.nCobrar++; } } return; }
       if(d.documento_siguiente_id || enl.has(d.id) || !falta(d)) return;
+      if(d.tipo === 'albaran' && est === 'trabajo_activo') v.acuenta.push({ent: ent.nombre || '', num: d.numero || '', falta: falta(d)});
+      else v.sf.push({ent: ent.nombre || '', admin: !!admin, tipo: d.tipo, falta: falta(d)});
       if(admin){ v.facturar += falta(d); v.nFacturar++; v.cobrar += falta(d); v.nCobrar++; if(d.fecha_devengo) v.facturarDias = Math.max(v.facturarDias, Math.round((hoy - new Date(d.fecha_devengo)) / 864e5)); }   // V8.36 (Daniel): lo de la Administración sin facturar también está pendiente de cobrar
       else if(['pendiente_cobrar', 'pendiente_enviar', 'parcial', 'borrador', 'entregado', 'por_cobrar_otra', 'parcial_otra'].includes(est)){ v.cobrar += falta(d); v.nCobrar++; }
     });
@@ -9573,6 +9575,26 @@ async function dirVivo(){
     const l = typeof tbPendientes === 'function' ? tbPendientes() : []; v.nTrab = l.length; if(l.length) v.meses = tbSuma(l).h / 160;
   }catch(e){}
   return v;
+}
+// V10.71: las tareas de «Qué hacer ahora» se calculan con fórmulas sobre los documentos reales (importe, nº y desaparecen cuando sale 0); las demás siguen con casilla a mano
+const DIR_FORMULAS = {
+  t1: v => dirAgrupa(v.sf.filter(x => x.admin)),
+  t2: v => dirAgrupa(v.sf.filter(x => !x.admin && /granjuela/i.test(x.ent))),
+  t3: v => { const l = v.acuenta.filter(x => /rafael s/i.test(x.ent)); return l.length ? {detalle: 'Albarán ' + (l[0].num || 'en curso') + ' en curso: entrega a cuenta o factura parcial', importe: l.reduce((a, x) => a + x.falta, 0)} : null; },
+  t4: v => v.parc.length ? {detalle: v.parc.length + (v.parc.length === 1 ? ' factura con cobro parcial' : ' facturas con cobro parcial'), importe: v.parc.reduce((a, x) => a + x.falta, 0)} : null,
+};
+function dirAgrupa(l){
+  if(!l.length) return null;
+  const na = l.filter(x => x.tipo === 'albaran').length, np = l.filter(x => x.tipo === 'proforma').length;
+  const partes = []; if(na) partes.push(na + (na === 1 ? ' albarán' : ' albaranes')); if(np) partes.push(np + (np === 1 ? ' proforma' : ' proformas'));
+  return {detalle: partes.join(' y ') + ' sin facturar', importe: l.reduce((a, x) => a + x.falta, 0)};
+}
+function dirTareas(d, v){
+  return (d.tareas || []).map(t => {
+    const f = DIR_FORMULAS[t.id]; if(!f) return t;
+    if(!v) return {...t, auto: true, detalle: '…', importe: null};
+    const r = f(v); return r ? {...t, auto: true, detalle: r.detalle, importe: r.importe, hecha: false} : null;
+  }).filter(Boolean);
 }
 async function dirGuardar(){ if(!sb || !_dirId) return; try{ await sb.from('sistema').update({data: _dirDatos, updated_at: new Date().toISOString()}).eq('id', _dirId); }catch(e){ mostrarToast('No se pudo guardar'); } }
 async function dirCargar(forzar){
@@ -9592,7 +9614,7 @@ function dirPintar(){
   if(_dirPest === 'valor'){ app0.innerHTML = pest + '<div id="vl-app"></div>'; if(_vl) vlPintar(); else vlCargar(); return; }
   app0.innerHTML = pest + '<div id="dir-mando"></div>'; const app = document.getElementById('dir-mando');
   const d = _dirDatos; if(!d){ app.innerHTML = '<div class="ce-nota">Todavía no hay datos de Dirección.</div>'; return; }
-  const v = _dirVivo, tareas = d.tareas || [], hechas = tareas.filter(t => t.hecha).length, pct = tareas.length ? hechas / tareas.length : 0;
+  const v = _dirVivo, tareas = dirTareas(d, _dirVivo), hechas = tareas.filter(t => t.hecha).length, pct = tareas.length ? hechas / tareas.length : 0;
   const decs = d.decisiones || [], pend = decs.filter(x => !x.elegida), dec = pend[0], tomadas = decs.filter(x => x.elegida);
   // semáforo: verde bien, amarillo ojo, rojo mal
   const semaf = (val, rojo, amar, inverso) => val == null ? 'gris' : (inverso ? (val < rojo ? 'rojo' : val < amar ? 'amar' : 'verde') : (val > rojo ? 'rojo' : val > amar ? 'amar' : 'verde'));
@@ -9611,7 +9633,7 @@ function dirPintar(){
   <div class="dir-tiles">${tiles.map(x => `<button type="button" class="dir-tile s-${x.s}" data-dir-ir="${x.ir}"><span class="dir-t-ico">${dirIco(x.ico)}</span><span class="dir-t-t">${x.t}</span><b>${x.v}</b><i>${escHtml(x.p)}</i></button>`).join('')}</div>
   <div class="dir-tit">Qué hacer ahora</div>
   <div class="dir-tareas">${tareas.map(t => `<div class="dir-tarea${t.hecha ? ' hecha' : ''}">
-      <button type="button" class="dir-check" data-dir-tarea="${t.id}" aria-label="Marcar">${t.hecha ? '✓' : ''}</button>
+      ${t.auto ? '' : `<button type="button" class="dir-check" data-dir-tarea="${t.id}" aria-label="Marcar">${t.hecha ? '✓' : ''}</button>`}
       <div class="dir-ta-txt"><b>${dirIco(t.ico, 'mini')} ${escHtml(t.titulo)}</b><span>${escHtml(t.detalle || '')}</span></div>
       ${t.importe ? `<span class="dir-ta-eur">${dirEur(t.importe)}</span>` : ''}
       ${t.ir && !t.hecha ? `<button type="button" class="dir-ir" data-dir-ir="${t.ir}" aria-label="Ir">→</button>` : ''}
@@ -9625,6 +9647,12 @@ function dirPintar(){
   <button type="button" class="dir-vermas" data-dir-diag>${_dirVerDiag ? 'Ocultar diagnóstico ▴' : 'Ver diagnóstico completo ▾'}</button>
   ${_dirVerDiag ? (d.secciones || []).map((x, i) => `<div class="dir-sec"><button type="button" data-dir-sec="${i}">${escHtml(x.titulo)}<i>▾</i></button><div class="dir-cuerpo">${dirMd(x.md)}</div></div>`).join('') : ''}`;
 }
+setInterval(async () => {   // V10.71: Dirección se actualiza sola cada minuto mientras está abierta
+  try{
+    const vista = document.getElementById('view-direccion'); if(!vista || !vista.classList.contains('active') || document.hidden || !sb || !_dirDatos || _dirPest !== 'mando') return;
+    _dirVivo = await dirVivo(); if(_dirPest === 'mando') dirPintar();
+  }catch(e){}
+}, 60000);
 document.addEventListener('click', e => {
   const t = e.target.closest ? e.target : null; if(!t) return;
   const sec = t.closest('[data-dir-sec]'); if(sec){ sec.parentElement.classList.toggle('abierta'); return; }
