@@ -508,7 +508,7 @@ R.simular2 = function(b, e){
 .rt-nd>summary{list-style:none;cursor:pointer}.rt-nd>summary::-webkit-details-marker{display:none}.rt-nd .rt-bd{padding:2px 0 10px 14px;font-size:12px;border-bottom:1px solid var(--line)}
 .rt-ch{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;font-size:12px}
 .rt-ch button,.rt-seg button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700;color:inherit}
-.rt-ch button.on,.rt-seg button.on{background:var(--orange);border-color:var(--orange);color:#fff}
+.rt-ch button.on,.rt-seg button.on{background:var(--paper);border:2px solid var(--orange);color:var(--ink)}
 .rt-tb{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}.rt-tb th:first-child,.rt-tb td:first-child{width:34%}
 .rt-tb.rt-fit{min-width:0 !important;width:100%}   /* V9.84: la regla global table{min-width:600px} desbordaba la tabla por máquina en el móvil */
 .rt-th9 th{font-size:8.5px !important;letter-spacing:0;padding-left:0 !important;padding-right:2px !important}.rt-th9 th:first-child,.rt-th9 td:first-child{width:25% !important}
@@ -530,9 +530,9 @@ R.simular2 = function(b, e){
 .rt-big{display:flex;flex-direction:column;margin:2px 0 4px}
 .rt-w .tb-cos{margin-bottom:0!important;padding:8px 10px}
 #te-subtabs{margin:0 0 6px!important;gap:6px}#te-subtabs .docs-tab{padding:5px 8px;font-size:12px}
-.rt-pl{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line)}.rt-pl button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:5px 22px;font-size:13px;font-weight:800;color:inherit}.rt-pl button.on{background:var(--orange);border-color:var(--orange);color:#fff}.rt-pw{margin-top:6px}
+.rt-pl{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line)}.rt-pl button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:5px 22px;font-size:13px;font-weight:800;color:inherit}.rt-pl button.on{background:var(--paper);border:2px solid var(--orange);color:var(--ink)}.rt-pw{margin-top:6px}
 .rt-pp{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:2px 0 6px}.rt-pp>div{display:flex;flex-direction:column;align-items:center;gap:2px}.rt-pp small{text-align:center}
-.rt-pp button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:5px 22px;font-size:13px;font-weight:800;color:inherit}.rt-pp button.on{background:var(--orange);border-color:var(--orange);color:#fff}
+.rt-pp button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:5px 22px;font-size:13px;font-weight:800;color:inherit}.rt-pp button.on{background:var(--paper);border:2px solid var(--orange);color:var(--ink)}
 .rt-g3{display:flex;flex-direction:column}
 .rt-tl{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:center;text-align:left;font-size:12.5px;line-height:1.25;color:var(--ink);padding:6px 0;border-top:1px solid var(--line)}
 .rt-tl span{grid-column:1}
