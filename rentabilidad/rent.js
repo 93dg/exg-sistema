@@ -531,7 +531,7 @@ R.simular2 = function(b, e){
 .rt-big{display:flex;flex-direction:column;margin:2px 0 4px}
 .rt-w .tb-cos{margin-bottom:0!important;padding:8px 10px}
 #te-subtabs{margin:0 0 6px!important;gap:6px}#te-subtabs .docs-tab{padding:5px 8px;font-size:12px}
-.rt-pl{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line)}.rt-pl button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:5px 22px;font-size:13px;font-weight:800;color:inherit}.rt-pl button.on{background:var(--paper);border:2px solid var(--orange);color:var(--ink)}.rt-pw{margin-top:6px}
+.rt-pl{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line)}.rt-pl>button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:5px 22px;font-size:13px;font-weight:800;color:inherit}.rt-pl>button.on{background:var(--paper);border:2px solid var(--orange);color:var(--ink)}.rt-pw{margin-top:6px}
 .rt-pp{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:2px 0 6px}.rt-pp>div{display:flex;flex-direction:column;align-items:center;gap:2px}.rt-pp small{text-align:center}
 .rt-pp button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:5px 22px;font-size:13px;font-weight:800;color:inherit}.rt-pp button.on{background:var(--paper);border:2px solid var(--orange);color:var(--ink)}
 .rt-g3{display:flex;flex-direction:column}
@@ -541,7 +541,7 @@ R.simular2 = function(b, e){
 .rt-tl small{grid-column:1;font-size:11px;color:var(--ink-soft)}
 .rt-big small *{display:inline!important;font-size:11px!important;margin:0!important}
 .rt-big small b{display:inline;font-size:11px;margin:0;white-space:normal}
-.rt-stg{display:flex;flex-direction:column;border-top:1px solid var(--line)}.rt-stg>div{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;padding:5px 0}.rt-stg>div+div{border-top:1px solid var(--line)}
+.rt-stg{display:flex;flex-direction:column}
 .rt-big div{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line);text-align:left}
 .rt-big span{grid-column:1;display:block;font-size:12.5px;font-weight:800}.rt-big b{grid-column:2;grid-row:1/span 2;display:block;font-size:16px;font-weight:900;white-space:nowrap;text-align:right}.rt-big small{grid-column:1;display:block;font-size:11px;color:var(--ink-soft)}
 .rt-an{font-size:11.5px;color:var(--orange);margin-top:4px}
@@ -651,11 +651,11 @@ R.simHtml = function(P, b){
   const opSim = b.obra && b.r ? R.opHtml(b.r, persSim, b.margenH, sociosSim, s.tr.rep + s.tr.ges, quienSim || undefined) : '';
   const pagoHr = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : NaN, cMaqH = coste('maquinista');
   const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small onclick="RENT.setFicha(\'' + k + '\')" style="color:var(--ink-soft);font-size:11px;text-align:right;cursor:pointer;">cobra ' + eur(v, 2) + (m === 'hoy' && xOp ? '' : '/h') + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : ''; };
-  const st = (k, t) => '<div><span onclick="RENT.setFicha(\'' + k + '\')" style="cursor:pointer;">' + t + '</span><span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>';
+  const st = (k, t) => '<div class="rt-pl"><button type="button" class="' + ((bd[k] > 0 || R.ficha === k) ? 'on' : '') + '" onclick="RENT.setFicha(\'' + k + '\')">' + t + '</button><span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>';   // V11.06: el puesto es una pastilla como Rafa/Manolo: al pulsarla sale su ficha y se marca en naranja (borde)
   const pp = (k, n) => '<div class="rt-pl"><button type="button" class="' + (bd[k] === 'fuera' ? '' : 'on') + '" onclick="RENT.setEsc2(\'' + k + '\',\'hoy\')">' + n + '</button>' + (cobH(k) || '<small style="font-size:10.5px;color:var(--ink-soft);">fuera</small>') + '</div>';   // V10.67: el nombre es la pastilla
   // V11.00 (Daniel 12/10/2026): al pulsar «cobra…» de Rafa o Manolo, o el nombre de un puesto, sale su ficha: neto, bruto, coste para la empresa y coste tras deducirlo como gasto
   const fichaHtml = (() => {
-    const k = R.ficha; if(!k || (bd[k] === 'fuera') || (k !== 'rafa' && k !== 'manolo' && !(bd[k] > 0))) return '';
+    const k = R.ficha; if(!k || (bd[k] === 'fuera')) return '';
     const tasa = (num(R.param.impuesto) || 0) / 100, horasT = Math.max(1, b.horas), hDia = num(R.param.horasDia) || 7, jor = num(R.param.jornadas) || 250;
     const fr = (t, tot, hh, nota) => '<div class="rt-sim-r"><span>' + t + (nota ? '<small style="display:block;color:var(--ink-soft);font-size:10px;">' + nota + '</small>' : '') + '</span><b style="white-space:nowrap;">' + (isFinite(tot) ? eur(tot) : '—') + (isFinite(hh) ? ' <span style="font-size:.78em;color:var(--ink-soft);font-weight:700;">· ' + eur(hh, 2) + '/h</span>' : '') + '</b></div>';
     let tit, filas, pie = '';
