@@ -32,6 +32,12 @@ if [ -z "$OK" ]; then
 fi
 echo "✓ EXG: caso ${CASO_ID} abierto, version_objetivo coincide con ${VERSION} — publicando"
 
+# Control de diseño: la GUÍA DE DISEÑO EXG de Daniel se comprueba en cada publicación (herramientas/lint_diseno.py)
+if ! python3 herramientas/lint_diseno.py; then
+  echo "❌ Deploy bloqueado: corrige lo anterior (o, si Daniel lo ha aprobado expresamente, ajusta la guía y el lint)"
+  exit 1
+fi
+
 # Actualizar versión en HTML
 # cache-buster de los scripts externos (rent.js, norm.js) para que el móvil cargue siempre el último
 sed -i -E "s#(rentabilidad/rent\.js\?v=)V[0-9.]+#\1${VERSION}#; s#(costes/norm\.js\?v=)V[0-9.]+#\1${VERSION}#; s#(ajustes/calc\.js\?v=)V[0-9.]+#\1${VERSION}#" index.html
