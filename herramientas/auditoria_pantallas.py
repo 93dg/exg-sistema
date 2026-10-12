@@ -72,7 +72,8 @@ async def main():
             except Exception as e: print('EVAL',v,str(e)[:200])
         await b.close()
         return res
-VISTAS=['control','trabajos','planificacion',"trabestad:teSub('costes')",'economia','documentos','albaranes','proformas','facturas','presupuestos','gastospro','impuestos','clientes','flota','direccion']
+VISTAS_TODAS=['control','trabajos','planificacion',"trabestad:teSub('costes')",'economia','documentos','albaranes','proformas','facturas','presupuestos','gastospro','impuestos','clientes','flota','direccion']
+VISTAS=[v for v in VISTAS_TODAS if not os.environ.get('SOLO') or v==os.environ.get('SOLO')]
 DESC={'minuscula':'Texto que empieza en minúscula (todo texto empieza con mayúscula)','partido':'Texto corto partido en dos líneas','desborda':'Texto que se sale de la pantalla'}
 BASE=os.path.join(os.path.dirname(os.path.abspath(__file__)),'auditoria_baseline.json')
 res=asyncio.run(main())

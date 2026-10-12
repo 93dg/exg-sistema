@@ -669,8 +669,10 @@ R.simHtml = function(P, b){
       if(!inf || !(inf.bruto > 0)) return '<div class="rt-an" style="margin-top:6px;">' + nom + ': falta el sueldo de convenio para sacar su ficha.</div>';
       const ph = x => x / (hDia * jor), tl = x => ph(x) * horasT;
       tit = nom + ' (por persona)';
-      filas = fr('Salario neto', tl(inf.neto), ph(inf.neto)) + fr('Salario bruto', tl(inf.bruto), ph(inf.bruto)) + fr('Coste para la empresa', tl(inf.coste), ph(inf.coste), 'bruto + Seguridad Social de empresa') + fr('Coste tras deducir', tl(inf.coste) * (1 - tasa), ph(inf.coste) * (1 - tasa), 'baja ' + Math.round(tasa * 100) + ' % por impuestos');
-      pie = 'Convenio, jornada completa. Total = €/h × ' + h1(horasT) + ' h de la obra.';
+      // V11.15 (Daniel): su salario al mes por convenio, sin depender de la obra, antes de lo de la obra
+      filas = fr('Salario neto al mes', inf.neto / 14, NaN) + fr('Salario bruto al mes', inf.bruto / 14, NaN) + fr('Coste para la empresa al mes', inf.coste / 12, NaN)
+        + fr('Salario neto en la obra', tl(inf.neto), ph(inf.neto)) + fr('Salario bruto en la obra', tl(inf.bruto), ph(inf.bruto)) + fr('Coste para la empresa en la obra', tl(inf.coste), ph(inf.coste), 'bruto + Seguridad Social de empresa') + fr('Coste tras deducir en la obra', tl(inf.coste) * (1 - tasa), ph(inf.coste) * (1 - tasa), 'baja ' + Math.round(tasa * 100) + ' % por impuestos');
+      pie = 'Convenio de construcción, jornada completa, 14 pagas: el neto y el bruto al mes son de cada nómina y el coste de empresa es el del año repartido en 12 meses. En la obra: €/h × ' + h1(horasT) + ' h.';
     }
     return '<div class="rt-c" style="margin:6px 0 8px;background:var(--paper);border:2px solid var(--orange);"><div style="font-weight:800;font-size:13px;margin-bottom:4px;">' + tit + '</div>' + filas + '<div style="font-size:10.5px;color:var(--ink-soft);margin-top:4px;">' + pie + '</div></div>';
   };
