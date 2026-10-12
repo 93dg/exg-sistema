@@ -4648,11 +4648,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.87" defer></script>
-<script src="costes/norm.js?v=V10.87" defer></script>
-<script src="ajustes/calc.js?v=V10.87" defer></script>
+<script src="rentabilidad/rent.js?v=V10.88" defer></script>
+<script src="costes/norm.js?v=V10.88" defer></script>
+<script src="ajustes/calc.js?v=V10.88" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.87</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.88</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4804,7 +4804,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.87</div>
+        <div class="sub" id="version-badge">V10.88</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9479,7 +9479,7 @@ function econ2Pintar(){
   const enPer = r => r.an === _e2anio && (_e2per === 'año' || r.tr === Number(_e2per[0]));
   const sel = _e2.filter(enPer), L = sel.reduce((a, r) => a + r.legal, 0), B = sel.reduce((a, r) => a + r.sinF, 0), G = sel.reduce((a, r) => a + r.gasto, 0), I = sel.reduce((a, r) => a + ing(r), 0), R = I - G;
   const RT = (_e2.ret || []).filter(enPer);   // V9.13: retiradas del periodo elegido
-  const v = _e2.vivo || {}, al = _e2.alerta, saldo = al ? al.saldo : v.saldo;
+  const v = _e2.vivo || {}, al = v.usoAlerta ? (v.alerta || _e2.alerta) : null, saldo = v.saldo != null ? v.saldo : (_e2.alerta ? _e2.alerta.saldo : null);   // V10.88: un solo saldo, el de dirVivo
   const flota = _valFlotaRaw ? (_valFlotaRaw.items || []).filter(x => x.maquina && x.estimado).reduce((a, x) => a + x.estimado, 0) : null;
   const cuando = iso => { const d = new Date(iso); return DIAS_SEMANA_CORTOS[(d.getDay() + 6) % 7].toLowerCase() + ' ' + d.getDate() + ' ' + MESES_CORTOS[d.getMonth()] + ' · ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
   const anios = [...new Set(_e2.map(r => r.an))].filter(a => a <= new Date().getFullYear()).sort((a, b) => b - a);
@@ -9587,8 +9587,14 @@ document.addEventListener('click', e => {
 // clave direccion:diagnostico). Cada apartado es una tarjeta plegable; la primera sale abierta. El texto va en markdown sencillo
 // (párrafos, **negrita**, listas, listas numeradas, casillas «- [ ]» y tablas con |)
 function dirMdLinea(t){ return escHtml(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
+// V10.88 (Daniel): las cifras que ya están calculadas en otra sección no se escriben a mano: el texto lleva {saldo}, {cobrar}… y se rellenan con lo que dice dirVivo (la misma fuente que Economía y los cuadros)
+function dirCifras(t){
+  const v = _dirVivo, f = n => v ? dirEur(n) : '…';
+  const m = {saldo: v && v.saldo != null ? dirEur(v.saldo) : '…', cobrar: f(v && v.cobrar), facturar: f(v && v.facturar), rsanchez: f(v && v.rsanchez), meses: v && v.meses != null ? tbN(v.meses) + ' meses' : '…', nrevisar: v ? String(v.nRevisar || 0) : '…'};
+  return String(t || '').replace(/\{(saldo|cobrar|facturar|rsanchez|meses|nrevisar)\}/g, (x, k) => m[k]);
+}
 function dirMd(md){
-  const lineas = String(md || '').split('\n'); let html = '', i = 0;
+  const lineas = dirCifras(md).split('\n'); let html = '', i = 0;
   while(i < lineas.length){
     const l = lineas[i];
     if(!l.trim()){ i++; continue; }
@@ -9610,12 +9616,17 @@ let _dirDatos = null, _dirId = null, _dirVivo = null, _dirVerDiag = false, _dirP
 const dirEur = n => tbN(Math.round(n || 0), 0) + ' €';
 // V7.82 datos en vivo de EXG para el semáforo: saldo del banco, por cobrar, por facturar a la Administración, meses de trabajo en cola
 async function dirVivo(){
-  const v = {saldo: null, cobrar: 0, nCobrar: 0, facturar: 0, nFacturar: 0, facturarDias: 0, meses: null, nTrab: 0, sf: [], acuenta: [], parc: []};   // V10.71: sf/acuenta/parc alimentan las tareas de «Qué hacer ahora» con fórmulas
+  const v = {saldo: null, cobrar: 0, nCobrar: 0, facturar: 0, nFacturar: 0, facturarDias: 0, meses: null, nTrab: 0, sf: [], acuenta: [], parc: [], deudas: [], nRevisar: 0, rsanchez: 0, usoAlerta: false};   // V10.71: sf/acuenta/parc alimentan las tareas de «Qué hacer ahora» con fórmulas
   try{
     const {data: mov} = await sb.from('movimientos_banco').select('fecha, orden, importe, saldo').order('fecha', {ascending: false}).order('orden', {ascending: false}).limit(200);
     const iS = (mov || []).findIndex(m => m.saldo != null);
     if(iS >= 0) v.saldo = Number(mov[iS].saldo) + mov.slice(0, iS).filter(m => m.fecha > mov[iS].fecha).reduce((s, m) => s + Number(m.importe || 0), 0);
+    // V10.88: el mismo saldo que enseña Economía: el último aviso del banco si es igual o más nuevo que el último movimiento
+    const {data: av} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').not('data->>saldo', 'is', null).order('data->>ts', {ascending: false}).limit(1);
+    const al = av && av[0] ? av[0].data : null;
+    if(al && (iS < 0 || String(al.ts).slice(0, 10) >= mov[iS].fecha)){ v.saldo = Number(al.saldo); v.usoAlerta = true; v.alerta = al; }
   }catch(e){}
+  try{ const {data: de} = await sb.from('sistema').select('data').eq('tipo', 'deuda'); v.deudas = (de || []).map(x => x.data).filter(x => (x.estado || 'pendiente') === 'pendiente'); }catch(e){}
   try{
     const [{data: docs}, {data: ents}] = await Promise.all([
       sb.from('documentos_economicos').select('id, tipo, importe, cobrado_importe, cobrado_en, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id, numero').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'albaran', 'proforma']).gte('anio', new Date().getFullYear() - 2),
@@ -9625,10 +9636,11 @@ async function dirVivo(){
     const hoy = Date.now(), falta = d => Math.max(0, Number(d.importe || 0) - Number(d.cobrado_importe || 0) - (d.estado_cobro === 'parcial_otra' ? enOtraSuma(d) : 0));
     (docs || []).forEach(d => {
       const est = d.estado_cobro || '', ent = E[d.entidad_id] || {}, admin = ent.es_administracion || esAdministracion(ent.nombre);
+      if(d.tipo === 'proforma' && est === 'revisar') v.nRevisar++;
       if(['cobrado', 'nula', 'rectificativa', 'cobrado_otra'].includes(est)) return;
       if(d.tipo === 'factura'){ if(est === 'parcial' && falta(d)) v.parc.push({falta: falta(d)}); if(['pendiente_cobrar', 'parcial'].includes(est)){ v.cobrar += falta(d); v.nCobrar++; } else if(['entregado', 'por_cobrar_otra'].includes(est)){ const x = Math.max(0, falta(d) - enOtraSuma(d)); if(x){ v.cobrar += x; v.nCobrar++; } } return; }
       if(d.documento_siguiente_id || enl.has(d.id) || !falta(d)) return;
-      if(d.tipo === 'albaran' && est === 'trabajo_activo') v.acuenta.push({ent: ent.nombre || '', num: d.numero || '', falta: falta(d)});
+      if(d.tipo === 'albaran' && est === 'trabajo_activo'){ v.acuenta.push({ent: ent.nombre || '', num: d.numero || '', falta: falta(d)}); if(/rafael s/i.test(ent.nombre || '')) v.rsanchez += falta(d); }
       else v.sf.push({ent: ent.nombre || '', admin: !!admin, tipo: d.tipo, falta: falta(d)});
       if(admin){ v.facturar += falta(d); v.nFacturar++; v.cobrar += falta(d); v.nCobrar++; if(d.fecha_devengo) v.facturarDias = Math.max(v.facturarDias, Math.round((hoy - new Date(d.fecha_devengo)) / 864e5)); }   // V8.36 (Daniel): lo de la Administración sin facturar también está pendiente de cobrar
       else if(['pendiente_cobrar', 'pendiente_enviar', 'parcial', 'borrador', 'entregado', 'por_cobrar_otra', 'parcial_otra'].includes(est)){ v.cobrar += falta(d); v.nCobrar++; }
@@ -9645,6 +9657,7 @@ const DIR_FORMULAS = {
   t1: v => dirAgrupa(v.sf.filter(x => x.admin)),
   t2: v => dirAgrupa(v.sf.filter(x => !x.admin && /granjuela/i.test(x.ent))),
   t3: v => { const l = v.acuenta.filter(x => /rafael s/i.test(x.ent)); return l.length ? {detalle: 'Albarán ' + (l[0].num || 'en curso') + ' en curso: entrega a cuenta o factura parcial', importe: l.reduce((a, x) => a + x.falta, 0)} : null; },
+  t5: v => { const l = (v.deudas || []).filter(x => /aeat|hacienda/i.test(x.acreedor || '')); return l.length ? {detalle: l[0].importe ? 'Queda por pagar' : 'Falta saber lo que queda y en qué fechas', importe: l.reduce((a, x) => a + Number(x.importe || 0), 0) || null} : null; },
   t4: v => v.parc.length ? {detalle: v.parc.length + (v.parc.length === 1 ? ' factura con cobro parcial' : ' facturas con cobro parcial'), importe: v.parc.reduce((a, x) => a + x.falta, 0)} : null,
 };
 function dirAgrupa(l){
