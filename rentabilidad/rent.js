@@ -648,10 +648,31 @@ R.simHtml = function(P, b){
   const quedan = ['rafa', 'manolo'].filter(k => s.e[k] === 'hoy'), sociosSim = s.obra ? s.retrib : b.socios * quedan.length / 2, quienSim = quedan.map(k => k === 'rafa' ? 'Rafa' : 'Manolo').join(' y ');   // V10.57 (Daniel): si uno sale (o pasa a empleado), se descuenta lo suyo
   const opSim = b.obra && b.r ? R.opHtml(b.r, persSim, b.margenH, sociosSim, s.tr.rep + s.tr.ges, quienSim || undefined) : '';
   const pagoHr = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : NaN, cMaqH = coste('maquinista');
-  const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small style="display:block;color:var(--ink-soft);font-size:10px;white-space:nowrap;letter-spacing:-.2px;">cobra ' + eur(v, 2) + (m === 'hoy' && xOp ? '' : '/h') + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : ''; };
-  const st = (k, t) => '<div><span>' + t + '</span><span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>';
+  const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small onclick="RENT.setFicha(\'' + k + '\')" style="display:block;color:var(--ink-soft);font-size:10px;white-space:nowrap;letter-spacing:-.2px;cursor:pointer;text-decoration:underline dotted;">cobra ' + eur(v, 2) + (m === 'hoy' && xOp ? '' : '/h') + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + ' ' + (R.ficha === k ? '▴' : '▾') + '</small>' : ''; };
+  const st = (k, t) => '<div><span onclick="RENT.setFicha(\'' + k + '\')" style="cursor:pointer;text-decoration:underline dotted;">' + t + ' ' + (R.ficha === k ? '▴' : '▾') + '</span><span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>';
   const pp = (k, n) => '<div><button type="button" class="' + (bd[k] === 'fuera' ? '' : 'on') + '" onclick="RENT.setEsc2(\'' + k + '\',\'hoy\')">' + n + '</button>' + (cobH(k) || '<small style="font-size:10.5px;color:var(--ink-soft);">fuera</small>') + '</div>';   // V10.67: el nombre es la pastilla
-  const controles = '<div class="rt-c"><h3>Organización</h3><div class="rt-pp">' + pp('rafa', 'Rafa') + pp('manolo', 'Manolo') + '</div>' + '<div class="rt-stg">' + st('maq', 'Maquinistas') + st('mec', 'Mecánicos') + st('cm', 'Conduc./mecánico') + '</div>' + (opSim ? '<div style="margin-top:4px;">' + opSim + '</div>' : '') + '</div>';
+  // V11.00 (Daniel 12/10/2026): al pulsar «cobra…» de Rafa o Manolo, o el nombre de un puesto, sale su ficha: neto, bruto, coste para la empresa y coste tras deducirlo como gasto
+  const fichaHtml = (() => {
+    const k = R.ficha; if(!k || (bd[k] === 'fuera') || (k !== 'rafa' && k !== 'manolo' && !(bd[k] > 0))) return '';
+    const tasa = (num(R.param.impuesto) || 0) / 100, horasT = Math.max(1, b.horas), hDia = num(R.param.horasDia) || 7, jor = num(R.param.jornadas) || 250;
+    const fr = (t, tot, hh, nota) => '<tr><td>' + t + (nota ? '<small style="display:block;color:var(--ink-soft);font-size:10px;">' + nota + '</small>' : '') + '</td><td style="text-align:right;white-space:nowrap;">' + (isFinite(tot) ? eur(tot) : '—') + '</td><td style="text-align:right;white-space:nowrap;">' + (isFinite(hh) ? eur(hh, 2) + '/h' : '—') + '</td></tr>';
+    let tit, filas, pie = '';
+    if(k === 'rafa' || k === 'manolo'){
+      const tot = b.socios / 2, hh = pagoHr;
+      tit = k === 'rafa' ? 'Rafa' : 'Manolo';
+      filas = fr('Salario neto (lo que retira)', tot, hh) + fr('Salario bruto', NaN, NaN, 'en B: sin nómina') + fr('Coste para la empresa', tot, hh, 'sin Seguridad Social: es el mismo importe') + fr('Coste tras deducir', tot, hh, 'en B no se deduce: cuenta entero');
+      pie = 'Su parte de la obra, la mitad de la retribución de los dos. Cuenta entera en «Todos los costes» y no baja los impuestos.';
+    } else {
+      const cat = k === 'maq' ? 'maquinista' : 'oficial1', nom = k === 'maq' ? 'Maquinista' : k === 'mec' ? 'Mecánico' : 'Conductor/mecánico', inf = (() => { try{ return convenioSueldoInfo(cat); }catch(e){ return null; } })();
+      if(!inf || !(inf.bruto > 0)) return '<div class="rt-an" style="margin-top:6px;">' + nom + ': falta el sueldo de convenio para sacar su ficha.</div>';
+      const ph = x => x / (hDia * jor), tl = x => ph(x) * horasT;
+      tit = nom + ' (por persona)';
+      filas = fr('Salario neto', tl(inf.neto), ph(inf.neto)) + fr('Salario bruto', tl(inf.bruto), ph(inf.bruto)) + fr('Coste para la empresa', tl(inf.coste), ph(inf.coste), 'bruto + Seguridad Social de empresa') + fr('Coste tras deducir', tl(inf.coste) * (1 - tasa), ph(inf.coste) * (1 - tasa), 'baja ' + Math.round(tasa * 100) + ' % por impuestos');
+      pie = 'Convenio, jornada completa. Total = €/h × ' + h1(horasT) + ' h de la obra.';
+    }
+    return '<div class="rt-c" style="margin:8px 0 0;background:var(--paper);"><div style="font-weight:800;font-size:13px;margin-bottom:4px;">' + tit + '</div><table style="width:100%;font-size:12px;border-collapse:collapse;"><tr style="color:var(--ink-soft);font-size:10.5px;"><td></td><td style="text-align:right;">En la obra</td><td style="text-align:right;">Por hora</td></tr>' + filas + '</table><div style="font-size:10.5px;color:var(--ink-soft);margin-top:4px;">' + pie + '</div></div>';
+  })();
+  const controles = '<div class="rt-c"><h3>Organización</h3><div class="rt-pp">' + pp('rafa', 'Rafa') + pp('manolo', 'Manolo') + '</div>' + '<div class="rt-stg">' + st('maq', 'Maquinistas') + st('mec', 'Mecánicos') + st('cm', 'Conduc./mecánico') + '</div>' + fichaHtml + (opSim ? '<div style="margin-top:4px;">' + opSim + '</div>' : '') + '</div>';
   const bx = (t, v, d, n, hh) => '<div class="' + (n >= 0 ? 'g' : 'r') + '"><span style="color:' + (n >= 0 ? G : RJ) + ';">' + t + '</span><b style="color:' + (n >= 0 ? G : RJ) + ';">' + eur(n) + '</b><small>' + hh + ' · ' + cs(d, dEur(d)) + ' vs hoy</small></div>';
   const costeNuevo = s.costePers + s.retrib - b.socios;
   const tl2 = (l, v) => '<div class="rt-tl"><span>' + l + '</span><b>' + v + '</b></div>';
@@ -700,6 +721,8 @@ R.vista = function(P){
   }
   return '<div class="panel te-panel rt-w">' + selector + obra + R.simHtml(P, R.baseObra(r, b)) + '<div style="font-size:11px;color:var(--ink-soft);"><a href="#" onclick="RENT.recargar();return false">Actualizar datos</a> · ' + dep + ' obras sin albaranes asignados no se calculan.' + (R.errores && R.errores.length ? ' Fallos al leer: ' + esc(R.errores.join(', ')) : '') + '</div></div>';
 };
+R.ficha = null;
+R.setFicha = k => { R.ficha = R.ficha === k ? null : k; R.repinta(); };
 R.setEsc2 = (k, v) => { R.build2[k] = (R.build2[k] === v && (k === 'rafa' || k === 'manolo')) ? 'fuera' : v; R.repinta(); };   // V9.90: sin botón «Fuera»: quitar la marca = fuera
 R.stepEsc2 = (k, d) => { R.build2[k] = Math.max(0, Math.min(10, (R.build2[k] | 0) + d)); R.repinta(); };
 R.escAdd2 = async () => { const P = R.P, e = {...R.build2}; if(R.nombreEsc2(e) === R.nombreEsc2(R.ESC2)) return; P.esc2 = [...(P.esc2 || []), e]; await R.escGuardar(); R.repinta(); };
