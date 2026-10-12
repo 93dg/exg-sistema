@@ -4637,11 +4637,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.77" defer></script>
-<script src="costes/norm.js?v=V10.77" defer></script>
-<script src="ajustes/calc.js?v=V10.77" defer></script>
+<script src="rentabilidad/rent.js?v=V10.78" defer></script>
+<script src="costes/norm.js?v=V10.78" defer></script>
+<script src="ajustes/calc.js?v=V10.78" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.77</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.78</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4793,7 +4793,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.77</div>
+        <div class="sub" id="version-badge">V10.78</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -29671,9 +29671,10 @@ function docsVistaPlegada(){
 // V10.77 (Daniel: «que los botones Proyecto hasta Factura hagan la función de filtros múltiples»): lista única de Documentos.
 // Los botones Presupuesto, Albarán, Proforma y Factura se marcan y desmarcan; la lista mezcla los tipos marcados (ninguno marcado = todos).
 // Las tarjetas son las de siempre (las construyen las filas de cada tipo); aquí solo se eligen, ordenan y colocan en una lista.
-var DOCM_TAB_TIPO = {presupuestos: 'presupuesto', albaranes: 'albaran', proformas: 'proforma', facturas: 'factura'};
-var DOCM_TIPO_VISTA = {presupuesto: 'presupuestos', albaran: 'albaranes', proforma: 'proformas', factura: 'facturas'};
-var DOCM_TIPOS = ['presupuesto', 'albaran', 'proforma', 'factura'];   // orden del proceso
+var DOCM_TAB_TIPO = {proyectos: 'proyecto', ayuntamiento: 'expediente', presupuestos: 'presupuesto', albaranes: 'albaran', proformas: 'proforma', facturas: 'factura'};
+var DOCM_NOMBRE = {proyecto: 'Proyecto', expediente: 'Expediente', presupuesto: 'Presupuesto', albaran: 'Albarán', proforma: 'Proforma', factura: 'Factura'};
+var DOCM_TIPO_VISTA = {proyecto: 'proyectos', expediente: 'ayuntamiento', presupuesto: 'presupuestos', albaran: 'albaranes', proforma: 'proformas', factura: 'facturas'};
+var DOCM_TIPOS = ['proyecto', 'expediente', 'presupuesto', 'albaran', 'proforma', 'factura'];   // orden del proceso
 var DOCM_TBODYS = ['presupuestos-tbody-standalone', 'albaranes-tbody-standalone', 'econ-facturas-tbody'];
 var _docm = {tipos: new Set(), anios: new Set(), trims: new Set(), estados: new Set(), q: '', orden: 'fecha_desc', limite: 40, abiertos: ['anio'], aniosTocado: false};
 function docmActiva(){ return !!document.getElementById('view-documentos')?.classList.contains('active'); }
@@ -29682,6 +29683,8 @@ function docmTiposActivos(){ const p = docmPermitidos(), s = p.filter(t => _docm
 function docmTiposVistaActual(){   // qué tipos están marcados ahora mismo, según la pantalla que se ve
   const act = (document.querySelector('.view.active')?.id || '').replace(/^view-/, '');
   if(act === 'documentos') return new Set(_docm.tipos);
+  if(act === 'proyectos') return new Set(['proyecto']);
+  if(act === 'ayuntamiento') return new Set(['expediente']);
   if(act === 'presupuestos') return new Set([presModo === 'proforma' ? 'proforma' : 'presupuesto']);
   if(act === 'albaranes') return new Set(['albaran']);
   if(act === 'facturas') return new Set(['factura']);
@@ -29701,7 +29704,7 @@ document.addEventListener('click', ev => {
   const b = ev.target.closest('.docs-tab'); if(!b || !DOCM_TAB_TIPO[b.dataset.tab]) return;
   ev.stopImmediatePropagation(); ev.preventDefault(); docmTab(b.dataset.tab);
 }, true);
-function docmMostrar(){ _docm.limite = 40; try{ docsAplicarVista(); }catch(e){} docmSync(); }
+function docmMostrar(){ _docm.limite = 40; if(!_docm.proyCargados && docmTiposActivos().has('proyecto') && typeof cargarProyectos === 'function'){ _docm.proyCargados = true; cargarProyectos(); } try{ docsAplicarVista(); }catch(e){} docmSync(); }
 function docmEstadoDe(d){
   const act = d.estado_cobro || 'pendiente_enviar';
   let txt = act; try{ txt = (estadosDeTipo(d.type, d).concat(ESTADOS_DOCUMENTO).find(o => o[0] === act) || [])[1] || stateLabels[act] || act; }catch(e){}
@@ -29716,9 +29719,23 @@ function docmFilas(){   // todos los documentos de los tipos marcados, sin filtr
       const d = documentosRealesById[did]; if(!d || !tipos.has(d.type)) return;
       const fecha = d.fecha_devengo || tr.dataset.fechaIso || '', [est, estTxt] = docmEstadoDe(d);
       if(tr._busqM === undefined) tr._busqM = [d.client, d.num || d.numero, d.job, d.obra_texto, d.amountLabel, d.dateLabel].filter(Boolean).join(' ').toLowerCase();
-      out.push({id: did, tr, d, tipo: d.type, fecha, anio: fecha ? fecha.slice(0, 4) : '', trim: fecha ? String(Math.floor((Number(fecha.slice(5, 7)) - 1) / 3) + 1) : '', estado: est, estadoTxt: estTxt, busq: tr._busqM, imp: Number(d.importe || 0), cli: d.client || ''});
+      out.push({kind: 'doc', id: did, tr, d, tipo: d.type, num: d.num || d.numero || '', job: d.job && d.job !== '—' ? d.job : (d.obra_texto || ''), fecha, anio: fecha ? fecha.slice(0, 4) : '', trim: fecha ? String(Math.floor((Number(fecha.slice(5, 7)) - 1) / 3) + 1) : '', estado: est, estadoTxt: estTxt, busq: tr._busqM, imp: Number(d.importe || 0), cli: d.client || ''});
     });
   });
+  if(tipos.has('proyecto') && typeof proyectosCache !== 'undefined'){
+    const ES = {en_curso: 'En curso', pausado: 'Pausado', formalizado: 'Formalizado', descartado: 'Descartado'}, orig = document.querySelectorAll('#proyectos-lista-movil > .exp-card-movil');
+    proyectosCache.forEach((p, i) => {
+      const cli = p.entidades?.nombre || p.cliente_nombre_libre || '', fecha = String(p.creado_at || '').slice(0, 10);
+      out.push({kind: 'proy', id: 'proy-' + p.id, orig: orig[i], tipo: 'proyecto', fecha, anio: fecha.slice(0, 4), trim: fecha ? String(Math.floor((Number(fecha.slice(5, 7)) - 1) / 3) + 1) : '', estado: p.estado || '', estadoTxt: ES[p.estado] || p.estado || '', busq: [cli, p.descripcion, p.notas].filter(Boolean).join(' ').toLowerCase(), imp: 0, cli, num: '', job: p.descripcion || '', d: {}});
+    });
+  }
+  if(tipos.has('expediente') && typeof expedientesById !== 'undefined'){
+    const rows = Object.values(expedientesById).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)), orig = document.querySelectorAll('#expedientes-lista-movil > .exp-card-movil');
+    rows.forEach((e, i) => {
+      const fecha = String(e.fecha || e.created_at || '').slice(0, 10), est = e.estado || '';
+      out.push({kind: 'exp', id: 'exp-' + e.id, orig: orig[i], tipo: 'expediente', fecha, anio: fecha.slice(0, 4), trim: fecha ? String(Math.floor((Number(fecha.slice(5, 7)) - 1) / 3) + 1) : '', estado: est, estadoTxt: est ? est.charAt(0).toUpperCase() + est.slice(1).replace(/_/g, ' ') : '', busq: [e.titulo, e.descripcion, 'ayuntamiento'].filter(Boolean).join(' ').toLowerCase(), imp: 0, cli: 'Ayuntamiento de Fuente Obejuna', num: '', job: e.titulo || '', d: {}});
+    });
+  }
   return out;
 }
 function docmPasa(f, salvo){
@@ -29806,7 +29823,7 @@ function docmSync(){
     const filas = docmFilas();
     docmPintarFiltros(filas);
     const vis = filas.filter(f => docmPasa(f)).sort(docmCmp);
-    const nombres = [...docmTiposActivos()].map(t => TIPO_DOC_NOMBRE[t]);
+    const nombres = [...docmTiposActivos()].map(t => DOCM_NOMBRE[t]);
     const desc = document.getElementById('docm-desc'); if(desc) desc.textContent = _docm.tipos.size ? nombres.join(' + ') : 'Todos los documentos';
     const aviso = document.getElementById('docm-aviso'), pend = _historico.pendientes.size;
     if(aviso) aviso.innerHTML = '<b style="color:var(--ink);">' + vis.length.toLocaleString('es-ES') + '</b> ' + (vis.length === 1 ? 'documento' : 'documentos') + (vis.length < filas.length ? ' de ' + filas.length.toLocaleString('es-ES') : '') + (_historico.enCurso ? ' · cargando los antiguos…' : '');
@@ -29815,11 +29832,13 @@ function docmSync(){
     if(lista.dataset.sig !== sig){ lista.dataset.sig = sig; _docm.limite = 40; }
     const lim = _docm.limite, mostrar = vis.slice(0, lim), quedan = new Set(mostrar.map(f => String(f.id))), filaDe = new Map(filas.map(f => [String(f.id), f]));
     lista.querySelector(':scope > .mostrar-mas-movil')?.remove();
+    lista.querySelectorAll(':scope > [data-docm-clon]').forEach(c => c.remove());   // las tarjetas de proyectos y expedientes son copias: se rehacen en cada pasada
     Array.from(lista.children).forEach(c => { const id = String(c.dataset.docId || ''); if(!id || quedan.has(id)) return; const f = filaDe.get(id); if(!f || f.tr._mkCard) c.remove(); else c.style.display = 'none'; });   // las que ya no tocan salen de esta lista
     let pos = 0;
     mostrar.forEach(f => {
-      let card = document.getElementById('mcard-' + f.id);
-      if(!card && f.tr._mkCard) card = f.tr._mkCard();
+      let card = null;
+      if(f.kind !== 'doc'){ if(f.orig){ card = f.orig.cloneNode(true); card.dataset.docmClon = '1'; card.querySelectorAll('[data-url]').forEach(el => { el.onclick = ev => { ev.stopPropagation(); abrirVisorDesdeUrl(el.dataset.url); }; }); } }
+      else { card = document.getElementById('mcard-' + f.id); if(!card && f.tr._mkCard) card = f.tr._mkCard(); }
       if(card){ if(card.style.display) card.style.display = ''; if(lista.children[pos] !== card) lista.insertBefore(card, lista.children[pos] || null); pos++; }
     });
     if(vis.length > lim){
@@ -29829,13 +29848,15 @@ function docmSync(){
     if(!vis.length && !lista.querySelector('.docm-vacio')){ const v = document.createElement('div'); v.className = 'docm-vacio sub-t'; v.style.cssText = 'padding:18px 14px;'; v.textContent = 'No hay documentos con estos filtros.'; lista.appendChild(v); }
     if(vis.length) lista.querySelector('.docm-vacio')?.remove();
     if(tb) tb.innerHTML = mostrar.map(f => {
-      const d = f.d, imp = f.imp.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
-      return `<tr onclick="openDocumentViewer('${f.id}')" style="cursor:pointer;"><td class="mono">${f.fecha ? formatFechaCorta(f.fecha) : '—'}</td><td><span class="fc-tipo-tag tp-${f.tipo}">${TIPO_DOC_NOMBRE[f.tipo] || f.tipo}</span></td><td class="mono">${svgEsc(d.num || d.numero || '—')}</td><td>${svgEsc(f.cli || '—')}</td><td>${svgEsc(d.job && d.job !== '—' ? d.job : (d.obra_texto || '—'))}</td><td class="num mono">${imp}</td><td onclick="event.stopPropagation();">${estadoDocumentoSelect(f.tipo, f.id, d.estado_cobro, 'dm-')}</td></tr>`;
+      const d = f.d, esDoc = f.kind === 'doc', imp = esDoc ? f.imp.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €' : '—';
+      return `<tr ${esDoc ? `onclick="openDocumentViewer('${f.id}')" style="cursor:pointer;"` : ''}><td class="mono">${f.fecha ? formatFechaCorta(f.fecha) : '—'}</td><td><span class="fc-tipo-tag tp-${f.tipo}">${DOCM_NOMBRE[f.tipo] || f.tipo}</span></td><td class="mono">${svgEsc(f.num || '—')}</td><td>${svgEsc(f.cli || '—')}</td><td>${svgEsc(f.job || '—')}</td><td class="num mono">${imp}</td><td ${esDoc ? 'onclick="event.stopPropagation();"' : ''}>${esDoc ? estadoDocumentoSelect(f.tipo, f.id, d.estado_cobro, 'dm-') : svgEsc(f.estadoTxt || '—')}</td></tr>`;
     }).join('');
   }catch(e){ console.error('Documentos', e); }
   window.__docmEnSync = false;
 }
 { const _stp = sincronizarTarjetasPaginadas; sincronizarTarjetasPaginadas = function(){ const r = _stp.apply(this, arguments); try{ if(!window.__docmEnSync && docmActiva()) deb(docmSync, 60); }catch(e){} return r; }; }   // si una lista de tipo recoloca tarjetas mientras se ve Documentos, esta vuelve a ponerlas en su sitio
+{ const _rp = renderProyectosTable; renderProyectosTable = function(){ const r = _rp.apply(this, arguments); try{ if(docmActiva()) deb(docmSync, 60); }catch(e){} return r; }; }   // al cargar o cambiar proyectos y expedientes, la lista única se rehace
+{ const _re = renderExpedientesTabla; renderExpedientesTabla = function(){ const r = _re.apply(this, arguments); try{ if(docmActiva()) deb(docmSync, 60); }catch(e){} return r; }; }
 function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta, entidad, trabajo, archivoUrl, calidadInfo){
   const lista = document.getElementById(listaId);
   if(!lista) return;
