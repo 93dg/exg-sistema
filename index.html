@@ -3072,6 +3072,10 @@ html.ai-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0px)
 .ai-tab[data-estado="descartada"] .ai-tab-estado-ico{color:var(--red,#C4685A);}
 
 #ai-task-card{background:var(--concrete);border:1px solid var(--line);border-top-left-radius:0;border-radius:0 10px 10px 10px;padding:20px;}
+.ai-card-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.ai-copiar{all:unset;cursor:pointer;color:var(--orange);display:inline-flex;padding:2px;}
+.ai-copiar svg{width:18px;height:18px;}
+#ai-revisar-bandeja{all:unset;cursor:pointer;display:block;margin:0 0 10px;font-size:13px;font-weight:700;color:var(--orange);}
 .ai-card-tipo{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--orange);background:var(--ochre-soft,rgba(216,86,15,0.12));padding:3px 10px;border-radius:10px;margin-bottom:10px;}
 .ai-card-titulo{font-family:'Archivo',sans-serif;font-weight:800;font-size:18px;color:var(--ink);margin-bottom:14px;}
 .ai-card-block{margin-bottom:14px;}
@@ -4650,11 +4654,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.94" defer></script>
-<script src="costes/norm.js?v=V10.94" defer></script>
-<script src="ajustes/calc.js?v=V10.94" defer></script>
+<script src="rentabilidad/rent.js?v=V10.95" defer></script>
+<script src="costes/norm.js?v=V10.95" defer></script>
+<script src="ajustes/calc.js?v=V10.95" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.94</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.95</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4806,7 +4810,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.94</div>
+        <div class="sub" id="version-badge">V10.95</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7456,6 +7460,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
 
     <!-- ESTADO 1: entrada -->
     <div class="ai-view" id="ai-view-input">
+      <button type="button" id="ai-revisar-bandeja" onclick="aiIrABandeja()" style="display:none;"></button>
       <div id="ai-attach-preview"></div>
       <div id="ai-input-row">
         <textarea id="asistente-ia-input" placeholder="Pídeme algo…" data-ph-largo="Ej. Hazme una factura a José López, apunta 80 € de gasoil y mira los trabajos urgentes…"></textarea>
@@ -8257,6 +8262,7 @@ function bandejaFabPintar(){
   const f = document.getElementById('asistente-ia-fab'), n = document.getElementById('ai-fab-n'); if(!f || !n) return;
   const t = Object.values(_bandejaCuentas.v).reduce((s, x) => s + (x || 0), 0) + (_bandejaCorreoN || 0);
   n.textContent = t > 99 ? '99+' : String(t); f.classList.toggle('con-n', t > 0); f.title = t ? t + ' pendientes en la Bandeja' : '';
+  try{ aiPintarRevisarBandeja(); }catch(e){}
 }
 async function bandejaCorreoContar(){
   if(!gmailAccessToken) return;
@@ -26131,6 +26137,7 @@ function aiContinuarDesdeHistorial(id){
   try{ if(!matchMedia('(max-width:768px)').matches){ const t = document.getElementById('asistente-ia-input'); if(t && t.dataset.phLargo) t.placeholder = t.dataset.phLargo; }
     if(matchMedia('(max-width:768px)').matches){ const h = document.getElementById('ai-panel-head'), tabs = document.getElementById('ai-panel-tabs'), ti = document.getElementById('ai-panel-title'); if(h && tabs && ti) ti.after(tabs); } }catch(e){} })();
 function abrirAsistenteIA(){
+  try{ aiPintarRevisarBandeja(); }catch(e){}
   document.getElementById('ai-panel-backdrop').classList.add('active');
   document.getElementById('ai-panel').classList.add('active'); document.documentElement.classList.add('ai-abierto');
   const pendientes = aiTareas.some(t=>t.estado!=='confirmada' && t.estado!=='descartada');
@@ -26321,7 +26328,7 @@ function pedirPermisoIA(mensaje, motivo, callback){
 // ============ FIN PARSEO LOCAL ============
 
 async function enviarAsistenteIA(){
-  const mensaje = document.getElementById('asistente-ia-input').value.trim();
+  const mensaje = document.getElementById('asistente-ia-input').value.trim(); window._aiPedido = mensaje;
   window.__ultimoMensajeAsistente = mensaje;
   if(!mensaje && !aiAdjuntos.length){ mostrarToast('Escribe, dicta o adjunta algo primero.'); return; }
 
@@ -26516,7 +26523,7 @@ function aiRenderTarjeta(){
   const bloqueada = (t.tipo==='documento'||t.tipo==='trabajo') && !t.datos.cliente;
 
   card.innerHTML = `
-    <span class="ai-card-tipo">${AI_TIPO_LABEL[t.tipo]||t.tipo}</span>
+    <div class="ai-card-cab"><span class="ai-card-tipo">${AI_TIPO_LABEL[t.tipo]||t.tipo}</span><button type="button" class="ai-copiar" onclick="aiCopiarParaClaude(${aiTareaActiva})" title="Copiar para Claude" aria-label="Copiar para Claude"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg></button></div>
     <div class="ai-card-titulo">${t.titulo}</div>
     <div class="ai-card-block"><div class="ai-card-label">He entendido</div><div class="ai-card-text">${t.entendido||'—'}</div></div>
     <div class="ai-card-block"><div class="ai-card-label">Propongo</div><div class="ai-card-text">${t.propuesta||'—'}</div></div>
@@ -26533,6 +26540,24 @@ function aiRenderTarjeta(){
   `;
 }
 
+// V10.95 (Daniel 07/10/2026: «en cada solución del asistente, botón Copiar para Claude para pegarla aquí sin capturas»)
+function aiCopiarParaClaude(i){
+  const t = aiTareas[i]; if(!t) return;
+  const d = t.datos || {}, campos = Object.entries(d).filter(([k, v]) => v != null && v !== '' && typeof v !== 'object').map(([k, v]) => '- ' + k + ': ' + v).join('\n');
+  const txt = ['ASISTENTE EXG · ' + (AI_TIPO_LABEL[t.tipo] || t.tipo), window._aiPedido ? 'Lo que pedí: ' + window._aiPedido : '', 'Título: ' + (t.titulo || ''), 'Entendió: ' + (t.entendido || '—'), 'Propone: ' + (t.propuesta || '—'), campos ? 'Datos:\n' + campos : '', 'Estado: ' + (t.estado || '')].filter(Boolean).join('\n');
+  const ok = () => mostrarToast('Copiado para Claude', 'ok');
+  try{ navigator.clipboard.writeText(txt).then(ok, () => { const a = document.createElement('textarea'); a.value = txt; document.body.appendChild(a); a.select(); try{ document.execCommand('copy'); ok(); }catch(e){} a.remove(); }); }catch(e){ const a = document.createElement('textarea'); a.value = txt; document.body.appendChild(a); a.select(); try{ document.execCommand('copy'); ok(); }catch(e2){} a.remove(); }
+}
+// V10.95: línea «Revisar bandeja · N» al abrir el asistente (solo si hay pendientes); lleva a la Bandeja, en Entradas
+function aiPintarRevisarBandeja(){
+  const b = document.getElementById('ai-revisar-bandeja'); if(!b) return;
+  const t = (typeof _bandejaCuentas !== 'undefined' ? Object.values(_bandejaCuentas.v).reduce((s, x) => s + (x || 0), 0) : 0) + (typeof _bandejaCorreoN !== 'undefined' ? _bandejaCorreoN || 0 : 0);
+  b.style.display = t ? '' : 'none'; b.textContent = 'Revisar bandeja · ' + t;
+}
+function aiIrABandeja(){
+  cerrarAsistenteIA();
+  const btn = document.querySelector('.nav button[data-view="entradas"]') || document.querySelector('.nav button[data-grupo="bandeja"]'); if(btn) btn.click();
+}
 /* ---------- pool de sugerencias de edición, seg\u00fan tipo de tarea ---------- */
 function aiPoolSugerencias(t){
   const pool = [];
