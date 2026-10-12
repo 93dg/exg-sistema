@@ -555,7 +555,9 @@ R.vistaObra = function(r, P, b){
   const nv = R.niveles4(r), cl = R.porClase(r), tar = r.niv.tarifa, hOk = r.H > 0, n2 = v => isFinite(v) ? v.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '—';
   const ok4 = isFinite(nv.n4) && hOk && isFinite(tar) ? tar >= nv.n4 / r.H : null, c4 = ok4 == null ? 'var(--ink)' : ok4 ? G : RJ;
   const mgPct = v => r.ejecutado > 0 && isFinite(v) ? Math.round(v / r.ejecutado * 100) : null;   // margen = beneficio ÷ trabajo hecho
-  const bdL = ls => ls.filter(x => Math.abs(x.valor) >= 0.5).map(x => '<div class="rt-sim-r"><span>' + esc(x.label || x.clave) + '</span><b>' + eur(x.valor) + '</b></div>').join('') || '<div class="rt-sim-r"><span>Sin importes</span></div>';
+  // V10.86 (Daniel): cada coste lleva al lado su % sobre el ingreso de la obra; los nombres empiezan siempre en mayúscula
+  const pcI = v => r.ejecutado > 0 && isFinite(v) ? ' <span style="font-size:.78em;color:var(--ink-soft);font-weight:700;">' + (Math.round(v / r.ejecutado * 1000) / 10).toLocaleString('es-ES', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' %</span>' : '', mayus = t => { t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); };
+  const bdL = ls => ls.filter(x => Math.abs(x.valor) >= 0.5).map(x => '<div class="rt-sim-r"><span>' + mayus(esc(x.label || x.clave)) + '</span><b>' + eur(x.valor) + pcI(x.valor) + '</b></div>').join('') || '<div class="rt-sim-r"><span>Sin importes</span></div>';
   const relRx = /^(maq:|amort:|gen:ss|gen:coches|gen:gestoria)/, relL = r.lineasI.filter(x => relRx.test(x.clave)), restoL = r.lineasI.filter(x => !relRx.test(x.clave));
   const sociosL = [{label: 'Salario de Rafa y Manolo', valor: r.socios.valor}];
   const fil = (titulo, sub, v, color, bd, cOver, base) => { const ok = v >= 0, c = cOver || (ok ? G : RJ), mg = base > 0 && isFinite(v) ? Math.round(v / base * 100) : mgPct(v);
@@ -567,7 +569,7 @@ R.vistaObra = function(r, P, b){
   // V9.90 (Daniel): tarjeta 1 = beneficio al ir restando costes; tarjeta 2 = lo que queda LIMPIO (tras impuestos): final frente a objetivo, aparte para compararlos; porcentaje de 1 a 100
   const m100 = Math.min(100, Math.max(1, num(R.param.margen) || 1));
   const cr = t => '<span style="color:' + G + ';">Benef.</span> <span style="color:' + RJ + ';">' + t + '</span>';
-  const hd = (t, v) => '<div class="rt-sim-r" style="font-weight:800;border-top:1px solid var(--line,#ddd);margin-top:4px;"><span>' + t + '</span><b>' + eur(v) + '</b></div>';
+  const hd = (t, v) => '<div class="rt-sim-r" style="font-weight:800;border-top:1px solid var(--line,#ddd);margin-top:4px;"><span>' + t + '</span><b>' + eur(v) + pcI(v) + '</b></div>';
   const filas1 = fil(cr('− costes directos'), '', r.ejecutado - nv.n1, '#2f8f5b', bdL(r.lineasD))
     + fil(cr('− directos − producción'), '', r.ejecutado - nv.n2, '#2f6fb0', hd('Costes directos', nv.n1) + bdL(r.lineasD) + hd('Producción', nv.n2 - nv.n1) + bdL(relL) + bdL(sociosL));
   const niveles = '<div class="rt-c"><h3>Beneficio bruto</h3><div style="font-size:11.5px;color:var(--ink-soft);margin:-4px 0 6px;">Ingresos: <b>' + eur(r.ejecutado) + '</b> (sin IVA)</div>' + filas1 + '</div>';
