@@ -6,10 +6,11 @@ import re, sys, json, os
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FICHEROS = ['index.html', 'rentabilidad/rent.js']
 BASE = os.path.join(RAIZ, 'herramientas', 'lint_baseline.json')
+EXCEPCION_VISOR = ('if(s.u) css', "x.localName === 't') h += visorEsc")
 FLECHAS = '▾▴▸◂▼▲►◄▶◀⌄⌃›‹'
 REGLAS = [
  ('flecha', 'Sin flechas ni triángulos en filas (guía 2)', re.compile('[' + FLECHAS + ']')),
- ('subrayado', 'Sin subrayados ni punteados que no sean enlaces (guía 2)', re.compile(r'text-decoration\s*:\s*underline|border-bottom\s*:\s*[^;"}]*dotted', re.I)),
+ ('subrayado', 'NI UN subrayado en la web (guía 2, decisión de Daniel 12/10/2026)', re.compile(r'text-decoration\s*:\s*underline|text-underline|<u[ >]|border-bottom\s*:\s*[^;"}]*dotted', re.I)),
  ('tabla-en-rent', 'Sin <table> en las vistas móviles de rentabilidad (guía 3)', re.compile(r'<table', re.I)),
 ]
 CSS_BLOQUE = re.compile(r'([^{};<>]{1,200})\{([^{}]{1,500})\}')
@@ -31,6 +32,7 @@ def hallazgos():
         for n, linea in enumerate(open(ruta, encoding='utf-8').read().split('\n'), 1):
             for clave, _, rx in REGLAS:
                 if clave == 'tabla-en-rent' and not f.endswith('rent.js'): continue
+                if clave == 'subrayado' and any(e in linea for e in EXCEPCION_VISOR): continue   # el visor reproduce el formato propio de un documento ajeno
                 if rx.search(linea):
                     out.append({'f': f, 'regla': clave, 'txt': re.sub(r'\s+', ' ', linea.strip())[:160]})
     return out
