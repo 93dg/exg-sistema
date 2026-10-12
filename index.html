@@ -3858,6 +3858,17 @@ svg.ic{width:1.25em;height:1.25em;flex:0 0 auto;display:inline-block;vertical-al
 .sis-det-cuerpo{padding:0 10px 12px;}
 .sis-sub{font-weight:400;font-size:12px;color:var(--ink-soft);}
 .tb-fondo{z-index:5100 !important;}
+
+/* V10.98 (Daniel): Año y Trim. ajustados a su texto; Estado y los iconos, más grandes; línea de info bajo los filtros */
+.pleg-cols .tb-plegado[data-pl="anio"], .pleg-cols .tb-plegado[data-pl="trim"]{padding:6px 7px !important;}
+.pleg-cols .tb-plegado[data-pl="estado"]{font-size:11px !important;padding:8px 7px !important;}
+.pleg-cols .cli-icon-btn, .pleg-cols .doc-cli-btn, .pleg-cols .doc-ord-btn, .pleg-cols .doc-vista-btn{width:28px !important;height:28px !important;}
+.pleg-cols .cli-icon-btn svg{width:15px !important;height:15px !important;}
+.doc-info{display:flex;align-items:center;gap:10px;margin:0 14px 8px;font-size:11.5px;color:var(--ink-soft);}
+.doc-info .hist-aviso{margin:0 !important;font-size:11.5px !important;order:0 !important;}
+.doc-info .doc-rev{background:none !important;border:0 !important;box-shadow:none !important;padding:0 !important;margin:0 !important;min-height:0 !important;width:auto !important;font-size:11.5px !important;font-weight:800 !important;color:var(--orange) !important;cursor:pointer;}
+.doc-info .doc-info-acc{margin-left:auto;display:flex;align-items:center;gap:6px;}
+.doc-info .doc-info-acc .count{display:none;}
 </style>
 <style>
 /* required styles */
@@ -4654,11 +4665,11 @@ window.exgLibLocal = (function(){ const prom = {}; return function(n){ if(prom[n
   return prom[n]; }; })();
 window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').catch(()=>{}); exgLibLocal('leaflet').catch(()=>{}); }; if('requestIdleCallback' in window) requestIdleCallback(ya, {timeout: 4000}); else setTimeout(ya, 2500); });
 </script>
-<script src="rentabilidad/rent.js?v=V10.98" defer></script>
-<script src="costes/norm.js?v=V10.98" defer></script>
-<script src="ajustes/calc.js?v=V10.98" defer></script>
+<script src="rentabilidad/rent.js?v=V10.99" defer></script>
+<script src="costes/norm.js?v=V10.99" defer></script>
+<script src="ajustes/calc.js?v=V10.99" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.98</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V10.99</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4810,7 +4821,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V10.98</div>
+        <div class="sub" id="version-badge">V10.99</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -21110,6 +21121,22 @@ const PLEG_CFG = {
   pres: {tbody: 'presupuestos-tbody-standalone'}
 };
 // V10.83 (Daniel: «¿por qué 2 cabeceros si cabe todo en uno?»): Buscar y Quitar filtros pasan a la misma línea que las pastillas; si el cabecero se queda sin nada, desaparece
+// V10.98 (Daniel: «¿por qué un cabecero solo para info? Ponlo debajo de los filtros, en pequeño, y Revisar en la misma línea, sin pastilla, texto naranja en negrita»):
+// el cabecero desaparece; su número de documentos, Revisar y los botones de selección pasan a una línea entre los filtros y la primera tarjeta
+function docInfoLinea(p, cab, caja){
+  if(!cab || !caja || document.getElementById(p + '-doc-info')) return;
+  try{ renderAvisoHistorico(); }catch(e){}
+  const info = document.createElement('div'); info.className = 'doc-info'; info.id = p + '-doc-info';
+  const av = cab.querySelector('.hist-aviso') || document.getElementById('hist-aviso-' + {fact: 'facturas', alb: 'albaranes', pres: 'presupuestos'}[p]);
+  const rev = cab.querySelector('.doc-rev, button[onclick^="revisarTipoDocumento"]');
+  const bm = cab.querySelector('[id$="-mover-sel-btn"]'), acc = bm && bm.parentElement;
+  if(av) info.appendChild(av);
+  if(rev){ rev.classList.add('doc-rev'); info.appendChild(rev); }
+  if(acc && acc !== cab){ acc.classList.add('doc-info-acc'); info.appendChild(acc); }
+  cab.querySelectorAll('h3').forEach(h => { const fila = h.parentElement; if(fila && fila !== cab && !fila.querySelector('button')) fila.style.display = 'none'; });
+  caja.insertAdjacentElement('afterend', info);
+  cab.classList.add('cab-sin-fila');
+}
 function plegCabVacia(cab){ if(!cab) return; const fila = cab.querySelector('.dd-filter-row-compacta'); if(fila && !fila.querySelector('button, .dd-filter')) cab.classList.add('cab-sin-fila'); }
 const PLEG_GRUPOS = [['anio', 'Año', 'anio'], ['trim', 'Trim.', 'trim'], ['estado', 'Estado', 'estado'], ['orden', 'Orden', null]];   // clave, título, atributo data- de la pastilla (Orden no filtra: ordena, y no lleva cantidades)
 const PLEG_FILTROS = PLEG_GRUPOS.filter(g => g[0] !== 'orden');
@@ -21166,6 +21193,7 @@ function plegIniciar(){
     dd.remove();   // el botón Filtros y su panel vacío ya no hacen falta
     const ddo = document.getElementById('dd-' + p + '-orden'); if(ddo) ddo.remove();   // el desplegable de Ordenar tampoco: sus pastillas ya están en la fila Orden
     try{ docCabecera(p, cab); }catch(e){ console.warn('cabecera', e); }
+    try{ docInfoLinea(p, cab, caja); }catch(e){ console.warn('info', e); }
     caja.addEventListener('click', ev => {
       const t = ev.target.closest('button[data-pl]');
       if(t){ const k = t.dataset.pl; _plegAnimar = k; const l = _plegEstado[p]; if(l.includes(k)) _plegEstado[p] = l.filter(x => x !== k); else l.push(k); plegGuardar(p); plegRender(p); return; }
@@ -21195,6 +21223,7 @@ function plegTextoPlegado(p, k, sel){   // lo que lleva el botón de un grupo pl
   if(k === 'anio' && sel[k].size === 1){ const a = [...sel[k]][0]; if(a) return '<b>' + a + '</b>'; }   // V7.72: con un solo año elegido se ve el año, no «Año 1»
   return tit + (sel[k].size ? ' <b>' + sel[k].size + '</b>' : '');
 }
+const plegColW = k => (k === 'anio' || k === 'trim') ? 'auto' : 'minmax(max-content, 1fr)';
 function plegRender(p){
   const caja = document.getElementById('pleg-' + p); if(!caja) return;
   const guard = caja.querySelector('.pleg-guardados'), filas = caja.querySelector('.pleg-filas'), cols = caja.querySelector('.pleg-cols');
@@ -21202,13 +21231,13 @@ function plegRender(p){
   const sel = {}; claves.forEach(k => { sel[k] = plegSeleccion(p, k); });
   const tit = Object.fromEntries(PLEG_GRUPOS.map(g => [g[0], g[1]]));
   // ARRIBA: todas las cabeceras, siempre en su columna y sin moverse (como en Trabajos); la del filtro abierto se marca
-  cols.style.cssText = 'display:grid;gap:6px;margin-bottom:6px;grid-template-columns:repeat(' + claves.length + ', minmax(0, 1fr));';
+  cols.style.cssText = 'display:grid;gap:6px;margin-bottom:6px;grid-template-columns:' + claves.map(plegColW).join(' ') + ';';   // V10.98: Año y Trim. del ancho de su texto; Estado se lleva el resto
   cols.innerHTML = claves.map((k, i) => { const ab = abiertos.includes(k); return `<button type="button" class="tb-ftit tb-plegado ${sel[k].size ? 'con' : ''} ${ab ? 'abierto' : ''}" data-pl="${k}" style="grid-column:${i + 1};" title="${ab ? 'Plegar' : 'Desplegar'} ${tit[k]}">${plegTextoPlegado(p, k, sel)} <i>${ab ? '▾' : '▸'}</i></button>`; }).join('');
   // V7.72 (Daniel: «Cliente y Ordenar en la misma línea que los otros filtros, Ordenar siempre a la derecha del todo»): en las listas de documentos
   // la fila de pastillas es Año · Trim. · Estado · [Cliente] · [Ordenar]; la pastilla Orden se sustituye por el icono
   if(!caja._iconos){ const cabD = caja.previousElementSibling; const bc = cabD && cabD.querySelector('.doc-cli-btn'), bo = cabD && cabD.querySelector('.doc-ord-btn'), bv = cabD && cabD.querySelector('.doc-vista-btn'); if(bc && bo){ const ex = cabD.querySelectorAll('button[title="Buscar"], button[title="Quitar los filtros"]'); caja._iconos = (bv ? [bc, bo, bv] : [bc, bo]).concat([...ex]);} }
-  if(caja._iconos){ cols.querySelector('[data-pl="orden"]')?.remove(); const vis = cols.children.length;
-    cols.style.gridTemplateColumns = 'repeat(' + vis + ', minmax(0, 1fr))' + ' auto'.repeat(caja._iconos.length); caja._iconos.forEach(b => { b.style.gridColumn = ''; cols.appendChild(b); });  plegCabVacia(caja.previousElementSibling); }
+  if(caja._iconos){ cols.querySelector('[data-pl="orden"]')?.remove();
+    cols.style.gridTemplateColumns = Array.from(cols.children).map(b => plegColW(b.dataset.pl)).join(' ') + ' auto'.repeat(caja._iconos.length); caja._iconos.forEach(b => { b.style.gridColumn = ''; cols.appendChild(b); });  plegCabVacia(caja.previousElementSibling); }
   claves.forEach(k => { const f = plegCont(p, k); if(f) guard.appendChild(f); });   // todas atrás, y ahora salen las abiertas en su fila
   filas.innerHTML = '';
   abiertos.forEach(k => {   // ABAJO: cada filtro abierto repite su cabecera a la izquierda de sus opciones
