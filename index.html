@@ -3026,6 +3026,7 @@ html.ai-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0px)
 .ai-attach-chip{position:relative;width:56px;height:56px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--concrete);display:flex;align-items:center;justify-content:center;font-size:20px;}
 .ai-attach-chip img{width:100%;height:100%;object-fit:cover;}
 .ai-attach-chip .rm{position:absolute;top:1px;right:1px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.ai-adj-esc,.ai-adj-mar{position:absolute;bottom:2px;width:22px;height:22px;border-radius:50%;background:rgba(27,31,36,0.82);border:none;color:#fff;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;} .ai-adj-esc{left:2px;} .ai-adj-mar{right:2px;} .ai-adj-esc svg,.ai-adj-mar svg{width:13px;height:13px;}
 #ai-input-toolbar{display:flex;align-items:center;gap:10px;margin-top:10px;}
 .ai-tool-wrap{position:relative;}
 .ai-tool-btn{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--concrete);font-size:17px;cursor:pointer;color:var(--ink-soft);flex-shrink:0;}
@@ -4677,11 +4678,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.18" defer></script>
-<script src="costes/norm.js?v=V11.18" defer></script>
-<script src="ajustes/calc.js?v=V11.18" defer></script>
+<script src="rentabilidad/rent.js?v=V11.19" defer></script>
+<script src="costes/norm.js?v=V11.19" defer></script>
+<script src="ajustes/calc.js?v=V11.19" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.18</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.19</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4833,7 +4834,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V11.18</div>
+        <div class="sub" id="version-badge">V11.19</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7501,9 +7502,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
             <button onclick="document.getElementById('ai-file-camara').click()">Hacer foto</button>
             <button onclick="document.getElementById('ai-file-escanear').click()">Escanear documento</button>
             <button onclick="document.getElementById('ai-file-foto').click()">Subir foto</button>
-            <button onclick="document.getElementById('ai-file-marcar').click()">Marcar una foto</button>
             <button onclick="document.getElementById('ai-file-doc').click()">Adjuntar archivo</button>
-            <button onclick="aiToggleAdjuntarMenu();cerrarAsistenteIA();abrirDigitalizar();">Digitalizar documento completo</button>
           </div>
         </div>
         <button class="ai-tool-btn" id="ai-mic-btn" onclick="toggleAsistenteVoz()" title="Dictar por voz"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:22px;height:22px;"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
@@ -7512,7 +7511,6 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
         <input type="file" id="ai-file-foto" accept="image/*" multiple style="display:none;" onchange="aiAdjuntarArchivos(this.files)">
         <input type="file" id="ai-file-doc" multiple style="display:none;" onchange="aiAdjuntarArchivos(this.files)">
         <input type="file" id="ai-file-escanear" accept="image/*" capture="environment" style="display:none;" onchange="aiEscanear(this.files);this.value=''">
-        <input type="file" id="ai-file-marcar" accept="image/*" style="display:none;" onchange="aiMarcar(this.files);this.value=''">
       </div>
       <button id="asistente-ia-enviar" onclick="enviarAsistenteIA()" title="Analizar" aria-label="Analizar"><span class="ai-env-txt">Analizar </span><span>→</span></button>
       <div id="ai-input-hint">Puedes pedir varias cosas de golpe — las separo yo.</div>
@@ -26262,9 +26260,12 @@ function aiAdjuntarArchivos(files){
 function aiEscanear(files){ const f = files && files[0]; document.getElementById('ai-adjuntar-menu')?.classList.remove('open'); if(!f) return;
   if(!window.EXGEscaner){ mostrarToast('El escáner aún no ha cargado. Prueba en un momento.'); return; }
   window.EXGEscaner.abrir(f, {añadir: a => aiAdjuntarArchivos([a]), aviso: mostrarToast, repetir: () => document.getElementById('ai-file-escanear').click()}); }
-function aiMarcar(files){ const f = files && files[0]; document.getElementById('ai-adjuntar-menu')?.classList.remove('open'); if(!f) return;
-  if(!window.EXGMarcar){ mostrarToast('El editor de marcas aún no ha cargado. Prueba en un momento.'); return; }
-  window.EXGMarcar.abrir(f, {aviso: mostrarToast, listo: a => aiAdjuntarArchivos([a])}); }
+// Como en subir: cada foto adjunta lleva sus botones de escanear y marcar (lápiz, círculo, flecha); el resultado sustituye a la foto
+function aiCambiarAdjunto(i, f){ const r = new FileReader(); r.onload = () => { aiAdjuntos[i] = {nombre: f.name || aiAdjuntos[i].nombre, tipo: f.type, esImagen: true, dataUrl: r.result, file: f}; aiRenderAdjuntos(); }; r.readAsDataURL(f); }
+function aiEscanearAdj(i){ const a = aiAdjuntos[i]; if(!a || !a.file) return; if(!window.EXGEscaner){ mostrarToast('El escáner aún no ha cargado. Prueba en un momento.'); return; }
+  window.EXGEscaner.abrir(a.file, {añadir: f => { if(f !== a.file) aiCambiarAdjunto(i, f); }, aviso: mostrarToast, repetir: () => document.getElementById('ai-file-escanear').click()}); }
+function aiMarcarAdj(i){ const a = aiAdjuntos[i]; if(!a || !a.file) return; if(!window.EXGMarcar){ mostrarToast('El editor de marcas aún no ha cargado. Prueba en un momento.'); return; }
+  window.EXGMarcar.abrir(a.file, {aviso: mostrarToast, listo: f => aiCambiarAdjunto(i, f)}); }
 // Dejar en cola = lo mismo que enviar desde subir.html: queda pendiente en Entradas para revisarlo con Claude (sin procesado automático: está en pausa)
 async function aiDejarEnCola(desdePropuestas){
   const ult = desdePropuestas ? (window._aiUltimo || {}) : {mensaje: document.getElementById('asistente-ia-input').value.trim(), adjuntos: aiAdjuntos.slice()};
@@ -26316,6 +26317,7 @@ function aiRenderAdjuntos(){
     <div class="ai-attach-chip" title="${a.nombre}">
       ${a.esImagen ? `<img src="${a.dataUrl}">` : '📎'}
       <div class="rm" onclick="aiQuitarAdjunto(${i})">✕</div>
+      ${a.esImagen && a.file ? `<button type="button" class="ai-adj-esc" title="Escanear" aria-label="Escanear" onclick="event.stopPropagation();aiEscanearAdj(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M4 12h16"/></svg></button><button type="button" class="ai-adj-mar" title="Marcar" aria-label="Marcar" onclick="event.stopPropagation();aiMarcarAdj(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z"/></svg></button>` : ''}
     </div>`).join('');
 }
 let aiGrabandoAudio = false;
