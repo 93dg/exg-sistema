@@ -4781,11 +4781,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.47" defer></script>
-<script src="costes/norm.js?v=V11.47" defer></script>
-<script src="ajustes/calc.js?v=V11.47" defer></script>
+<script src="rentabilidad/rent.js?v=V11.48" defer></script>
+<script src="costes/norm.js?v=V11.48" defer></script>
+<script src="ajustes/calc.js?v=V11.48" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.47</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.48</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4937,7 +4937,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V11.47</div>
+        <div class="sub" id="version-badge">V11.48</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9237,7 +9237,11 @@ function c3Pintar(){
   // V10.30 (Daniel): si un trabajo está el viernes y sigue el lunes, los días sin trabajar de en medio llevan la línea de pausa que lo conecta
   Object.keys(_c3VS).forEach(id => { const j = _c3VJ[id]; if(!j) return; const ds = [..._c3VS[id]].sort(); for(let q = 1; q < ds.length; q++){ const a0 = new Date(ds[q - 1] + 'T00:00'), b0 = new Date(ds[q] + 'T00:00'), gap = Math.round((b0 - a0) / 86400000) - 1; if(gap < 1 || gap > 10) continue; const d0 = new Date(a0); for(let g = 0; g < gap; g++){ d0.setDate(d0.getDate() + 1); const iso0 = c2Iso(d0), arr = PAU[iso0] = PAU[iso0] || []; if(!arr.includes(j)) arr.push(j); } } });
   // V10.27/V10.32: cada trabajo/albarán ocupa la MISMA fila en toda su semana, y su línea de pausa va en esa misma fila, pegada a la barra (sin separación)
-  const LANE = {}; semanas.forEach((fila, wi) => { const jobs = {}, mete = (j, k) => { (jobs[j.id] = jobs[j.id] || {k0: k, dias: new Set()}).dias.add(k); }; fila.forEach((d, k) => { const iso = c2Iso(d); (PD[iso] || []).forEach(x => mete(x.j, k)); (PAU[iso] || []).forEach(j => mete(j, k)); }); const lane = {}; Object.entries(jobs).sort((a, b) => a[1].k0 - b[1].k0).forEach(([id, o]) => { let l = 0; while(Object.entries(lane).some(([id2, l2]) => l2 === l && [...jobs[id2].dias].some(k => o.dias.has(k)))) l++; lane[id] = l; }); LANE[wi] = lane; });
+  const LANE = {}; semanas.forEach((fila, wi) => { const jobs = {}, mete = (j, k) => { (jobs[j.id] = jobs[j.id] || {k0: k, dias: new Set()}).dias.add(k); }; fila.forEach((d, k) => { const iso = c2Iso(d); (PD[iso] || []).forEach(x => mete(x.j, k)); (PAU[iso] || []).forEach(j => mete(j, k)); }); const lane = {}, prev = wi > 0 ? LANE[wi - 1] : {}, choca = (o, l) => Object.entries(lane).some(([id2, l2]) => l2 === l && [...jobs[id2].dias].some(k => o.dias.has(k)));
+    // V11.48 (reporte d130f8f7): cada trabajo sigue en su misma fila de una semana a otra (también la línea de pausa); los que empiezan nuevos van debajo
+    const sigue = Object.entries(jobs).filter(([id]) => prev[id] !== undefined).sort((a, b) => prev[a[0]] - prev[b[0]]), nuevos = Object.entries(jobs).filter(([id]) => prev[id] === undefined).sort((a, b) => a[1].k0 - b[1].k0);
+    sigue.forEach(([id, o]) => { let l = prev[id]; while(choca(o, l)) l++; lane[id] = l; });
+    nuevos.forEach(([id, o]) => { let l = 0; while(choca(o, l)) l++; lane[id] = l; }); LANE[wi] = lane; });
   const SL = (L, P, lane) => { const s = []; L.forEach(x => { s[lane[x.j.id]] = x; }); P.forEach(j => { if(lane[j.id] !== undefined && !s[lane[j.id]]) s[lane[j.id]] = {j, pausa: true}; }); const out = []; for(let q = 0; q < Math.min(s.length, 3); q++) out.push(s[q] || null); return out; };
   app.innerHTML = `
     ${preg ? `<div class="c3-q"><small>Pregunta del día</small><h2>¿Terminasteis ${escHtml(c3Nom(preg))}${preg.trabajo && preg.cliente ? ' · ' + escHtml(tbMay(preg.trabajo)) : ''}?</h2>
