@@ -32,6 +32,8 @@ if [ -z "$OK" ]; then
 fi
 echo "✓ EXG: caso ${CASO_ID} abierto, version_objetivo coincide con ${VERSION} — publicando"
 
+# JavaScript sin errores de sintaxis (un error deja la web en blanco)
+if ! python3 herramientas/sintaxis_js.py; then echo "❌ Deploy bloqueado: error de sintaxis"; exit 1; fi
 # Control de diseño: la GUÍA DE DISEÑO EXG de Daniel se comprueba en cada publicación (herramientas/lint_diseno.py)
 if ! python3 herramientas/lint_diseno.py; then
   echo "❌ Deploy bloqueado: corrige lo anterior (o, si Daniel lo ha aprobado expresamente, ajusta la guía y el lint)"

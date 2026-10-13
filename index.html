@@ -795,8 +795,8 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .fl-tabs{display:flex;flex-wrap:wrap;gap:4px;padding:8px 0 2px;}
 .fl-tab{flex:0 0 auto;border:none;background:transparent;font-family:inherit;font-size:13px;font-weight:600;color:var(--ink-soft);padding:7px 12px;border-radius:999px;cursor:pointer;}
 .fl-tab b{font-weight:700;color:var(--orange);margin-left:3px;font-size:11.5px;}
-.fl-tab.act{background:var(--asphalt);color:#fff;}
-.fl-tab.act b{color:#FF9A5C;}
+.fl-tab.act{background:var(--paper);color:var(--ink);box-shadow:inset 0 0 0 2px var(--orange);}   /* V11.44: marcado = borde naranja, nunca fondo negro */
+.fl-tab.act b{color:var(--orange);}
 .fl-cuerpo{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px calc(env(safe-area-inset-bottom,0px) + 90px);max-width:760px;width:100%;margin:0 auto;box-sizing:border-box;}
 .fl-sec{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:12px;}
 .fl-sec > h4{margin:0 0 10px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;}
@@ -4773,11 +4773,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.43" defer></script>
-<script src="costes/norm.js?v=V11.43" defer></script>
-<script src="ajustes/calc.js?v=V11.43" defer></script>
+<script src="rentabilidad/rent.js?v=V11.44" defer></script>
+<script src="costes/norm.js?v=V11.44" defer></script>
+<script src="ajustes/calc.js?v=V11.44" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.43</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.44</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4929,7 +4929,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V11.43</div>
+        <div class="sub" id="version-badge">V11.44</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8445,10 +8445,15 @@ async function bandejaContadores(forzar){
     const vista = document.querySelector('.view.active'); if(!vista) return;
     // V7.86 (Daniel: «en toda la web; y al llegar a la última, seguir deslizando empieza otra vez por la primera»): también las pestañas de Dirección
     // (.dir-pest), y la lista da la vuelta: después de la última va la primera y antes de la primera, la última
-    const barra = [...vista.querySelectorAll('.docs-tabs, .client-tabs, .dir-pest')].find(b => b.offsetParent && b.querySelectorAll('button, .client-tab').length > 1); if(!barra) return;
-    const tabs = [...barra.querySelectorAll(':scope > button, :scope > .client-tab, :scope > * > button')].filter(b => b.offsetParent);
-    const i = tabs.findIndex(b => b.classList.contains('active') || b.classList.contains('act')); if(i < 0 || tabs.length < 2) return;
-    const sig = tabs[(i + (dx < 0 ? 1 : -1) + tabs.length) % tabs.length]; if(sig) sig.click();
+    // V11.44 (reporte 8361668e: «en todos los sitios donde haya pestañas»): la barra de pestañas más de dentro que se vea (la del contenido que tienes delante), también los segmentos tipo Pendientes/Activos
+    const barras = [...vista.querySelectorAll('.docs-tabs, .client-tabs, .dir-pest, .tb-seg, .fl-tabs')].filter(b => b.offsetParent && [...b.querySelectorAll(':scope > button, :scope > .client-tab, :scope > * > button')].some(x => x.classList.contains('active') || x.classList.contains('act')));
+    const tabsDe = b => [...b.querySelectorAll(':scope > button, :scope > .client-tab, :scope > * > button')].filter(x => x.offsetParent), dir = dx < 0 ? 1 : -1;
+    // se pasa por las pestañas de dentro; al acabarse, salta a la siguiente pestaña de la barra de fuera; en la de más fuera da la vuelta
+    for(let n = barras.length - 1; n >= 0; n--){
+      const tabs = tabsDe(barras[n]), i = tabs.findIndex(b => b.classList.contains('active') || b.classList.contains('act')); if(i < 0 || tabs.length < 2) continue;
+      const j = i + dir; if(j >= 0 && j < tabs.length){ tabs[j].click(); return; }
+      if(n === 0){ tabs[(j + tabs.length) % tabs.length].click(); return; }
+    }
   }, {passive: true});
 })();
 
@@ -19242,7 +19247,7 @@ function abrirFichaMaquina(id){
 (function flDeslizar(){   // en la ficha de una máquina o de un contrato, deslizar de lado cambia de pestaña
   let x0 = null, y0 = null, t0 = 0, activo = null;
   const tabsDe = ov => Array.from(ov.querySelectorAll('.fl-tab'));
-  document.addEventListener('touchstart', ev => { const ov = ev.target.closest && ev.target.closest('#fl-overlay, #gr-overlay'); if(!ov || ev.touches.length !== 1 || ev.target.closest('input, textarea, select, .fl-tabs, .fl-pre, .gr-spark')){ x0 = null; return; } activo = ov; x0 = ev.touches[0].clientX; y0 = ev.touches[0].clientY; t0 = Date.now(); }, {passive: true});
+  document.addEventListener('touchstart', ev => { const ov = ev.target.closest && ev.target.closest('#fl-overlay, #gr-overlay, .fl-overlay'); /* V11.44 (reporte 8361668e): también la ficha de cada persona y cualquier hoja con pestañas */ if(!ov || ev.touches.length !== 1 || ev.target.closest('input, textarea, select, .fl-tabs, .fl-pre, .gr-spark')){ x0 = null; return; } activo = ov; x0 = ev.touches[0].clientX; y0 = ev.touches[0].clientY; t0 = Date.now(); }, {passive: true});
   document.addEventListener('touchend', ev => {
     if(x0 == null || !activo) return; const t = ev.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0, ov = activo; x0 = null; activo = null;
     if(Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.6 || Date.now() - t0 > 700) return;   // un deslizamiento claro y horizontal, no un desplazamiento hacia abajo
