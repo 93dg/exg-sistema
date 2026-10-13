@@ -4686,11 +4686,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.32" defer></script>
-<script src="costes/norm.js?v=V11.32" defer></script>
-<script src="ajustes/calc.js?v=V11.32" defer></script>
+<script src="rentabilidad/rent.js?v=V11.33" defer></script>
+<script src="costes/norm.js?v=V11.33" defer></script>
+<script src="ajustes/calc.js?v=V11.33" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.32</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.33</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4842,7 +4842,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V11.32</div>
+        <div class="sub" id="version-badge">V11.33</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9473,7 +9473,7 @@ document.addEventListener('click', e => { const t = e.target.closest && e.target
 // factura · año · periodo); tarjeta oscura con dinero en cuenta, valor de la flota y pendiente de cobrar; 4 tarjetas con semáforo; ingresos por año
 // en barras tumbadas (el año a la izquierda: no se pisan); trimestres. Ingresos con la norma activa: legal = facturas; sin factura = proformas y
 // albaranes de particulares cobrados sin factura enlazada; la Administración nunca es «sin factura»
-let _e2det = null;   // V8.13: dato abierto (se despliega debajo)
+let _e2det = null, _e2cli = null;   // V8.13: dato abierto (se despliega debajo)
 let _e2 = null, _e2cf = 'todo', _e2anio = new Date().getFullYear(), _e2per = 'año', _e2menu = null;
 async function econ2Cargar(){
   const box = document.getElementById('econ2'); if(!box || !sb) return;
@@ -9513,8 +9513,10 @@ function econ2Detalle(k, {sel, e}){   // V8.13: el detalle que se despliega al t
   const tipoTxt = t => ({factura: 'Factura', proforma: 'Proforma', albaran: 'Albarán', gasto: 'Gasto'})[t] || t;
   const filaDoc = (r, imp, extra) => `<button type="button" class="e2-fila" data-e2-doc="${r.id}"><div><b>${escHtml(String(r.cli))}</b><span>${tipoTxt(r.tipo)}${r.numero ? ' nº ' + escHtml(String(r.numero)) : ''} · ${fch(r.fecha)}${extra ? ' · ' + extra : ''}</span></div><strong>${e(imp)}</strong></button>`;
   const lista = (rs, imp, extra, max = 15) => { const o = rs.slice().sort((a, b) => imp(b) - imp(a)); return o.slice(0, max).map(r => filaDoc(r, imp(r), extra && extra(r))).join('') + (o.length > max ? `<div class="e2-mas">y ${o.length - max} más</div>` : ''); };
+  // V11.33 (reporte 2f816e90 de Daniel): cada línea de cliente o proveedor se despliega ahí mismo con los documentos de los que sale su total (facturas, albaranes, proformas, gastos); cada uno abre su documento
   const porCli = (rs, imp, max = 12) => { const m = {}; rs.forEach(r => { m[r.cli] = (m[r.cli] || 0) + imp(r); }); const o = Object.entries(m).filter(x => x[1] > 0.5).sort((a, b) => b[1] - a[1]), tot = o.reduce((a, x) => a + x[1], 0);
-    return o.slice(0, max).map(([c, v]) => `<div class="e2-fila"><div><b>${escHtml(c)}</b><span>${Math.round(v / tot * 100)} %</span></div><strong>${e(v)}</strong></div>`).join('') + (o.length > max ? `<div class="e2-mas">y ${o.length - max} más</div>` : ''); };
+    const docsDe = c => rs.filter(r => r.cli === c && imp(r) > 0.005).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).map(r => r.tipo === 'retirada' ? `<div class="e2-fila"><div><b>${fch(r.fecha)}</b><span>Retirada en efectivo</span></div><strong>${e(imp(r))}</strong></div>` : `<button type="button" class="e2-fila" data-e2-doc="${r.id}"><div><b>${tipoTxt(r.tipo)}${r.numero ? ' nº ' + escHtml(String(r.numero)) : ''}</b><span>${fch(r.fecha)}</span></div><strong>${e(imp(r))}</strong></button>`).join('');   // sin repetir el nombre, que ya está en la línea de arriba
+    return o.slice(0, max).map(([c, v]) => `<div class="e2-fila e2-cli${_e2cli === c ? ' abierto' : ''}" data-e2-cli="${escHtml(c)}" style="cursor:pointer;"><div><b>${escHtml(c)}</b><span>${Math.round(v / tot * 100)} %</span></div><strong>${e(v)}</strong></div>` + (_e2cli === c ? `<div class="e2-cli-docs" style="margin:0 0 6px 10px;border-left:2px solid var(--orange);padding-left:8px;">${docsDe(c)}</div>` : '')).join('') + (o.length > max ? `<div class="e2-mas">y ${o.length - max} más</div>` : ''); };
   if(k === 'saldo') return (_e2.avisos || []).length ? (_e2.avisos || []).map(a => `<div class="e2-fila"><div><b>${escHtml(a.concepto || ({abono: 'Abono', cargo: 'Cargo', recibo: 'Recibo', prestamo: 'Préstamo', tarjeta: 'Tarjeta', reintegro: 'Cajero', otro: 'Aviso sin interpretar'})[a.tipo] || '')}</b><span>${fch(a.fecha)}${a.saldo != null ? ' · saldo ' + e(a.saldo) : ''}</span></div><strong class="${a.importe == null ? '' : a.importe >= 0 ? 'pos' : 'neg'}">${a.importe == null ? '—' : (a.importe >= 0 ? '+' : '') + e(a.importe)}</strong></div>`).join('') : '<div class="e2-mas">Aún no hay avisos del banco leídos.</div>';
   if(k === 'flota') return ((_valFlotaRaw && _valFlotaRaw.items) || []).filter(x => x.maquina).map(x => { const f = (typeof fleet !== 'undefined' ? fleet : []).find(m => m.id === x.flota_id); return `<div class="e2-fila"><div><b>${escHtml(f ? (f.modelo || f.name) : 'Máquina')}</b><span>${x.min && x.max ? 'entre ' + e(x.min) + ' y ' + e(x.max) : ''}</span></div><strong>≈ ${e(x.estimado)}</strong></div>`; }).join('');
   if(k === 'deuda') return (_e2Deuda || []).map(x => `<div class="e2-fila"><div><b>${escHtml(x.quien)}</b><span>${escHtml(x.que || '')}</span></div><strong>${x.imp == null ? '<em style="font-style:normal;color:#E8A33A;">Falta</em>' : (x.aprox ? '≈ ' : '') + e(x.imp)}</strong></div>`).join('') || '<div class="e2-mas">No hay deudas apuntadas.</div>';
@@ -9650,6 +9652,7 @@ document.addEventListener('click', e => {
   const t = e.target.closest ? e.target : null; if(!t) return;
   if(t.closest('.nav [data-view="economia"], [data-gtab="economia"]')){ setTimeout(econ2Cargar, 60); return; }
   if(!t.closest('#econ2')){ if(_e2menu){ _e2menu = null; econ2Pintar(); } return; }
+  const cl = t.closest('[data-e2-cli]'); if(cl){ _e2cli = _e2cli === cl.dataset.e2Cli ? null : cl.dataset.e2Cli; econ2Pintar(); return; }   // V11.33
   const dc = t.closest('[data-e2-doc]'); if(dc){ if(typeof openDocumentViewer === 'function') openDocumentViewer(dc.dataset.e2Doc); return; }
   const dt = t.closest('[data-e2-det]'); if(dt){ _e2det = _e2det === dt.dataset.e2Det ? null : dt.dataset.e2Det; econ2Pintar(); return; }
   const m = t.closest('[data-e2-menu]'); if(m){ _e2menu = _e2menu === m.dataset.e2Menu ? null : m.dataset.e2Menu; econ2Pintar(); return; }
