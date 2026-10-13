@@ -41,6 +41,20 @@
       const k = 'd' + txt.slice(0, 40); if (!vistos.has(k)) { vistos.add(k); out.push(['desborda', txt.slice(0, 80)]); }
     }
   }
+  // 5) lo marcado (pestaña, pastilla o botón elegido) nunca con fondo oscuro: solo borde naranja (Daniel, reporte 4abba0be)
+  document.querySelectorAll('.active,.act,.on,.sel,[aria-selected="true"],[aria-pressed="true"]').forEach(e => {
+    if (!e.offsetParent || e.closest('.bottom-nav,.mobile-nav,#sel-flotante,.toast,#busq-ov') || e.matches('.busq-linea')) return;
+    const m = getComputedStyle(e).backgroundColor.match(/rgba?\(([\d.]+), ([\d.]+), ([\d.]+)(?:, ([\d.]+))?/); if (!m || (m[4] !== undefined && +m[4] < 0.5)) return;
+    if ((0.299 * m[1] + 0.587 * m[2] + 0.114 * m[3]) / 255 < 0.35) { const t = 'Marcado con fondo oscuro: ' + (e.innerText || '').trim().slice(0, 40); if (!vistos.has(t)) { vistos.add(t); out.push(['marcado', t]); } }
+  });
+  // 6) botones de solo icono sin círculo ni borde alrededor (Daniel 13/10/2026)
+  document.querySelectorAll('button,[role=button],.cli-icon-btn').forEach(e => {
+    if (!e.offsetParent || e.closest('.bottom-nav,.mobile-nav,#sel-flotante,#busq-ov,.busq-linea,.modal,.drawer') || /fab|report-bug|ai-fab|asist/i.test(e.id + ' ' + e.className)) return;
+    const t = (e.innerText || '').trim(); if (t.length > 2 || /[a-z0-9áéíóúñ]/i.test(e.textContent || '') || e.matches('.dir-check,[role=checkbox]')) return;
+    const s2 = getComputedStyle(e), bw = parseFloat(s2.borderTopWidth) || 0, bc = s2.borderTopColor, bg = s2.backgroundColor;
+    const conBorde = bw > 0 && !/rgba\(.*,\s*0\)$/.test(bc) && bc !== 'transparent', conFondo = bg && !/rgba\(.*,\s*0\)$/.test(bg) && bg !== 'transparent' && bg !== getComputedStyle(e.parentElement).backgroundColor;
+    if ((conBorde || conFondo) && !e.matches('.activo,.doc-cli-on')) { const k = 'Botón de icono con círculo/borde: ' + (t || e.title || e.getAttribute('aria-label') || '').slice(0, 30); if (!vistos.has(k)) { vistos.add(k); out.push(['circulo', k]); } }
+  });
   // 4) la lupa siempre en un extremo de su línea (Daniel 13/10/2026)
   document.querySelectorAll('button[title="Buscar"], .busq-lupa, .emp-f-lupa').forEach(b => {
     if (!b.offsetParent || b.closest('#busq-ov,#busq-fab')) return;

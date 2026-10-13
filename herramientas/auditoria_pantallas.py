@@ -79,7 +79,7 @@ async def main():
         return res
 VISTAS_TODAS=['control','trabajos','planificacion',"trabestad:teSub('costes')",'economia','documentos','albaranes','proformas','facturas','presupuestos','gastospro','impuestos','clientes','flota','direccion','empresa','personal','archivos','entradas','gastosrec','proyectos','tarifas','calcempleado','ayuntamiento','correo','reportes']   # V11.34: todas las pantallas (Empresa no se revisaba y por eso volvían las minúsculas)
 VISTAS=[v for v in VISTAS_TODAS if not os.environ.get('SOLO') or v==os.environ.get('SOLO')]
-DESC={'minuscula':'Texto que empieza en minúscula (todo texto empieza con mayúscula)','partido':'Texto corto partido en dos líneas','desborda':'Texto que se sale de la pantalla','lupa':'Lupa que no está en un extremo de su línea','correo_mayus':'Correo o enlace que sale con la primera letra en mayúscula (ponle class no-cap)'}
+DESC={'minuscula':'Texto que empieza en minúscula (todo texto empieza con mayúscula)','partido':'Texto corto partido en dos líneas','desborda':'Texto que se sale de la pantalla','circulo':'Botón de solo icono con círculo o borde alrededor','marcado':'Algo marcado con fondo oscuro (solo borde naranja)','lupa':'Lupa que no está en un extremo de su línea','correo_mayus':'Correo o enlace que sale con la primera letra en mayúscula (ponle class no-cap)'}
 BASE=os.path.join(os.path.dirname(os.path.abspath(__file__)),'auditoria_baseline.json')
 res=asyncio.run(main())
 c={}
@@ -91,7 +91,7 @@ if '--baseline' in sys.argv:
         old=json.load(open(BASE)); c={k:max(c.get(k,0),old.get(k,0)) for k in set(c)|set(old)}   # se guarda el máximo visto: una pantalla que tarda en cargar no rebaja la línea base
     json.dump(c,open(BASE,'w'),indent=0); print('baseline de pantallas guardada:',sum(c.values())); sys.exit(0)
 base=json.load(open(BASE)) if os.path.exists(BASE) else {}
-malos=[k for k,v in c.items() if v>(0 if k.split('|')[1] in ('minuscula','correo_mayus','lupa') else base.get(k,0))]   # V11.34: ninguna minúscula al principio, ni nueva ni de antes
+malos=[k for k,v in c.items() if v>(0 if k.split('|')[1] in ('minuscula','correo_mayus','lupa','marcado','circulo') else base.get(k,0))]   # V11.34: ninguna minúscula al principio, ni nueva ni de antes
 if malos:
     print('❌ PANTALLAS: aparece algo nuevo que incumple la guía de Daniel (python3 herramientas/auditoria_pantallas.py --todo):')
     for k in malos:
