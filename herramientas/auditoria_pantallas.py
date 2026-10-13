@@ -53,7 +53,7 @@ async def main():
             return await route.continue_()
         await pg.route(U+"/**",ruta)
         await pg.goto('http://localhost:8768/index.html');await pg.wait_for_timeout(15000)
-        AUD=open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'auditoria.js'),encoding='utf-8').read()
+        AUD=open(os.environ.get('AUD_JS') or os.path.join(os.path.dirname(os.path.abspath(__file__)),'auditoria.js'),encoding='utf-8').read()
         res=[]
         for v in VISTAS:
             try:
