@@ -41,5 +41,13 @@
       const k = 'd' + txt.slice(0, 40); if (!vistos.has(k)) { vistos.add(k); out.push(['desborda', txt.slice(0, 80)]); }
     }
   }
+  // 4) la lupa siempre en un extremo de su línea (Daniel 13/10/2026)
+  document.querySelectorAll('button[title="Buscar"], .busq-lupa, .emp-f-lupa').forEach(b => {
+    if (!b.offsetParent || b.closest('#busq-ov,#busq-fab')) return;
+    const q = b.getBoundingClientRect(); let f = b.parentElement; while (f && f.parentElement && f.getBoundingClientRect().width < 0.6 * f.parentElement.getBoundingClientRect().width) f = f.parentElement; if (!f) return;
+    const mid = (q.top + q.bottom) / 2, hojas = [...f.querySelectorAll('*')].filter(x => x !== b && !b.contains(x) && !x.contains(b) && x.offsetParent && x.children.length === 0 && x.getBoundingClientRect().width > 0 && Math.abs((x.getBoundingClientRect().top + x.getBoundingClientRect().bottom) / 2 - mid) < 14);
+    const der = hojas.some(x => x.getBoundingClientRect().left > q.right - 2), izq = hojas.some(x => x.getBoundingClientRect().right < q.left + 2);
+    if (der && izq) { const t = 'Lupa en medio de su línea: ' + (f.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 50); if (!vistos.has(t)) { vistos.add(t); out.push(['lupa', t]); } }
+  });
   return out;
 })()
