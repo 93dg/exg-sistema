@@ -4788,11 +4788,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.51" defer></script>
-<script src="costes/norm.js?v=V11.51" defer></script>
-<script src="ajustes/calc.js?v=V11.51" defer></script>
+<script src="rentabilidad/rent.js?v=V11.52" defer></script>
+<script src="costes/norm.js?v=V11.52" defer></script>
+<script src="ajustes/calc.js?v=V11.52" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.51</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.52</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4944,7 +4944,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V11.51</div>
+        <div class="sub" id="version-badge">V11.52</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -26778,6 +26778,45 @@ function pedirPermisoIA(mensaje, motivo, callback){
 }
 // ============ FIN PARSEO LOCAL ============
 
+// V11.52 (Daniel 13/10: «lo que me tiene que dar es una puntuación y subirlo como lo hace la web de subir»): en el Chat, lo que se escribe sin adjuntos ya no pide «¿Usar IA?».
+// Se sube a Entradas igual que subir.html (lo reviso con Claude) y el motor dice adónde lo llevaría, con su puntuación, para ver si acierta. La IA solo si se elige.
+const AI_MAQ = [[/\b(mixta|retro(mixta)?)\b/i, 'Mixta'], [/\bgiratoria\b/i, 'Giratoria'], [/\bcami[oó]n\b/i, 'Camión'], [/\bniveladora\b/i, 'Niveladora'], [/\brulo\b/i, 'Rulo'], [/\bcuba\b/i, 'Cuba']];
+async function aiMotorPropuesta(texto){
+  const t = String(texto || '').trim(), out = {lineas: [], destino: null, puntuacion: 0, motivos: []};
+  // líneas de trabajo: «1.5 mixta abriendo…», «6h de giratoria rebajando…, 2,5h mixta extendiendo…»
+  t.split(/(?<!\d)\s*,\s*(?=\d)|\s*[;\n]\s*(?=\d)/).forEach(tr => { const m = tr.match(/^(\d+(?:[.,]\d+)?)\s*(?:h(?:oras?)?\b\.?)?\s*(?:de\s+)?(.*)$/i); if(!m) return; const resto = m[2] || '', mq = AI_MAQ.find(([r]) => r.test(resto));
+    out.lineas.push({horas: Number(m[1].replace(',', '.')), maquina: mq ? mq[1] : null, concepto: resto.replace(mq ? mq[0] : /^$/, '').replace(/\s+/g, ' ').trim()}); });
+  let interp = null; try{ const r = await sb.rpc('interpretar_entrada_texto', {p_texto: t}); interp = r.data; }catch(e){}
+  if(interp && interp.trabajo && interp.cliente){ out.destino = {nombre: interp.trabajo.codigo + ' · ' + interp.cliente.nombre, motivo: 'nombra al cliente (' + (interp.cliente.motivo || '') + ')'}; out.puntuacion += 45; }
+  else { try{   // norma de Daniel (06/10): si no dice cliente ni sitio, va al mismo albarán que la entrada anterior
+      const {data: n} = await sb.from('sistema_notificaciones').select('elemento_id, created_at').eq('origen', 'motor_entradas').order('created_at', {ascending: false}).limit(10);
+      for(const x of (n || [])){ const {data: d} = await sb.from('documentos_economicos').select('id, numero, tipo, estado_cobro, entidad_id').eq('id', x.elemento_id).maybeSingle(); if(d && d.tipo === 'albaran'){ const cli = (mapaClientes().get(d.entidad_id) || {}).name || ''; out.destino = {id: d.id, nombre: 'Albarán ' + (d.numero || '') + (cli ? ' · ' + cli : ''), motivo: 'no dice cliente: va donde fue la entrada anterior'}; out.puntuacion += d.estado_cobro === 'trabajo_activo' ? 35 : 20; break; } }
+    }catch(e){} }
+  const ok = out.lineas.filter(l => l.horas > 0 && l.maquina && l.concepto);
+  if(ok.length && ok.length === out.lineas.length){ out.puntuacion += 45; } else if(ok.length){ out.puntuacion += 25; out.motivos.push('alguna línea sin máquina u horas'); } else out.motivos.push('no veo horas y máquina');
+  if(!out.destino) out.motivos.push('no sé a qué trabajo va');
+  out.puntuacion = Math.max(5, Math.min(95, out.puntuacion + (out.destino ? 5 : 0)));
+  return out;
+}
+async function aiSubirConPuntuacion(mensaje){
+  aiMostrarVista('loading'); document.getElementById('ai-loading-text').textContent = 'Subiéndolo a Entradas…';
+  let P = null; try{ P = await aiMotorPropuesta(mensaje); }catch(e){}
+  const hoy = new Date().toISOString().slice(0, 10), lote = (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
+  const {error} = await sb.from('documentos').insert({tipo: 'otro', fecha: hoy, source: 'texto', status: 'pendiente', lote_id: lote, nota: mensaje, interpretacion: P ? {motor_asistente: P} : null});
+  aiMostrarVista('input');
+  if(error){ mostrarToast('No se pudo subir: ' + (error.message || error)); return; }
+  document.getElementById('asistente-ia-input').value = ''; window.aiAutoCrece && aiAutoCrece();
+  const eh = s => escHtml(String(s || '')), may = s => { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(); };
+  const lin = P && P.lineas.length ? P.lineas.map(l => `<div class="ai-mp-l"><span>${eh(may(l.concepto) || '—')}${l.maquina ? ' · ' + eh(l.maquina) : ''}</span><b>${String(l.horas).replace('.', ',')} h</b></div>`).join('') : '';
+  const col = !P ? 'var(--ink-soft)' : P.puntuacion >= 80 ? 'var(--green)' : P.puntuacion >= 50 ? 'var(--orange)' : 'var(--red)';
+  window._aiTextoIA = mensaje;
+  mostrarModalGenerico('Subido a Entradas', `<div class="ai-mp">
+    <div class="ai-mp-r"><span>Lo reviso con Claude, como lo que subes en subir.</span></div>
+    ${P ? `<div class="ai-mp-r ai-mp-d"><span>El motor lo llevaría a</span><b>${P.destino ? eh(P.destino.nombre.replace(/·\s*(.+)$/, (m, c) => '· ' + c.toLowerCase().replace(/(^|\s)\S/g, x => x.toUpperCase()))) : 'No lo sabe'}</b><small>${P.destino ? eh(P.destino.motivo) : eh(P.motivos.join(' · '))}</small></div>${lin}
+    <div class="ai-mp-r"><span>Puntuación del motor${P.motivos.length && P.destino ? `<small>${eh(P.motivos.join(' · '))}</small>` : ''}</span><b style="color:${col};">${P.puntuacion} %</b></div>` : ''}
+    <button type="button" class="ai-mp-ia" onclick="cerrarModalGenerico();const i=document.getElementById('asistente-ia-input');i.value=window._aiTextoIA||'';window.__aiConfirmado=true;enviarAsistenteIA()">Usar IA (~0,07 €)</button></div>`);
+}
+if(!document.getElementById('ai-mp-css')){ const st = document.createElement('style'); st.id = 'ai-mp-css'; st.textContent = '.ai-mp{display:flex;flex-direction:column;font-size:13px;}.ai-mp-r,.ai-mp-l{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);}.ai-mp-r:first-child{border-top:0;}.ai-mp-r small{display:block;font-size:11px;color:var(--ink-soft);}.ai-mp-r b,.ai-mp-l b{white-space:nowrap;text-align:right;}.ai-mp-d{display:block;}.ai-mp-d>span{display:block;font-size:12px;color:var(--ink-soft);}.ai-mp-d>b{display:block;text-align:left;white-space:normal;font-size:14px;margin:2px 0;}.ai-mp-d>small{display:block;font-size:11px;color:var(--ink-soft);}.ai-mp-l{padding-left:10px;font-size:12.5px;}.ai-mp-ia{margin-top:10px;align-self:flex-end;background:none;border:0;color:var(--orange);font-weight:800;font-size:13px;font-family:inherit;padding:4px 0;cursor:pointer;}'; document.head.appendChild(st); }
 async function enviarAsistenteIA(){
   if(window._aiModoSubir) return aiDejarEnCola();   // V11.18: en la pestaña Subir, enviar es lo mismo que en subir.html: queda en cola
   const mensaje = document.getElementById('asistente-ia-input').value.trim(); window._aiPedido = mensaje; window._aiUltimo = {mensaje, adjuntos: aiAdjuntos.slice()};
@@ -26838,9 +26877,10 @@ async function enviarAsistenteIA(){
   }
   window.__aiContextoContinuacion = null;
 
-  // 2. Gate de permiso: pedir confirmación antes de llamar a la IA
+  // 2. Sin adjuntos y sin haber elegido la IA: se sube a Entradas como en subir y el motor da su propuesta con puntuación (V11.52)
   const tieneAdjunto = aiAdjuntos.length > 0;
-  if(!tieneAdjunto && !window.__aiConfirmado){
+  if(!tieneAdjunto && !window.__aiConfirmado){ return aiSubirConPuntuacion(mensaje); }
+  if(false){
     const motivo = 'El texto no tiene un formato que el motor local reconozca.';
     const coste = '~0,07 €';
     const ok = await new Promise(resolve => {
