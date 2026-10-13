@@ -9,12 +9,16 @@
     const own = [...e.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim());
     if (!own.length || !visible(e)) continue;
     const s = getComputedStyle(e);
-    // 1) minúscula al principio de un bloque de texto
-    if (BLOQ.test(s.display)) {
+    // 1) minúscula al principio de un texto (V11.34, Daniel: «ni una minúscula al principio en toda la web»): bloques, pastillas y también lo que va en línea si es lo primero de su bloque; sin excepciones de palabras
+    {
       const first = [...e.childNodes].find(n => (n.nodeType === 3 && n.textContent.trim()) || n.nodeType === 1);
       if (first && first.nodeType === 3) {
         const t = first.textContent.trim();
-        if (/^[a-zñáéíóú]/.test(t) && !/^(h|x|vs|kg|km|m|l|de|del|en|y|o|a|e|al|por|con|sin|desde|hasta)\b/.test(t) && s.textTransform !== 'uppercase') {
+        let alPrincipio = BLOQ.test(s.display), bl = e;
+        if (!alPrincipio) { let b = e.parentElement; while (b && !BLOQ.test(getComputedStyle(b).display)) b = b.parentElement; bl = b; alPrincipio = !!b && (b.innerText || '').trim().startsWith(t.slice(0, 12)); }
+        // lo que cuenta es lo que ve Daniel: si la primera letra ya sale en mayúscula por la regla general (::first-letter), está bien
+        if (alPrincipio && bl) { let q = bl, sale = false; while (q && q !== document.body) { const d = getComputedStyle(q).display; if (/flex|grid/.test(d)) break; if (getComputedStyle(q, '::first-letter').textTransform === 'uppercase') { sale = true; break; } if ((q.parentElement && (q.parentElement.innerText || '').trim().startsWith(t.slice(0, 12)))) q = q.parentElement; else break; } if (sale) { alPrincipio = false; if (/^[a-z0-9._%+-]+@\S+|^(https?:|www\.)/.test(t)) { const k = 'c' + t.slice(0, 40); if (!vistos.has(k)) { vistos.add(k); out.push(['correo_mayus', t.slice(0, 80)]); } } } }
+        if (alPrincipio && /^[a-zñáéíóúü]/.test(t) && !/^(h|d|x|kg|km|ud|uds|cm|mm|t|l)\b/.test(t) && !/^\S+@\S+/.test(t) && !/^(https?:|www\.)/.test(t) && s.textTransform !== 'uppercase' && !e.closest('.no-cap,.mono,[translate=no]')) {
           const k = 'm' + t.slice(0, 40); if (!vistos.has(k)) { vistos.add(k); out.push(['minuscula', t.slice(0, 80)]); }
         }
       }

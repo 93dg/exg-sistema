@@ -20,7 +20,7 @@ async def main():
         b=await p.chromium.launch(executable_path='/opt/pw-browsers/chromium-1194/chrome-linux/chrome')
         ctx=await b.new_context(viewport={'width':390,'height':844},device_scale_factor=2,has_touch=True,is_mobile=True)
         await ctx.add_init_script("localStorage.setItem('sb-sshctqnpuolawtcujxkt-auth-token',"+json.dumps(json.dumps(ses))+");")
-        pg=await ctx.new_page();errs=[];pg.on('pageerror',lambda e:errs.append(str(e)[:200]))
+        errs=[]
         bloqueadas=[]
         async def ruta(route,req):
             u=req.url
@@ -51,30 +51,35 @@ async def main():
                 if cr: hd['content-range']=cr
                 return await route.fulfill(status=st,headers=hd,body=bd)
             return await route.continue_()
-        await pg.route(U+"/**",ruta)
-        await pg.goto('http://localhost:8768/index.html');await pg.wait_for_timeout(15000)
+        await ctx.route(U+"/**",ruta)
         AUD=open(os.environ.get('AUD_JS') or os.path.join(os.path.dirname(os.path.abspath(__file__)),'auditoria.js'),encoding='utf-8').read()
         res=[]
-        for v in VISTAS:
-            try:
-                vv,sub=(v.split(':')+[''])[:2]
-                await pg.evaluate("v=>{const b=document.querySelector('.nav button[data-view='+v+']')||document.querySelector('[data-view='+v+']'); if(b) b.click();}", vv)
-                if sub: await pg.wait_for_timeout(1500); await pg.evaluate(sub)
-                await pg.wait_for_timeout(22000 if ':' in v else 2500)
-                prev=-1; quieto=0; t0=time.time()
-                while time.time()-t0 < (40 if ':' in v else 20):   # espera a que la pantalla deje de cambiar (datos cargados)
-                    n=await pg.evaluate("document.body.innerText.length")
-                    quieto = quieto+1 if n==prev else 0
-                    if quieto>=3: break
-                    prev=n; await pg.wait_for_timeout(800)
-                r=await pg.evaluate(AUD)
-                for x in r: res.append({'vista':v,'regla':x[0],'txt':x[1]})
-            except Exception as e: print('EVAL',v,str(e)[:200])
+        async def tanda(vistas):   # V11.34: varias pestañas a la vez para revisar todas las pantallas sin pasar del tiempo del deploy
+            pg=await ctx.new_page(); pg.on('pageerror',lambda e:errs.append(str(e)[:200]))
+            await pg.goto('http://localhost:8768/index.html');await pg.wait_for_timeout(15000)
+            for v in vistas:
+                try:
+                    vv,sub=(v.split(':')+[''])[:2]
+                    await pg.evaluate("v=>{const b=document.querySelector('.nav button[data-view='+v+']')||document.querySelector('[data-view='+v+']'); if(b) b.click();}", vv)
+                    if sub: await pg.wait_for_timeout(1500); await pg.evaluate(sub)
+                    await pg.wait_for_timeout(22000 if ':' in v else 2500)
+                    prev=-1; quieto=0; t0=time.time()
+                    while time.time()-t0 < (40 if ':' in v else 20):   # espera a que la pantalla deje de cambiar (datos cargados)
+                        n=await pg.evaluate("document.body.innerText.length")
+                        quieto = quieto+1 if n==prev else 0
+                        if quieto>=3: break
+                        prev=n; await pg.wait_for_timeout(800)
+                    r=await pg.evaluate(AUD)
+                    for x in r: res.append({'vista':v,'regla':x[0],'txt':x[1]})
+                except Exception as e: print('EVAL',v,str(e)[:200])
+            await pg.close()
+        N=int(os.environ.get('TANDAS','4'))
+        await asyncio.gather(*[tanda(VISTAS[k::N]) for k in range(N)])
         await b.close()
         return res
-VISTAS_TODAS=['control','trabajos','planificacion',"trabestad:teSub('costes')",'economia','documentos','albaranes','proformas','facturas','presupuestos','gastospro','impuestos','clientes','flota','direccion']
+VISTAS_TODAS=['control','trabajos','planificacion',"trabestad:teSub('costes')",'economia','documentos','albaranes','proformas','facturas','presupuestos','gastospro','impuestos','clientes','flota','direccion','empresa','personal','archivos','entradas','gastosrec','proyectos','tarifas','calcempleado','ayuntamiento','correo','reportes']   # V11.34: todas las pantallas (Empresa no se revisaba y por eso volvían las minúsculas)
 VISTAS=[v for v in VISTAS_TODAS if not os.environ.get('SOLO') or v==os.environ.get('SOLO')]
-DESC={'minuscula':'Texto que empieza en minúscula (todo texto empieza con mayúscula)','partido':'Texto corto partido en dos líneas','desborda':'Texto que se sale de la pantalla'}
+DESC={'minuscula':'Texto que empieza en minúscula (todo texto empieza con mayúscula)','partido':'Texto corto partido en dos líneas','desborda':'Texto que se sale de la pantalla','correo_mayus':'Correo o enlace que sale con la primera letra en mayúscula (ponle class no-cap)'}
 BASE=os.path.join(os.path.dirname(os.path.abspath(__file__)),'auditoria_baseline.json')
 res=asyncio.run(main())
 c={}
@@ -86,7 +91,7 @@ if '--baseline' in sys.argv:
         old=json.load(open(BASE)); c={k:max(c.get(k,0),old.get(k,0)) for k in set(c)|set(old)}   # se guarda el máximo visto: una pantalla que tarda en cargar no rebaja la línea base
     json.dump(c,open(BASE,'w'),indent=0); print('baseline de pantallas guardada:',sum(c.values())); sys.exit(0)
 base=json.load(open(BASE)) if os.path.exists(BASE) else {}
-malos=[k for k,v in c.items() if v>base.get(k,0)]
+malos=[k for k,v in c.items() if v>(0 if k.split('|')[1] in ('minuscula','correo_mayus') else base.get(k,0))]   # V11.34: ninguna minúscula al principio, ni nueva ni de antes
 if malos:
     print('❌ PANTALLAS: aparece algo nuevo que incumple la guía de Daniel (python3 herramientas/auditoria_pantallas.py --todo):')
     for k in malos:

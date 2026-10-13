@@ -1462,6 +1462,9 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 /* V8.32 (reporte de Daniel: «nada en minúscula cuando la primera debe ir en mayúscula»): datos, etiquetas, chips y líneas empiezan con mayúscula en toda la web */
 .fl-kv-i b, .fl-kv-i span, .fl-doc .nm{display:block;}
 .fl-kv-i b::first-letter, .fl-kv-i span::first-letter, .fl-nota::first-letter, .fl-aviso-lin::first-letter, .fl-chip::first-letter, .fl-chips span::first-letter, .rec-lista li::first-letter, .rec-fila span::first-letter, .ct-g2::first-letter, .ct-g3::first-letter, .fl-doc .nm::first-letter, .gr-cob::first-letter, .fl-falta::first-letter{text-transform:uppercase;}
+/* V11.34 · Daniel: «ni una minúscula al principio en toda la web». Regla general: la primera letra de todo bloque de texto sale en mayúscula, también los datos escritos a mano (nombres, notas). Excepciones con .no-cap (correos, nombres de archivo, código) */
+:where(body *)::first-letter{text-transform:uppercase}
+.no-cap::first-letter, .no-cap *::first-letter, .mono::first-letter, pre::first-letter, code::first-letter, [contenteditable]::first-letter, [contenteditable] *::first-letter{text-transform:none}
 .fl-chips span{display:inline-block;}
 /* V8.33 (Daniel: «el tamaño como en octubre»): el mes siempre mide lo mismo que uno de 5 semanas; si tiene 6, las filas son algo más bajas */
 #cal3-app .c3-mes{grid-auto-rows:calc(520px / var(--filas, 5));}
@@ -4686,11 +4689,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.33" defer></script>
-<script src="costes/norm.js?v=V11.33" defer></script>
-<script src="ajustes/calc.js?v=V11.33" defer></script>
+<script src="rentabilidad/rent.js?v=V11.34" defer></script>
+<script src="costes/norm.js?v=V11.34" defer></script>
+<script src="ajustes/calc.js?v=V11.34" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.33</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.34</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4842,7 +4845,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V11.33</div>
+        <div class="sub" id="version-badge">V11.34</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9496,7 +9499,7 @@ async function econ2Cargar(){
       }
       const ajeno = d.tipo === 'gasto' && /^gasto personal\s*[–-]\s*alberto/i.test(d.categoria || '');   // V11.31 (Daniel: «tiene la instrucción de que no cuenta»): lo personal de Alberto no es de la empresa ni de los socios, no suma en ningún sitio
       const gper = d.tipo === 'gasto' && !ajeno && d.relacion_actividad === 'no_relacionada' ? imp : 0;   // gasto personal de Rafa y Manolo (no relacionado con la actividad)
-      return {id: d.id, tipo: d.tipo, numero: d.numero, fecha: f, cli: E[d.entidad_id] || '—', an, tr, legal, sinF, gasto: d.tipo === 'gasto' && !ajeno ? imp : 0, gper, ret: 0, pend, sinFact}; });
+      return {id: d.id, tipo: d.tipo, numero: d.numero, fecha: f, cli: E[d.entidad_id] || (d.tipo === 'gasto' ? (d.categoria || 'Sin proveedor') : '—'), an, tr, legal, sinF, gasto: d.tipo === 'gasto' && !ajeno ? imp : 0, gper, ret: 0, pend, sinFact}; });
     try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').order('data->>ts', {ascending: false}).limit(12); _e2.avisos = (data || []).map(r => r.data); }catch(e){ _e2.avisos = []; }
     try{ const rt = []; let d2 = 0;   // V9.13: retiradas en efectivo del cajero = la manera de cobrar de Rafa y Manolo; van aparte, no son gasto
       while(true){ const {data, error} = await sb.from('movimientos_banco').select('id, fecha, importe, nota').eq('categoria', 'efectivo').lt('importe', 0).range(d2, d2 + 999); if(error || !data || !data.length) break; rt.push(...data); if(data.length < 1000) break; d2 += 1000; }
