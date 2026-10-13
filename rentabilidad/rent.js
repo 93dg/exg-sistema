@@ -651,13 +651,21 @@ R.simHtml = function(P, b){
   const opSim = b.obra && b.r ? R.opHtml(b.r, persSim, b.margenH, sociosSim, s.tr.rep + s.tr.ges, quienSim || undefined) : '';
   const pagoHr = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : NaN, cMaqH = coste('maquinista');
   const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small onclick="RENT.setFicha(\'' + k + '\')" style="color:var(--ink-soft);font-size:11px;text-align:right;cursor:pointer;">' + (m === 'hoy' ? 'gasto personal ' : 'cobra ') + eur(v, 2) + '/h' + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : ''; };
-  const st = (k, t) => '<div class="rt-stw"><div><div onclick="RENT.setFicha(\'' + k + '\')" style="cursor:pointer;font-size:12.5px;padding:6px 0;">' + t + '</div><span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>' + fichaDe(k) + '</div>';   // V11.06 (Daniel): sin pastilla; al pulsar el puesto se despliega su ficha ahí mismo
+  const infPuesto = k => { try{ return convenioSueldoInfo(k === 'maq' ? 'maquinista' : 'oficial1'); }catch(e){ return null; } };
+  const tasaImp = (num(R.param.impuesto) || 0) / 100, hAnio = (num(R.param.horasDia) || 7) * (num(R.param.jornadas) || 250);
+  const trasDedH = k => { const inf = infPuesto(k); return inf && inf.coste > 0 ? inf.coste / hAnio * (1 - tasaImp) : NaN; };   // V11.24 (Daniel, reporte ecec04fa): coste tras deducir por hora, también en la fila del puesto
+  const ganaLibre = k => {   // V11.24 (Daniel): lo que se gana en otra obra con los días que libera una persona más de este puesto (al ritmo de hoy)
+    if(!s.obra || !isFinite(b.margenH)) return NaN;
+    const n = bd[k] | 0, con = Object.assign({}, bd, {[k]: Math.max(1, n)}), sin = Object.assign({}, bd, {[k]: Math.max(1, n) - 1});
+    try{ return Math.max(0, (R.simular2(b, con).c1.libre - R.simular2(b, sin).c1.libre) * b.margenH); }catch(e){ return NaN; }
+  };
+  const st = (k, t) => '<div class="rt-stw"><div><div onclick="RENT.setFicha(\'' + k + '\')" style="cursor:pointer;font-size:12.5px;padding:6px 0;">' + t + '</div>' + (isFinite(trasDedH(k)) ? '<small onclick="RENT.setFicha(\'' + k + '\')" style="color:var(--ink-soft);font-size:11px;white-space:nowrap;cursor:pointer;margin-left:auto;margin-right:10px;">' + eur(trasDedH(k), 2) + '/h</small>' : '') + '<span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>' + fichaDe(k) + '</div>';   // V11.06 (Daniel): sin pastilla; al pulsar el puesto se despliega su ficha ahí mismo
   const pp = (k, n) => '<div class="rt-pl"><button type="button" class="' + (bd[k] === 'fuera' ? '' : 'on') + '" onclick="RENT.setEsc2(\'' + k + '\',\'hoy\')">' + n + '</button>' + (cobH(k) || '') + '</div>';   // V10.67: el nombre es la pastilla
   // V11.00 (Daniel 12/10/2026): al pulsar «cobra…» de Rafa o Manolo, o el nombre de un puesto, sale su ficha: neto, bruto, coste para la empresa y coste tras deducirlo como gasto
   const fichaDe = k => {
     if(R.ficha !== k || (bd[k] === 'fuera')) return '';
     const tasa = (num(R.param.impuesto) || 0) / 100, horasT = Math.max(1, b.horas), hDia = num(R.param.horasDia) || 7, jor = num(R.param.jornadas) || 250;
-    const fr = (t, tot, hh, nota) => '<div class="rt-sim-r"><span>' + t + (nota ? '<small style="display:block;color:var(--ink-soft);font-size:10px;">' + nota + '</small>' : '') + '</span><b style="white-space:nowrap;">' + (isFinite(tot) ? eur(tot) : '—') + (isFinite(hh) ? ' <span style="font-size:.78em;color:var(--ink-soft);font-weight:700;">· ' + eur(hh, 2) + '/h</span>' : '') + '</b></div>';
+    const fr = (t, tot, hh, nota) => '<div class="rt-sim-r"><span style="flex:1;min-width:0;">' + t + (nota ? '<small style="display:block;color:var(--ink-soft);font-size:10px;">' + nota + '</small>' : '') + '</span><b style="white-space:nowrap;">' + (isFinite(tot) ? eur(tot) : '—') + (isFinite(hh) ? ' <span style="font-size:.78em;color:var(--ink-soft);font-weight:700;">· ' + eur(hh, 2) + '/h</span>' : '') + '</b></div>';
     let tit, filas, pie = '';
     if(k === 'rafa' || k === 'manolo'){
       const tot = b.socios / 2, hh = pagoHr;
@@ -671,7 +679,8 @@ R.simHtml = function(P, b){
       tit = nom + ' (por persona)';
       // V11.15 (Daniel): su salario al mes por convenio, sin depender de la obra, antes de lo de la obra
       filas = fr('Salario neto al mes', inf.neto / 14, NaN) + fr('Salario bruto al mes', inf.bruto / 14, NaN) + fr('Coste para la empresa al mes', inf.coste / 12, NaN)
-        + fr('Salario neto en la obra', tl(inf.neto), ph(inf.neto)) + fr('Salario bruto en la obra', tl(inf.bruto), ph(inf.bruto)) + fr('Coste para la empresa en la obra', tl(inf.coste), ph(inf.coste), 'bruto + Seguridad Social de empresa') + fr('Coste tras deducir en la obra', tl(inf.coste) * (1 - tasa), ph(inf.coste) * (1 - tasa), 'baja ' + Math.round(tasa * 100) + ' % por impuestos');
+        + fr('Salario neto en la obra', tl(inf.neto), ph(inf.neto)) + fr('Salario bruto en la obra', tl(inf.bruto), ph(inf.bruto)) + fr('Coste para la empresa en la obra', tl(inf.coste), ph(inf.coste), 'bruto + Seguridad Social de empresa') + fr('Coste tras deducir en la obra', tl(inf.coste) * (1 - tasa), ph(inf.coste) * (1 - tasa), 'baja ' + Math.round(tasa * 100) + ' % por impuestos')
+        + (() => { const g = ganaLibre(k), cf = tl(inf.coste) * (1 - tasa) - g; return R.costeFinalOk && isFinite(g) ? fr('Coste final', cf, cf / horasT, 'menos ' + eur(g) + ' de los días que libera, en otra obra') : ''; })();
       pie = 'Convenio de construcción, jornada completa, 14 pagas: el neto y el bruto al mes son de cada nómina y el coste de empresa es el del año repartido en 12 meses. En la obra: €/h × ' + h1(horasT) + ' h.';
     }
     return '<div class="rt-c" style="margin:6px 0 8px;background:var(--paper);border:2px solid var(--orange);"><div style="font-weight:800;font-size:13px;margin-bottom:4px;">' + tit + '</div>' + filas + '<div style="font-size:10.5px;color:var(--ink-soft);margin-top:4px;">' + pie + '</div></div>';
