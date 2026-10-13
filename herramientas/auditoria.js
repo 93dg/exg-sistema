@@ -36,7 +36,8 @@
     }
     // 3) texto que se sale de la pantalla
     const r = e.getBoundingClientRect();
-    if (r.right > W + 2 && s.position !== 'fixed' && !e.closest('[style*="overflow-x"],.tabla-scroll')) {
+    let recortado = false; for (let q = e; q && q !== document.body; q = q.parentElement) { const qs = getComputedStyle(q); if (qs.textOverflow === 'ellipsis' && qs.overflow !== 'visible') { recortado = q.getBoundingClientRect().right <= W + 2; break; } }   // lo que se corta con «…» dentro de su caja no se sale: Daniel ve los puntos suspensivos
+    if (r.right > W + 2 && !recortado && s.position !== 'fixed' && !e.closest('[style*="overflow-x"],.tabla-scroll')) {
       const k = 'd' + txt.slice(0, 40); if (!vistos.has(k)) { vistos.add(k); out.push(['desborda', txt.slice(0, 80)]); }
     }
   }
