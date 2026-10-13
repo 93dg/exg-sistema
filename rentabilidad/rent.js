@@ -81,7 +81,9 @@ R.efectivos = function(P){
 // ---------- asignación de albaranes a obras (sin mezclar obras del mismo cliente) ----------
 R.entidadCasa = (job, ent) => { const nj = norm(job.cliente), ne = norm(ent && ent.nombre); if(!nj || !ne) return false; if(nj === ne) return true; if(nj.length >= 5 && (ne.includes(nj) || nj.includes(ne))) return true; const tj = nj.split(' ').filter(t => t.length >= 3), te = ne.split(' '); return tj.length >= 2 && tj.every(t => te.includes(t)); };
 R.fechaRef = d => { const f = R.lineas(d).map(l => l.f).sort(); return f.length ? f[f.length - 1] : dia(d.fecha_devengo); };
-R.asignar = function(P){
+const _asigCache = new WeakMap();   // V11.29 (reporte 4fa0f2c6: «tarda mucho en desplegar»): el reparto de documentos por obra se calculaba 43 veces en cada repintado (≈9 s); ahora una vez por carga de datos
+R.asignar = function(P){ if(P && _asigCache.has(P)) return _asigCache.get(P); const res = R._asignar(P); if(P) _asigCache.set(P, res); return res; };
+R._asignar = function(P){
   const jobs = (P.jobs || []).filter(j => j.estado !== 'Cancelado'), entById = new Map((P.entidades || []).map(e => [e.id, e]));
   const porJob = {}, ambiguos = [], sinAsignar = [], origen = {};
   jobs.forEach(j => { porJob[j.id] = []; });
@@ -541,7 +543,7 @@ R.simular2 = function(b, e){
 .rt-tl small{grid-column:1;font-size:11px;color:var(--ink-soft)}
 .rt-big small *{display:inline!important;font-size:11px!important;margin:0!important}
 .rt-big small b{display:inline;font-size:11px;margin:0;white-space:normal}
-.rt-stg{display:flex;flex-direction:column;border-top:1px solid var(--line)}.rt-stw>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;padding:5px 0}.rt-stw+.rt-stw{border-top:1px solid var(--line)}
+.rt-fila-t{cursor:pointer;-webkit-tap-highlight-color:transparent;}.rt-fila-t:active{background:var(--concrete);}.rt-stg{display:flex;flex-direction:column;border-top:1px solid var(--line)}.rt-stw>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;padding:5px 0}.rt-stw+.rt-stw{border-top:1px solid var(--line)}
 .rt-big div{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line);text-align:left}
 .rt-big span{grid-column:1;display:block;font-size:12.5px;font-weight:800}.rt-big b{grid-column:2;grid-row:1/span 2;display:block;font-size:16px;font-weight:900;white-space:nowrap;text-align:right}.rt-big small{grid-column:1;display:block;font-size:11px;color:var(--ink-soft)}
 .rt-an{font-size:11.5px;color:var(--orange);margin-top:4px}
@@ -650,7 +652,7 @@ R.simHtml = function(P, b){
   const quedan = ['rafa', 'manolo'].filter(k => s.e[k] === 'hoy'), sociosSim = s.obra ? s.retrib : b.socios * quedan.length / 2, quienSim = quedan.map(k => k === 'rafa' ? 'Rafa' : 'Manolo').join(' y ');   // V10.57 (Daniel): si uno sale (o pasa a empleado), se descuenta lo suyo
   const opSim = b.obra && b.r ? R.opHtml(b.r, persSim, b.margenH, sociosSim, s.tr.rep + s.tr.ges, quienSim || undefined) : '';
   const pagoHr = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : NaN, cMaqH = coste('maquinista');
-  const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small onclick="RENT.setFicha(\'' + k + '\')" style="color:var(--ink-soft);font-size:11px;text-align:right;cursor:pointer;">' + (m === 'hoy' ? 'gasto personal ' : 'cobra ') + eur(v, 2) + '/h' + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : ''; };
+  const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 7)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small style="color:var(--ink-soft);font-size:11px;text-align:right;">' + (m === 'hoy' ? 'gasto personal ' : 'cobra ') + eur(v, 2) + '/h' + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : ''; };
   const infPuesto = k => { try{ return convenioSueldoInfo(k === 'maq' ? 'maquinista' : 'oficial1'); }catch(e){ return null; } };
   const tasaImp = (num(R.param.impuesto) || 0) / 100, hAnio = (num(R.param.horasDia) || 7) * (num(R.param.jornadas) || 250);
   const trasDedH = k => { const inf = infPuesto(k); return inf && inf.coste > 0 ? inf.coste / hAnio * (1 - tasaImp) : NaN; };   // V11.24 (Daniel, reporte ecec04fa): coste tras deducir por hora, también en la fila del puesto
@@ -659,8 +661,8 @@ R.simHtml = function(P, b){
     const n = bd[k] | 0, con = Object.assign({}, bd, {[k]: Math.max(1, n)}), sin = Object.assign({}, bd, {[k]: Math.max(1, n) - 1});
     try{ const dias = Math.max(0, R.simular2(b, sin).c1.d - R.simular2(b, con).c1.d); return dias * (num(R.param.horasDia) || 7) * b.margenH; }catch(e){ return NaN; }   // V11.25 (Daniel): solo las horas del propio puesto en los días que se acaba antes, no las de Rafa y Manolo
   };
-  const st = (k, t) => '<div class="rt-stw"><div><div onclick="RENT.setFicha(\'' + k + '\')" style="cursor:pointer;font-size:12.5px;padding:6px 0;">' + t + '</div>' + (isFinite(trasDedH(k)) ? '<small onclick="RENT.setFicha(\'' + k + '\')" style="color:var(--ink-soft);font-size:11px;white-space:nowrap;cursor:pointer;margin-left:auto;margin-right:10px;">' + eur(trasDedH(k), 2) + '/h</small>' : '') + '<span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>' + fichaDe(k) + '</div>';   // V11.06 (Daniel): sin pastilla; al pulsar el puesto se despliega su ficha ahí mismo
-  const pp = (k, n) => '<div class="rt-pl"><button type="button" class="' + (bd[k] === 'fuera' ? '' : 'on') + '" onclick="RENT.setEsc2(\'' + k + '\',\'hoy\')">' + n + '</button>' + (cobH(k) || '') + '</div>';   // V10.67: el nombre es la pastilla
+  const st = (k, t) => '<div class="rt-stw"><div class="rt-fila-t" onclick="RENT.setFicha(\'' + k + '\')"><div style="font-size:12.5px;padding:6px 0;">' + t + '</div>' + (isFinite(trasDedH(k)) ? '<small style="color:var(--ink-soft);font-size:11px;white-space:nowrap;margin-left:auto;margin-right:10px;">' + eur(trasDedH(k), 2) + '/h</small>' : '') + '<span class="rt-st" onclick="event.stopPropagation()"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>' + fichaDe(k) + '</div>';   // V11.06 (Daniel): sin pastilla; al pulsar el puesto se despliega su ficha ahí mismo
+  const pp = (k, n) => '<div class="rt-pl rt-fila-t" onclick="RENT.setFicha(\'' + k + '\')"><button type="button" class="' + (bd[k] === 'fuera' ? '' : 'on') + '" onclick="event.stopPropagation();RENT.setEsc2(\'' + k + '\',\'hoy\')">' + n + '</button>' + (cobH(k) || '') + '</div>';   // V10.67: el nombre es la pastilla
   // V11.00 (Daniel 12/10/2026): al pulsar «cobra…» de Rafa o Manolo, o el nombre de un puesto, sale su ficha: neto, bruto, coste para la empresa y coste tras deducirlo como gasto
   const fichaDe = k => {
     if(R.ficha !== k || (bd[k] === 'fuera')) return '';
