@@ -4788,11 +4788,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.53" defer></script>
-<script src="costes/norm.js?v=V11.53" defer></script>
-<script src="ajustes/calc.js?v=V11.53" defer></script>
+<script src="rentabilidad/rent.js?v=V11.54" defer></script>
+<script src="costes/norm.js?v=V11.54" defer></script>
+<script src="ajustes/calc.js?v=V11.54" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.53</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.54</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4944,7 +4944,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V11.53</div>
+        <div class="sub" id="version-badge">V11.54</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -26786,7 +26786,16 @@ const AI_MAQ = [[/\b(mixta|retro(mixta)?)\b/i, 'Mixta'], [/\bgiratoria\b/i, 'Gir
 const AI_NOMBRE = {abriendo: 'apertura de', excavando: 'excavación de', extendiendo: 'extendido de', rebajando: 'rebaje de', cargando: 'carga de', retirando: 'retirada de', tapando: 'tapado de', repasando: 'repaso de', nivelando: 'nivelación de', picando: 'picado de', limpiando: 'limpieza de', desbrozando: 'desbroce de', rellenando: 'relleno de', compactando: 'compactado de', arreglando: 'arreglo de', haciendo: 'hecho de', moviendo: 'movimiento de', transportando: 'transporte de', llevando: 'transporte de', trayendo: 'transporte de', quitando: 'retirada de', demoliendo: 'demolición de', derribando: 'derribo de', sacando: 'extracción de', metiendo: 'colocación de', colocando: 'colocación de', echando: 'vertido de', regando: 'riego de', apisonando: 'compactado de', zanjeando: 'apertura de zanja de', ampliando: 'ampliación de', preparando: 'preparación de', terminando: 'terminación de', acopiando: 'acopio de'};
 const AI_SUST = /^(apertura|excavaci[oó]n|extendido|rebaje|carga|retirada|tapado|repaso|nivelaci[oó]n|picado|limpieza|desbroce|relleno|compactado|arreglo|movimiento|transporte|demolici[oó]n|derribo|extracci[oó]n|colocaci[oó]n|vertido|riego|ampliaci[oó]n|preparaci[oó]n|terminaci[oó]n|acopio)$/i;
 const AI_TARIFA = {Mixta: 45, Camión: 45, Giratoria: 65, Niveladora: 65, Rulo: 45, Cuba: 45};   // precio por hora si el albarán no trae uno de esa máquina
+// V11.54 (Daniel: «¿y aprenderá para la siguiente?»): antes de redactar se aplica lo aprendido (vocabulario del motor: lo que Daniel escribe → cómo va en el albarán).
+// Cada vez que al revisar una entrada se corrige la línea, la corrección se guarda en ese vocabulario y la siguiente vez sale ya bien.
+let _aiVocab = null;
+async function aiVocabCargar(){ if(_aiVocab) return _aiVocab; try{ const {data} = await sb.from('conocimiento_motor').select('contenido, created_at').eq('tipo', 'vocabulario_profesional').order('created_at', {ascending: false}).limit(2000); _aiVocab = (data || []).map(r => r.contenido || {}).filter(c => c.variante && c.concepto_normalizado).map(c => ({v: aiSinTilde(c.variante), n: String(c.concepto_normalizado).toUpperCase()})).sort((a, b) => b.v.length - a.v.length); }catch(e){ _aiVocab = []; } return _aiVocab; }
+const aiSinTilde = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+function aiAplicarVocab(concepto){ const V = _aiVocab || []; let t = aiSinTilde(concepto), usado = null;
+  for(const x of V){ if(x.v.length >= 4 && (' ' + t + ' ').includes(' ' + x.v + ' ')){ t = (' ' + t + ' ').replace(' ' + x.v + ' ', ' §' + V.indexOf(x) + '§ ').trim(); usado = usado || x; } }
+  return {texto: t.replace(/§(\d+)§/g, (m, i) => V[i].n.toLowerCase()), aprendido: usado}; }
 function aiRedactarLinea(concepto, maquina){
+  const ap = aiAplicarVocab(concepto); if(ap.aprendido) concepto = ap.texto;
   let w = String(concepto || '').toLowerCase().replace(/^(de|con|la|el)\s+/, '').split(/\s+/).filter(Boolean), out = [];
   for(let i = 0; i < w.length; i++){
     const x = w[i], nom = AI_NOMBRE[x];
@@ -26809,6 +26818,7 @@ async function aiMotorPropuesta(texto){
   // líneas de trabajo: «1.5 mixta abriendo…», «6h de giratoria rebajando…, 2,5h mixta extendiendo…»
   t.replace(/^\s*(hoy|ayer|anteayer|antes de ayer|(el\s+)?(d[ií]a\s+)?\d{1,2}[\/\-]\d{1,2}([\/\-]\d{2,4})?)\s*[,:.\-]?\s*/i, '').split(/(?<!\d)\s*,\s*(?=\d)|\s*[;\n]\s*(?=\d)/).forEach(tr => { const m = tr.match(/^(\d+(?:[.,]\d+)?)\s*(?:h(?:oras?)?\b\.?)?\s*(?:de\s+)?(.*)$/i); if(!m) return; const resto = m[2] || '', mq = AI_MAQ.find(([r]) => r.test(resto));
     out.lineas.push({horas: Number(m[1].replace(',', '.')), maquina: mq ? mq[1] : null, concepto: resto.replace(mq ? mq[0] : /^$/, '').replace(/\s+/g, ' ').trim()}); });
+  await aiVocabCargar();
   let interp = null; try{ const r = await sb.rpc('interpretar_entrada_texto', {p_texto: t}); interp = r.data; }catch(e){}
   if(interp && interp.trabajo && interp.cliente){ out.destino = {nombre: interp.trabajo.codigo + ' · ' + interp.cliente.nombre, motivo: 'nombra al cliente (' + (interp.cliente.motivo || '') + ')'}; out.puntuacion += 45; }
   else { try{   // norma de Daniel (06/10): si no dice cliente ni sitio, va al mismo albarán que la entrada anterior
@@ -26818,7 +26828,7 @@ async function aiMotorPropuesta(texto){
   // precio: el de esa máquina en el propio albarán (su última línea); si no hay, la tarifa por hora de la máquina
   let lineasDest = []; if(out.destino && out.destino.id){ try{ const {data: dd} = await sb.from('documentos_economicos').select('conceptos').eq('id', out.destino.id).maybeSingle(); lineasDest = (dd && dd.conceptos) || []; }catch(e){} }
   const fecha = aiFechaDe(t);
-  out.lineas.forEach(l => { l.texto = aiRedactarLinea(l.concepto, l.maquina); l.fecha = fecha; l.unidad = 'h';
+  out.lineas.forEach(l => { l.aprendido = !!aiAplicarVocab(l.concepto).aprendido; l.texto = aiRedactarLinea(l.concepto, l.maquina); l.fecha = fecha; l.unidad = 'h';
     const sinT = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
     const prev = l.maquina ? lineasDest.filter(c => sinT(c.descripcion).includes('CON ' + sinT(l.maquina)) && Number(c.precio_unitario) > 0).sort((a, b) => String(b.fecha || b.fecha_albaran || '').localeCompare(String(a.fecha || a.fecha_albaran || ''))) : [];
     l.precio = prev.length ? Number(prev[0].precio_unitario) : (AI_TARIFA[l.maquina] || null); l.precioDe = prev.length ? 'el mismo que en este albarán' : l.precio ? 'tarifa de la ' + (l.maquina || '').toLowerCase() : 'sin precio';
@@ -26839,7 +26849,7 @@ async function aiSubirConPuntuacion(mensaje){
   document.getElementById('asistente-ia-input').value = ''; window.aiAutoCrece && aiAutoCrece();
   const eh = s => escHtml(String(s || '')), may = s => { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(); };
   const e2 = n => n == null ? '—' : Number(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €', fF = f => f ? f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(2, 4) : '—';
-  const lin = P && P.lineas.length ? `<div class="ai-mp-t">Así quedaría en el albarán</div>` + P.lineas.map(l => `<div class="ai-mp-ln"><b>${eh(l.texto || '—')}</b><small>Escrito: ${eh(may(l.concepto) || '—')}${l.maquina ? '' : ' · falta la máquina'}</small>
+  const lin = P && P.lineas.length ? `<div class="ai-mp-t">Así quedaría en el albarán</div>` + P.lineas.map(l => `<div class="ai-mp-ln"><b>${eh(l.texto || '—')}</b><small>Escrito: ${eh(may(l.concepto) || '—')}${l.maquina ? '' : ' · falta la máquina'}${l.aprendido ? ' · con lo aprendido' : ''}</small>
       <div class="ai-mp-k"><span>Fecha</span><b>${fF(l.fecha)}</b></div><div class="ai-mp-k"><span>Cantidad</span><b>${String(l.horas).replace('.', ',')}</b></div><div class="ai-mp-k"><span>Unidad</span><b>${l.unidad === 'h' ? 'Horas' : eh(l.unidad)}</b></div>
       <div class="ai-mp-k"><span>Precio<small>${eh(l.precioDe)}</small></span><b>${l.precio != null ? e2(l.precio) + '/h' : '—'}</b></div><div class="ai-mp-k"><span>Importe</span><b>${e2(l.importe)}</b></div></div>`).join('') : '';
   const col = !P ? 'var(--ink-soft)' : P.puntuacion >= 80 ? 'var(--green)' : P.puntuacion >= 50 ? 'var(--orange)' : 'var(--red)';
