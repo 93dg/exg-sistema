@@ -1,6 +1,8 @@
 (() => {
   // Comprobaciones de la GUÍA DE DISEÑO EXG sobre lo que se ve de verdad (a 390 px).
   const out = [], W = innerWidth, vistos = new Set();
+  // V11.47: se revisa como en el iPhone de Daniel, donde la regla de CSS de la primera letra no siempre llega: cuenta el texto de verdad
+  const _sinCss = document.createElement('style'); _sinCss.textContent = '*::first-letter{text-transform:none !important}'; document.head.appendChild(_sinCss);
   const visible = e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0' && r.bottom > -100000; };
   const BLOQ = /^(block|flex|grid|list-item|table-cell|inline-block|inline-flex)$/;
   const SIN = 'INPUT,TEXTAREA,SELECT,OPTION,SCRIPT,STYLE,CODE,PRE,svg';
@@ -63,5 +65,6 @@
     const der = hojas.some(x => x.getBoundingClientRect().left > q.right - 2), izq = hojas.some(x => x.getBoundingClientRect().right < q.left + 2);
     if (der && izq) { const t = 'Lupa en medio de su línea: ' + (f.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 50); if (!vistos.has(t)) { vistos.add(t); out.push(['lupa', t]); } }
   });
+  _sinCss.remove();
   return out;
 })()

@@ -185,7 +185,7 @@ R.calcular = function(job, P, asig){
     const nom = k === 'B' ? 'Gasóleo B de las máquinas' : 'Gasóleo A del camión', ex = {clases: CLS[k]};
     if(real > 0 || sum(Object.values(ingObra[k])) > 0) lineasD.push(L('combustible:' + k, nom, real, real ? 'calculada' : 'falta', 'combustible de cada mes × la parte de esta obra en lo que trabajaron ' + (k === 'B' ? 'las máquinas' : 'el camión') + ' ese mes', real ? h1(lit) + ' litros' : 'No hay facturas en los meses de la obra.', ex));
     const est = iCub > 0 ? sum(sinF, m => ingObra[k][m]) * fCub / iCub : 0;
-    if(est > 1) lineasD.push(L('combustible_est:' + k, nom + ' (meses aún sin factura)', est, 'estimada', 'gasto medio por € trabajado de los meses con factura × lo trabajado en ' + sinF.join(', '), 'Se sustituye por el real cuando llegue la factura.', ex));
+    if(est > 1) lineasD.push(L('combustible_est:' + k, nom + ' (meses aún sin factura)', est, 'estimada', 'Gasto medio por € trabajado de los meses con factura × lo trabajado en ' + sinF.join(', '), 'Se sustituye por el real cuando llegue la factura.', ex));
     combReal += real; });
   if(lineasD.some(x => /^combustible(_est)?:A$/.test(x.clave) && x.valor > 0)) avisos.push('El gasóleo A incluye también el de los coches (X-Trail, Matrix y Audi): el coste del camión sale más alto de lo real.');
   // ---- DIRECTO: gastos vinculados, ayudantes, reparaciones ----
@@ -604,7 +604,7 @@ R.escHtml2 = (b, lista) => {
   const hoy = R.simular2(b, R.ESC2), filas = [hoy, ...lista.map(e => R.simular2(b, e))];
   const f = (t, fn) => '<tr><td style="color:var(--ink-soft);">' + t + '</td>' + filas.map(s => '<td>' + fn(s) + '</td>').join('') + '</tr>';
   return '<div style="overflow-x:auto;"><table class="rt-tb"><tr><th></th>' + filas.map((s, i) => '<th style="max-width:96px;white-space:normal;text-transform:none;">' + esc(s.nombre) + (i ? ' <a href="#" onclick="RENT.escDel2(' + (i - 1) + ');return false" style="color:var(--red);">✕</a>' : '') + '</th>').join('') + '</tr>'
-    + f('Coste de personal', s => s.costePers + s.retrib ? '<b>' + cR(eur(s.costePers + s.retrib)) + '</b>' : '—') + f('Se podría producir', s => h1(s.capacidad) + ' h') + f('Beneficio neto con las horas de hoy', s => '<b>' + cs(s.netAseg, eur(s.netAseg)) + '</b>') + f('Beneficio neto a ' + (num(R.param.horasDia) || 6) + ' h al día', s => '<b>' + cs(s.netPot, eur(s.netPot)) + '</b>') + f('Trabajo de Rafa y Manolo', s => cs(hoy.tr.total - s.tr.total, h1(s.tr.total) + ' h')) + '</table></div>';
+    + f('Coste de personal', s => s.costePers + s.retrib ? '<b>' + cR(eur(s.costePers + s.retrib)) + '</b>' : '—') + f('Se podría producir', s => h1(s.capacidad) + ' h') + f('Beneficio neto con las horas de hoy', s => '<b>' + cs(s.netAseg, eur(s.netAseg)) + '</b>') + f('Beneficio neto a ' + h1(num(R.param.horasDia) || 6) + ' h al día', s => '<b>' + cs(s.netPot, eur(s.netPot)) + '</b>') + f('Trabajo de Rafa y Manolo', s => cs(hoy.tr.total - s.tr.total, h1(s.tr.total) + ' h')) + '</table></div>';
 };
 // V10.40 (Daniel): coste de oportunidad = horas que se podían haber echado (7 h operativas por persona y día, lunes a viernes, mientras duró la obra) menos las que se echaron; cada día cuenta por separado
 R.perdidas = function(r, personas, margenH, carga){
@@ -620,7 +620,7 @@ R.opHtml = function(r, personas, margenH, socios, carga, quien){
   const x = R.perdidas(r, personas, margenH, carga), tl = (t, v, col, sub) => '<div class="rt-tl"><span>' + t + '</span><b style="color:' + col + ';">' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>';
   const como = '<div style="font-size:11.5px;color:var(--ink-soft);line-height:1.5;padding:4px 0 2px;"><b>Valor:</b> horas operativas desaprovechadas × ' + (isFinite(x.margenH) ? eur(x.margenH, 2) : '—') + '/h: lo que habrían dado trabajadas en otra obra al ritmo de esta (lo que esta obra da por hora operativa). <b>Coste real:</b> lo que ' + (quien.indexOf(' y ') > 0 ? 'cobran ' : 'cobra ') + quien + ' + ese valor.</div>';
   if(!isFinite(x.dinero)) return '';
-  return '<div class="rt-g3">' + tl('Valor de ' + h1(x.hPerd) + ' h en otra obra', eur(x.dinero), '#c0392b') + (socios > 0 ? tl('Gasto personal de ' + quien, eur(socios), 'var(--ink)') + tl('Coste real', eur(socios + x.dinero), '#c0392b', eur((socios + x.dinero) / Math.max(1, r.H), 2) + ' por hora') : '') + '</div>'
+  return '<div class="rt-g3">' + tl('Valor de ' + h1(x.hPerd) + ' h en otra obra', eur(x.dinero), '#c0392b') + (socios > 0 ? tl('Salario de ' + quien, eur(socios), 'var(--ink)') + tl('Coste real', eur(socios + x.dinero), '#c0392b', eur((socios + x.dinero) / Math.max(1, r.H), 2) + ' por hora') : '') + '</div>'
     + '<details><summary style="font-size:11.5px;color:var(--orange);font-weight:700;cursor:pointer;">Cómo se calcula</summary>' + como + '</details>';
 };
 R.datosReales = function(r, b){   // V10.51 (Daniel): datos reales sobre la hora, arriba de todo
@@ -653,7 +653,7 @@ R.simHtml = function(P, b){
   const quedan = ['rafa', 'manolo'].filter(k => s.e[k] === 'hoy'), sociosSim = s.obra ? s.retrib : b.socios * quedan.length / 2, quienSim = quedan.map(k => k === 'rafa' ? 'Rafa' : 'Manolo').join(' y ');   // V10.57 (Daniel): si uno sale (o pasa a empleado), se descuenta lo suyo
   const opSim = b.obra && b.r ? R.opHtml(b.r, persSim, b.margenH, sociosSim, s.tr.rep + s.tr.ges, quienSim || undefined) : '';
   const pagoHr = (b.horas + hs.rep + hs.ges) > 0 ? b.socios / (b.horas + hs.rep + hs.ges) : NaN, cMaqH = coste('maquinista');
-  const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 6)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small style="color:var(--ink-soft);font-size:11px;text-align:right;">' + (m === 'hoy' ? 'gasto personal ' : 'cobra ') + eur(v, 2) + '/h' + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? ' · real ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h' : '') + '</small>' : ''; };
+  const cobH = k => { const m = bd[k], v = m === 'hoy' ? pagoHr : m === 'empleado' ? (isFinite(cMaqH) ? cMaqH / (((num(R.param.horasDia) || 6)) * (num(R.param.jornadas) || 250)) : NaN) : NaN; return isFinite(v) ? '<small style="color:var(--ink-soft);font-size:11px;text-align:right;line-height:1.35;"><span style="display:block;white-space:nowrap;">' + (m === 'hoy' ? 'Salario ' : 'Cobra ') + eur(v, 2) + '/h</span>' + (m === 'hoy' && xOp && isFinite(xOp.dinero) && (b.horas + hs.rep + hs.ges) > 0 ? '<span style="display:block;white-space:nowrap;">Coste ' + eur((b.socios + xOp.dinero) / Math.max(1, b.horas), 2) + '/h</span>' : '') + '</small>' : ''; };   // V11.47 (reporte 40b25d21): «es salario y lo otro es coste»; una cosa por línea
   const infPuesto = k => { try{ return convenioSueldoInfo(k === 'maq' ? 'maquinista' : 'oficial1'); }catch(e){ return null; } };
   const tasaImp = (num(R.param.impuesto) || 0) / 100, hAnio = (num(R.param.horasDia) || 6) * (num(R.param.jornadas) || 250);
   const trasDedH = k => { const inf = infPuesto(k); return inf && inf.coste > 0 ? inf.coste / hAnio * (1 - tasaImp) : NaN; };   // V11.24 (Daniel, reporte ecec04fa): coste tras deducir por hora, también en la fila del puesto
@@ -673,7 +673,7 @@ R.simHtml = function(P, b){
     if(k === 'rafa' || k === 'manolo'){
       const tot = b.socios / 2, hh = pagoHr;
       tit = k === 'rafa' ? 'Rafa' : 'Manolo';
-      filas = fr('Gasto personal', tot, hh, 'retiradas y gastos personales');
+      filas = fr('Salario', tot, hh, 'Retiradas y gastos personales');
       pie = 'Su parte de la obra, la mitad de lo de los dos. En B: sin nómina ni Seguridad Social, cuenta entero y no baja los impuestos.';
     } else {
       const cat = k === 'maq' ? 'maquinista' : 'oficial1', nom = k === 'maq' ? 'Maquinista' : k === 'mec' ? 'Mecánico' : 'Conductor/mecánico', inf = (() => { try{ return convenioSueldoInfo(cat); }catch(e){ return null; } })();
@@ -692,7 +692,7 @@ R.simHtml = function(P, b){
   const bx = (t, v, d, n, hh) => '<div class="' + (n >= 0 ? 'g' : 'r') + '"><span style="color:' + (n >= 0 ? G : RJ) + ';">' + t + '</span><b style="color:' + (n >= 0 ? G : RJ) + ';">' + eur(n) + '</b><small>' + hh + ' · ' + cs(d, dEur(d)) + ' vs hoy</small></div>';
   const costeNuevo = s.costePers + s.retrib - b.socios;
   const tl2 = (l, v) => '<div class="rt-tl"><span>' + l + '</span><b>' + v + '</b></div>';
-  const res = '<div class="rt-big">' + bx(s.obra ? 'Neto en ' + h1(s.d1) + ' días al ritmo de hoy' : 'Neto con las horas de hoy', s.benAseg, s.netAseg - hoy.netAseg, s.netAseg, h1(s.horasAseg) + ' h') + bx(s.obra ? 'Neto en ' + h1(s.d2) + ' días a ' + (num(R.param.horasDia) || 6) + ' h/día' : 'Neto a ' + (num(R.param.horasDia) || 6) + ' h operativas/día', s.benPot, s.netPot - hoy.netAseg, s.netPot, h1(s.capacidad) + ' h') + '</div>'
+  const res = '<div class="rt-big">' + bx(s.obra ? 'Neto en ' + h1(s.d1) + ' días al ritmo de hoy' : 'Neto con las horas de hoy', s.benAseg, s.netAseg - hoy.netAseg, s.netAseg, h1(s.horasAseg) + ' h') + bx(s.obra ? 'Neto en ' + h1(s.d2) + ' días a ' + h1(num(R.param.horasDia) || 6) + ' h/día' : 'Neto a ' + h1(num(R.param.horasDia) || 6) + ' h operativas/día', s.benPot, s.netPot - hoy.netAseg, s.netPot, h1(s.capacidad) + ' h') + '</div>'
     + '<div class="rt-g3">' + tl2('Se podría producir', h1(s.capacidad) + ' h ' + cs(s.dPot, '(' + (s.dPot >= 0 ? '+' : '') + h1(s.dPot) + ')')) + tl2('Coste de personal vs hoy', costeNuevo > 0 ? cR('+' + eur(costeNuevo)) : costeNuevo < 0 ? cG(eur(costeNuevo)) : '0 €') + tl2('Trabajo Rafa y Manolo', cs(hoy.tr.total - s.tr.total, h1(s.tr.total) + ' h')) + (s.ahorro ? tl2('Ahorro taller (est.)', cG(eur(s.ahorro))) : '') + '</div>';
   const cuentas = s.obra ? (() => { const r = b.r, c1 = s.c1, c2 = s.c2, fx = (t, f1, f2, neg) => '<tr><td>' + t + '</td><td>' + f1 + '</td><td>' + f2 + '</td></tr>', m = v => v ? cR('− ' + eur(v)) : '—', p = v => v ? cG('+ ' + eur(v)) : '—';
     return '<table class="rt-tb"><tr><th>Cuenta de la obra</th><th>' + h1(c1.d) + ' días</th><th>' + h1(c2.d) + ' días</th></tr>'

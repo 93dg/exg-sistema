@@ -4781,11 +4781,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.46" defer></script>
-<script src="costes/norm.js?v=V11.46" defer></script>
-<script src="ajustes/calc.js?v=V11.46" defer></script>
+<script src="rentabilidad/rent.js?v=V11.47" defer></script>
+<script src="costes/norm.js?v=V11.47" defer></script>
+<script src="ajustes/calc.js?v=V11.47" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.46</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.47</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4937,7 +4937,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V11.46</div>
+        <div class="sub" id="version-badge">V11.47</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -21234,6 +21234,22 @@ function cancelarSeleccionClientes(){
 // ===== Buscador/Restablecer genéricos para las cabeceras unificadas de
 // Facturas/Albaranes/Presupuestos-Proformas (mismo estilo que Clientes) =====
 // V10.73: el buscador de TODAS las listas (Facturas, Albaranes, Presupuestos, Gastos, Clientes, Trabajos) ocupa el cabecero entero con una caja redonda, sin el resto de elementos; al cerrarlo se borra lo escrito y vuelve el cabecero
+// V11.47 (reporte 40b25d21: «¡MINÚSCULAS! ¡OTRA VEZ!»): en el iPhone (Safari) la regla de CSS de la primera letra no llega a todo (pastillas, textos dentro de filas flex).
+// Por eso la primera letra de cada texto se pone en mayúscula también en el propio texto, al pintarse: vale en cualquier navegador y para lo escrito a mano.
+(function capitalizarPrimeras(){
+  const BLOQ = /^(block|flex|grid|list-item|table-cell|inline-block|inline-flex|inline-grid|flow-root|table-caption)$/, MIN = /[a-zñáéíóúü]/;
+  const EXC = /^(h|d|x|kg|km|ud|uds|cm|mm|t|l|ml|cv)\b|^\S+@\S+|^(https?:|www\.)/;
+  const omitir = el => !el || !!el.closest('.no-cap,.mono,pre,code,textarea,input,select,option,script,style,noscript,[contenteditable=""],[contenteditable="true"],svg');
+  const bloqueDe = n => { let e = n.parentElement; while(e && e !== document.body){ if(BLOQ.test(getComputedStyle(e).display)) return e; e = e.parentElement; } return null; };
+  const primero = b => { const w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT, {acceptNode: t => t.data.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP}); return w.nextNode(); };
+  const arreglar = t => { const s = t.data, i = s.search(/\S/); if(i < 0 || !MIN.test(s[i])) return; if(EXC.test(s.slice(i)) || omitir(t.parentElement)) return; const b = bloqueDe(t); if(!b || primero(b) !== t) return; t.data = s.slice(0, i) + s[i].toUpperCase() + s.slice(i + 1); };
+  const pasar = r => { if(!r) return; if(r.nodeType === 3){ arreglar(r); return; } if(r.nodeType !== 1 || omitir(r)) return; const w = document.createTreeWalker(r, NodeFilter.SHOW_TEXT, {acceptNode: t => /^\s*[a-zñáéíóúü]/.test(t.data) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP}); const l = []; let t; while((t = w.nextNode())) l.push(t); l.forEach(arreglar); };
+  let pend = new Set(), tm = null;
+  const mo = new MutationObserver(ms => { ms.forEach(m => { if(m.type === 'characterData') pend.add(m.target); else m.addedNodes.forEach(n => pend.add(n)); }); clearTimeout(tm); tm = setTimeout(() => { const l = [...pend]; pend.clear(); l.forEach(n => { if(n.isConnected) try{ pasar(n); }catch(e){} }); }, 80); });
+  const empezar = () => { try{ pasar(document.body); }catch(e){} mo.observe(document.body, {childList: true, subtree: true, characterData: true}); };
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', empezar); else empezar();
+  window.capitalizarPrimeras = pasar;
+})();
 // V11.38 (Daniel: «todos los buscadores se despliegan de derecha a izquierda o de izquierda a derecha en la misma línea en la que están, y la lupa siempre en un extremo»; modelo: el buscador general)
 // Al tocar la lupa, la caja de búsqueda crece desde el lado de la lupa y tapa toda su línea; la ✕ la recoge hacia el mismo lado y borra lo buscado.
 const ICO_LUPA_BUSQ = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
