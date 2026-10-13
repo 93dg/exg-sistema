@@ -131,53 +131,66 @@ const tabla = (cab, filas) => {
 };
 const inp = (v, fn, w) => '<input type="text" inputmode="decimal" value="' + (v == null ? '' : v) + '" onchange="' + fn + '" style="width:' + (w || 70) + 'px;text-align:right;font-size:12.5px;padding:2px 4px;">';
 
+// V11.51 (reporte 4e562a8a: «esta sección da asco, el diseño es antidiseño web»): como Control y Ren. obras: tarjetas blancas con líneas (nombre a la izquierda, importe a la derecha),
+// cada línea se toca y se despliega ahí mismo con su desglose (mes, día laborable, hora de jornada…); sin tablas, sin mayúsculas de etiqueta y sin textos largos
+if(!document.getElementById('nm2-css')){ const st = document.createElement('style'); st.id = 'nm2-css'; st.textContent = `
+.nm2-c{background:var(--paper,#fff);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin:0 0 10px;}
+.nm2-c>h3{font-size:14px;font-weight:800;margin:2px 0 6px;}
+.nm2-l>summary{list-style:none;cursor:pointer;-webkit-tap-highlight-color:transparent;}.nm2-l>summary::-webkit-details-marker{display:none}
+.nm2-r{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:13px;line-height:1.25;}
+.nm2-c>.nm2-r:first-of-type,.nm2-c>h3+.nm2-l>summary>.nm2-r,.nm2-c>h3+.nm2-r,.nm2-c>h3+.nm2-g>summary>.nm2-r{border-top:0;}
+.nm2-r>span{min-width:0;}.nm2-r>span small{display:block;font-size:11px;color:var(--ink-soft);}
+.nm2-r>b{white-space:nowrap;text-align:right;flex-shrink:0;font-weight:800;}.nm2-r>b small{display:block;font-size:11px;font-weight:700;color:var(--ink-soft);}
+.nm2-l[open]>summary>.nm2-r{border-left:2px solid var(--orange);padding-left:8px;}
+.nm2-d{padding:0 0 6px 10px;}.nm2-d .nm2-r{font-size:12px;padding:5px 0;}
+.nm2-g>summary{list-style:none;cursor:pointer}.nm2-g>summary::-webkit-details-marker{display:none}.nm2-g>summary .nm2-r{font-weight:800;}
+.nm2-g[open]>summary .nm2-r{border-left:2px solid var(--orange);padding-left:8px;}.nm2-g>.nm2-gb{padding-left:10px;}
+.nm2-tot .nm2-r{font-weight:800;font-size:13.5px;}
+.nm2-falta{color:var(--red);}
+.nm2-c input[type=text]{width:84px;text-align:right;font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:8px;background:var(--paper,#fff);font-family:inherit;}
+.nm2-c select{font-size:12.5px;padding:3px 6px;border:1px solid var(--line);border-radius:8px;background:var(--paper,#fff);font-family:inherit;max-width:150px;}
+`; document.head.appendChild(st); }
 C.vista = function(D){
-  const c = C.cfg, { eur } = U(), hJ = D.hJ;
+  const c = C.cfg, { eur } = U(), hJ = D.hJ, h1 = U().h1;
+  const fila = (izq, der, sub, subD, cls) => '<div class="nm2-r' + (cls ? ' ' + cls : '') + '"><span>' + izq + (sub ? '<small>' + sub + '</small>' : '') + '</span><b>' + der + (subD ? '<small>' + subD + '</small>' : '') + '</b></div>';
+  const lin = (izq, der, cuerpo, sub, subD) => cuerpo ? '<details class="nm2-l"><summary>' + fila(izq, der, sub, subD) + '</summary><div class="nm2-d">' + cuerpo + '</div></details>' : fila(izq, der, sub, subD);
+  const eqv = v => fila('Al mes', f2(v.mes)) + fila('Por día laborable', f2(v.diaLab)) + fila('Por hora de jornada', f2(v.horaJ)) + fila('Por día natural', f2(v.diaNat));
+  const card2 = (t, inner) => '<div class="nm2-c"><h3>' + t + '</h3>' + inner + '</div>';
   let h = '';
-  // 1. Parámetros
-  h += card('Parámetros de conversión',
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;font-size:12.5px;">'
-    + [['Días laborables al año', c.diasLab], ['Horas de jornada al día', c.horasJornada], ['Días naturales', c.diasNat], ['Horas naturales', c.horasNat]].map(([l, v]) => '<div><div style="font-size:10.5px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;">' + l + '</div><b style="font-size:15px;">' + v + '</b></div>').join('') + '</div>'
-    + '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin-top:10px;"><input type="checkbox" ' + (c.incluirB ? 'checked' : '') + ' onchange="COSTES.toggleB(this.checked)"> Incluir gastos en B</label>'
-    + nota('Hora de jornada = días laborables × horas de jornada = <b>' + U().h1(hJ) + ' h</b> (convenio: 1.736 h = 217 días × 8 h). La hora natural (8.760 h) es solo referencia: nunca se usa para repartir a las obras. Horas con actividad en albaranes (12 m): <b>' + U().h1(D.horasEmpresa) + ' h</b> en <b>' + D.diasActividad + '</b> días.'));
-  // 2. Tipos
-  h += card('Qué es cada cosa', '<div style="font-size:12px;line-height:1.5;">' + REAL + ' gasto realmente pagado o facturado, sin IVA, últimos 12 meses (' + D.W0 + ' a ' + D.hoy + ').<br>' + CALC + ' coste obtenido por cálculo (reparto, convenio) a partir de datos registrados.<br>' + PROV + ' amortización: reserva para renovar, no es un pago. Necesita el precio de compra de cada máquina.</div>');
-  const vu = (D.P.flota || []).filter(f => f.estado !== 'vendida').map(f => '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:3px 0;border-bottom:1px solid var(--line,#0001);"><span>' + esc(f.nombre) + ' <span style="color:var(--ink-soft);font-size:11px;">' + esc(f.matricula || '') + '</span></span><select onchange="COSTES.setUso(\'' + f.id + '\',this.value)" style="font-size:12px;">' + Object.keys(USOS).map(k => '<option value="' + k + '"' + (C.usoDe(f) === k ? ' selected' : '') + '>' + USOS[k] + '</option>').join('') + '</select></div>').join('');
-  h += card('Uso de cada vehículo', vu + nota('Un gasto de un vehículo va a donde diga su uso. Nissan X-Trail y Hyundai Matrix: coches de empresa para ir a las obras. Los dos Audi: personales de Rafa, fuera del coste de explotación aunque a efectos fiscales se sigan deduciendo como mixtos (eso no se toca aquí). Galloper averiado, sin uso. El Evoque es de Alberto.'));
-  // 3. Contratos
-  const cf = D.ctr.map(k => {
-    const v = k.anualCalc != null ? C.conv(k.anualCalc) : null, aviso = k.imp == null ? FALTA + ' sin importe' : k.cuadra === false ? EST + ' no cuadra: registrado ' + f2(k.reg) + ' / calculado ' + f2(k.anualCalc) : k.reg == null ? EST + ' sin coste anual registrado' : '';
-    return '<tr><td style="' + TD + 'text-align:left;white-space:normal;">' + esc(k.nombre) + '<div style="font-size:10.5px;color:var(--ink-soft);">' + (k.imp != null ? f2(k.imp) + ' · ' + esc(k.periodicidad || '?') : 'sin importe') + (aviso ? ' · ' + aviso : '') + '</div></td>' + (v ? celdas(v) : '<td colspan="6" style="' + TD + '">' + FALTA + '</td>') + '</tr>';
-  }).join('');
-  h += card('Contratos recurrentes: importe original, periodicidad real y equivalentes', tabla(CAB, cf) + nota('El año se recalcula con importe × periodicidad real; si no coincide con el «coste anual» registrado se avisa, no se corrige solo. Los contratos cancelados no se cuentan.'));
-  // 4. Registrado por categoría
-  const grup = Object.keys(GRUPOS).filter(k => D.porGrupo[k]).map(k => {
+  // 1. Lo que cuesta la empresa
+  const t = D.total, hpE = D.hMaq ? t.economico / D.hMaq : null;
+  h += card2('Coste de la empresa (12 meses)',
+    [['Máquinas y vehículos', D.porGrupo.flota || 0], ['Personal y autónomos', D.porGrupo.personal || 0], ['Estructura', D.porGrupo.estructura || 0], ['Directo de obra', D.porGrupo.obra || 0]].map(([n, v]) => lin(n, f2(v), eqv(C.conv(v)))).join('')
+    + '<div class="nm2-tot">' + lin('Coste de explotación', f2(t.registrado), eqv(C.conv(t.registrado))) + '</div>'
+    + lin('Amortización', D.amortTot ? f2(t.provision) : '<span class="nm2-falta">Falta precio</span>', D.amortTot ? eqv(C.conv(t.provision)) : '', D.amort.filter(a => a.anual != null).length + ' de ' + D.amort.length + ' máquinas con precio')
+    + '<div class="nm2-tot">' + lin('Coste total', f2(t.economico), eqv(C.conv(t.economico)) + fila('Por hora de máquina', f2(hpE), h1(D.hMaq) + ' h productivas')) + '</div>'
+    + fila('Fuera: retiradas y gastos de socios', f2(D.porGrupo.socios || 0)) + fila('Fuera: Hacienda y compra de vehículos', f2(D.porGrupo.fuera || 0)) + (D.porGrupo.sin ? fila('Sin clasificar', f2(D.porGrupo.sin)) : ''));
+  // 2. Por máquina
+  h += card2('Coste por máquina', D.clases.map(k => {
+    const cuerpo = (k.clase !== 'desplazamiento' ? fila('Horas productivas', '<input type="text" inputmode="decimal" placeholder="' + h1(k.hReal) + '" value="' + (k.manual ? k.h : '') + '" onchange="COSTES.setHP(\'' + k.clase + '\',this.value)">', 'Reales: ' + h1(k.hReal) + ' h (vacío = reales)') : '')
+      + fila('Al año', f2(k.total)) + fila('Al mes', f2(k.mes)) + fila('Suyo directo', f2(k.directo)) + fila('Parte del resto de la flota', f2(k.parte)) + (k.maquinas.length ? fila('Máquinas', '', k.maquinas.map(m => esc(m.nombre)).join(', ')) : '');
+    return lin(esc(k.nombre), k.horaProd != null ? f2(k.horaProd) + '/h' : f2(k.total), cuerpo, k.clase !== 'desplazamiento' ? h1(k.h) + ' h' : '', k.horaProd != null ? f2(k.total) + ' al año' : 'al año');
+  }).join(''));
+  // 3. Gastos por categoría
+  h += card2('Gastos por categoría (12 meses)', Object.keys(GRUPOS).filter(k => D.porGrupo[k]).map(k => {
     const cats = D.porCat.filter(x => x.grupo === k);
-    return '<tr><td style="' + TD + 'text-align:left;background:var(--concrete-2);" colspan="7"><b>' + GRUPOS[k][0] + '</b> · reparto: ' + GRUPOS[k][1] + ' · ' + eur(D.porGrupo[k]) + '</td></tr>'
-      + cats.map(x => '<tr><td style="' + TD + 'text-align:left;white-space:normal;">' + esc(x.cat) + ' <span style="font-size:10.5px;color:var(--ink-soft);">(' + x.n + ' doc.' + (x.baseB ? ', ' + eur(x.baseB) + ' en B' : '') + (x.recl ? ', ' + x.recl + ' pasados aquí por el uso del vehículo' : '') + ')</span></td>' + celdas(C.conv(x.base)) + '</tr>').join('');
-  }).join('');
-  h += card('Gastos registrados 12 meses por categoría ' + REAL, tabla(CAB, grup) + nota(D.gastos + ' gastos sin IVA' + (c.incluirB ? ' (incluye ' + D.nB + ' en B por ' + eur(D.baseB) + ')' : ' (sin los gastos en B)') + '. Los gastos de socios y los de fuera de la explotación se muestran pero no entran en el coste de explotación.'));
-  // 5. Coste por recurso
-  const rc = D.clases.map(k => '<tr><td style="' + TD + 'text-align:left;white-space:normal;"><b>' + k.nombre + '</b><div style="font-size:10.5px;color:var(--ink-soft);">' + (k.maquinas.length ? k.maquinas.map(m => esc(m.nombre)).join(', ') + ' · ' : '') + 'directo ' + f2(k.directo) + ' + reparto del resto de la flota ' + f2(k.parte) + '</div></td>' + celdas(k) + '</tr>').join('');
-  const hp = D.clases.filter(k => k.clase !== 'desplazamiento').map(k => '<tr><td style="' + TD + 'text-align:left;">' + k.nombre + '</td><td style="' + TD + '">' + U().h1(k.hReal) + ' h</td><td style="' + TD + '">' + inp(k.manual ? k.h : '', "COSTES.setHP('" + k.clase + "',this.value)") + '</td><td style="' + TD + '"><b>' + U().h1(k.h) + ' h</b> ' + (k.manual ? EST : CALC) + '</td><td style="' + TD + '"><b>' + f2(k.horaProd) + '</b> / h productiva</td></tr>').join('');
-  h += card('Coste por recurso: máquinas y vehículos ' + CALC, tabla(CAB, rc) + nota('Solo se asigna a una máquina lo que tiene vehículo o máquina indicados en el gasto; el resto de la flota (combustible, seguros, repuestos…) se reparte entre máquinas por sus horas productivas. Si pocos gastos llevan máquina, el reparto es aproximado.')
-    + '<div style="font-weight:700;font-size:12.5px;margin-top:8px;">Horas productivas por máquina</div>' + tabla('<th style="' + TH + 'text-align:left;">Clase</th><th style="' + TH + '">Reales (albaranes)</th><th style="' + TH + '">Fijar a mano</th><th style="' + TH + '">Se usan</th><th style="' + TH + '">Coste</th>', hp) + nota('Horas reales sacadas de los albaranes de los últimos 12 meses. Si dejas el campo vacío se usan las reales; si escribes un número se usa ese y se marca como Estimado.'));
-  // 6. Trabajadores
-  const cv = c.convenio, hjo = hJ || 1;
-  h += card('Coste por recurso: trabajadores ' + CALC,
-    '<div style="font-size:12.5px;">Coste anual de empresa por trabajador (convenio + Seguridad Social): maquinista/oficial 1ª ' + inp(cv.maquinista, "COSTES.setConv('maquinista',this.value)", 80) + ' · oficial 2ª ' + inp(cv.oficial2, "COSTES.setConv('oficial2',this.value)", 80) + '</div>'
-    + tabla(CAB, '<tr><td style="' + TD + 'text-align:left;">Maquinista / oficial 1ª</td>' + celdas(C.conv(num(cv.maquinista))) + '</tr><tr><td style="' + TD + 'text-align:left;">Oficial 2ª</td>' + celdas(C.conv(num(cv.oficial2))) + '</tr>')
-    + nota('Coste teórico de convenio por trabajador a jornada completa. No se suma al total de empresa: lo realmente pagado a personal ya está en «Personal y autónomos».'));
-  // 7. Amortización
-  const am = D.amort.map(a => '<tr><td style="' + TD + 'text-align:left;">' + esc(a.nombre) + '</td><td style="' + TD + '">' + inp(a.compra, "COSTES.setCompra('" + a.id + "',this.value)", 90) + '</td>' + (a.anual != null ? celdas(C.conv(a.anual)) : '<td colspan="6" style="' + TD + '">' + FALTA + ' precio de compra</td>') + '</tr>').join('');
-  h += card('Provisiones: amortización de maquinaria ' + PROV, tabla('<th style="' + TH + 'text-align:left;">Máquina</th><th style="' + TH + '">Precio de compra</th><th style="' + TH + '">Año</th><th style="' + TH + '">Mes</th><th style="' + TH + '">Día natural</th><th style="' + TH + '">Día laborable</th><th style="' + TH + '">Hora natural</th><th style="' + TH + '">Hora jornada</th>', am) + nota('Amortización lineal: precio × (1 − residual %) ÷ vida útil (' + (window.RENT.param.vidaUtil || 10) + ' años, en Rentabilidad → hipótesis). Sin precio de compra no se calcula nada ni se inventa.'));
-  // 8. Total empresa
-  const t = D.total, tr = (n, v, b, tag) => '<tr><td style="' + TD + 'text-align:left;white-space:normal;">' + (b ? '<b>' + n + '</b>' : n) + ' ' + tag + '</td>' + celdas(C.conv(v)) + '</tr>';
-  const hpE = D.hMaq ? t.economico / D.hMaq : null;
-  h += card('Coste total de la empresa',
-    tabla(CAB, tr('Máquinas y vehículos', D.porGrupo.flota || 0, 0, REAL) + tr('Personal y autónomos', D.porGrupo.personal || 0, 0, REAL) + tr('Estructura', D.porGrupo.estructura || 0, 0, REAL) + tr('Directo de obra', D.porGrupo.obra || 0, 0, REAL)
-      + tr('Total coste de explotación registrado', t.registrado, 1, REAL) + tr('Amortización (' + D.amort.filter(a => a.anual != null).length + ' de ' + D.amort.length + ' máquinas con precio)', t.provision, 0, D.amortTot ? PROV : FALTA) + tr('Coste económico total', t.economico, 1, D.amortTot ? CALC : EST))
-    + nota('Por hora productiva de máquina (' + U().h1(D.hMaq) + ' h): <b>' + f2(hpE) + '</b>. Fuera de este total: retiradas y gastos personales de socios ' + eur(D.porGrupo.socios || 0) + '; Hacienda y compra de vehículos ' + eur(D.porGrupo.fuera || 0) + (D.porGrupo.sin ? '; sin clasificar ' + eur(D.porGrupo.sin) : '') + '.'));
+    return '<details class="nm2-g"><summary>' + fila(GRUPOS[k][0], f2(D.porGrupo[k]), 'Se reparte por ' + GRUPOS[k][1]) + '</summary><div class="nm2-gb">'
+      + cats.map(x => lin(esc(x.cat), f2(x.base), fila('Documentos', x.n + (x.baseB ? ' · ' + f2(x.baseB) + ' en B' : '')) + eqv(C.conv(x.base)))).join('') + '</div></details>';
+  }).join('') + fila('Incluir gastos en B', '<input type="checkbox" ' + (c.incluirB ? 'checked' : '') + ' onchange="COSTES.toggleB(this.checked)">'));
+  // 4. Contratos
+  h += card2('Contratos recurrentes', D.ctr.map(k => {
+    const falta = k.imp == null, dif = k.cuadra === false;
+    return lin(esc(k.nombre), falta ? '<span class="nm2-falta">Sin importe</span>' : f2(k.anualCalc), falta ? '' : fila('Importe', f2(k.imp), '', esc(k.periodicidad || '')) + (dif ? fila('Coste anual apuntado', '<span class="nm2-falta">' + f2(k.reg) + '</span>', 'No cuadra con importe × periodicidad') : '') + eqv(C.conv(k.anualCalc)), '', falta ? '' : 'al año');
+  }).join('') || fila('Sin contratos', ''));
+  // 5. Amortización
+  h += card2('Amortización de maquinaria', D.amort.map(a => lin(esc(a.nombre), a.anual != null ? f2(a.anual) : '<span class="nm2-falta">Falta precio</span>', fila('Precio de compra', '<input type="text" inputmode="decimal" value="' + (a.compra == null ? '' : a.compra) + '" onchange="COSTES.setCompra(\'' + a.id + '\',this.value)">') + (a.anual != null ? eqv(C.conv(a.anual)) : ''), '', a.anual != null ? 'al año' : '')).join(''));
+  // 6. Trabajadores (convenio)
+  const cv = c.convenio;
+  h += card2('Coste de un trabajador (convenio)', [['maquinista', 'Maquinista / oficial 1ª'], ['oficial2', 'Oficial 2ª']].map(([kk, n]) => lin(n, f2(num(cv[kk])), fila('Coste anual de empresa', '<input type="text" inputmode="decimal" value="' + (cv[kk] == null ? '' : cv[kk]) + '" onchange="COSTES.setConv(\'' + kk + '\',this.value)">') + eqv(C.conv(num(cv[kk]))), '', 'al año')).join(''));
+  // 7. Uso de cada vehículo
+  h += card2('Uso de cada vehículo', (D.P.flota || []).filter(f => f.estado !== 'vendida').map(f => fila(esc(f.nombre), '<select onchange="COSTES.setUso(\'' + f.id + '\',this.value)">' + Object.entries(USOS).map(([k, l]) => '<option value="' + k + '"' + (C.usoDe(f) === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>', esc(f.matricula || ''))).join(''));
+  // 8. Ajustes
+  h += card2('Ajustes', fila('Días laborables al año', '<input type="text" inputmode="numeric" value="' + c.diasLab + '" onchange="COSTES.set(\'diasLab\',this.value)">') + fila('Horas de jornada al día', '<input type="text" inputmode="decimal" value="' + c.horasJornada + '" onchange="COSTES.set(\'horasJornada\',this.value)">', 'Hora de jornada = ' + h1(hJ) + ' h al año') + fila('Actividad en albaranes (12 m)', h1(D.horasEmpresa) + ' h', D.diasActividad + ' días'));
   return h;
 };
 
@@ -196,9 +209,15 @@ C.setConv = async (k, v) => { C.cfg.convenio = {...C.cfg.convenio, [k]: num(v)};
 C.setCompra = async (id, v) => { const n = String(v).trim() === '' ? null : num(v); const {error} = await sb.from('flota').update({coste_compra: n}).eq('id', id); if(error){ alert('No se pudo guardar: ' + error.message); return; } await C.recargar(); };
 C.repinta = async () => { if(C.el) await C.pintar(C.el, false); };
 C.recargar = async () => { if(window.RENT) window.RENT.invalidar(); C.D = null; if(C.el) await C.pintar(C.el, true); };
+// V11.51 (reporte d80cd0e4: «¿por qué calcula costes cada vez que entro? Esto no debe pasar en ningún sitio»): se enseña al momento lo último calculado (guardado en este dispositivo)
+// y se pone al día por detrás sin avisos ni «Calculando…»; lo que se abrió sigue abierto
+const CACHE_K = 'costes_vista_v2';
 C.pintar = async function(el, forzar){
-  C.el = el; if(!C.D) el.innerHTML = '<div class="panel te-panel" style="font-size:13px;">Calculando costes…</div>';
-  try{ const D = await C.cargar(forzar); el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><b style="font-size:14px;">Normalización y distribución de costes</b><a href="#" onclick="COSTES.recargar();return false" style="font-size:12px;">recalcular</a></div>' + C.vista(D); }
-  catch(e){ console.error(e); el.innerHTML = '<div class="panel te-panel" style="font-size:13px;">No se pudieron calcular los costes: ' + esc(e.message) + '</div>'; }
+  C.el = el;
+  if(!C.D && !el.querySelector('.nm2-c')){ let html = ''; try{ html = localStorage.getItem(CACHE_K) || ''; }catch(e){} el.innerHTML = html || '<div class="nm2-c" style="font-size:13px;color:var(--ink-soft);">Cargando…</div>'; }
+  try{ const D = await C.cargar(forzar); const abiertos = [...el.querySelectorAll('details[open]')].map(d => d.querySelector('summary')?.textContent); const html = C.vista(D);
+    el.innerHTML = html; el.querySelectorAll('details').forEach(d => { if(abiertos.includes(d.querySelector('summary')?.textContent)) d.open = true; });
+    try{ localStorage.setItem(CACHE_K, html); }catch(e){} }
+  catch(e){ console.error(e); if(!el.querySelector('.nm2-c')) el.innerHTML = '<div class="nm2-c" style="font-size:13px;">No se pudieron calcular los costes: ' + esc(e.message) + '</div>'; }
 };
 })();
