@@ -4686,11 +4686,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.26" defer></script>
-<script src="costes/norm.js?v=V11.26" defer></script>
-<script src="ajustes/calc.js?v=V11.26" defer></script>
+<script src="rentabilidad/rent.js?v=V11.27" defer></script>
+<script src="costes/norm.js?v=V11.27" defer></script>
+<script src="ajustes/calc.js?v=V11.27" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.26</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.27</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4842,7 +4842,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V11.26</div>
+        <div class="sub" id="version-badge">V11.27</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -15637,8 +15637,16 @@ async function rbCapturar(){
       s.setProperty('position', 'absolute', 'important'); s.setProperty('bottom', 'auto', 'important'); s.setProperty('right', 'auto', 'important'); s.setProperty('margin', '0', 'important'); s.setProperty('transform', 'none', 'important'); s.setProperty('box-sizing', 'border-box', 'important');
       s.setProperty('width', f.w + 'px', 'important'); s.setProperty('height', f.h + 'px', 'important'); s.setProperty('top', '0px', 'important'); s.setProperty('left', '0px', 'important');
       const r0 = el.getBoundingClientRect(), vw = doc.defaultView; s.setProperty('top', (f.t - (r0.top + (vw.scrollY || 0))) + 'px', 'important'); s.setProperty('left', (f.l - (r0.left + (vw.scrollX || 0))) + 'px', 'important'); }); }catch(e){ console.warn(e); } };   // coordenadas de documento: se mide dónde cae con top/left a 0 (sumando el desplazamiento de la copia) y se corrige la diferencia
-  const quitarMarcas = () => { document.querySelectorAll('[data-rbfix]').forEach(el => el.removeAttribute('data-rbfix')); document.querySelectorAll('[data-rbi]').forEach(el => el.removeAttribute('data-rbi')); document.querySelectorAll('[data-rbx],[data-rbarriba]').forEach(el => { el.removeAttribute('data-rbx'); el.removeAttribute('data-rbarriba'); }); };
+  const quitarMarcas = () => { document.querySelectorAll('[data-rbimg]').forEach(el => el.removeAttribute('data-rbimg')); document.querySelectorAll('[data-rbfix]').forEach(el => el.removeAttribute('data-rbfix')); document.querySelectorAll('[data-rbi]').forEach(el => el.removeAttribute('data-rbi')); document.querySelectorAll('[data-rbx],[data-rbarriba]').forEach(el => { el.removeAttribute('data-rbx'); el.removeAttribute('data-rbarriba'); }); };
   const conTiempo = (pr, ms) => Promise.race([pr, new Promise((_, ko) => setTimeout(() => ko(new Error('la captura tardó más de ' + ms / 1000 + ' s')), ms))]);
+  // V11.27 (reporte de Daniel c3c1e78d: el permiso de conducir salía cortado en la foto del reporte): la copia volvía a cargar cada imagen y en el iPhone la pintaba a medio decodificar.
+  // Ahora cada imagen que se ve se pinta antes, entera y al tamaño de pantalla, y la copia usa esa versión ya hecha
+  const imgsListas = [];
+  try{ const vis = [...document.images].filter(im => { if(!im.complete || !im.naturalWidth) return false; const r = im.getBoundingClientRect(); return r.width > 20 && r.height > 20 && r.bottom > 0 && r.top < window.innerHeight; }).slice(0, 10);
+    await conTiempo(Promise.all(vis.map(async (im, k) => { const r = im.getBoundingClientRect(), src = im.currentSrc || im.src; const cp = new Image(); if(!/^(data|blob):/.test(src)) cp.crossOrigin = 'anonymous'; cp.src = src; await cp.decode();
+      const cv = document.createElement('canvas'), f = Math.min(2, Math.max(1, window.devicePixelRatio || 1)); cv.width = Math.round(r.width * f); cv.height = Math.round(r.height * f); cv.getContext('2d').drawImage(cp, 0, 0, cv.width, cv.height);
+      imgsListas[k] = cv.toDataURL('image/jpeg', 0.85); im.setAttribute('data-rbimg', k); })).catch(() => {}), 1500); }catch(e){}   // como mucho 1,5 s: las fotos ya están en la caché y se pintan al momento; la pantalla no se mueve mientras
+  const ponerImgs = doc => { try{ doc.querySelectorAll('img[data-rbimg]').forEach(el => { const u = imgsListas[Number(el.getAttribute('data-rbimg'))]; if(u){ el.removeAttribute('srcset'); el.src = u; } }); }catch(e){} };
   // V8.14: se copia la zona visible real. V8.56: la zona se mide al pulsar (G) y la copia no se desplaza: se sube con top:-y y lo fijo (barra inferior, botones) queda en su sitio, igual que en pantalla
   // V8.59: la copia va de arriba de la página hasta el final de la pantalla, con el desplazamiento a 0. Dentro se pone una MARCA (un cuadrito de color) justo debajo de la pantalla; al terminar se busca dónde ha caído de verdad y se recorta ahí. Así no importa cómo coloque Safari del iPhone la copia
   const ALTO = G.y + G.h + 14; let esc = Math.max(0.4, Math.min(2, 800 / window.innerWidth)); if(G.w * ALTO * esc * esc > 12e6) esc = Math.max(0.4, Math.sqrt(12e6 / (G.w * ALTO)));
@@ -15655,7 +15663,7 @@ async function rbCapturar(){
   try{
     for(const intento of [1, 2]){   // 1: se quitan los colores modernos de los estilos; 2: además se revisan los colores ya calculados de lo que se ve
       try{
-        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { subirCopia(doc); fijarCopia(doc); doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); rbCompactarStyle(doc); }})), 9000);
+        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { subirCopia(doc); fijarCopia(doc); ponerImgs(doc); doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); rbCompactarStyle(doc); }})), 9000);
         if(cap && cap.width > 0){ const fin = recortar(cap); return {cap: fin, error: '', diag: fin._diag}; }
       }catch(e){ ultimoError = String(e && e.message || e).slice(0, 160); console.warn('captura, intento ' + intento, e); }
     }
@@ -18498,7 +18506,7 @@ async function visorPintar(soloZoom){
     if(soloZoom){ const im = c.querySelector('img'); if(im) ajuste(im); return; }
     c.innerHTML = '<div class="visor-msg">Abriendo…</div>';
     const im = new Image(); im.alt = ''; im.className = 'visor-img';
-    im.onload = () => { c.innerHTML = ''; c.appendChild(im); ajuste(im); };
+    im.onload = async () => { try{ await im.decode(); }catch(e){} c.innerHTML = ''; c.appendChild(im); ajuste(im); };   // V11.27: en el iPhone la foto se enseña ya decodificada entera, no a medias
     im.onerror = () => { visorSinVista(c); };
     im.src = _visorUrl; return;
   }
