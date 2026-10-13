@@ -608,7 +608,7 @@ R.escHtml2 = (b, lista) => {
 };
 // V10.40 (Daniel): coste de oportunidad = horas que se podían haber echado (7 h operativas por persona y día, lunes a viernes, mientras duró la obra) menos las que se echaron; cada día cuenta por separado
 R.perdidas = function(r, personas, margenH, carga){
-  const pot = 7 * personas, mH = r.H > 0 ? r.ejecutado / r.H : NaN;   // V10.85 (Daniel): solo cuenta la obra elegida; las horas perdidas valen lo que esta obra da por hora operativa, nunca el margen de otras obras
+  const pot = (num(R.param.horasDia) || 6) * personas, mH = r.H > 0 ? r.ejecutado / r.H : NaN;   // V10.85 (Daniel): solo cuenta la obra elegida; las horas perdidas valen lo que esta obra da por hora operativa, nunca el margen de otras obras
    let dLab = 0, hPerd = 0, dFlojos = 0, dVacios = 0;
   for(let f = r.desde; f <= r.hasta; f = addDays(f, 1)){ const dow = new Date(f + 'T12:00:00').getDay(); if(dow === 0 || dow === 6) continue; dLab++; const h = r.hDia[f] || 0, p = Math.max(0, pot - h); hPerd += p; if(!h) dVacios++; else if(p > 0) dFlojos++; }
   carga = 0;   // V10.51 (Daniel): de 8 h de jornada, 1 h se reserva a mantenimiento/reparaciones/preparativos: las 7 h operativas ya la excluyen
