@@ -657,7 +657,7 @@ R.simHtml = function(P, b){
   const ganaLibre = k => {   // V11.24 (Daniel): lo que se gana en otra obra con los días que libera una persona más de este puesto (al ritmo de hoy)
     if(!s.obra || !isFinite(b.margenH)) return NaN;
     const n = bd[k] | 0, con = Object.assign({}, bd, {[k]: Math.max(1, n)}), sin = Object.assign({}, bd, {[k]: Math.max(1, n) - 1});
-    try{ return Math.max(0, (R.simular2(b, con).c1.libre - R.simular2(b, sin).c1.libre) * b.margenH); }catch(e){ return NaN; }
+    try{ const dias = Math.max(0, R.simular2(b, sin).c1.d - R.simular2(b, con).c1.d); return dias * (num(R.param.horasDia) || 7) * b.margenH; }catch(e){ return NaN; }   // V11.25 (Daniel): solo las horas del propio puesto en los días que se acaba antes, no las de Rafa y Manolo
   };
   const st = (k, t) => '<div class="rt-stw"><div><div onclick="RENT.setFicha(\'' + k + '\')" style="cursor:pointer;font-size:12.5px;padding:6px 0;">' + t + '</div>' + (isFinite(trasDedH(k)) ? '<small onclick="RENT.setFicha(\'' + k + '\')" style="color:var(--ink-soft);font-size:11px;white-space:nowrap;cursor:pointer;margin-left:auto;margin-right:10px;">' + eur(trasDedH(k), 2) + '/h</small>' : '') + '<span class="rt-st"><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',-1)">−</button><b>' + bd[k] + '</b><button type="button" onclick="RENT.stepEsc2(\'' + k + '\',1)">+</button></span></div>' + fichaDe(k) + '</div>';   // V11.06 (Daniel): sin pastilla; al pulsar el puesto se despliega su ficha ahí mismo
   const pp = (k, n) => '<div class="rt-pl"><button type="button" class="' + (bd[k] === 'fuera' ? '' : 'on') + '" onclick="RENT.setEsc2(\'' + k + '\',\'hoy\')">' + n + '</button>' + (cobH(k) || '') + '</div>';   // V10.67: el nombre es la pastilla
@@ -680,7 +680,7 @@ R.simHtml = function(P, b){
       // V11.15 (Daniel): su salario al mes por convenio, sin depender de la obra, antes de lo de la obra
       filas = fr('Salario neto al mes', inf.neto / 14, NaN) + fr('Salario bruto al mes', inf.bruto / 14, NaN) + fr('Coste para la empresa al mes', inf.coste / 12, NaN)
         + fr('Salario neto en la obra', tl(inf.neto), ph(inf.neto)) + fr('Salario bruto en la obra', tl(inf.bruto), ph(inf.bruto)) + fr('Coste para la empresa en la obra', tl(inf.coste), ph(inf.coste), 'bruto + Seguridad Social de empresa') + fr('Coste tras deducir en la obra', tl(inf.coste) * (1 - tasa), ph(inf.coste) * (1 - tasa), 'baja ' + Math.round(tasa * 100) + ' % por impuestos')
-        + (() => { const g = ganaLibre(k), cf = tl(inf.coste) * (1 - tasa) - g; return R.costeFinalOk && isFinite(g) ? fr('Coste final', cf, cf / horasT, 'menos ' + eur(g) + ' de los días que libera, en otra obra') : ''; })();
+        + (() => { const g = ganaLibre(k), cf = tl(inf.coste) * (1 - tasa) - g; return isFinite(g) ? fr('Coste final', cf, cf / horasT, 'menos ' + eur(g) + ': sus ' + h1(g / (b.margenH * (num(R.param.horasDia) || 7))) + ' días libres en otra obra') : ''; })();
       pie = 'Convenio de construcción, jornada completa, 14 pagas: el neto y el bruto al mes son de cada nómina y el coste de empresa es el del año repartido en 12 meses. En la obra: €/h × ' + h1(horasT) + ' h.';
     }
     return '<div class="rt-c" style="margin:6px 0 8px;background:var(--paper);border:2px solid var(--orange);"><div style="font-weight:800;font-size:13px;margin-bottom:4px;">' + tit + '</div>' + filas + '<div style="font-size:10.5px;color:var(--ink-soft);margin-top:4px;">' + pie + '</div></div>';
