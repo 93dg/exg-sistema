@@ -138,6 +138,7 @@ const GENERALES = [['Autónomos y Seguridad Social', /aut[oó]nomo|seguridad soc
 R.GENERALES = GENERALES;
 
 // ---------- cálculo de una obra ----------
+const dsg = (o, f) => Object.entries(o || {}).map(([k, v]) => [k, v * f]).filter(x => Math.abs(x[1]) >= 0.5).sort((a, b) => b[1] - a[1]);   // V11.49: desglose de una línea de coste (partidas × la parte de esta obra)
 const L = (clave, label, valor, nivel, criterio, nota, extra) => ({clave, label, valor, nivel, criterio: criterio || '', nota: nota || '', ...(extra || {})});
 R.calcular = function(job, P, asig){
   const albs = (asig.porJob[job.id] || []).slice(); const prm = R.param;
@@ -201,7 +202,7 @@ R.calcular = function(job, P, asig){
     ids.forEach(id => { const x = maq.get(id) || [...maq.values()].find(y => String(y.m.id) === String(id)), gs = porV[id]; lineasD.push(L('reparaciones:' + id, 'Reparaciones: ' + (x ? x.m.nombre : 'máquina'), sum(gs, R.baseGasto), 'real', 'facturas anotadas a esta máquina entre las fechas de la obra', gs.length + ' factura(s)', {clases: x ? [...x.clases] : []})); }); }
   // ---- INDIRECTO: parte fija de las máquinas (seguros, impuestos…) de los 12 meses, repartida por horas de utilización ----
   Object.keys(hClase).forEach(c => { if(!(hClase[c] > 0)) return; const k = CO && CO.clases.find(x => x.clase === c), nom = R.NOMBRE_CLASE[c] || c;
-    if(k && k.horaFija != null) lineasI.push(L('maq:' + c, 'Costes fijos de máquina: ' + nom, k.horaFija * hClase[c], k.manual ? 'estimada' : 'calculada', eur(k.horaFija, 2) + ' por hora productiva × ' + h1(hClase[c]) + ' h', 'Seguros, impuestos y demás costes fijos de la flota (12 meses) repartidos por horas de utilización (Gastos → Normalización).'));
+    if(k && k.horaFija != null) lineasI.push(L('maq:' + c, 'Costes fijos de máquina: ' + nom, k.horaFija * hClase[c], k.manual ? 'estimada' : 'calculada', eur(k.horaFija, 2) + ' por hora productiva × ' + h1(hClase[c]) + ' h', 'Seguros, impuestos y demás costes fijos de la flota (12 meses) repartidos por horas de utilización (Gastos → Normalización).', {desg: dsg(k.fijoCat, k.h ? hClase[c] / k.h : 0)}));
     else lineasI.push(L('maq:' + c, 'Costes fijos de máquina: ' + nom, 0, 'falta', '', 'No hay coste por hora para esta clase en Normalización.')); });
   // ---- INDIRECTO: amortización (provisión; solo con precio de compra) ----
   const W0 = ev.W0, W1 = hasta, jorn = num(window.COSTES && COSTES.cfg.diasLab) || num(prm.jornadas) || 250;
@@ -217,14 +218,14 @@ R.calcular = function(job, P, asig){
   const dLab = num(window.COSTES && COSTES.cfg.diasLab) || 217;
   if(CO){
     const est0 = CO.porGrupo.estructura || 0, ges = sum(CO.porCat.filter(x => x.grupo === 'estructura' && /gestor/i.test(x.cat)), x => x.base), est = est0 - ges;
-    if(ges > 0) lineasI.push(L('gen:gestoria', 'Gestoría (sin ella no se declara el IVA)', ges / dLab * Dq, 'calculada', eur(ges) + ' al año ÷ ' + dLab + ' días laborables × ' + h1(Dq) + ' días de esta obra (su parte de cada día trabajado)', 'Gastos → Normalización, estructura.'));
+    if(ges > 0) lineasI.push(L('gen:gestoria', 'Gestoría (sin ella no se declara el IVA)', ges / dLab * Dq, 'calculada', eur(ges) + ' al año ÷ ' + dLab + ' días laborables × ' + h1(Dq) + ' días de esta obra (su parte de cada día trabajado)', 'Gastos → Normalización, estructura.', {desg: dsg(Object.fromEntries(CO.porCat.filter(x => x.grupo === 'estructura' && /gestor/i.test(x.cat)).map(x => [x.cat, x.base])), Dq / dLab)}));
     if(est > 0) lineasI.push(L('gen:estructura', 'Resto de la estructura (nave, financiación, suministros, programas…)', est / dLab * Dq, 'calculada', eur(est) + ' al año ÷ ' + dLab + ' días laborables × ' + h1(Dq) + ' días de esta obra (su parte de cada día trabajado)', 'Gastos → Normalización, grupo Estructura.'));
     const ss = sum(CO.porCat.filter(x => x.grupo === 'personal' && /seguridad social|aut[oó]nomo/i.test(x.cat)), x => x.base), otrosP = (CO.porGrupo.personal || 0) - ss;
-    if(ss > 0) lineasI.push(L('gen:ss', 'Autónomos y Seguridad Social', ss / dLab * Dq, 'calculada', eur(ss) + ' al año ÷ ' + dLab + ' días laborables × ' + h1(Dq) + ' días de esta obra (su parte de cada día trabajado)', otrosP > 1 ? 'No se imputan ' + eur(otrosP) + ' de nóminas y pagos en B a personas: falta decidir si son coste de obra.' : ''));
+    if(ss > 0) lineasI.push(L('gen:ss', 'Autónomos y Seguridad Social', ss / dLab * Dq, 'calculada', eur(ss) + ' al año ÷ ' + dLab + ' días laborables × ' + h1(Dq) + ' días de esta obra (su parte de cada día trabajado)', otrosP > 1 ? 'No se imputan ' + eur(otrosP) + ' de nóminas y pagos en B a personas: falta decidir si son coste de obra.' : '', {desg: dsg(Object.fromEntries(CO.porCat.filter(x => x.grupo === 'personal' && /seguridad social|aut[oó]nomo/i.test(x.cat)).map(x => [x.cat, x.base])), Dq / dLab)}));
     const des = CO.clases.find(x => x.clase === 'desplazamiento'); if(des && des.total > 0) lineasI.push(L('gen:coches', 'Coches de empresa (desplazamiento a obras)', des.total / dLab * Dq, 'calculada', eur(des.total) + ' al año ÷ ' + dLab + ' días laborables × ' + h1(Dq) + ' días de esta obra (su parte de cada día trabajado)', 'Nissan X-Trail y Hyundai Matrix.'));
   } else avisos.push('No se pudo leer la normalización de costes: faltan los costes generales.');
   const sociosAnual = sum((P.socios || []).filter(x => x.f >= W0 && x.f <= W1), x => x.imp), socios = sociosAnual / dLab * Dq;
-  const socL = L('socios', 'Retribución de Rafa y Manolo (retiradas y gastos personales)', socios, sociosAnual > 0 ? 'calculada' : 'falta', eur(sociosAnual) + ' al año ÷ ' + dLab + ' días laborables × ' + h1(Dq) + ' días de esta obra (su parte de cada día trabajado)', 'No es un gasto deducible: se resta para ver cuánto queda de verdad, pero no baja los impuestos.', {deducible: false});
+  const socL = L('socios', 'Retribución de Rafa y Manolo (retiradas y gastos personales)', socios, sociosAnual > 0 ? 'calculada' : 'falta', eur(sociosAnual) + ' al año ÷ ' + dLab + ' días laborables × ' + h1(Dq) + ' días de esta obra (su parte de cada día trabajado)', 'No es un gasto deducible: se resta para ver cuánto queda de verdad, pero no baja los impuestos.', {deducible: false, desg: dsg((P.socios || []).filter(x => x.f >= W0 && x.f <= W1).reduce((o, x) => { o[x.o || 'Otros'] = (o[x.o || 'Otros'] || 0) + x.imp; return o; }, {}), Dq / dLab)});
   // ---- imputaciones manuales y correcciones ----
   const imps = (P.imput || []).filter(i => i.job_id === job.id);
   const aplicar = (arr, bloque) => { imps.filter(i => i.bloque === bloque).forEach(i => { if(i.modo === 'sustituir' && i.clave){ const x = arr.find(y => y.clave === i.clave); if(x){ x.original = x.valor; x.valor = num(i.importe); x.nivel = i.nivel; x.nota = (x.nota ? x.nota + ' · ' : '') + 'Corregido a mano: ' + (i.nota || 'sin nota'); x.manualId = i.id; return; } } arr.push(L('man:' + i.id, i.concepto, num(i.importe), i.nivel, 'imputación manual (' + i.origen + ')', i.nota || '', {manualId: i.id})); }); };
@@ -525,7 +526,11 @@ R.simular2 = function(b, e){
 .rt-d .tb-cos{margin-left:0;margin-right:0}
 .rt-sim-r{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid var(--line);font-size:13px;line-height:1.25}
 .rt-sim-r:first-of-type{border-top:0}
-.rt-sim-r>b{text-align:right}
+.rt-sim-r>b{text-align:right;white-space:nowrap;flex-shrink:0}.rt-sim-r>span{min-width:0}
+.rt-ph{display:block;font-size:11px;font-weight:700;color:var(--ink-soft);white-space:nowrap}
+.rt-ld>summary{list-style:none;cursor:pointer;-webkit-tap-highlight-color:transparent}.rt-ld>summary::-webkit-details-marker{display:none}.rt-ld>summary:active{background:var(--concrete)}.rt-ld[open]>summary{border-left:2px solid var(--orange);padding-left:6px}
+.rt-ldb{padding:0 0 6px 10px;font-size:12px}.rt-ldb .rt-sim-r{font-size:12px}.rt-ldx{font-size:11.5px;color:var(--ink-soft);padding:3px 0;border-top:1px solid var(--line)}
+.rt-ld+.rt-ld>summary,.rt-ld+.rt-sim-r,.rt-sim-r+.rt-ld>summary{border-top:1px solid var(--line)}
 .rt-st{display:inline-flex;align-items:center;gap:8px}
 .rt-st button{width:28px;height:28px;border:none;background:transparent;font-size:22px;font-weight:800;color:var(--orange);line-height:1;padding:0;flex:none}
 .rt-st b{min-width:20px;text-align:center;font-size:16px}
@@ -563,9 +568,13 @@ R.vistaObra = function(r, P, b){
   // V10.86 (Daniel): cada coste lleva al lado su % sobre el ingreso de la obra; los nombres empiezan siempre en mayúscula
   const pcI = v => r.ejecutado > 0 && isFinite(v) ? ' <span style="font-size:.78em;color:var(--ink-soft);font-weight:700;">' + (Math.round(v / r.ejecutado * 1000) / 10).toLocaleString('es-ES', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' %</span>' : '', mayus = t => { t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); };
   const pcH = v => r.H > 0 && isFinite(v) ? ' <span style="font-size:.78em;color:var(--ink-soft);font-weight:700;">· ' + eur(v / r.H, 2) + '/h</span>' : '';   // V10.98 (Daniel): cada coste con su importe, su % y su €/h
-  const bdL = ls => ls.filter(x => Math.abs(x.valor) >= 0.5).map(x => '<div class="rt-sim-r"><span>' + mayus(esc(x.label || x.clave)) + '</span><b>' + eur(x.valor) + pcI(x.valor) + pcH(x.valor) + '</b></div>').join('') || '<div class="rt-sim-r"><span>Sin importes</span></div>';
+  const pcIH = v => '<small class="rt-ph">' + (pcI(v) + pcH(v)).replace(/<[^>]+>/g, '').trim() + '</small>';   // V11.49 (reporte 17a04432): % y €/h debajo del importe, sin partirse
+  // V11.49 (Daniel): cada línea se toca y se despliega ahí mismo con su desglose: partidas que la forman, cómo se calcula y la nota
+  const bdL = ls => ls.filter(x => Math.abs(x.valor) >= 0.5).map(x => { const dd = (!x.manualId && x.desg && x.desg.length ? x.desg.map(([k, v]) => '<div class="rt-sim-r"><span>' + mayus(esc(k)) + '</span><b>' + eur(v) + '</b></div>').join('') : '') + (x.criterio ? '<div class="rt-ldx">' + mayus(esc(x.criterio)) + '</div>' : '') + (x.nota ? '<div class="rt-ldx">' + mayus(esc(x.nota)) + '</div>' : '');
+    const fila = '<span>' + mayus(esc(x.label || x.clave)) + '</span><b>' + eur(x.valor) + pcIH(x.valor) + '</b>';
+    return dd ? '<details class="rt-ld"><summary class="rt-sim-r">' + fila + '</summary><div class="rt-ldb">' + dd + '</div></details>' : '<div class="rt-sim-r">' + fila + '</div>'; }).join('') || '<div class="rt-sim-r"><span>Sin importes</span></div>';
   const relRx = /^(maq:|amort:|gen:ss|gen:coches|gen:gestoria)/, relL = r.lineasI.filter(x => relRx.test(x.clave)), restoL = r.lineasI.filter(x => !relRx.test(x.clave));
-  const sociosL = [{label: 'Salario de Rafa y Manolo', valor: r.socios.valor}];
+  const sociosL = [Object.assign({}, r.socios, {label: 'Salario de Rafa y Manolo'})];
   const fil = (titulo, sub, v, color, bd, cOver, base) => { const ok = v >= 0, c = cOver || (ok ? G : RJ), mg = base > 0 && isFinite(v) ? Math.round(v / base * 100) : mgPct(v);
     return '<details class="rt-nd"><summary><div class="rt-n"><i style="background:' + color + ';"></i><div><b>' + titulo + '</b><small>' + sub + '</small></div><div class="v"><b style="color:' + c + ';">' + (isFinite(v) ? eur(v) : 'sin dato') + (mg != null ? ' <span style="font-size:.72em;font-weight:700;">' + mg + ' %</span>' : '') + '</b><small style="color:' + c + ';font-weight:700;">' + (hOk && isFinite(v) ? eur(v / r.H, 2) + '/h' : 'sin horas') + '</small></div></div></summary><div class="rt-bd">' + bd + '</div></details>'; };
   const sg = v => v >= 0 ? G : RJ, tile = (cl2, t, v, sm, c) => '<div class="rt-t"><span style="color:' + c + ';">' + t + '</span><b style="color:' + c + ';">' + v + '</b><small>' + sm + '</small></div>';
@@ -575,7 +584,7 @@ R.vistaObra = function(r, P, b){
   // V9.90 (Daniel): tarjeta 1 = beneficio al ir restando costes; tarjeta 2 = lo que queda LIMPIO (tras impuestos): final frente a objetivo, aparte para compararlos; porcentaje de 1 a 100
   const m100 = Math.min(100, Math.max(1, num(R.param.margen) || 1));
   const cr = t => '<span style="color:' + G + ';">Benef.</span> <span style="color:' + RJ + ';">' + t + '</span>';
-  const hd = (t, v) => '<div class="rt-sim-r" style="font-weight:800;border-top:1px solid var(--line,#ddd);margin-top:4px;"><span>' + t + '</span><b>' + eur(v) + pcI(v) + pcH(v) + '</b></div>';
+  const hd = (t, v) => '<div class="rt-sim-r" style="font-weight:800;border-top:1px solid var(--line,#ddd);margin-top:4px;"><span>' + t + '</span><b>' + eur(v) + pcIH(v) + '</b></div>';
   const limpioFin = r.neto, limpioObj = nv.mar, okLim = isFinite(limpioObj) && limpioFin >= limpioObj;
   const filaL = (tit, sub, v, pct, color, c, bd) => '<details class="rt-nd"><summary><div class="rt-n"><i style="background:' + color + ';"></i><div><b>' + tit + '</b><small>' + sub + '</small></div><div class="v"><b style="color:' + c + ';">' + (isFinite(v) ? eur(v) : 'sin dato') + (pct != null ? ' <span style="font-size:.72em;font-weight:700;">' + pct + ' %</span>' : '') + '</b><small style="color:' + c + ';font-weight:700;">' + (hOk && isFinite(v) ? eur(v / r.H, 2) + '/h' : 'sin horas') + '</small></div></div></summary><div class="rt-bd">' + bd + '</div></details>';
   // V10.98 (Daniel 12/10/2026): una sola lista de 7 filas, cada una con importe, % sobre el ingreso y €/h

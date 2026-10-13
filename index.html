@@ -4781,11 +4781,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.48" defer></script>
-<script src="costes/norm.js?v=V11.48" defer></script>
-<script src="ajustes/calc.js?v=V11.48" defer></script>
+<script src="rentabilidad/rent.js?v=V11.49" defer></script>
+<script src="costes/norm.js?v=V11.49" defer></script>
+<script src="ajustes/calc.js?v=V11.49" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.48</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.49</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4937,7 +4937,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V11.48</div>
+        <div class="sub" id="version-badge">V11.49</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -30952,12 +30952,12 @@ async function costeSociosCargar(){   // V9.17: lo que se llevan Rafa y Manolo: 
   const out = [];
   try{
     let d1 = 0; while(true){ const {data, error} = await sb.from('documentos_economicos').select('fecha_devengo, importe').is('deleted_at', null).eq('tipo', 'gasto').ilike('categoria', 'Gasto personal%').not('categoria', 'ilike', '%Alberto%').range(d1, d1 + 999); if(error || !data || !data.length) break;
-      data.forEach(d => { if(d.fecha_devengo) out.push({f: String(d.fecha_devengo).slice(0, 10), imp: Math.abs(Number(d.importe || 0))}); });
+      data.forEach(d => { if(d.fecha_devengo) out.push({f: String(d.fecha_devengo).slice(0, 10), imp: Math.abs(Number(d.importe || 0)), o: 'Facturas personales'}); });
       if(data.length < 1000) break; d1 += 1000; }
   }catch(e){ console.error('Socios: fallo al leer los gastos personales', e); }
   try{
     let d2 = 0; while(true){ const {data, error} = await sb.from('movimientos_banco').select('fecha, importe, nota, categoria').lt('importe', 0).gte('fecha', '2026-07-01').in('categoria', ['efectivo', 'tarjeta_otros']).range(d2, d2 + 999); if(error || !data || !data.length) break;
-      data.forEach(m => { if(m.categoria === 'efectivo' ? (!m.nota || /^EFECTIVO DE USO PERSONAL/i.test(m.nota)) : /^PERSONAL/i.test(m.nota || '')) out.push({f: m.fecha, imp: -Number(m.importe)}); });
+      data.forEach(m => { if(m.categoria === 'efectivo' ? (!m.nota || /^EFECTIVO DE USO PERSONAL/i.test(m.nota)) : /^PERSONAL/i.test(m.nota || '')) out.push({f: m.fecha, imp: -Number(m.importe), o: m.categoria === 'efectivo' ? 'Retiradas de efectivo' : 'Pagos con tarjeta personales'}); });
       if(data.length < 1000) break; d2 += 1000; }
   }catch(e){ console.error('Socios: fallo al leer el banco', e); }
   if(out.length) _sociosCache = out;

@@ -65,6 +65,7 @@ C.calcular = function(P, contratos){
   CLASES_MAQ.forEach(k => { const man = c.horasProd && c.horasProd[k] != null && c.horasProd[k] !== '' ? num(c.horasProd[k]) : null, real = num(ev.horasClase[k]); horasProd[k] = {h: man != null ? man : real, real, manual: man != null}; hMaq += horasProd[k].h; });
   const gW = (P.gastos || []).filter(g => g.fecha_devengo >= W0 && g.fecha_devengo <= hoy && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada') && (c.incluirB || g.contabilidad !== 'en_b'));
   const porCat = new Map(), porGrupo = {}, porClase = {}, varClase = {}; const add = (o, k, v) => { o[k] = (o[k] || 0) + v; };
+  const fijoCatC = {}, fijoCatPool = {}; const addC = (k, cat, v) => { (fijoCatC[k] = fijoCatC[k] || {}); add(fijoCatC[k], cat, v); };   // V11.49: de qué se componen los costes fijos de cada clase (para el desglose en Ren. obras)
   let nB = 0, baseB = 0;
   gW.forEach(g => {
     const base = R.baseGasto(g), cat = g.categoria || '(sin categoría)', esB = g.contabilidad === 'en_b', veh = g.vehiculo_id ? flotaById.get(g.vehiculo_id) : null;
@@ -78,8 +79,8 @@ C.calcular = function(P, contratos){
     if(grupo === 'flota'){
       if(uso === 'empresa'){ add(porClase, 'desplazamiento', base); return; }
       const esVar = /combust|repuest|recambio|lubric|neum|taller/i.test(cat);
-      if(veh && uso === 'maquina'){ add(porClase, claseFlota(veh), base); if(esVar) add(varClase, claseFlota(veh), base); return; }
-      add(porClase, 'pool', base); if(esVar) add(varClase, 'pool', base);
+      if(veh && uso === 'maquina'){ add(porClase, claseFlota(veh), base); if(esVar) add(varClase, claseFlota(veh), base); else addC(claseFlota(veh), cat, base); return; }
+      add(porClase, 'pool', base); if(esVar) add(varClase, 'pool', base); else add(fijoCatPool, cat, base);
     }
   });
   // reparto del pool de flota por horas de utilización de cada clase
@@ -87,7 +88,8 @@ C.calcular = function(P, contratos){
   CLASES_MAQ.forEach(k => {
     const h = horasProd[k].h, directo = porClase[k] || 0, parte = hMaq ? poolF * h / hMaq : 0, total = directo + parte, variable = (varClase[k] || 0) + (hMaq ? poolV * h / hMaq : 0), fijo = total - variable;
     if(!h && !directo) return;
-    clases.push({clase: k, nombre: NOM[k], h, hReal: horasProd[k].real, manual: horasProd[k].manual, directo, parte, total, variable, fijo, ...C.conv(total), horaProd: h ? total / h : null, horaFija: h ? fijo / h : null, maquinas: (P.flota || []).filter(f => claseFlota(f) === k && C.usoDe(f) === 'maquina' && f.estado !== 'vendida')});
+    const fijoCat = Object.assign({}, fijoCatC[k] || {}); if(hMaq) Object.keys(fijoCatPool).forEach(ct => { fijoCat[ct] = (fijoCat[ct] || 0) + fijoCatPool[ct] * h / hMaq; });
+    clases.push({clase: k, nombre: NOM[k], fijoCat, h, hReal: horasProd[k].real, manual: horasProd[k].manual, directo, parte, total, variable, fijo, ...C.conv(total), horaProd: h ? total / h : null, horaFija: h ? fijo / h : null, maquinas: (P.flota || []).filter(f => claseFlota(f) === k && C.usoDe(f) === 'maquina' && f.estado !== 'vendida')});
   });
   if(porClase.desplazamiento) clases.push({clase: 'desplazamiento', nombre: NOM.desplazamiento, h: 0, directo: porClase.desplazamiento, parte: 0, total: porClase.desplazamiento, ...C.conv(porClase.desplazamiento), horaProd: null, maquinas: (P.flota || []).filter(f => C.usoDe(f) === 'empresa' && f.estado !== 'vendida')});
   // amortización (provisión): solo con precio de compra conocido
