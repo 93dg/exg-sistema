@@ -4686,11 +4686,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.31" defer></script>
-<script src="costes/norm.js?v=V11.31" defer></script>
-<script src="ajustes/calc.js?v=V11.31" defer></script>
+<script src="rentabilidad/rent.js?v=V11.32" defer></script>
+<script src="costes/norm.js?v=V11.32" defer></script>
+<script src="ajustes/calc.js?v=V11.32" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.31</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.32</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4842,7 +4842,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXCAVACIONES GÓMEZ</div>
-        <div class="sub" id="version-badge">V11.31</div>
+        <div class="sub" id="version-badge">V11.32</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9533,12 +9533,13 @@ function econ2Detalle(k, {sel, e}){   // V8.13: el detalle que se despliega al t
 // V8.46 (reporte de Daniel: «falta deuda»): lo que se debe — préstamos (lo que queda según su cuadro) y deudas apuntadas (Magarín, planta de escombros, Cano, Hacienda)
 let _e2Deuda = null;
 async function e2DeudaCargar(){
-  try{ const {data} = await sb.from('sistema').select('id, tipo, data').in('tipo', ['deuda', 'prestamo']);
+  try{ const {data} = await sb.from('sistema').select('id, tipo, data').eq('tipo', 'prestamo');   // V11.32 (reporte 98abf65f): las deudas a mano se acaban; lo que se debe sale de pagos_pendientes_vivos(), la misma lista que Control
     const hoyIso = new Date().toISOString().slice(0, 10), items = [];
     (data || []).forEach(r => { const d = r.data || {};
       if(r.tipo === 'prestamo'){ if(d.estado === 'cerrado') return; let saldo = Number(d.capital || 0); try{ const c = prCuadro(d), pag = c.filter(f => f.iso <= hoyIso); if(pag.length) saldo = pag[pag.length - 1].pendiente; }catch(e){}
         items.push({quien: d.entidad || 'Préstamo', que: (d.nombre || 'Préstamo') + ' · cuota ' + Number(d.cuota || 0).toLocaleString('es-ES', {minimumFractionDigits: 2}) + ' €/mes hasta ' + String(d.vencimiento || '').split('-').reverse().join('/'), imp: saldo}); }
-      else if(d.estado !== 'pagada') items.push({quien: d.acreedor, que: d.concepto, imp: d.importe == null ? null : Number(d.importe), aprox: !!d.aproximado}); });
+    });
+    try{ const {data: pv} = await sb.rpc('pagos_pendientes_vivos'); (pv || []).forEach(x => items.push({quien: x.acreedor, que: x.concepto, imp: x.queda == null ? null : Number(x.queda)})); }catch(e){}
     _e2Deuda = items.sort((a, b) => (b.imp || 0) - (a.imp || 0)); }catch(e){ _e2Deuda = []; }
   if(document.getElementById('econ2')?.offsetParent && _e2) econ2Pintar();
   try{ if(window.RENT && document.getElementById('econ-precios')?.offsetParent) RENT.pintarPrecios(document.getElementById('econ-precios')); }catch(e){}
@@ -13850,18 +13851,19 @@ function htmlAvisoItv(a){
 let _pp = [];
 async function ppCargar(){
   const box = document.getElementById('pp-lista'); if(!box || !sb) return;
-  const {data, error} = await sb.from('sistema').select('id, data, created_at').eq('tipo', 'pago_pendiente').order('created_at', {ascending: true});
+  const {data, error} = await sb.rpc('pagos_pendientes_vivos');   // V11.32 (reporte 98abf65f): calculado: apuntes a mano menos lo pagado en el banco + facturas sin pago enlazado; se quita solo al pagar
   if(error){ box.innerHTML = '<div class="s" style="color:var(--red);">No se pudo cargar</div>'; return; }
-  _pp = (data || []).filter(r => (r.data || {}).estado === 'pendiente').sort((a, b) => { const va = (a.data || {}).vence || '9999', vb = (b.data || {}).vence || '9999'; return va.localeCompare(vb); });
+  _pp = (data || []).map(x => ({id: x.id, origen: x.origen, data: {acreedor: x.acreedor, concepto: x.concepto, importe: x.queda, vence: x.vence, nota: x.nota, estado: 'pendiente'}})).sort((a, b) => { const va = (a.data || {}).vence || '9999', vb = (b.data || {}).vence || '9999'; return va.localeCompare(vb); });
   const tot = _pp.reduce((s, r) => s + Number((r.data || {}).importe || 0), 0), cnt = document.getElementById('pp-count');
   if(cnt){ cnt.style.display = _pp.length ? '' : 'none'; cnt.textContent = _pp.length; }
   const eur = n => Number(n).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €', hoy = new Date().toISOString().slice(0, 10);
   box.innerHTML = _pp.length ? _pp.map(r => { const d = r.data || {}, venc = d.vence && d.vence < hoy, f = d.vence ? new Date(d.vence + 'T12:00:00').toLocaleDateString('es-ES', {day: '2-digit', month: 'short'}) : '';
     return `<details class="alert-det rec-card t-pagos"><summary class="alert-sum"><div class="t"><span class="rec-tit">${escHtml(d.acreedor || '—')}${d.concepto ? ' · ' + escHtml(d.concepto) : ''}</span><span class="rec-fila"><span class="rec-est" style="--e:#A32D2D">${d.importe != null && d.importe !== '' ? escHtml(eur(d.importe)) : 'Sin importe'}</span>${f ? `<div class="rec-pil ${venc ? 'roja' : ''}">${venc ? 'vencido · ' : ''}${f}</div>` : ''}</span></div></summary>
-      <div class="alert-det-b">${d.nota ? `<div class="rec-largo">${escHtml(d.nota)}</div>` : ''}<div class="rec-acc"><button type="button" class="rec-b rec-b-pri" onclick="ppPagado('${r.id}')">Pagado</button><button type="button" class="rec-b" onclick="ppEditar('${r.id}')">Editar</button><button type="button" class="rec-b" onclick="ppQuitar('${r.id}')">Quitar</button></div></div></details>`; }).join('') + `<div class="s" style="margin:4px 2px 8px;font-weight:700;">Total pendiente: ${escHtml(eur(tot))}</div>` : '<div class="s" style="padding:6px 2px 10px;color:var(--ink-soft);">Nada pendiente de pagar</div>';
+      <div class="alert-det-b">${d.nota ? `<div class="rec-largo">${escHtml(d.nota)}</div>` : ''}${r.origen === 'factura' ? '' : `<div class="rec-acc"><button type="button" class="rec-b rec-b-pri" onclick="ppPagado('${r.id}')">Pagado</button><button type="button" class="rec-b" onclick="ppEditar('${r.id}')">Editar</button><button type="button" class="rec-b" onclick="ppQuitar('${r.id}')">Quitar</button></div>`}</div></details>`; }).join('') + `<div class="s" style="margin:4px 2px 8px;font-weight:700;">Total pendiente: ${escHtml(eur(tot))}</div>` : '<div class="s" style="padding:6px 2px 10px;color:var(--ink-soft);">Nada pendiente de pagar</div>';
 }
-function ppEditar(id){
-  const r = id ? _pp.find(x => String(x.id) === String(id)) : null, d = r ? (r.data || {}) : {};
+async function ppEditar(id){
+  const r = id ? _pp.find(x => String(x.id) === String(id)) : null; let d = {};
+  if(r){ const {data: fila} = await sb.from('sistema').select('data').eq('id', r.id).maybeSingle(); d = (fila && fila.data) || {}; }   // V11.32: se edita el apunte guardado (la lista enseña lo que queda, ya restado lo pagado)
   mostrarModalGenerico(r ? 'Editar pago' : 'Añadir pago', `<label class="rec-est-con">A quién<input id="pp-acr" type="text" value="${escHtml(d.acreedor || '')}"></label>
     <label class="rec-est-con">Por qué<input id="pp-con" type="text" value="${escHtml(d.concepto || '')}"></label>
     <label class="rec-est-con">Importe (€)<input id="pp-imp" type="text" inputmode="decimal" value="${d.importe != null ? escHtml(String(d.importe).replace('.', ',')) : ''}"></label>
@@ -13878,8 +13880,9 @@ function ppEditar(id){
     cerrarModalGenerico(); ppCargar(); mostrarToast('Guardado', 'ok'); };
 }
 async function ppCambiar(id, estado){
-  const r = _pp.find(x => String(x.id) === String(id)); if(!r) return;
-  const {error} = await sb.from('sistema').update({data: {...(r.data || {}), estado, [estado === 'pagado' ? 'pagado_en' : 'quitado_en']: new Date().toISOString().slice(0, 10)}}).eq('id', id);
+  const r = _pp.find(x => String(x.id) === String(id)); if(!r || r.origen === 'factura') return;
+  const {data: fila} = await sb.from('sistema').select('data').eq('id', id).maybeSingle();   // V11.32: se cambia el apunte guardado, no la copia calculada de la lista
+  const {error} = await sb.from('sistema').update({data: {...((fila && fila.data) || {}), estado, [estado === 'pagado' ? 'pagado_en' : 'quitado_en']: new Date().toISOString().slice(0, 10)}}).eq('id', id);
   if(error){ mostrarToast('No se pudo: ' + errText(error), 'err'); return; }
   ppCargar(); mostrarToast(estado === 'pagado' ? 'Pagado' : 'Quitado', 'ok');
 }
