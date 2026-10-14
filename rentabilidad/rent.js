@@ -691,8 +691,8 @@ R.perdidas = function(r, personas, margenH, carga){
    let dLab = 0, hPerd = 0, dFlojos = 0, dVacios = 0;
   for(let f = r.desde; f <= r.hasta; f = addDays(f, 1)){ const dow = new Date(f + 'T12:00:00').getDay(); if(dow === 0 || dow === 6) continue; dLab++; const h = r.hDia[f] || 0, p = Math.max(0, pot - h); hPerd += p; if(!h) dVacios++; else if(p > 0) dFlojos++; }
   carga = 0;   // V10.51 (Daniel): de 8 h de jornada, 1 h se reserva a mantenimiento/reparaciones/preparativos: las 7 h operativas ya la excluyen
-  const dTr = Object.keys(r.hDia).length; hPerd = Math.max(0, pot * dTr - r.H);   // V10.55 (Daniel): solo cuentan los días trabajados en esta obra; los demás días de su periodo pudieron ser de otra obra
-  return {pot, personas, carga, dLab, hPerd, dEq: pot > 0 ? hPerd / pot : 0, dFlojos, dVacios, dinero: isFinite(mH) ? hPerd * mH : NaN, margenH: mH};
+  const dTr = Object.keys(r.hDia).length, tope = R.param.diasTope || {}, dT = Object.keys(r.hDia).filter(f => tope[f]), hTope = sum(dT, f => r.hDia[f] || 0); hPerd = Math.max(0, pot * (dTr - dT.length) - (r.H - hTope));   // V11.72 (Daniel): los días con tope (inspección de trabajo) se trabajó lo máximo posible: no cuentan como desaprovechados   // V10.55 (Daniel): solo cuentan los días trabajados en esta obra; los demás días de su periodo pudieron ser de otra obra
+  return {pot, personas, carga, dLab, hPerd, diasTope: dT.length, dEq: pot > 0 ? hPerd / pot : 0, dFlojos, dVacios, dinero: isFinite(mH) ? hPerd * mH : NaN, margenH: mH};
 };
 R.opHtml = function(r, personas, margenH, socios, carga, quien){
   quien = quien || 'Rafa y Manolo';
@@ -713,7 +713,7 @@ R.datosReales = function(r, b){   // V10.51 (Daniel): datos reales sobre la hora
     + f('€/h operativas (ingreso ÷ horas)', r.H > 0 ? eur(r.ejecutado / r.H, 2) : '—', G)
     + f('€/día operativo (ingreso ÷ días trabajados)', dTr > 0 ? eur(r.ejecutado / dTr) : '—', G)
     + f('Duración ideal (' + h1(hO) + ' h/día × empleado)', isFinite(dEmp) ? h1(dEmp) + ' días' : '—', G)
-    + f('Días operativos desaprovechados', h1(x.dEq) + ' días', '#c58a1b') + f('Horas operativas desaprovechadas', h1(x.hPerd) + ' h', '#c58a1b') + f('Valor de las horas perdidas', isFinite(x.dinero) ? eur(x.dinero) : '—', '#c0392b', h1(x.hPerd) + ' h × ' + (isFinite(x.margenH) ? eur(x.margenH, 2) : '—') + '/h en otra obra') + f('H/día operativas desaprovechadas · ' + h1(x.pot) + ' − ' + (isFinite(media) ? h1(media) : '—'), isFinite(media) ? h1(Math.max(0, x.pot - media)) + ' h/día' : '—', '#c58a1b')
+    + f('Días operativos desaprovechados', h1(x.dEq) + ' días', '#c58a1b') + f('Horas operativas desaprovechadas', h1(x.hPerd) + ' h', '#c58a1b', x.diasTope ? 'Sin ' + x.diasTope + (x.diasTope === 1 ? ' día' : ' días') + ' de inspección de trabajo (no se podía más)' : '') + f('Valor de las horas perdidas', isFinite(x.dinero) ? eur(x.dinero) : '—', '#c0392b', h1(x.hPerd) + ' h × ' + (isFinite(x.margenH) ? eur(x.margenH, 2) : '—') + '/h en otra obra') + f('H/día operativas desaprovechadas · ' + h1(x.pot) + ' − ' + (isFinite(media) ? h1(media) : '—'), isFinite(media) ? h1(Math.max(0, x.pot - media)) + ' h/día' : '—', '#c58a1b')
     + f('Empleados', h1(x.personas))
     + R.salariosReales(r)
     + f('Maquinaria usada', mq.length)
