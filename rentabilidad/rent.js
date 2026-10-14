@@ -606,7 +606,7 @@ R.vistaObra = function(r, P, b){
   const avisos = (r.avisos.length ? '<div class="rt-an">' + r.avisos.map(a => '• ' + esc(a)).join('<br>') + '</div>' : '') + R.sinHorasAviso(r);
   const detalle = det('Ver detalle', avisos + detNiv + R.secDirecto(r) + R.secReal(r) + R.secOport(r) + R.secComp(r, P, b));
   const opObra = '<div class="rt-c"><h3>Coste de oportunidad</h3>' + R.opHtml(r, 2, b.margenH, r.socios.valor, (() => { const hh = R.horasSocios(R.baseObra(r, b)); return hh.rep + hh.ges; })()) + '</div>';
-  return R.datosReales(r, b) + niveles + detalle;   // V10.49 (Daniel): sin los tres cuadros de arriba; los ingresos van dentro de Beneficio bruto   // V10.47 (Daniel): sin tarjeta «Por máquina €/h» (no se usa); el coste de oportunidad va junto a Organización
+  return R.datosReales(r, b) + niveles + R.htmlPrecios(R.preciosDe(r), true) + R.htmlComparar(r, P) + detalle;   // V11.62 (Daniel 14/10): ¿Estamos en precio? (la misma tarjeta que Economía) y ¿Cómo de rentable es?   // V10.49 (Daniel): sin los tres cuadros de arriba; los ingresos van dentro de Beneficio bruto   // V10.47 (Daniel): sin tarjeta «Por máquina €/h» (no se usa); el coste de oportunidad va junto a Organización
 };
 
 R.escHtml2 = (b, lista) => {
@@ -725,6 +725,7 @@ R.simHtml = function(P, b){
 };
 R.hipHtml = P => { const prm = R.param, inp = (k, l, u) => '<label style="font-size:11.5px;display:flex;flex-direction:column;gap:2px;">' + l + '<input type="number" value="' + prm[k] + '" onchange="RENT.setParam(\'' + k + '\',this.value)" style="width:90px;"><span' + (/^(d|h|kg|km)\b/.test(u || '') ? ' class="no-cap"' : '') + ' style="color:var(--ink-soft);">' + (u || '') + '</span></label>';
   return '<div style="font-weight:800;font-size:13px;margin:8px 0 4px;">Hipótesis</div><div style="display:flex;flex-wrap:wrap;gap:10px;">' + inp('jornadas', 'Jornadas al año', 'd') + inp('horasDia', 'Horas operativas al día', 'h (el resto hasta 8 h es reserva)') + inp('indisponibilidad', 'Averías / paradas', '% de tiempo') + inp('reduccionAverias', 'Reducción con mecánico', '% de las averías') + inp('ahorroTaller', 'Ahorro en taller con mecánico', '%') + inp('condMecPct', 'Conductor/mecánico conduce', '% del tiempo') + inp('repSemana', 'Rafa y Manolo reparan', 'h/semana entre los dos') + inp('gesSemana', 'Rafa y Manolo gestionan', 'h/semana entre los dos') + inp('impuesto', 'Impuestos', '% sobre beneficio') + inp('vidaUtil', 'Vida útil maquinaria', 'años') + inp('residualPct', 'Valor residual', '%') + '</div>'
+  + '<div style="font-weight:800;font-size:13px;margin:10px 0 4px;">Valor de venta hoy de cada máquina</div><div style="display:flex;flex-wrap:wrap;gap:10px;">' + R.MAQ_VALOR(P).map(f => '<label style="font-size:11.5px;display:flex;flex-direction:column;gap:2px;">' + esc(f.nombre) + '<input type="number" value="' + (num(prm['vv_' + f.id]) || '') + '" onchange="RENT.setParam(\'vv_' + f.id + '\',this.value)" style="width:90px;"><span style="color:var(--ink-soft);">€</span></label>').join('') + '</div>'
   + '<div style="font-weight:800;font-size:13px;margin:10px 0 4px;">Obra de referencia (precio por hora)</div><select class="rt-sel" onchange="RENT.setRef(this.value)" style="font-size:12.5px;max-width:100%;"><option value="">Automática: nave avícola</option>' + (P.jobs || []).filter(j => (R.asignar(P).porJob[j.id] || []).length).map(j => '<option value="' + j.id + '"' + (R.param.refJob === j.id ? ' selected' : '') + '>' + esc(j.trabajo || j.id) + '</option>').join('') + '</select>'; };
 
 R.vista = function(P){
@@ -761,22 +762,50 @@ R.repinta = () => { if(R.el && R.P) R.el.innerHTML = R.vista(R.P); };
 R.setTab = n => { R.tab = n; R.repinta(); R.snapshot(); };
 R.setSel = id => { R.sel = id; R.repinta(); R.snapshot(); };
 
-// ---------- Economía: ¿estamos en precio? (precio actual por hora frente al mínimo que sale de los gastos; se recalcula con los gastos de los últimos 12 meses) ----------
-R.tablaPrecios = function(P){
-  const ref = R.referencia(P); if(!ref || !P.costes) return null;
-  const r = R.calcular(ref.job, P, R.asignar(P)); if(r.vacio || !r.H || !r.niv || !isFinite(r.niv.minImp)) return null;
-  const cl = Object.keys(r.hClase).filter(c => r.hClase[c] > 0 && ref.cls[c] && P.costes.clases.find(x => x.clase === c && x.horaFija != null));
-  const fija = c => P.costes.clases.find(x => x.clase === c).horaFija, avgF = sum(cl, c => fija(c) * r.hClase[c]) / sum(cl, c => r.hClase[c]);
-  const filas = cl.map(c => { const tarifa = ref.cls[c].tarifa, min = r.niv.minImp + (fija(c) - avgF); return {clase: c, nombre: R.NOMBRE_CLASE[c] || c, horas: r.hClase[c], tarifa, min, dif: tarifa - min}; });
-  return {filas, obra: ref.job.trabajo, minMedio: r.niv.minImp, tarifaMedia: r.niv.tarifa, impuesto: R.param.impuesto, horas: r.H};
+// ---------- ¿Estamos en precio? (V11.62, Daniel 14/10/2026): la MISMA tarjeta en Economía y en Ren. obras, con el reparto por máquina de R.porClase ----------
+// Por máquina: lo que se cobra por hora frente a su coste completo, el mínimo (coste completo + impuestos) y el precio objetivo (mínimo + el margen limpio del marcador).
+R.preciosDe = function(r){
+  if(!r || r.vacio || !(r.H > 0)) return null; const cl = R.porClase(r); if(!cl) return null;
+  const t = num(R.param.impuesto) / 100;
+  const filas = cl.filter(x => x.h > 0 && isFinite(x.tarifa) && x.clase !== 'otros').map(x => ({clase: x.clase, nombre: x.nombre, horas: x.h, tarifa: x.tarifa, coste: x.n3 / x.h, min: R.objetivo(x.n3 - r.socios.valor * x.h / r.H, r.socios.valor * x.h / r.H, t, 0) / x.h, obj: x.n4 / x.h}));
+  if(!filas.length) return null;
+  const nv = R.niveles4(r), tm = r.ejecutado / r.H;
+  return {filas, obra: r.job.trabajo, horas: r.H, tarifaMedia: tm, minMedio: R.objetivo(r.directo + r.indirecto, r.socios.valor, t, 0) / r.H, objMedio: nv.n4 / r.H, impuesto: R.param.impuesto, margen: R.param.margen};
 };
-R.htmlPrecios = T => {
-  if(!T) return '<div class="panel" style="padding:12px;margin-top:12px;font-size:12.5px;color:var(--ink-soft);">¿Estamos en precio? Aún no hay una obra con horas completas para calcularlo.</div>';
-  const f = T.filas, ok = f.filter(x => x.dif >= 0).length;
-  // V11.30 (Daniel, reporte 00aea0c7 «Diseño»): sin tabla en el móvil (la columna del mínimo se salía): una línea por máquina, precio a la derecha con la diferencia en su color y el mínimo debajo del nombre
-  const rows = f.map(x => '<div class="rt-sim-r"><span style="flex:1;min-width:0;font-weight:700;">' + esc(x.nombre) + '<small style="display:block;color:var(--ink-soft);font-size:10.5px;font-weight:400;white-space:nowrap;">mínimo ' + eur(x.min, 2) + '/h</small></span><span style="text-align:right;white-space:nowrap;"><b>' + eur(x.tarifa, 2) + '/h</b><small style="display:block;font-size:10.5px;font-weight:700;color:' + col(x.dif) + ';">' + (x.dif >= 0 ? '+' : '') + eur(x.dif, 2) + '</small></span></div>').join('');
-  return '<div class="panel" style="padding:12px;margin-top:12px;"><div style="font-weight:800;font-size:14px;">¿Estamos en precio?</div><div style="font-size:12px;color:var(--ink-soft);margin:2px 0 8px;">' + ok + ' de ' + f.length + ' máquinas cubren su coste. En conjunto cobráis <span style="white-space:nowrap;">' + eur(T.tarifaMedia, 2) + '/h</span> y el mínimo medio es <span style="white-space:nowrap;">' + eur(T.minMedio, 2) + '/h.</span></div><div>' + rows + '</div>'
-    + '<div style="font-size:11px;color:var(--ink-soft);margin-top:8px;">El mínimo es el coste completo por hora (combustible, averías, seguros, impuestos, autónomos, gestoría, estructura y la retribución de Rafa y Manolo) más los impuestos estimados (' + T.impuesto + ' %). Se recalcula solo con los gastos de los últimos 12 meses. Precio actual y horas: obra de referencia «' + esc(T.obra) + '» (' + h1(T.horas) + ' h). Aún no incluye la reposición de las máquinas.</div></div>';
+R.tablaPrecios = function(P){ const ref = R.referencia(P); if(!ref || !P.costes) return null; return R.preciosDe(R.calcular(ref.job, P, R.asignar(P))); };
+R.htmlPrecios = (T, enObra) => {
+  const caja = h => enObra ? '<div class="rt-c">' + h + '</div>' : '<div class="panel" style="padding:12px;margin-top:12px;">' + h + '</div>';
+  if(!T) return caja('<div style="font-size:12.5px;color:var(--ink-soft);">¿Estamos en precio? Aún no hay una obra con horas completas para calcularlo.</div>');
+  const f = T.filas, okO = f.filter(x => x.tarifa >= x.obj).length, okM = f.filter(x => x.tarifa >= x.min).length, r2 = v => eur(v, 2) + '/h';
+  const sr = (a, b2, c) => '<div class="rt-sim-r"><span>' + a + '</span><b' + (c ? ' style="color:' + c + ';"' : '') + '>' + b2 + '</b></div>';
+  // V11.30 (reporte 00aea0c7): una línea por máquina, sin tabla; V11.62: se toca y despliega ahí mismo su cuenta; la diferencia es con el precio objetivo, en verde o rojo por su signo
+  const rows = f.map(x => { const dO = x.tarifa - x.obj, dM = x.tarifa - x.min, est = dO >= 0 ? 'En precio' : dM >= 0 ? 'Cubre costes, no llega al objetivo' : 'No cubre costes';
+    return '<details class="rt-nd"><summary><div class="rt-sim-r"><span style="flex:1;min-width:0;font-weight:700;">' + esc(x.nombre) + '<small style="display:block;color:var(--ink-soft);font-size:10.5px;font-weight:400;">' + est + ' · objetivo ' + r2(x.obj) + '</small></span><span style="text-align:right;white-space:nowrap;"><b>' + r2(x.tarifa) + '</b><small style="display:block;font-size:10.5px;font-weight:700;color:' + col(dO) + ';">' + (dO >= 0 ? '+' : '') + eur(dO, 2) + '</small></span></div></summary><div class="rt-bd">'
+      + sr('Cobráis', r2(x.tarifa)) + sr('Coste completo', r2(x.coste), RJ) + sr('Mínimo (coste + impuestos)', r2(x.min), RJ) + sr('Precio objetivo (' + T.margen + ' % limpio)', r2(x.obj)) + sr('Diferencia con el mínimo', (dM >= 0 ? '+' : '') + eur(dM, 2), col(dM)) + sr('Diferencia con el objetivo', (dO >= 0 ? '+' : '') + eur(dO, 2), col(dO)) + sr('Horas en la obra', h1(x.horas) + ' h') + '</div></details>'; }).join('');
+  return caja('<div style="font-weight:800;font-size:14px;">¿Estamos en precio?</div><div style="font-size:12px;color:var(--ink-soft);margin:2px 0 8px;">' + okO + ' de ' + f.length + ' máquinas llega' + (okO === 1 ? '' : 'n') + ' al objetivo y ' + okM + ' cubre' + (okM === 1 ? '' : 'n') + ' su coste. En conjunto cobráis <span style="white-space:nowrap;">' + r2(T.tarifaMedia) + '</span>, el mínimo es <span style="white-space:nowrap;">' + r2(T.minMedio) + '</span> y el objetivo <span style="white-space:nowrap;">' + r2(T.objMedio) + '.</span></div><div>' + rows + '</div>'
+    + '<div style="font-size:11px;color:var(--ink-soft);margin-top:8px;">Obra «' + esc(T.obra) + '» (' + h1(T.horas) + ' h). Mínimo: coste completo más impuestos (' + T.impuesto + ' %). Objetivo: un ' + T.margen + ' % limpio, el del marcador. Sin la reposición de las máquinas.</div>');
+};
+// ---------- ¿Cómo de rentable es? (V11.62, Daniel 14/10/2026): margen neto, si el objetivo es razonable y rentabilidad sobre lo invertido, con referencias para comparar con otros negocios ----------
+R.REF_RENT = {letras: 2.7, empresas: 6.7, construccionROE: 3.1};   // Letras del Tesoro 12 meses (subastas 2026) · rentabilidad del activo de las empresas españolas (Banco de España, 2024) · rentabilidad de los fondos propios en construcción (BBVA Research, 2023)
+R.MAQ_VALOR = P => (P.flota || []).filter(f => ['activo', 'averiada', 'averia'].includes(f.estado) && !/todoterreno|turismo|coche/i.test(f.clase || ''));
+R.htmlComparar = function(r, P){
+  if(!r || r.vacio || !(r.ejecutado > 0)) return '';
+  const m = num(R.param.margen), mg = r.neto / r.ejecutado * 100, dT = Object.keys(r.hDia || {}).length, jA = num(R.param.jornadas) || 250;
+  const p1 = v => (Math.round(v * 10) / 10).toLocaleString('es-ES', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' %';
+  const sr = (a, b2, c) => '<div class="rt-sim-r"><span>' + a + '</span><b' + (c ? ' style="color:' + c + ';"' : '') + '>' + b2 + '</b></div>', tx = t => '<div class="rt-ldx">' + t + '</div>';
+  const lin = (tit, sub, v, c, bd) => '<details class="rt-nd"><summary><div class="rt-sim-r"><span style="flex:1;min-width:0;font-weight:700;">' + tit + '<small style="display:block;color:var(--ink-soft);font-size:10.5px;font-weight:400;">' + sub + '</small></span><b style="white-space:nowrap;' + (c ? 'color:' + c + ';' : '') + '">' + v + '</b></div></summary><div class="rt-bd">' + bd + '</div></details>';
+  const vObj = m < 5 ? 'Bajo: deja poco para imprevistos y para reponer máquinas' : m < 8 ? 'Normal en construcción' : m <= 12 ? 'Bueno y razonable para una empresa pequeña con máquinas propias' : m <= 15 ? 'Alto: hay que cobrar por encima de la media' : 'Muy alto: difícil de cobrar salvo trabajos especiales';
+  const l1 = lin('Margen neto de esta obra', 'Lo que queda limpio de cada 100 € facturados', p1(mg), col(mg), sr('Trabajo hecho', eur(r.ejecutado)) + sr('Limpio tras todos los costes e impuestos', eur(r.neto), col(r.neto)) + sr('Margen neto', p1(mg), col(mg)) + sr('Construcción en España (orientativo)', 'entre 3 y 5 %') + sr('Vuestro objetivo', p1(m)) + tx('Ya cuenta como coste la retribución de Rafa y Manolo: es lo que queda después de pagaros.'));
+  const l2 = lin('Objetivo del marcador', vObj, p1(m), null, sr('Menos del 5 %', 'bajo') + sr('Del 5 al 8 %', 'normal del sector') + sr('Del 8 al 12 %', 'bueno (recomendado)') + sr('Más del 12 %', 'alto') + tx('Recomendado entre el 8 y el 12 %. Mientras no se cuente la reposición de las máquinas, mejor no bajar del 10 %: ese hueco sale del margen.'));
+  const ms = R.MAQ_VALOR(P), usadas = ms.filter(f => (r.maq || []).some(x => String(x.id) === String(f.id))), val = f => num(R.param['vv_' + f.id]), falta = usadas.filter(f => !(val(f) > 0)), cap = sum(usadas, val);
+  const anual = dT ? r.neto / dT * jA : NaN, roa = cap > 0 && !falta.length ? anual / cap * 100 : NaN, RF = R.REF_RENT;
+  const vRoa = !isFinite(roa) ? 'Falta el valor de las máquinas (Hipótesis)' : roa >= RF.empresas ? 'Renta más que la media de las empresas españolas' : roa >= RF.letras ? 'Renta más que las Letras del Tesoro, menos que la media' : 'Renta menos que tener el dinero en Letras del Tesoro';
+  const l3 = lin('Rentabilidad sobre lo invertido', vRoa, isFinite(roa) ? p1(roa) + ' al año' : 'sin dato', isFinite(roa) ? col(roa) : null,
+    sr('Limpio de la obra', eur(r.neto), col(r.neto)) + sr('Días con trabajo', h1(dT) + ' d') + sr('Limpio al año a este ritmo (' + jA + ' jornadas)', isFinite(anual) ? eur(anual) : '—', col(anual))
+    + usadas.map(f => sr(esc(f.nombre) + ' (valor de venta hoy)', val(f) > 0 ? eur(val(f)) : 'falta')).join('') + sr('Total invertido', cap > 0 ? eur(cap) : 'falta')
+    + sr('Letras del Tesoro a 12 meses (2026)', p1(RF.letras)) + sr('Media de las empresas españolas (Banco de España, 2024)', p1(RF.empresas)) + sr('Construcción en España, sobre fondos propios (2023)', p1(RF.construccionROE))
+    + tx('Es la cifra que se usa para comparar negocios: cuánto deja al año cada 100 € metidos en él. Se cuenta lo que os darían hoy por las máquinas vendiéndolas, porque es el dinero que tenéis metido.' + (falta.length ? ' Falta el valor de ' + falta.map(f => esc(f.nombre)).join(', ') + ': ponlo en Hipótesis.' : '')));
+  return '<div class="rt-c"><h3>¿Cómo de rentable es?</h3>' + l1 + l2 + l3 + '</div>';
 };
 R.pintarPrecios = async function(el){ if(!el) return; try{ const P = await R.cargar(false); el.innerHTML = R.htmlPrecios(R.tablaPrecios(P)); }catch(e){ console.error(e); el.innerHTML = ''; } };
 R.recargar = async () => { R.invalidar(); if(R.el) await R.pintar(R.el, true); };
