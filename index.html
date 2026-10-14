@@ -4797,11 +4797,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.74" defer></script>
-<script src="costes/norm.js?v=V11.74" defer></script>
-<script src="ajustes/calc.js?v=V11.74" defer></script>
+<script src="rentabilidad/rent.js?v=V11.75" defer></script>
+<script src="costes/norm.js?v=V11.75" defer></script>
+<script src="ajustes/calc.js?v=V11.75" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.74</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.75</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4953,7 +4953,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.74</div>
+        <div class="sub" id="version-badge">V11.75</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6212,6 +6212,10 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
         <div class="panel">
           <div class="panel-head"><h3>Otros gastos de la gasolinera</h3></div>
           <div class="panel-body" id="gpro-comb-otros" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Proveedores</h3></div>
+          <div class="panel-body" id="gpro-comb-prov" style="padding:4px 14px 8px;"></div>
         </div>
         <div class="two-col-note">Importes con IVA, tal y como vienen en las facturas. Es solo control interno: al gestor se le manda únicamente la factura.</div>
       </div>
@@ -11383,7 +11387,21 @@ function renderGastosProControl(){
   const sinLineas = docs.filter(d => !(Array.isArray(d.conceptos) && d.conceptos.some(c => Number(c.importe) > 0))).length;
   $('gpro-ctl-aviso').textContent = 'Incluye Oficial y En B, con IVA. Toca una fila para ver el detalle.' + (sinLineas ? ` ${sinLineas} gasto(s) no tienen líneas: cuentan con su categoría y como "Sin detalle".` : '');
 }
+// ===== V11.75 (Daniel 14/10/2026): proveedores de combustible con lo que les escribimos y lo que contestaron (sistema tipo=proveedor_combustible), para poder comparar o cambiar en el futuro =====
+let _combProv = null, _combProvAb = null;
+async function combProvCargar(){ try{ const {data} = await sb.from('sistema').select('id,data').eq('tipo', 'proveedor_combustible'); _combProv = (data || []).map(r => ({id: r.id, ...(r.data || {})})); }catch(e){ _combProv = []; } combProvPintar(); }
+function combProvPintar(){
+  const el = document.getElementById('gpro-comb-prov'); if(!el) return; if(!_combProv){ el.innerHTML = '<div class="empty" style="padding:8px;">Cargando…</div>'; combProvCargar(); return; }
+  const fF = f => { const d = String(f || ''); return d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(2, 4) + (d.length > 10 ? ' ' + d.slice(11, 16) : '') : ''; };
+  const lista = _combProv.slice().sort((a, b) => { const ua = (a.historial || []).slice(-1)[0], ub = (b.historial || []).slice(-1)[0]; return String((ub || {}).fecha || '').localeCompare(String((ua || {}).fecha || '')); });
+  el.innerHTML = lista.length ? lista.map(p => { const h = p.historial || [], resp = h.filter(x => x.quien === 'ellos').length, ult = h.slice(-1)[0], ab = _combProvAb === p.id;
+    return `<div class="gp-pers${ab ? ' abierta' : ''}" data-cprov="${escHtml(p.id)}"><div class="gp-pers-c"><span>${escHtml(p.nombre || '')}<small>${escHtml(p.producto || 'Gasóleo A')}${ult ? ' · ' + fF(ult.fecha) : ''}</small></span><b style="color:${resp ? 'var(--green)' : 'var(--ink-soft)'};">${resp ? (resp === 1 ? '1 respuesta' : resp + ' respuestas') : 'Sin respuesta'}</b></div>`
+      + (ab ? `<div class="gp-pers-l">${[['Correo', p.correo], ['Teléfono', p.telefono], ['Zona', p.zona]].filter(x => x[1]).map(([a, v]) => `<div class="gp-pers-f"><span>${a}</span><b class="no-cap">${escHtml(v)}</b></div>`).join('')}`
+        + h.map(x => `<div class="gp-pers-f"><span>${x.quien === 'ellos' ? 'Ellos' : 'Nosotros'}<small>${escHtml(fF(x.fecha))}</small><small style="color:var(--ink);font-size:12px;">${escHtml(x.texto || '')}</small></span></div>`).join('') + `</div>` : '') + `</div>`; }).join('') : '<div class="empty" style="padding:8px;">Aún no hay proveedores.</div>';
+  if(!el.dataset.listo){ el.dataset.listo = '1'; el.addEventListener('click', ev => { const r = ev.target.closest('[data-cprov]'); if(!r || ev.target.closest('.gp-pers-l')) return; _combProvAb = _combProvAb === r.dataset.cprov ? null : r.dataset.cprov; combProvPintar(); }); }
+}
 function renderGastosProCombustible(){
+  try{ combProvPintar(); }catch(e){ console.error('Proveedores de combustible', e); }
   const vista = document.getElementById('gpro-comb');
   if(!vista) return;
   const $ = id => document.getElementById(id);
