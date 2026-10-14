@@ -4029,6 +4029,17 @@ svg.ic{width:1.25em;height:1.25em;flex:0 0 auto;display:inline-block;vertical-al
   .sidebar{padding-bottom:10px !important;}
   body:has(#app.mobile-nav-open) #asistente-ia-fab, body:has(#app.mobile-nav-open) #busq-fab, body:has(#app.mobile-nav-open) #report-bug-btn, body:has(#app.mobile-nav-open) #global-add-fab{visibility:hidden !important;}   /* con el menú abierto no se monta nada encima */
 }
+
+/* V11.88: Trabajos dentro de su tarjeta blanca, como Documentos */
+.tb-panel{padding:10px 8px 6px;margin-bottom:12px;}
+.tb-panel #tb-barra{gap:6px;}
+.tb-panel #tb-seg.tb-seg{gap:4px;}
+.tb-panel #tb-seg.tb-seg > button{padding:10px 5px !important;font-size:12.5px !important;}
+.tb-panel #tb-seg.tb-seg > button[data-v="historial"]{padding:10px 6px !important;}
+.tb-panel .tb-vista-barra{flex:none;width:28px !important;padding:0 !important;}
+.tb-panel .tb-ayuda{margin-left:4px;margin-right:4px;}
+.tb-panel .tb-card{margin-left:0 !important;}
+.tb-panel .tb-doc .factura-card-movil{margin-left:0 !important;margin-right:0 !important;}
 </style>
 <style>
 /* required styles */
@@ -4827,11 +4838,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.87" defer></script>
-<script src="costes/norm.js?v=V11.87" defer></script>
-<script src="ajustes/calc.js?v=V11.87" defer></script>
+<script src="rentabilidad/rent.js?v=V11.88" defer></script>
+<script src="costes/norm.js?v=V11.88" defer></script>
+<script src="ajustes/calc.js?v=V11.88" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.87</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.88</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4983,7 +4994,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.87</div>
+        <div class="sub" id="version-badge">V11.88</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -6550,6 +6561,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
         <div class="tb-cont" id="tb-cont"></div>
         <button type="button" class="btn primary tb-mas" onclick="tbAbrirEditor()">+ Trabajo</button>
       </div>
+      <div class="panel tb-panel" id="tb-panel">   <!-- V11.88: la lista de Trabajos va dentro de su tarjeta blanca, como Documentos y Control (guía: nunca suelta sobre el gris) -->
       <div class="tb-barra" id="tb-barra">
         <div class="tb-seg tb-seg4" id="tb-seg"><button type="button" data-v="activos" class="active">Pendientes <b id="tb-n-act">0</b></button><button type="button" data-v="enmarcha">Activos <b id="tb-n-mar">0</b></button><button type="button" data-v="tramites">Trámites <b id="tb-n-tra">0</b></button><button type="button" data-v="historial" aria-label="Historial" title="Historial"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-4px;"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg> <b id="tb-n-his">0</b></button></div>
       </div>
@@ -6558,6 +6570,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
       <div class="tb-filtros2" id="tb-filtros2" style="display:none;"></div>
       <div class="tb-ayuda" id="tb-ayuda">Mantén pulsado un trabajo y arrástralo para cambiarlo de sitio.</div>
       <div id="tb-lista"></div>
+      </div>
       <div class="tb-fondo" id="tb-fondo" style="display:none;"><div class="tb-hoja" id="tb-hoja"></div></div>
     </div>
 
@@ -24806,9 +24819,11 @@ function tbRenderFiltros(todos, idCont){
   // ARRIBA: todas las cabeceras, siempre en su columna y sin moverse; la abierta se marca. ABAJO: cada filtro abierto repite su cabecera a la izquierda de sus opciones. Tocar cualquiera de las dos lo abre o lo pliega.
   // V11.85 (reporte 0709cc2a): si la lista enseña tarjetas de documento, al final de la fila de filtros va el MISMO botón de vista plegada de Documentos
   const bVista = window._tbConDocs ? `<button type="button" class="cli-icon-btn doc-vista-btn${window._docCompacto ? ' doc-cli-on' : ''}" title="Vista plegada o desplegada" aria-label="Vista plegada o desplegada" onclick="docsVistaPlegada()" style="justify-self:end;">${ICO_VISTA_PLEGADA}</button>` : '';
-  const cols = !visibles.length && bVista ? `<div class="tb-fcols" style="grid-template-columns:1fr auto;"><span></span>${bVista}</div>` : visibles.length ? `<div class="tb-fcols" style="grid-template-columns:${bVista ? `repeat(${visibles.length}, auto) 30px;justify-content:space-between` : `repeat(${visibles.length}, minmax(0, 1fr))`};"${bVista ? ' data-convista="1"' : ''}>${visibles.map((g, i) => { const ab = abiertos.includes(g); return `<button type="button" class="tb-ftit tb-plegado ${_tbFil[g].length ? 'con' : ''} ${ab ? 'abierto' : ''}" data-t="${g}" style="grid-column:${i + 1};" title="${ab ? 'Plegar' : 'Desplegar'} ${escHtml(TB_TIT_FILTRO[g])}">${escHtml(TB_TIT_FILTRO[g])}${_tbFil[g].length ? ` <b>${_tbFil[g].length}</b>` : ''}</button>`; }).join('')}${bVista}</div>` : '';
+  const cols = visibles.length ? `<div class="tb-fcols" style="grid-template-columns:${bVista ? `repeat(${visibles.length}, auto) 30px;justify-content:space-between` : `repeat(${visibles.length}, minmax(0, 1fr))`};"${bVista ? ' data-convista="1"' : ''}>${visibles.map((g, i) => { const ab = abiertos.includes(g); return `<button type="button" class="tb-ftit tb-plegado ${_tbFil[g].length ? 'con' : ''} ${ab ? 'abierto' : ''}" data-t="${g}" style="grid-column:${i + 1};" title="${ab ? 'Plegar' : 'Desplegar'} ${escHtml(TB_TIT_FILTRO[g])}">${escHtml(TB_TIT_FILTRO[g])}${_tbFil[g].length ? ` <b>${_tbFil[g].length}</b>` : ''}</button>`; }).join('')}${bVista}</div>` : '';
   const filas = abiertos.map(g => `<div class="tb-frow"><button type="button" class="tb-ftit" data-t="${g}" title="Plegar ${escHtml(TB_TIT_FILTRO[g])}">${escHtml(TB_TIT_FILTRO[g])}</button><div>${ops[g].map(o => `<button type="button" class="tb-fchip ${_tbFil[g].includes(o.v) ? 'active' : o.n ? '' : 'cero'}" data-g="${g}" data-v="${escHtml(o.v)}">${escHtml(g === 'maquina' ? TB_MAQ_NOM[o.v] : o.v)} <b>${o.n}</b></button>`).join('')}</div></div>`).join('');
   const quitar = tbHayFiltros() ? '<div class="tb-frow"><span></span><div><button type="button" class="tb-fchip tb-quitar" data-g="todos">Quitar filtros</button></div></div>' : '';
+  // V11.88 (Daniel): sin filtros no queda una fila vacía solo con el botón de vista: va en la fila de las pestañas, al final
+  window._tbVistaSuelta = !visibles.length && bVista && (idCont || 'tb-filtros2') === 'tb-filtros2' ? bVista : '';   // V11.88: sin filtros, el botón va al final de la línea de ayuda (sin fila vacía y sin apretar las pestañas)
   const html = cols + filas + quitar, abrio = _tbAnimar; _tbAnimar = null;
   cont.innerHTML = html; cont.style.display = html ? '' : 'none';
   // solo se anima lo que aparece (las opciones del filtro recién abierto); ninguna cabecera se mueve
@@ -25069,6 +25084,7 @@ function tbRender(){
   const ayuda = document.getElementById('tb-ayuda');
   ayuda.style.display = _tbVista === 'historial' ? 'none' : '';
   ayuda.textContent = tbHayFiltros() ? 'Con filtros puestos no se pueden mover los trabajos. Quita los filtros para reordenarlos.' : _tbFiltro !== 'todos' ? 'Filtrando por ' + _tbFiltro + '. Toca el contador otra vez para ver todos y poder mover trabajos.' : _tbVista === 'tramites' ? 'Trabajos terminados a los que les falta el albarán, la factura o el cobro.' : _tbVista === 'enmarcha' ? 'Trabajos que ya están en marcha. Mantén pulsado uno y arrástralo para cambiarlo de sitio.' : 'Ordenados por su día en el calendario. Si arrastras uno, se mueve también en el calendario.';
+  ayuda.style.display = _tbVista === 'historial' ? 'none' : ''; if(window._tbVistaSuelta){ ayuda.innerHTML = `<span>${ayuda.innerHTML}</span>` + window._tbVistaSuelta; ayuda.style.display = 'flex'; ayuda.style.alignItems = 'center'; ayuda.style.gap = '8px'; ayuda.style.justifyContent = 'space-between'; } else { ayuda.style.display = _tbVista === 'historial' ? 'none' : ''; }
   const carta = (j, esHis) => { if(!esHis && (_tbVista === 'tramites' || _tbVista === 'enmarcha')){ const d = tbDocDe(j);   // V11.79: también en Activos (albarán en «Trabajo activo»)
  if(d){ const h = tbDocCartaHtml(j, d); if(h) return h; } } return tbCartaHtml(j, esHis); };
   if(_tbVista === 'historial'){ tbRenderComputo(filtrados); lista.innerHTML = filtrados.length ? filtrados.map(j => carta(j, true)).join('') : '<div class="empty" style="padding:24px;">' + (his.length ? 'Ningún trabajo cumple los filtros.' : 'Aún no hay trabajos cobrados.') + '</div>'; return; }
