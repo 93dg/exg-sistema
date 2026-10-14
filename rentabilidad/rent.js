@@ -46,13 +46,14 @@ R.cargar = async function(forzar){
     pag('polizas_seguro', 'flota_id,coste_anual,activa'),
     pag('rent_vinculos', '*'),
     pag('rent_imputaciones', '*', b => b.eq('activo', true)),
-    pag('sistema', 'id,tipo,data', b => b.in('tipo', ['trabajo_cola', 'coste_hora', 'rent_parametros', 'rent_escenarios', 'costes_config'])),
+    pag('sistema', 'id,tipo,data', b => b.in('tipo', ['trabajo_cola', 'coste_hora', 'rent_parametros', 'rent_escenarios', 'costes_config', 'valoracion_flota'])),
     pag('entidades', 'id,nombre,tipo', b => b.is('deleted_at', null))
   ]);
   P.docs = docs; P.gastos = gastos; P.flota = flota; P.polizas = polizas.filter(p => p.activa !== false); P.vinculos = vinc; P.imput = imp; P.entidades = tarifas;
   P.jobs = sis.filter(r => r.tipo === 'trabajo_cola' && r.data).map(r => ({id: r.id, ...r.data}));
   const ch = sis.find(r => r.tipo === 'coste_hora'); P.ayudantes = (ch && ch.data && ch.data.ayudantes) || {};
   const pa = sis.find(r => r.tipo === 'rent_parametros'); P.paramId = pa ? pa.id : null; R.param = {...PARAM0, ...((pa && pa.data) || {})};
+  const vf = sis.find(r => r.tipo === 'valoracion_flota' && r.data && r.data.clave === 'flota:valoracion'); P.valFlota = {}; ((vf && vf.data.items) || []).forEach(x => { if(x.maquina && x.estimado) P.valFlota[String(x.flota_id)] = x; });   // V11.63: el valor de venta de cada máquina es el de Valor flota (Economía)
   const es = sis.find(r => r.tipo === 'rent_escenarios'); P.escId = es ? es.id : null; P.escenarios = (es && es.data && es.data.lista) || []; P.esc2 = (es && es.data && es.data.lista2) || [];
   try{ P.socios = await costeSociosCargar(); }catch(e){ P.socios = []; R.errores.push('socios: ' + e.message); }
   try{ const {data} = await sb.from('tarifas').select('concepto,precio_particular'); P.tarifas = data || []; }catch(e){ P.tarifas = []; }
@@ -725,7 +726,6 @@ R.simHtml = function(P, b){
 };
 R.hipHtml = P => { const prm = R.param, inp = (k, l, u) => '<label style="font-size:11.5px;display:flex;flex-direction:column;gap:2px;">' + l + '<input type="number" value="' + prm[k] + '" onchange="RENT.setParam(\'' + k + '\',this.value)" style="width:90px;"><span' + (/^(d|h|kg|km)\b/.test(u || '') ? ' class="no-cap"' : '') + ' style="color:var(--ink-soft);">' + (u || '') + '</span></label>';
   return '<div style="font-weight:800;font-size:13px;margin:8px 0 4px;">Hipótesis</div><div style="display:flex;flex-wrap:wrap;gap:10px;">' + inp('jornadas', 'Jornadas al año', 'd') + inp('horasDia', 'Horas operativas al día', 'h (el resto hasta 8 h es reserva)') + inp('indisponibilidad', 'Averías / paradas', '% de tiempo') + inp('reduccionAverias', 'Reducción con mecánico', '% de las averías') + inp('ahorroTaller', 'Ahorro en taller con mecánico', '%') + inp('condMecPct', 'Conductor/mecánico conduce', '% del tiempo') + inp('repSemana', 'Rafa y Manolo reparan', 'h/semana entre los dos') + inp('gesSemana', 'Rafa y Manolo gestionan', 'h/semana entre los dos') + inp('impuesto', 'Impuestos', '% sobre beneficio') + inp('vidaUtil', 'Vida útil maquinaria', 'años') + inp('residualPct', 'Valor residual', '%') + '</div>'
-  + '<div style="font-weight:800;font-size:13px;margin:10px 0 4px;">Valor de venta hoy de cada máquina</div><div style="display:flex;flex-wrap:wrap;gap:10px;">' + R.MAQ_VALOR(P).map(f => '<label style="font-size:11.5px;display:flex;flex-direction:column;gap:2px;">' + esc(f.nombre) + '<input type="number" value="' + (num(prm['vv_' + f.id]) || '') + '" onchange="RENT.setParam(\'vv_' + f.id + '\',this.value)" style="width:90px;"><span style="color:var(--ink-soft);">€</span></label>').join('') + '</div>'
   + '<div style="font-weight:800;font-size:13px;margin:10px 0 4px;">Obra de referencia (precio por hora)</div><select class="rt-sel" onchange="RENT.setRef(this.value)" style="font-size:12.5px;max-width:100%;"><option value="">Automática: nave avícola</option>' + (P.jobs || []).filter(j => (R.asignar(P).porJob[j.id] || []).length).map(j => '<option value="' + j.id + '"' + (R.param.refJob === j.id ? ' selected' : '') + '>' + esc(j.trabajo || j.id) + '</option>').join('') + '</select>'; };
 
 R.vista = function(P){
@@ -787,7 +787,6 @@ R.htmlPrecios = (T, enObra) => {
 };
 // ---------- ¿Cómo de rentable es? (V11.62, Daniel 14/10/2026): margen neto, si el objetivo es razonable y rentabilidad sobre lo invertido, con referencias para comparar con otros negocios ----------
 R.REF_RENT = {letras: 2.7, empresas: 6.7, construccionROE: 3.1};   // Letras del Tesoro 12 meses (subastas 2026) · rentabilidad del activo de las empresas españolas (Banco de España, 2024) · rentabilidad de los fondos propios en construcción (BBVA Research, 2023)
-R.MAQ_VALOR = P => (P.flota || []).filter(f => ['activo', 'averiada', 'averia'].includes(f.estado) && !/todoterreno|turismo|coche/i.test(f.clase || ''));
 R.htmlComparar = function(r, P){
   if(!r || r.vacio || !(r.ejecutado > 0)) return '';
   const m = num(R.param.margen), mg = r.neto / r.ejecutado * 100, dT = Object.keys(r.hDia || {}).length, jA = num(R.param.jornadas) || 250;
@@ -797,14 +796,14 @@ R.htmlComparar = function(r, P){
   const vObj = m < 5 ? 'Bajo: deja poco para imprevistos y para reponer máquinas' : m < 8 ? 'Normal en construcción' : m <= 12 ? 'Bueno y razonable para una empresa pequeña con máquinas propias' : m <= 15 ? 'Alto: hay que cobrar por encima de la media' : 'Muy alto: difícil de cobrar salvo trabajos especiales';
   const l1 = lin('Margen neto de esta obra', 'Lo que queda limpio de cada 100 € facturados', p1(mg), col(mg), sr('Trabajo hecho', eur(r.ejecutado)) + sr('Limpio tras todos los costes e impuestos', eur(r.neto), col(r.neto)) + sr('Margen neto', p1(mg), col(mg)) + sr('Construcción en España (orientativo)', 'entre 3 y 5 %') + sr('Vuestro objetivo', p1(m)) + tx('Ya cuenta como coste la retribución de Rafa y Manolo: es lo que queda después de pagaros.'));
   const l2 = lin('Objetivo del marcador', vObj, p1(m), null, sr('Menos del 5 %', 'bajo') + sr('Del 5 al 8 %', 'normal del sector') + sr('Del 8 al 12 %', 'bueno (recomendado)') + sr('Más del 12 %', 'alto') + tx('Recomendado entre el 8 y el 12 %. Mientras no se cuente la reposición de las máquinas, mejor no bajar del 10 %: ese hueco sale del margen.'));
-  const ms = R.MAQ_VALOR(P), usadas = ms.filter(f => (r.maq || []).some(x => String(x.id) === String(f.id))), val = f => num(R.param['vv_' + f.id]), falta = usadas.filter(f => !(val(f) > 0)), cap = sum(usadas, val);
+  const VF = P.valFlota || {}, usadas = (r.maq || []).map(x => ({id: String(x.id), nombre: x.nombre})), val = f => num((VF[f.id] || {}).estimado), falta = usadas.filter(f => !(val(f) > 0)), cap = sum(usadas, val);
   const anual = dT ? r.neto / dT * jA : NaN, roa = cap > 0 && !falta.length ? anual / cap * 100 : NaN, RF = R.REF_RENT;
-  const vRoa = !isFinite(roa) ? 'Falta el valor de las máquinas (Hipótesis)' : roa >= RF.empresas ? 'Renta más que la media de las empresas españolas' : roa >= RF.letras ? 'Renta más que las Letras del Tesoro, menos que la media' : 'Renta menos que tener el dinero en Letras del Tesoro';
+  const vRoa = !isFinite(roa) ? 'Falta el valor de alguna máquina en Valor flota' : roa >= RF.empresas ? 'Renta más que la media de las empresas españolas' : roa >= RF.letras ? 'Renta más que las Letras del Tesoro, menos que la media' : 'Renta menos que tener el dinero en Letras del Tesoro';
   const l3 = lin('Rentabilidad sobre lo invertido', vRoa, isFinite(roa) ? p1(roa) + ' al año' : 'sin dato', isFinite(roa) ? col(roa) : null,
     sr('Limpio de la obra', eur(r.neto), col(r.neto)) + sr('Días con trabajo', h1(dT) + ' d') + sr('Limpio al año a este ritmo (' + jA + ' jornadas)', isFinite(anual) ? eur(anual) : '—', col(anual))
-    + usadas.map(f => sr(esc(f.nombre) + ' (valor de venta hoy)', val(f) > 0 ? eur(val(f)) : 'falta')).join('') + sr('Total invertido', cap > 0 ? eur(cap) : 'falta')
+    + usadas.map(f => sr(esc(f.nombre), val(f) > 0 ? eur(val(f)) : 'falta')).join('') + sr('Total invertido', cap > 0 ? eur(cap) : 'falta')
     + sr('Letras del Tesoro a 12 meses (2026)', p1(RF.letras)) + sr('Media de las empresas españolas (Banco de España, 2024)', p1(RF.empresas)) + sr('Construcción en España, sobre fondos propios (2023)', p1(RF.construccionROE))
-    + tx('Es la cifra que se usa para comparar negocios: cuánto deja al año cada 100 € metidos en él. Se cuenta lo que os darían hoy por las máquinas vendiéndolas, porque es el dinero que tenéis metido.' + (falta.length ? ' Falta el valor de ' + falta.map(f => esc(f.nombre)).join(', ') + ': ponlo en Hipótesis.' : '')));
+    + tx('Es la cifra que se usa para comparar negocios: cuánto deja al año cada 100 € metidos en él. Lo invertido es el valor de venta de las máquinas de la obra, el de «Valor flota» en Economía: es el dinero que tenéis metido.' + (falta.length ? ' Falta el valor de ' + falta.map(f => esc(f.nombre)).join(', ') + ' en Valor flota.' : '')));
   return '<div class="rt-c"><h3>¿Cómo de rentable es?</h3>' + l1 + l2 + l3 + '</div>';
 };
 R.pintarPrecios = async function(el){ if(!el) return; try{ const P = await R.cargar(false); el.innerHTML = R.htmlPrecios(R.tablaPrecios(P)); }catch(e){ console.error(e); el.innerHTML = ''; } };

@@ -15,6 +15,13 @@ exp=int(time.time())+86400*30
 user={"id":"00000000-0000-0000-0000-0000000000dg","email":"dg@exg.local","aud":"authenticated","role":"authenticated","user_metadata":{"rol":"admin"},"app_metadata":{}}
 tok=b64({"alg":"HS256","typ":"JWT"})+"."+b64({"sub":user["id"],"email":user["email"],"exp":exp,"role":"authenticated","user_metadata":{"rol":"admin"}})+".x"
 ses={"access_token":tok,"token_type":"bearer","expires_in":86400*30,"expires_at":exp,"refresh_token":"r","user":user}
+def abrir(cuerpo):   # V11.63: hasta 4 intentos si el proxy corta la conexión (SSL EOF): sin esto la auditoría salía distinta en cada pasada
+    for i in range(4):
+        try: return urllib.request.urlopen(urllib.request.Request(U+"/functions/v1/exg-prueba-lectura",data=cuerpo,headers={"x-exg-clave":CL,"Content-Type":"application/json"}),timeout=60)
+        except urllib.error.HTTPError: raise
+        except Exception:
+            if i==3: raise
+            time.sleep(1+i)
 async def main():
     async with async_playwright() as p:
         b=await p.chromium.launch(executable_path='/opt/pw-browsers/chromium-1194/chrome-linux/chrome')
@@ -31,7 +38,7 @@ async def main():
                 u2=u; h=req.headers;cuerpo=json.dumps({"ruta":u2[len(U):],"range":h.get('range'),"prefer":None,"accept":h.get('accept')}).encode()
                 def llamar2():
                     try:
-                        r=urllib.request.urlopen(urllib.request.Request(U+"/functions/v1/exg-prueba-lectura",data=cuerpo,headers={"x-exg-clave":CL,"Content-Type":"application/json"}),timeout=60)
+                        r=abrir(cuerpo)
                         return r.status,r.read(),r.headers.get('content-type')
                     except urllib.error.HTTPError as e: return e.code,e.read(),'application/json'
                 st,bd,ct=await asyncio.get_event_loop().run_in_executor(None,llamar2)
@@ -43,7 +50,7 @@ async def main():
                 h=req.headers;cuerpo=json.dumps({"ruta":u[len(U):],"range":h.get('range'),"prefer":h.get('prefer'),"accept":h.get('accept')}).encode()
                 def llamar():
                     try:
-                        r=urllib.request.urlopen(urllib.request.Request(U+"/functions/v1/exg-prueba-lectura",data=cuerpo,headers={"x-exg-clave":CL,"Content-Type":"application/json"}),timeout=60)
+                        r=abrir(cuerpo)
                         return r.status,r.read(),r.headers.get('x-content-range'),r.headers.get('content-type')
                     except urllib.error.HTTPError as e: return e.code,e.read(),None,'application/json'
                 st,bd,cr,ct=await asyncio.get_event_loop().run_in_executor(None,llamar)
