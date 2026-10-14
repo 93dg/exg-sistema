@@ -720,10 +720,10 @@ R.datosReales = function(r, b){   // V10.51 (Daniel): datos reales sobre la hora
     + (mq.length ? '<div style="font-weight:800;font-size:12.5px;margin:4px 0 0;">Horas por máquina</div>' + mq.map(m => f(esc(m.nombre), h1(m.horas) + ' h · ' + m.dias + ' días')).join('') : '')
     + '</div>';
 };
-// V11.64 (Daniel 14/10/2026): lo que cobra cada socio y lo que cuesta de verdad. El coste lleva dentro su cuota de autónomo y las horas que se perdieron en la obra (coste de oportunidad)
+// V11.64 (Daniel 14/10/2026): lo que cobra cada socio y lo que cuesta de verdad: lo que cobra más las horas que se perdieron en la obra (coste de oportunidad). V11.70: sin la cuota de autónomos, que es de la empresa
 R.salarioSocio = function(r, k){   // la misma cuenta en Datos reales y en el simulador
   const SA = r.socAnual || {}, dLab = r.dLab || num(R.param.jornadas) || 250, Dq = Math.max(1, r.Dq || r.D || 1), xr = R.perdidas(r, 2, NaN, 0), mesDias = dLab / 12;
-  const anual = num(SA[k]), sal = anual / dLab * Dq, ss = num(r.ssAnual) / 2 / dLab * Dq, perd = isFinite(xr.dinero) ? xr.dinero / 2 : 0, coste = sal + ss + perd, hT = r.H / 2;
+  const anual = num(SA[k]), sal = anual / dLab * Dq, ss = 0, perd = isFinite(xr.dinero) ? xr.dinero / 2 : 0, coste = sal + perd, hT = r.H / 2;   // V11.70 (Daniel): la cuota de autónomos es gasto de la empresa, no de la persona
   const cobMes = anual / 12; return {xr, sal, ss, perd, coste, hT, cobMes, costeMes: coste / Dq * mesDias, cobH: cobMes / (8 * mesDias), costeH: hT > 0 ? coste / hT : NaN};
 };
 R.salariosReales = function(r){
@@ -733,7 +733,7 @@ R.salariosReales = function(r){
   const uno = (k, nom) => { const {sal, ss, perd, coste, hT, cobMes, costeMes, cobH, costeH} = R.salarioSocio(r, k);
     return '<details class="rt-nd"><summary><div class="rt-sim-r"><span style="flex:1;min-width:0;font-weight:700;">Salario ' + nom + '<small style="display:block;color:var(--ink-soft);font-size:10.5px;font-weight:400;">Cobra ' + eur(cobH, 2) + '/h · coste real ' + eur(costeH, 2) + '/h</small></span><span style="text-align:right;white-space:nowrap;"><b>' + eur(cobMes) + '/mes</b><small style="display:block;font-size:10.5px;font-weight:700;color:' + RJ + ';">Coste ' + eur(costeMes) + '/mes</small></span></div></summary><div class="rt-bd">'
       + sr('Cobra al mes', eur(cobMes), null, 'Retiradas y gastos personales de los últimos 12 meses ÷ 12') + sr('Coste real al mes', eur(costeMes), RJ) + sr('Cobra por hora', eur(cobH, 2) + '/h', null, '8 h al día, de lunes a viernes') + sr('Coste real por hora', isFinite(costeH) ? eur(costeH, 2) + '/h' : '—', RJ, 'Por cada hora que de verdad se facturó (' + h1(hT) + ' h, su mitad)')
-      + '<div style="font-weight:800;font-size:12px;margin:6px 0 2px;">En esta obra</div>' + sr('Lo que cobra', eur(sal)) + sr('Autónomos y SS (su mitad)', eur(ss), RJ) + sr('Horas perdidas (su mitad)', eur(perd), RJ, h1(xr.hPerd / 2) + ' h × ' + (isFinite(xr.margenH) ? eur(xr.margenH, 2) : '—') + '/h') + sr('Coste real', eur(coste), RJ)
+      + '<div style="font-weight:800;font-size:12px;margin:6px 0 2px;">En esta obra</div>' + sr('Lo que cobra', eur(sal)) + sr('Horas perdidas (su mitad)', eur(perd), RJ, h1(xr.hPerd / 2) + ' h × ' + (isFinite(xr.margenH) ? eur(xr.margenH, 2) : '—') + '/h') + sr('Coste real', eur(coste), RJ)
       + '<div class="rt-ldx">Sus retiradas no desgravan. Lo que no dice de quién es se reparte a medias.</div></div></details>'; };
   return '<div style="font-weight:800;font-size:12.5px;margin:6px 0 0;">Rafa y Manolo</div>' + uno('rafa', 'Rafa') + uno('manolo', 'Manolo');
 };
