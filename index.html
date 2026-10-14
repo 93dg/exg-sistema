@@ -4797,11 +4797,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.79" defer></script>
-<script src="costes/norm.js?v=V11.79" defer></script>
-<script src="ajustes/calc.js?v=V11.79" defer></script>
+<script src="rentabilidad/rent.js?v=V11.80" defer></script>
+<script src="costes/norm.js?v=V11.80" defer></script>
+<script src="ajustes/calc.js?v=V11.80" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.79</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.80</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4953,7 +4953,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.79</div>
+        <div class="sub" id="version-badge">V11.80</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -25036,7 +25036,8 @@ function tbRender(){
   const ayuda = document.getElementById('tb-ayuda');
   ayuda.style.display = _tbVista === 'historial' ? 'none' : '';
   ayuda.textContent = tbHayFiltros() ? 'Con filtros puestos no se pueden mover los trabajos. Quita los filtros para reordenarlos.' : _tbFiltro !== 'todos' ? 'Filtrando por ' + _tbFiltro + '. Toca el contador otra vez para ver todos y poder mover trabajos.' : _tbVista === 'tramites' ? 'Trabajos terminados a los que les falta el albarán, la factura o el cobro.' : _tbVista === 'enmarcha' ? 'Trabajos que ya están en marcha. Mantén pulsado uno y arrástralo para cambiarlo de sitio.' : 'Ordenados por su día en el calendario. Si arrastras uno, se mueve también en el calendario.';
-  const carta = (j, esHis) => { if(!esHis && _tbVista === 'tramites'){ const d = tbDocDe(j); if(d){ const h = tbDocCartaHtml(j, d); if(h) return h; } } return tbCartaHtml(j, esHis); };
+  const carta = (j, esHis) => { if(!esHis && (_tbVista === 'tramites' || _tbVista === 'enmarcha')){ const d = tbDocDe(j);   // V11.79: también en Activos (albarán en «Trabajo activo»)
+ if(d){ const h = tbDocCartaHtml(j, d); if(h) return h; } } return tbCartaHtml(j, esHis); };
   if(_tbVista === 'historial'){ tbRenderComputo(filtrados); lista.innerHTML = filtrados.length ? filtrados.map(j => carta(j, true)).join('') : '<div class="empty" style="padding:24px;">' + (his.length ? 'Ningún trabajo cumple los filtros.' : 'Aún no hay trabajos cobrados.') + '</div>'; return; }
   const ver = _tbFiltro === 'todos' ? filtrados : filtrados.filter(j => tbPrioridades(j).includes(_tbFiltro));
   tbRenderComputo(ver);
@@ -25194,6 +25195,8 @@ async function tbSyncDoc(docId){
   const cerrado = CC_ESTADOS_CERRADOS.has(d.estado_cobro);
   for(const j of _tbJobs.filter(x => (x.docs || []).includes(docId))){
     if(cerrado && j.estado !== 'Cobrado'){ j.estado = 'Cobrado'; j.terminado_at = new Date().toISOString(); }
+    else if(!cerrado && d.estado_cobro !== 'trabajo_activo' && TB_EST_ENMARCHA.includes(j.estado)){ j.estado = 'Por cobrar'; }   // V11.79: el albarán deja de estar en «Trabajo activo» → el trabajo pasa a Trámites
+    else if(d.estado_cobro === 'trabajo_activo' && !TB_EST_ENMARCHA.includes(j.estado)){ j.estado = 'Activo'; j.terminado_at = null; }
     else if(!cerrado && j.estado === 'Cobrado'){ j.estado = 'Por cobrar'; j.terminado_at = null; }
     else continue;
     await tbPersistir(j);
