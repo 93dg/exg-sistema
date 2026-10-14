@@ -4797,11 +4797,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.81" defer></script>
-<script src="costes/norm.js?v=V11.81" defer></script>
-<script src="ajustes/calc.js?v=V11.81" defer></script>
+<script src="rentabilidad/rent.js?v=V11.82" defer></script>
+<script src="costes/norm.js?v=V11.82" defer></script>
+<script src="ajustes/calc.js?v=V11.82" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.81</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.82</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4953,7 +4953,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.81</div>
+        <div class="sub" id="version-badge">V11.82</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -26058,11 +26058,19 @@ function impPaquete(q, anio){
   if(D.excluidos.length) add('aviso', `${D.excluidos.length} documento(s) registrado(s) en el trimestre que NO se incluyen en el paquete`, D.excluidos.map(x => (x.d.client || '—') + ' ' + impEur(impTotalGasto(x.d)) + ' — ' + x.motivo).join(' · ') + '. Quedan listados en la última página del PDF resumen.');
   return {D, facturas, gastos, avisos};
 }
+// V11.82 (Daniel 14/10): el correo al gestor, corto y como empresa: sin año ni fechas (ya las sabe), lo adjunto en lista, las cifras y nada interno.
+// Las preguntas solo si de verdad no las podemos resolver nosotros; se añaden a mano. El PDF resumen va aparte, fuera del ZIP
+function impNombreCorto(n){ n = String(n || '').trim(); const m = n.match(/\(([^)]+)\)\s*$/); if(m) n = m[1]; n = n.replace(/,?\s*(S\.?\s*L\.?\s*U?\.?|S\.?\s*A\.?|S\.?\s*C\.?\s*A\.?|S\.\s*COOP\..*)$/i, '').trim(); return n.toLowerCase().replace(/(^|[\s\-(])([a-záéíóúñü])/g, (x, a, b) => a + b.toUpperCase()).replace(/\b(De|Del|La|Las|Los|Y|E)\b/g, w => w.toLowerCase()).replace(/^./, c => c.toUpperCase()).replace(/\bMpe\b/g, 'MPE').replace(/\bCovap\b/g, 'COVAP'); }
 function impMensajeGestor(P, c130, incompleto303){
-  const q = P.D.q, anio = P.D.anio, r303 = impRes303(P.D);
-  const iva = incompleto303 ? 'está todavía pendiente de completar (faltan datos)' : (r303 >= 0 ? 'es de ' + impEur(r303) + ' a pagar' : 'es de ' + impEur(-r303) + ' a compensar');
-  const irpf = c130.completo ? 'es de ' + impEur(c130.resultado) : 'está todavía pendiente de completar (faltan datos)';
-  return `Hola,\n\nAdjunto la documentación correspondiente al ${q}.º trimestre de ${anio}, junto con un PDF resumen de las facturas emitidas y los gastos registrados.\n\nSegún nuestros datos, la estimación actual del IVA ${iva} y la del pago fraccionado de IRPF ${irpf}.\n\nTe adjunto toda la documentación para su revisión y cálculo definitivo.\n\nUna cosa más: como en los trimestres anteriores, no os olvidéis de incluir este trimestre las facturas de vuestra propia gestoría. Nosotros solo tenemos el recibo del banco de la cuota mensual (45 € + IVA), así que, por favor, mandádnoslas cada mes para tenerlas también nosotros.\n\nGracias.`;
+  const q = P.D.q, r303 = impRes303(P.D), ini = `${P.D.anio}-${String((q - 1) * 3 + 1).padStart(2, '0')}-01`;
+  const ord = ['', 'primer', 'segundo', 'tercer', 'cuarto'][q];
+  const tard = P.gastos.filter(d => String(d.dateRaw || '').slice(0, 10) < ini), grupos = new Map();
+  tard.forEach(d => { const k = impNombreCorto(d.client); if(!grupos.has(k)) grupos.set(k, []); const nu = d.numero || (d.num && d.num !== '—' ? d.num : ''); if(nu && String(nu).length <= 6) grupos.get(k).push('nº ' + nu); });
+  const y = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' y ' + a[a.length - 1] : a.join('');
+  const tardTxt = tard.length ? ` (${tard.length} del ${q === 1 ? '4T' : (q - 1) + 'T'} que llegaron tarde: ${y([...grupos].map(([k, nums]) => k + (nums.length ? ' ' + y(nums) : '')))})` : '';
+  const iva = incompleto303 ? 'pendiente de completar' : impEur(Math.abs(r303)) + (r303 >= 0 ? ' a pagar' : ' a compensar');
+  const irpf = c130.completo ? impEur(c130.resultado) : 'pendiente de completar';
+  return `Hola, José Alberto:\n\nTe adjunto la documentación del ${ord} trimestre:\n- ${P.facturas.length} facturas emitidas\n- ${P.gastos.length} justificantes de gasto${tardTxt}\n- 1 PDF con el resumen\n\nSegún nuestros datos:\n- IVA (303): ${iva}\n- IRPF (130): ${irpf}\n\nGracias, un saludo.\nDaniel`;
 }
 function impAbrirGestor(){
   if(!_docsListos){ mostrarToast('Espera un momento: aún se están cargando los documentos.', 'err'); return; }
@@ -26074,7 +26082,7 @@ function impAbrirGestor(){
   $('imp-g-sub').textContent = `Se incluyen ${P.facturas.length} facturas de ingresos y ${P.gastos.length} gastos oficiales de este trimestre.`;
   $('imp-g-avisos-n').textContent = P.avisos.length;
   $('imp-g-avisos').innerHTML = P.avisos.length ? P.avisos.map(a => `<div class="imp-av ${a.nivel}"><span class="ic">${a.nivel === 'aviso' ? '!' : '·'}</span><span>${escHtml(a.txt)}${a.sub ? `<span class="sub">${escHtml(a.sub)}</span>` : ''}</span></div>`).join('') : '<div class="imp-av ok"><span class="ic">✓</span><span>Sin incidencias: todo lo del trimestre está listo para incluirse.</span></div>';
-  $('imp-g-incluye').innerHTML = `<div class="imp-linea"><span>📁 ${q}T ${anio}</span><span></span></div><div class="imp-linea sub"><span>📄 Resumen trimestre.pdf (resumen, ingresos, gastos y no incluidos)</span><span></span></div><div class="imp-linea sub"><span>📁 Ingresos — ${P.facturas.length} factura(s) en PDF</span><span></span></div><div class="imp-linea sub"><span>📁 Gastos — ${P.gastos.length} justificante(s)</span><span></span></div>`;
+  $('imp-g-incluye').innerHTML = `<div class="imp-linea"><span>📁 ${q}T ${anio}</span><span></span></div><div class="imp-linea sub"><span>📄 Resumen (PDF aparte, fuera del ZIP: resumen, ingresos, gastos y no incluidos)</span><span></span></div><div class="imp-linea sub"><span>📁 Ingresos — ${P.facturas.length} factura(s) en PDF</span><span></span></div><div class="imp-linea sub"><span>📁 Gastos — ${P.gastos.length} justificante(s)</span><span></span></div>`;
   const hayAviso = P.avisos.some(a => a.nivel === 'aviso');
   const btn = $('imp-g-btn'); btn.textContent = hayAviso ? 'Generar igualmente' : 'Generar paquete'; btn.disabled = false;
   $('imp-g-progreso').textContent = '';
@@ -26133,12 +26141,13 @@ async function impGenerarPaquete(){
       }catch(e){ fallos.push((d.client || 'Gasto') + ': ' + (e.message || e)); res.set(d.id, {doc: '', estado: 'NO INCLUIDO: no se pudo descargar el documento'}); }
     }
     paso('Creando el PDF resumen…');
-    zip.file(`${raiz}/Resumen trimestre.pdf`, impResumenPdf(P, res));
+    const pdfRes = impResumenPdf(P, res);   // V11.82 (Daniel): el PDF resumen va aparte, fuera del ZIP
+    { const u = URL.createObjectURL(new Blob([pdfRes], {type: "application/pdf"})), a2 = document.createElement('a'); a2.href = u; a2.download = `Resumen ${q}T ${anio}.pdf`; document.body.appendChild(a2); a2.click(); a2.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); }
     paso('Comprimiendo…');
     const zb = await zip.generateAsync({type: 'blob', compression: 'DEFLATE'});
     const url = URL.createObjectURL(zb), a = document.createElement('a'); a.href = url; a.download = `${raiz} - Documentación para el gestor.zip`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
     const incl = [...res.values()].filter(x => x.doc).length;
-    prog.innerHTML = `<div class="imp-av ok"><span class="ic">✓</span><span><b>Paquete descargado</b>: ${incl} documento(s) + Resumen trimestre.pdf.${fallos.length ? `<span class="sub">Con fallos (${fallos.length}), consta en el Excel: ${escHtml(fallos.join(' · '))}</span>` : ''}</span></div>`;
+    prog.innerHTML = `<div class="imp-av ok"><span class="ic">✓</span><span><b>Paquete descargado</b>: ${incl} documento(s) en el ZIP y el resumen en PDF aparte.${fallos.length ? `<span class="sub">Con fallos (${fallos.length}), consta en el Excel: ${escHtml(fallos.join(' · '))}</span>` : ''}</span></div>`;
   }catch(e){ console.error(e); prog.innerHTML = `<div class="imp-av aviso"><span class="ic">!</span><span>No se pudo generar el paquete: ${escHtml(errText(e))}</span></div>`; }
   btn.disabled = false;
 }
@@ -26181,9 +26190,7 @@ function impResumenPdf(P, res){
   fila(`${IMP_PORC_130} % del rendimiento`, impEur(c130.bruto), {gris: true, tam: 9.5});
   fila('Pagos anteriores del modelo 130', q === 1 ? 'no hay' : c130.faltan.length ? 'faltan datos' : '- ' + impEur(c130.previos), {gris: true, tam: 9.5});
   if(!c130.completo) parrafo(c130.faltan.length ? `Estimación incompleta: falta registrar el pago del modelo 130 del ${c130.faltan.map(k => k + 'T').join(' y ')}.` : 'Estimación incompleta: hay gastos sin datos de IVA.', 9.5, false, 0);
-  subtitulo('Avisos y datos pendientes de revisar');
-  if(!P.avisos.length) parrafo('Ninguno.', 10.5);
-  P.avisos.forEach(a => { parrafo((a.nivel === 'aviso' ? 'PENDIENTE DE REVISION: ' : 'Nota: ') + a.txt, 10); if(a.sub) parrafo(a.sub, 9, true, 4); y += 1.2; });
+  // V11.82 (Daniel 14/10, muy enfadado): los avisos son internos (notas nuestras, lo que falta pedir…): se ven en la pantalla, pero NO van en el PDF del gestor
   subtitulo('Contenido del paquete');
   parrafo(`Ingresos: ${P.facturas.length} factura(s) en PDF. Gastos: ${P.gastos.length} justificante(s). Cada documento aparece a continuación con la ruta de su archivo dentro del paquete.`, 10);
   // ---------- INGRESOS ----------
