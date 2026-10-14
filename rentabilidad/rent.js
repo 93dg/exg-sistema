@@ -483,6 +483,23 @@ R.estacion = function(P){   // peso de cada mes en el trabajo del año, sacado d
   const tot = sum(m); return P._est = tot > 0 ? m.map(x => x / tot) : Array(12).fill(1 / 12);
 };
 R.LLUVIA = [7.2, 6.1, 4.9, 6.7, 4.9, 1.4, 0.4, 0.6, 3.2, 6.9, 5.9, 8.1];   // días de lluvia (≥ 1 mm) al mes, Córdoba Aeropuerto (AEMET, normales 1981-2010): esos días no se trabaja
+// V11.66 (Daniel 14/10): con lluvia a veces se trabaja (tirar una casa, otro trabajo): se mira en los albaranes qué parte de los días de lluvia se trabajó de verdad.
+// Lluvia diaria real de Fuente Obejuna (Open-Meteo, archivo); se calcula una vez al mes y se guarda en Hipótesis (lluviaPct): la pantalla no recalcula cada vez que se abre.
+R.lluviaCalibrar = async function(P){
+  const prm = R.param, hoy = new Date().toISOString().slice(0, 10);
+  if(prm.lluviaFecha && diffDays(prm.lluviaFecha, hoy) < 30) return false;
+  const dias = new Set(); (R.efectivos(P).lista || []).forEach(d => R.lineas(d).forEach(l => { if(l.h > 0) dias.add(l.f); }));
+  if(dias.size < 20) return false;
+  const orden = [...dias].sort(), desde = orden[0] < '2022-01-01' ? '2022-01-01' : orden[0], hasta = addDays(hoy, -2);
+  const meses = {}; orden.forEach(f => { meses[f.slice(0, 7)] = (meses[f.slice(0, 7)] || 0) + 1; });
+  try{ const lat = window.FTE_OBEJUNA_LAT || 38.27, lon = window.FTE_OBEJUNA_LON || -5.42;
+    const rsp = await fetch('https://archive-api.open-meteo.com/v1/archive?latitude=' + lat + '&longitude=' + lon + '&start_date=' + desde + '&end_date=' + hasta + '&daily=precipitation_sum&timezone=Europe%2FMadrid'); if(!rsp.ok) return false;
+    const j = await rsp.json(), t = (j.daily && j.daily.time) || [], pr = (j.daily && j.daily.precipitation_sum) || [];
+    let n = 0, trab = 0; t.forEach((f, i) => { const dow = new Date(f + 'T12:00:00').getDay(); if(dow === 0 || dow === 6 || !(num(pr[i]) >= 1) || (meses[f.slice(0, 7)] || 0) < 5) return; n++; if(dias.has(f)) trab++; });   // solo meses con trabajo apuntado (5 días o más)
+    if(n < 8) return false;
+    prm.lluviaPct = Math.round(trab / n * 100); prm.lluviaN = n; prm.lluviaTrab = trab; prm.lluviaFecha = hoy; await R.param_(); return true;
+  }catch(e){ console.warn('Lluvia', e); return false; }
+};
 R.MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 R.simAnio = function(P, b, e, real){   // real = como hoy: Rafa y Manolo con sus retiradas (no desgravan)
   const r = b.r, prm = R.param, hd = num(prm.horasDia) || 6, t = num(prm.impuesto) / 100, ok = x => isFinite(x) ? x : 0;
@@ -494,7 +511,7 @@ R.simAnio = function(P, b, e, real){   // real = como hoy: Rafa y Manolo con sus
   const nMaqF = Math.max(1, (r.maq || []).filter(x => !(x.clases || []).includes('camion')).length), nCamF = Math.max(Hc > 0 ? 1 : 0, (r.maq || []).filter(x => (x.clases || []).includes('camion')).length);
   const cap = R.capacidad(e, hd), maxM = nMaqF * hd, maxC = nCamF * hd;
   // El trabajo que no se hace un mes (lluvia, falta de gente) espera al siguiente, como mucho 2 meses de trabajo medio; lo que pasa de ahí se pierde (el cliente se va a otro)
-  const capMes = i => { const dm = Math.max(0, dLab / 12 - R.LLUVIA[i] * 5 / 7) * (1 - ind), cM = Math.min(cap.M + cap.F, maxM) * dm, cC = Math.min(cap.C + cap.F, maxC) * dm, cT = Math.min(cap.M + cap.C + cap.F, maxM + maxC) * dm; return {cM, cC, cT, dm}; };
+  const lluTrab = Math.min(100, Math.max(0, num(prm.lluviaPct))) / 100, capMes = i => { const dm = Math.max(0, dLab / 12 - R.LLUVIA[i] * 5 / 7 * (1 - lluTrab)) * (1 - ind), cM = Math.min(cap.M + cap.F, maxM) * dm, cC = Math.min(cap.C + cap.F, maxC) * dm, cT = Math.min(cap.M + cap.C + cap.F, maxM + maxC) * dm; return {cM, cC, cT, dm}; };
   const tope = Dh / 12 * 2; let qm = 0, qc = 0, meses = [];
   for(let pasada = 0; pasada < 2; pasada++){ meses = w.map((p, i) => { const c = capMes(i), am = qm + Dh * p * (1 - shC), ac = qc + Dh * p * shC;
       let sm = Math.min(am, c.cM), sc = Math.min(ac, c.cC); if(sm + sc > c.cT && sm + sc > 0){ const k = c.cT / (sm + sc); sm *= k; sc *= k; }
@@ -822,7 +839,7 @@ R.anioHtml = function(P, b, e){
     return '<details class="rt-nd"><summary><div class="rt-sim-r"><span style="flex:1;min-width:0;font-weight:700;">' + n + ' que más dejan<small style="display:block;color:var(--ink-soft);font-size:10.5px;font-weight:400;">' + (sig ? 'Con uno más: ' + eur(sig.net - q.best.net) + ' al año' : '') + '</small></span><b>' + q.best.n + '</b></div></summary><div class="rt-bd">' + sub + '</div></details>'; }).join('');
   const meses = '<details class="rt-nd"><summary><div class="rt-sim-r"><span style="flex:1;min-width:0;font-weight:700;">Trabajo por meses<small style="display:block;color:var(--ink-soft);font-size:10.5px;font-weight:400;">Trabajo del historial de 5 años; lluvia de AEMET</small></span><b>' + hh(A.S) + '</b></div></summary><div class="rt-bd">' + A.meses.map(m => '<div class="rt-sim-r"><span>' + m.mes + '<small style="display:block;color:var(--ink-soft);font-size:10.5px;">' + h1(m.cola) + ' h por hacer · ' + h1(m.cap) + ' h posibles · ' + h1(m.lluvia) + ' días de lluvia</small></span><b' + (m.cap - m.hechas > 0.5 ? ' style="color:' + RJ + ';"' : '') + '>' + hh(m.hechas) + '</b></div>').join('') + '</div></details>';
   return '<div style="font-weight:800;font-size:13px;margin:12px 0 4px;">Al año con esta gente</div>' + lin + '<div style="font-weight:800;font-size:13px;margin:12px 0 4px;">Punto de equilibrio</div>' + eqs + meses
-    + '<div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">Cada hora vale lo que esta obra: ' + eur(b.r.ejecutado / b.r.H, 2) + '/h de ingreso y su coste de máquina por hora. Los días de lluvia no se trabaja y ese trabajo espera al mes siguiente (como mucho 2 meses de trabajo; lo demás se pierde). Contratar más solo suma mientras haya trabajo: si no queda, la gente de más cobra sin obra. Hoy: Rafa y Manolo con sus retiradas reales. En la simulación Rafa se lleva lo de dos maquinistas (no desgrava) y Manolo va en nómina de maquinista (desgrava).</div>';
+    + '<div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">Cada hora vale lo que esta obra: ' + eur(b.r.ejecutado / b.r.H, 2) + '/h de ingreso y su coste de máquina por hora. ' + (num(R.param.lluviaN) ? 'Días de lluvia: según los albaranes se trabajó el ' + num(R.param.lluviaPct) + ' % (' + num(R.param.lluviaTrab) + ' de ' + num(R.param.lluviaN) + ' días de lluvia laborables); el resto se pierde' : 'Días de lluvia: se dan por perdidos hasta cruzarlos con los albaranes') + ' y ese trabajo espera al mes siguiente (como mucho 2 meses de trabajo; lo demás se pierde). Contratar más solo suma mientras haya trabajo: si no queda, la gente de más cobra sin obra. Hoy: Rafa y Manolo con sus retiradas reales. En la simulación Rafa se lleva lo de dos maquinistas (no desgrava) y Manolo va en nómina de maquinista (desgrava).</div>';
 };
 R.hipHtml = P => { const prm = R.param, inp = (k, l, u) => '<label style="font-size:11.5px;display:flex;flex-direction:column;gap:2px;">' + l + '<input type="number" value="' + prm[k] + '" onchange="RENT.setParam(\'' + k + '\',this.value)" style="width:90px;"><span' + (/^(d|h|kg|km)\b/.test(u || '') ? ' class="no-cap"' : '') + ' style="color:var(--ink-soft);">' + (u || '') + '</span></label>';
   return '<div style="font-weight:800;font-size:13px;margin:8px 0 4px;">Hipótesis</div><div style="display:flex;flex-wrap:wrap;gap:10px;">' + inp('jornadas', 'Jornadas al año', 'd') + inp('horasDia', 'Horas operativas al día', 'h (el resto hasta 8 h es reserva)') + inp('indisponibilidad', 'Averías / paradas', '% de tiempo') + inp('reduccionAverias', 'Reducción con mecánico', '% de las averías') + inp('ahorroTaller', 'Ahorro en taller con mecánico', '%') + inp('condMecPct', 'Conductor/mecánico conduce', '% del tiempo') + inp('repSemana', 'Rafa y Manolo reparan', 'h/semana entre los dos') + inp('gesSemana', 'Rafa y Manolo gestionan', 'h/semana entre los dos') + inp('impuesto', 'Impuestos', '% sobre beneficio') + inp('vidaUtil', 'Vida útil maquinaria', 'años') + inp('residualPct', 'Valor residual', '%') + '</div>'
@@ -939,6 +956,6 @@ R.snapshot = async () => {   // histórico: solo guarda si cambió algo respecto
 };
 R.pintar = async function(el, forzar){
   R.el = el; if(!R.P) el.innerHTML = '<div class="panel te-panel" style="font-size:13px;">Calculando rentabilidad…</div>';
-  try{ const P = await R.cargar(forzar); el.innerHTML = R.vista(P); R.snapshot(); }catch(e){ console.error(e); el.innerHTML = '<div class="panel te-panel" style="font-size:13px;">No se pudo calcular la rentabilidad: ' + esc(e.message) + '</div>'; }
+  try{ const P = await R.cargar(forzar); el.innerHTML = R.vista(P); R.snapshot(); R.lluviaCalibrar(P).then(c => { if(c) R.repinta(); }); }catch(e){ console.error(e); el.innerHTML = '<div class="panel te-panel" style="font-size:13px;">No se pudo calcular la rentabilidad: ' + esc(e.message) + '</div>'; }
 };
 })();
