@@ -4795,11 +4795,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.72" defer></script>
-<script src="costes/norm.js?v=V11.72" defer></script>
-<script src="ajustes/calc.js?v=V11.72" defer></script>
+<script src="rentabilidad/rent.js?v=V11.73" defer></script>
+<script src="costes/norm.js?v=V11.73" defer></script>
+<script src="ajustes/calc.js?v=V11.73" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.72</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.73</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4951,7 +4951,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.72</div>
+        <div class="sub" id="version-badge">V11.73</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11556,12 +11556,12 @@ function gpResumenPersona(p, l, per, hoy, todos){
   const pag = l.reduce((s, x) => s + x.v, 0), fechas = l.map(x => String(x.d.dateRaw || '').slice(0, 10)).filter(Boolean).sort();
   const mPer = per === 'mes' ? 1 : per === 'trim' ? hoy.getMonth() % 3 + 1 : per === 'anio' ? hoy.getMonth() + 1 : per === '12m' ? 12 : 0;
   const desdePrim = fechas.length ? (hoy.getFullYear() - +fechas[0].slice(0, 4)) * 12 + hoy.getMonth() - (+fechas[0].slice(5, 7) - 1) + 1 : 1, meses = Math.max(1, mPer ? Math.min(mPer, desdePrim) : desdePrim);
-  let dias = [], horas = NaN, cuota = 0, notas = [], nDias = 0, desdeH = null, pagH = NaN;   // pagH: lo pagado desde que hay horas apuntadas (para el €/h)
+  let dias = [], horas = NaN, cuota = 0, notas = [], nDias = 0, desdeH = null, pagH = NaN, diasH = null;   // pagH: lo pagado desde que hay horas apuntadas (para el €/h)
   const H = _gpHoras;
   if(p === 'Dani'){ if(H){ let prev = null; l.slice().sort((a, b) => String(a.d.dateRaw).localeCompare(String(b.d.dateRaw))).forEach(x => { const ds = gpDiasPago(x.d, prev); if(ds.length){ dias.push(...ds); prev = String(x.d.dateRaw).slice(0, 10); } }); horas = dias.reduce((s, x) => s + x.h, 0); }
     notas.push('Hasta el 08/10/2026, en B. Desde entonces tiene nómina: su bruto y neto reales saldrán del contrato (pedido a Nuria).'); }
   else if(p === 'Rafa' || p === 'Manolo'){
-    if(H && fechas.length){ const h0 = Object.keys(H).sort()[0] || '9999', d0 = fechas[0] > h0 ? fechas[0].slice(0, 7) + '-01' : h0, kd = Object.keys(H).filter(x => x >= d0 && x <= hoy.toISOString().slice(0, 10)), hTot = kd.reduce((s, x) => s + H[x], 0); nDias = kd.length; desdeH = d0; pagH = l.filter(x => String(x.d.dateRaw || '').slice(0, 10) >= d0).reduce((s, x) => s + x.v, 0); horas = Math.max(0, hTot - ((todos && todos.daniH) || 0)) / 2; }
+    if(H && fechas.length){ const h0 = Object.keys(H).sort()[0] || '9999', d0 = fechas[0] > h0 ? fechas[0].slice(0, 7) + '-01' : h0, kd = Object.keys(H).filter(x => x >= d0 && x <= hoy.toISOString().slice(0, 10)), hTot = kd.reduce((s, x) => s + H[x], 0); nDias = kd.length; desdeH = d0; diasH = kd.map(x => ({f: x, h: Math.max(0, H[x] - ((todos && todos.daniDia[x]) || 0)) / 2})); pagH = l.filter(x => String(x.d.dateRaw || '').slice(0, 10) >= d0).reduce((s, x) => s + x.v, 0); horas = Math.max(0, hTot - ((todos && todos.daniH) || 0)) / 2; }
     notas.push('Retiradas: no desgravan. Su cuota de autónomos es gasto de la empresa, no suyo.'); }   // V11.70 (Daniel): Rafa como empleado no es Rafa como empresa
   const L = (a, b2, sub) => `<div class="gp-pers-f"><span>${a}${sub ? `<small>${sub}</small>` : ''}</span><b>${b2}</b></div>`;
   return (dias.length ? L('Días pagados', String(dias.length), dias.map(x => x.f.slice(8, 10) + '/' + x.f.slice(5, 7) + ' ' + hh(x.h)).join(' · ')) : '') + (isFinite(horas) && (dias.length || nDias) ? L('Media por día trabajado', hh(horas / (dias.length || nDias)), (dias.length || nDias) + ' días con trabajo') : '')
@@ -11571,7 +11571,15 @@ function gpResumenPersona(p, l, per, hoy, todos){
       return L('Neto', euro(pag), 'Lo que ha recibido') + L('Bruto', isFinite(bru) ? euro(bru) : '—', 'El de una nómina que le dejara ese neto (Seguridad Social e IRPF)')
         + L('Coste para la empresa', euro(coste), 'No desgrava: es lo que hay que ganar antes del ' + Math.round(t * 100) + ' % de impuestos para pagarlo')
         + (isFinite(nom) ? L('En nómina costaría', euro(nom), 'Bruto + Seguridad Social de empresa; desgrava: ' + euro(nom * (1 - t)) + ' tras impuestos') : '')
-        + (hOk ? L('Neto por hora', euro(base / horas)) + L('Coste por hora', euro(base / (1 - t) / horas)) : ''); })()
+        + (() => { if(!hOk) return '';
+          // V11.73 (Daniel): como en Ren. obras, cada día trabajado debería tener las horas operativas de referencia (6 h); las que faltan son horas perdidas (sin los días de inspección) y valen lo que da la hora en la obra de referencia
+          const R2 = window.RENT, hd = Number((R2 && R2.param && R2.param.horasDia) || 6), tope = (R2 && R2.param && R2.param.diasTope) || {}, dl = (dias.length ? dias : (diasH || [])).filter(x => !tope[x.f]);
+          let ingH = NaN; try{ const ref = R2 && R2.P && R2.referencia(R2.P); ingH = ref ? ref.ingH : NaN; }catch(e){}
+          const perdH = Math.max(0, hd * dl.length - dl.reduce((s2, x) => s2 + x.h, 0)), perdE = isFinite(ingH) ? perdH * ingH : 0, costeH = base / (1 - t) + perdE;   // los días con horas ya son los del mismo tramo que «base»
+          return L('Horas perdidas', hh(perdH), dl.length + ' días a ' + hh(hd).replace(' h', '') + ' h operativas' + (Object.keys(tope).length ? ', sin los días de inspección' : '') + (desdeH ? ', desde el ' + desdeH.split('-').reverse().join('/') : '') + (isFinite(ingH) ? ' · ' + euro(ingH) + '/h de la obra' : ''))
+            + L('Coste de oportunidad', euro(perdE), 'Lo que esas horas habrían dado en otra obra')
+            + L('Coste real', euro(coste + perdE), 'Coste para la empresa + coste de oportunidad')
+            + L('Neto por hora', euro(base / horas)) + L('Coste real por hora', euro(costeH / horas)); })(); })()
     + `<div class="gp-pers-f"><span><small>${notas.join(' ')}</small></span></div>`;
 }
 function renderGastoPersonal(per, hoy){
@@ -11593,7 +11601,7 @@ function renderGastoPersonal(per, hoy){
     if(c && c === c.toUpperCase()) c = c.toLowerCase();   // solo lo que viene todo en mayúsculas del banco; lo escrito a mano se deja como está
     c = c.split(/\s\(|\.\s|;\s|\s—\s/)[0].replace(/[,:]\s*$/, ''); if(c.length > 70) c = c.slice(0, 68).replace(/\s+\S*$/, '') + '…';   // solo lo primero, sin la explicación larga
     return c.charAt(0).toUpperCase() + c.slice(1); };
-  const todos = {daniH: 0}; try{ const dl = (g['Dani'] || []); if(_gpHoras && dl.length){ let prev = null; dl.slice().sort((a, b) => String(a.d.dateRaw).localeCompare(String(b.d.dateRaw))).forEach(x => { const ds = gpDiasPago(x.d, prev); if(ds.length){ todos.daniH += ds.reduce((s, y) => s + y.h, 0); prev = String(x.d.dateRaw).slice(0, 10); } }); } }catch(e){}
+  const todos = {daniH: 0, daniDia: {}}; try{ const dl = (g['Dani'] || []); if(_gpHoras && dl.length){ let prev = null; dl.slice().sort((a, b) => String(a.d.dateRaw).localeCompare(String(b.d.dateRaw))).forEach(x => { const ds = gpDiasPago(x.d, prev); if(ds.length){ todos.daniH += ds.reduce((s, y) => s + y.h, 0); ds.forEach(y => { todos.daniDia[y.f] = (todos.daniDia[y.f] || 0) + y.h; }); prev = String(x.d.dateRaw).slice(0, 10); } }); } }catch(e){}
   el.innerHTML = filas.length ? filas.map(([p, l, v]) => { const ab = _gpPersAbierta === p;
     return `<div class="gp-pers${ab ? ' abierta' : ''}" data-gp-pers="${escHtml(p)}"><div class="gp-pers-c"><span>${escHtml(p)}<small>${l.length} ${l.length === 1 ? 'pago' : 'pagos'}</small></span><b>${euro(v)}</b></div>${ab ? `<div class="gp-pers-l">${gpResumenPersona(p, l, per, hoy || new Date(), todos)}<div class="gp-pers-f" style="font-weight:800;"><span>Pagos</span></div>${l.sort((a, b) => String(b.d.dateRaw).localeCompare(String(a.d.dateRaw))).map(x => `<div class="gp-pers-f"${x.d.banco ? '' : ` data-gp-doc="${x.d.id}"`}><span>${fF(x.d)} · ${escHtml(limpio(x.d.concepto || x.d.categoria))}${x.mitad != null ? `<small>Mitad de ${euro(x.mitad)}</small>` : ''}</span><b>${euro(x.v)}</b></div>`).join('')}</div>` : ''}</div>`; }).join('') : '<div class="empty" style="padding:10px;">En este periodo no hay pagos a personas.</div>';
   if(!el.dataset.listo){ el.dataset.listo = '1'; el.addEventListener('click', ev => { const f = ev.target.closest('[data-gp-doc]'); if(f){ try{ if(typeof openDocumentViewer === 'function') openDocumentViewer(f.dataset.gpDoc); }catch(e){} return; } const p = ev.target.closest('[data-gp-pers]'); if(!p || ev.target.closest('.gp-pers-l')) return; _gpPersAbierta = _gpPersAbierta === p.dataset.gpPers ? null : p.dataset.gpPers; const per2 = document.querySelector('#gpro-resumen .filters:first-child .chip-filter.active')?.dataset.per || 'trim'; renderGastoPersonal(per2, new Date()); }); }
