@@ -1125,6 +1125,7 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .ie-pasar-a{display:flex;gap:8px;align-items:flex-start;margin:0 20px 16px 20px;padding:0;background:none;}
 .ie-pasar-a .ps-pasar{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2;}   /* sin marcar: neutras, como las pastillas no elegidas */
 .ie-pasar-a .ps-pasar:active{background:var(--concrete);}
+.ie-pasar-a .ps-tipo-sel{border-color:var(--orange);color:var(--ink);} .ie-pasar-a .ps-tipo-sel[disabled]{border-color:var(--line);color:var(--ink-soft);cursor:default;} .ps-tipo-bloq{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:4px;}
 .rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
 .te-queso{width:100% !important;max-width:560px;height:auto !important;margin:0 auto 4px !important;}
 .te-svg{width:100%;height:auto;display:block;overflow:visible;}
@@ -2118,7 +2119,7 @@ button.ie-hist-p{font-family:inherit;cursor:pointer;}
 #ps-menu{position:fixed;z-index:2147483100;display:flex;flex-direction:column;gap:6px;padding:10px;background:var(--paper);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 34px rgba(0,0,0,.28);max-width:calc(100vw - 16px);animation:psMenuEntra .14s ease-out;}
 @keyframes psMenuEntra{from{opacity:0;transform:translateY(6px) scale(.98);}to{opacity:1;transform:none;}}
 .ps-menu-op{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;text-align:left;}
-.ps-menu-op.act{border:2px solid var(--ink);}
+.ps-menu-op.act{border:2px solid var(--orange);}   /* V11.59: lo marcado, solo con borde naranja (regla de Daniel) */
 .ps-menu-op:not(.pill).act{background:var(--paper);border-color:var(--ink);color:var(--ink);}   /* V9.70: lo elegido en blanco con aro, sin negro */
 .ps-menu-tit{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin:6px 4px 0;}
 .ps-menu-tgs{display:flex;flex-wrap:wrap;gap:6px;max-width:260px;}
@@ -4794,11 +4795,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.58" defer></script>
-<script src="costes/norm.js?v=V11.58" defer></script>
-<script src="ajustes/calc.js?v=V11.58" defer></script>
+<script src="rentabilidad/rent.js?v=V11.59" defer></script>
+<script src="costes/norm.js?v=V11.59" defer></script>
+<script src="ajustes/calc.js?v=V11.59" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.58</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.59</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4950,7 +4951,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.58</div>
+        <div class="sub" id="version-badge">V11.59</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7860,7 +7861,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
          Solo aparece si hay alguna transición válida para ESTE documento en su estado actual;
          una factura ya emitida nunca la muestra. -->
     <div class="ie-pasar-a ie-edit-only" id="ni-pasar-a-wrap" style="display:none;">
-      <span class="tb-ftit" style="cursor:default;">Pasar a</span><div class="pillsel" id="ni-pasar-a-pastillas"></div>
+      <span class="tb-ftit" style="cursor:default;">Tipo</span><div class="pillsel" id="ni-pasar-a-pastillas"></div>
     </div>
 
     <div class="ie-historial ie-edit-only" id="ni-historial" style="display:none;"></div>
@@ -12526,10 +12527,8 @@ function accionesDocumento(doc){
   // transiciones (Pasar a…/Volver a…) con la MISMA terminología y el mismo criterio en todas
   // las filas de todas las secciones — nunca "Crear factura" cuando se está evolucionando
   // un documento existente
-  const transiciones = transicionesDocumento(doc).map(t=>({
-    t: etiquetaTransicion(t),
-    fn: t.volver ? `volverAFaseAnterior('${doc.id}')` : `avanzarFaseDocumento('${doc.id}','${t.tipo}')`,
-  }));
+  // V11.59: el tipo se cambia con un solo selector dentro del documento (delante o atrás); aquí solo se ofrece abrirlo
+  const transiciones = (['presupuesto','albaran','proforma','factura'].includes(doc.type) && !docBloqueoTipo(doc)) ? [{t: 'Cambiar de tipo', fn: `openDocumentViewer('${doc.id}')`}] : [];
   if(doc.type==='factura'){
     const estado = doc.estado_cobro || 'pendiente_enviar';
     if(doc.enviado_gestor || ['pendiente_cobrar','parcial','cobrado'].includes(estado)){
@@ -12565,6 +12564,25 @@ function abrirMenuAccionesMovil(docId, event){
   const botones = gestor.concat(accionesDocumento(doc).filter(x=>x.t!=='Editar'))
     .map(x=>`<button class="btn" style="width:100%;text-align:left;margin-bottom:6px;" onclick="cerrarModalGenerico();${x.fn}">${x.t}</button>`).join('');
   mostrarModalGenerico(tipoDocEtiqueta(doc.type)+' '+(doc.num||'')+' — '+doc.client, `<div style="display:flex;flex-direction:column;">${botones}</div>`);
+}
+function docBloqueoTipo(doc){   // V11.59: mismo criterio que factura_bloqueo_tipo en la base de datos
+  if(!doc || doc.type !== 'factura') return null;
+  if(doc.enviado_gestor) return 'ya se mandó al gestor';
+  const n = /^\d+$/.test(String(doc.num || doc.numero || '')) ? Number(doc.num || doc.numero) : null, an = String(doc.dateRaw || doc.fecha_devengo || '').slice(0, 4);
+  if(n == null) return null;
+  const mayor = Object.values(documentosRealesById).filter(x => x.type === 'factura' && x.id !== doc.id && String(x.dateRaw || x.fecha_devengo || '').slice(0, 4) === an && /^\d+$/.test(String(x.num || x.numero || ''))).map(x => Number(x.num || x.numero)).filter(x => x > n);
+  return mayor.length ? 'ya existe la factura ' + Math.max(...mayor) + ' y quedaría un hueco en la numeración' : null;
+}
+async function cambiarTipoDocumento(id, tipo){
+  if(!exigirNivelTipo(tipo,'editar') || !exigirNivelDoc(id,'editar') || !sb) return;
+  const doc = documentosRealesById[id]; if(!doc) return;
+  const H = Array.isArray(doc.historial_tipos) ? doc.historial_tipos : [], ult = [...H].reverse().find(x => x && x.paso_a === doc.type && !x.volvio), restaura = ult && ult.tipo === tipo;
+  const extra = {}; if(!restaura && ['factura','proforma'].includes(tipo)) extra.numero = proximoNumero(tipo);
+  const {error} = await sb.rpc('cambiar_tipo_documento', {p_documento_id: id, p_tipo: tipo, p_campos_extra: extra});
+  if(error){ mostrarToast('Error: ' + errText(error)); return; }
+  if(!restaura && tipo === 'factura'){ await sb.from('documentos_economicos').update({forma_pago: 'TRANSFERENCIA', iban: EMPRESA_BANCO.iban, titular: EMPRESA_BANCO.titular, concepto_transferencia: conceptoDeFactura(extra.numero)}).eq('id', id); }
+  mostrarToast(restaura ? `Vuelve a ${tipoDocEtiqueta(tipo).toLowerCase()} como estaba antes.` : `Pasado a ${tipoDocEtiqueta(tipo).toLowerCase()}: es el mismo documento y guarda de qué era antes.`);
+  await cargarDocumentosEconomicosReales(); openDocumentViewer(id);
 }
 async function avanzarFaseDocumento(id, tipoDestino){
   if(!exigirNivelTipo(tipoDestino,'editar') || !exigirNivelDoc(id,'editar')) return;
@@ -29129,21 +29147,21 @@ function openDocumentViewer(id){
   { let en = document.getElementById('ni-enlaces'); if(!en){ en = document.createElement('div'); en.id = 'ni-enlaces'; en.style.cssText = 'font-size:12px;color:var(--ink-soft);margin:4px 0 8px;line-height:1.5;'; btnOriginal.insertAdjacentElement('afterend', en); }
     try{ const e = enlacesDocumento(doc); en.innerHTML = e.detalle.length ? 'Enlazado con · ' + e.detalle.map(x => '<span class="link-btn" style="' + (x.avisa ? 'color:var(--red,#B3261E);' : '') + '" onclick="openDocumentViewer(\'' + x.id + '\')">' + escHtml(x.texto) + '</span>').join(' · ') + e.avisos.map(a => '<br><span style="color:var(--red,#B3261E);">' + escHtml(a) + '</span>').join('') : ''; en.style.display = e.detalle.length ? '' : 'none'; }catch(err){ en.innerHTML = ''; } }
   ieHistorial(doc);
-  document.getElementById('ni-otras-acciones').innerHTML = accionesDocumento(doc).filter(x=>x.t!=='Editar' && x.t!=='Imprimir' && !x.t.startsWith('Pasar a') && !x.t.startsWith('← Volver a')).map(x=>`<button type="button" class="btn sm" onclick="${x.fn}">${x.t}</button>`).join('');
+  document.getElementById('ni-otras-acciones').innerHTML = accionesDocumento(doc).filter(x=>x.t!=='Editar' && x.t!=='Imprimir' && !x.t.startsWith('Pasar a') && !x.t.startsWith('← Volver a') && x.t !== 'Cambiar de tipo').map(x=>`<button type="button" class="btn sm" onclick="${x.fn}">${x.t}</button>`).join('');
   // PASAR A… — desplegable único con la transición principal preseleccionada
   {
-    // V8.38 (01/10 se tocó «Volver a Albarán» 6 s después de «Pasar a Proforma» sin querer): «Volver a…» ya no va en las pastillas, va en Más acciones
-    const todasTr = transicionesDocumento(doc), opciones = todasTr.filter(t => !t.volver), trVolver = todasTr.find(t => t.volver);
-    { const bv = document.getElementById('ni-volver'); if(bv){ bv.style.display = trVolver ? '' : 'none'; if(trVolver) bv.textContent = '← Volver a ' + tipoDocEtiqueta(trVolver.tipo, false); } }
-    const wrap = document.getElementById('ni-pasar-a-wrap');
-    if(opciones.length){
-      wrap.style.display = 'flex';
-      const pas = document.getElementById('ni-pasar-a-pastillas');
-      pas.innerHTML = opciones.map(t=>`<button type="button" class="ps-pasar ${t.principal ? 'principal' : ''} ${t.volver ? 'atras' : ''}" data-v="${valorTransicion(t)}">${t.volver ? '← Volver a ' + tipoDocEtiqueta(t.tipo, false) : tipoDocEtiqueta(t.tipo, false) + ' →'}</button>`).join('');
-      pas.onclick = ev => { const b = ev.target.closest('.ps-pasar'); if(b) ejecutarTransicion(b.dataset.v); };
-    } else {
-      wrap.style.display = 'none';
-    }
+    // V11.59 (Daniel 14/10: «es un selector que te deja pasar atrás, y tú le dices la opción»): un solo selector de tipo; el mismo documento pasa al que elijas (delante o atrás).
+    // Una factura ya mandada al gestor o con una factura posterior numerada no cambia de tipo (dejaría un hueco), pero se puede seguir editando.
+    { const bv = document.getElementById('ni-volver'); if(bv) bv.style.display = 'none'; }
+    const wrap = document.getElementById('ni-pasar-a-wrap'), pas = document.getElementById('ni-pasar-a-pastillas');
+    if(['presupuesto','albaran','proforma','factura'].includes(doc.type) && !['nula','rectificativa'].includes(doc.estado_cobro)){
+      wrap.style.display = 'flex'; const bloq = docBloqueoTipo(doc);
+      pas.innerHTML = `<button type="button" class="ps-pasar ps-tipo-sel" id="ni-tipo-sel"${bloq ? ' disabled' : ''}>${tipoDocEtiqueta(doc.type, false)}</button>${bloq ? `<span class="ps-tipo-bloq">No puede cambiar de tipo: ${escHtml(bloq)}. Se puede seguir editando.</span>` : ''}`;
+      const b = document.getElementById('ni-tipo-sel'); b.value = doc.type;
+      if(!bloq) b.onclick = () => { const H = Array.isArray(doc.historial_tipos) ? doc.historial_tipos : [], antes = new Set(H.map(h => h.tipo));
+        const ops = ['presupuesto','albaran','proforma','factura'].filter(t => t !== 'presupuesto' || doc.type === 'presupuesto' || antes.has('presupuesto')).map(t => [t, tipoDocEtiqueta(t, false)]);
+        psMenuAbrir(b, ops, false, v => { if(v && v !== doc.type) cambiarTipoDocumento(doc.id, v); }); };
+    } else wrap.style.display = 'none';
   }
   onClientChange();
   // los datos de cliente propios de ESTE documento (si los hay) pisan lo que acaba de
