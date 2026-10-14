@@ -4838,11 +4838,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.88" defer></script>
-<script src="costes/norm.js?v=V11.88" defer></script>
-<script src="ajustes/calc.js?v=V11.88" defer></script>
+<script src="rentabilidad/rent.js?v=V11.89" defer></script>
+<script src="costes/norm.js?v=V11.89" defer></script>
+<script src="ajustes/calc.js?v=V11.89" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.88</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.89</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4994,7 +4994,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.88</div>
+        <div class="sub" id="version-badge">V11.89</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -25085,7 +25085,8 @@ function tbRender(){
   ayuda.style.display = _tbVista === 'historial' ? 'none' : '';
   ayuda.textContent = tbHayFiltros() ? 'Con filtros puestos no se pueden mover los trabajos. Quita los filtros para reordenarlos.' : _tbFiltro !== 'todos' ? 'Filtrando por ' + _tbFiltro + '. Toca el contador otra vez para ver todos y poder mover trabajos.' : _tbVista === 'tramites' ? 'Trabajos terminados a los que les falta el albarán, la factura o el cobro.' : _tbVista === 'enmarcha' ? 'Trabajos que ya están en marcha. Mantén pulsado uno y arrástralo para cambiarlo de sitio.' : 'Ordenados por su día en el calendario. Si arrastras uno, se mueve también en el calendario.';
   ayuda.style.display = _tbVista === 'historial' ? 'none' : ''; if(window._tbVistaSuelta){ ayuda.innerHTML = `<span>${ayuda.innerHTML}</span>` + window._tbVistaSuelta; ayuda.style.display = 'flex'; ayuda.style.alignItems = 'center'; ayuda.style.gap = '8px'; ayuda.style.justifyContent = 'space-between'; } else { ayuda.style.display = _tbVista === 'historial' ? 'none' : ''; }
-  const carta = (j, esHis) => { if(!esHis && (_tbVista === 'tramites' || _tbVista === 'enmarcha')){ const d = tbDocDe(j);   // V11.79: también en Activos (albarán en «Trabajo activo»)
+  const carta = (j, esHis) => { if(!esHis && (_tbVista === 'tramites' || _tbVista === 'enmarcha') && (j.docs || []).length && !tbDocDe(j) && !_docsListos) return '<div class="tb-cargando" style="padding:12px 6px;font-size:13px;color:var(--ink-soft);">Cargando…</div>';   // V11.89 (Daniel): al cargar no sale primero la tarjeta del trabajo y luego la del albarán
+    if(!esHis && (_tbVista === 'tramites' || _tbVista === 'enmarcha')){ const d = tbDocDe(j);   // V11.79: también en Activos (albarán en «Trabajo activo»)
  if(d){ const h = tbDocCartaHtml(j, d); if(h) return h; } } return tbCartaHtml(j, esHis); };
   if(_tbVista === 'historial'){ tbRenderComputo(filtrados); lista.innerHTML = filtrados.length ? filtrados.map(j => carta(j, true)).join('') : '<div class="empty" style="padding:24px;">' + (his.length ? 'Ningún trabajo cumple los filtros.' : 'Aún no hay trabajos cobrados.') + '</div>'; return; }
   const ver = _tbFiltro === 'todos' ? filtrados : filtrados.filter(j => tbPrioridades(j).includes(_tbFiltro));
@@ -25253,6 +25254,17 @@ async function tbSyncDoc(docId){
   if(document.getElementById('tb-lista')) tbRender();
 }
 document.addEventListener('exg-docs-listos', () => { if((_tbVista === 'tramites' || _tbVista === 'enmarcha') && document.getElementById('tb-lista')) tbRender(); });   // V11.85 (reporte f308b882): también Activos   // V11.77: si Trámites se pintó antes de cargar los documentos
+// V11.89 (Daniel 14/10): un trabajo en Activos es su albarán en «Trabajo activo»: al darle ✓ en Pendientes se crea ya, con el cliente y la obra puestos; «Ir al albarán» lo abre para editarlo
+async function tbEmpezar(j){
+  const antes = tbFoto(j), nom = escHtml(j.cliente || j.trabajo || 'Trabajo');
+  const ent = clientes.find(c => c.esCli !== false && tbNorm(c.name) === tbNorm(j.cliente)), hoy = new Date().toISOString().slice(0, 10), num = 'A' + siguienteNumeroNuevo('albaran');
+  const fila = {tipo: 'albaran', estado: 'emitido', numero: num, fecha_devengo: hoy, entidad_id: ent ? ent.id : null, obra_texto: [j.trabajo, j.lugar].filter(Boolean).join(' · ') || null, importe: 0, concepto: '', conceptos: [], contabilidad: 'oficial', iva_pct: 21, tratamiento_iva: 'normal', estado_cobro: 'trabajo_activo'};
+  const {data, error} = await sb.from('documentos_economicos').insert(fila).select().single();
+  if(error){ mostrarToast('No se pudo crear el albarán: ' + errText(error), 'err'); return; }
+  documentosRealesById[data.id] = {...data, type: 'albaran', num: data.numero, client: ent ? ent.name : '—', job: '—', dateRaw: data.fecha_devengo, dateLabel: formatFechaLabel(new Date(data.fecha_devengo)), amountLabel: '0,00 €', status: 'Validado', items: [], ivaPct: 21, tratamientoIva: 'normal', total: 0, base: 0, iva: 0};
+  j.docs = [...(j.docs || []), data.id]; j.estado = 'Activo'; tbRender(); await tbPersistir(j);
+  avisoDeshacer(nom + ': ahora en <b>Activos</b>, con su albarán ' + escHtml(num), async () => { await sb.from('documentos_economicos').delete().eq('id', data.id); delete documentosRealesById[data.id]; j.docs = (j.docs || []).filter(x => x !== data.id); await tbVolver(j, antes); }, 6, {txt: 'Ir al albarán', fn: () => openDocumentViewer(data.id)});
+}
 function tbDocDe(j){ const ids = (j.docs || []).slice().reverse(); for(const id of ids){ const d = documentosRealesById[id]; if(d) return d; } return null; }
 // la misma tarjeta de Documentos (construirCardMovil), sin la casilla de selección
 function tbDocCartaHtml(j, d){
@@ -25261,7 +25273,6 @@ function tbDocCartaHtml(j, d){
     const ent = clientes.find(c => c.id === d.entidad_id), trab = (typeof jobs !== 'undefined' ? jobs : []).find(x => x.id === d.trabajo_id);
     const tot = Number(d.importe ?? d.total ?? 0), url = d.archivo_url || (d.archivo_path ? `https://sshctqnpuolawtcujxkt.supabase.co/storage/v1/object/public/documentos-exg/${d.archivo_path}` : null);
     construirCardMovil(d, tipo, 'tb-doc-tmp', 'tb-doc-chk', tot.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €', formatFechaCorta(d.fecha_devengo), ent, trab, url, calidadCorta(d));
-    tmp.querySelectorAll('.fc-check').forEach(x => x.remove());
     const card = tmp.firstElementChild; if(!card) return null; card.removeAttribute('id'); card.innerHTML = card.innerHTML.split('estado-doc-dd-cm-').join('estado-doc-dd-tbcm-');
     // V11.78 (Daniel 14/10, enfadado): nada de «Hacer factura» ni «Marcar cobrado» fuera: el tipo se elige dentro del editor y el cobro con el estado de la tarjeta
     return `<div class="tb-doc${window._docCompacto ? ' cc-compacto' : ''}" data-id="${j.id}">${card.outerHTML}</div>`;   // V11.85 (reporte 0709cc2a): sin envoltorio de tarjeta de trabajo, para que sea EXACTAMENTE la de Documentos
@@ -25336,6 +25347,13 @@ async function tbAccion(id, a){
     return;
   }
   if(a === 'alb' || a === 'fac') return tbHacerDoc(j, a === 'alb' ? 'albaran' : 'factura');
+  if(a === 'fin' && TB_EST_PENDIENTES.includes(j.estado) && !tbDocDe(j)) return tbEmpezar(j);   // V11.89 (Daniel): en Activos todo es albarán: al empezar se crea su albarán en «Trabajo activo»
+  if(a === 'fin' && TB_EST_ENMARCHA.includes(j.estado) && tbDocDe(j)){   // terminar un trabajo con albarán: el albarán pasa a «Listo para entregar» y el trabajo a Trámites
+    const d = tbDocDe(j), antes = tbFoto(j), est = d.estado_cobro;
+    await cambiarEstadoDocumento(d.tipo || d.type || 'albaran', d.id, 'pendiente_enviar', '');
+    avisoDeshacer(escHtml(j.cliente || j.trabajo || 'Trabajo') + ': ahora en <b>Trámites</b>', async () => { await sb.from('documentos_economicos').update({estado_cobro: est}).eq('id', d.id); d.estado_cobro = est; await tbVolver(j, antes); }, 6, {txt: 'Ir al albarán', fn: () => openDocumentViewer(d.id)});
+    return;
+  }
   if(a === 'fin'){   // V8.53: ✓ = trabajo terminado, pasa a Trámites; V11.81 (Daniel 14/10): en Pendientes el ✓ lo pasa a Activos
     const sig = TB_EST_PENDIENTES.includes(j.estado) ? 'Activo' : TB_EST_TRAMITES.includes(j.estado) ? TB_ESTADOS[Math.min(TB_ESTADOS.indexOf(j.estado) + 1, TB_ESTADOS.length - 1)] : 'Albarán';
     if(sig === j.estado) return;
