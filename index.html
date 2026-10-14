@@ -4795,11 +4795,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.60" defer></script>
-<script src="costes/norm.js?v=V11.60" defer></script>
-<script src="ajustes/calc.js?v=V11.60" defer></script>
+<script src="rentabilidad/rent.js?v=V11.61" defer></script>
+<script src="costes/norm.js?v=V11.61" defer></script>
+<script src="ajustes/calc.js?v=V11.61" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.60</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.61</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4951,7 +4951,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.60</div>
+        <div class="sub" id="version-badge">V11.61</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9892,7 +9892,8 @@ const SL_T = {   // 2026 — comprobar con la gestoría antes de decidir
   minimo: 5550, dificilPct: .05, dificilMax: 2000, otrosGastosTrabajo: 2000,
   isMicro: [[50000, .19], [Infinity, .21]],   // microempresa (cifra de negocios < 1 M€), Ley 7/2024
   cuotaSocietarioMes: 448.69,   // base mínima 1.424,40 € × 31,5 %
-  extraGestoriaAno: 1200        // contabilidad, cuentas anuales e Impuesto de Sociedades (estimado)
+  extraGestoriaAno: 1200,       // contabilidad, cuentas anuales e Impuesto de Sociedades (estimado)
+  salarioMaquinista: 28053      // convenio de la construcción de Córdoba, nivel VIII (maquinista), bruto al año
 };
 const slEscala = (b, E) => { let r = 0, d = 0; for(const [h, t] of E){ if(b <= d) break; r += (Math.min(b, h) - d) * t; d = h; } return r; };
 const slIrpf = b => Math.max(0, slEscala(Math.max(0, b), SL_T.estatal) + slEscala(Math.max(0, b), SL_T.andalucia) - slEscala(SL_T.minimo, SL_T.estatal) - slEscala(SL_T.minimo, SL_T.andalucia));
@@ -9907,7 +9908,7 @@ async function slPintar(){
   const ing = sum(F, impBaseFactura), gas = sum(G, impGastoDeducible);
   const esSS = d => /seguridad social|aut[oó]nomo/i.test(String(d.categoria || '')), cuotaRafa = sum(G.filter(esSS), impGastoDeducible);
   const retiradas = sum((_slSoc || []).filter(x => x.f > dIso && x.f <= hIso), x => x.imp);
-  if(_slSalario == null) _slSalario = Math.round(retiradas / 100) * 100 || 18000;
+  if(_slSalario == null) _slSalario = 2 * SL_T.salarioMaquinista;   // V11.61 (Daniel): la jugada es que Rafa cobre en la SL el salario de dos personas (el suyo y el de Manolo): 2 × el de maquinista de convenio
   // AUTÓNOMO (estimación directa simplificada): rendimiento neto − 5 % de gastos de difícil justificación (máx. 2.000 €) → IRPF
   const rend = ing - gas, dificil = Math.min(SL_T.dificilMax, Math.max(0, rend) * SL_T.dificilPct), baseA = Math.max(0, rend - dificil), irpfA = slIrpf(baseA), netoA = rend - irpfA;
   // SL: la empresa paga el salario de Rafa y su cuota de autónomo societario; Impuesto de Sociedades; Rafa paga IRPF por su salario; lo que sobra se queda en la empresa o se reparte (dividendos)
@@ -9927,13 +9928,13 @@ async function slPintar(){
     <div class="sl-f sl-cab"><span></span><b>Autónomo</b><b>SL</b></div>
     ${fila('Ingresos', e0(ing), e0(ing), '', F.length + ' facturas, sin IVA')}
     ${fila('Gastos de la empresa', '−' + e0(gas), '−' + e0(gasSL), '', 'En la SL: cuota de autónomo societario y gestoría más cara')}
-    ${fila('Salario de Rafa', '—', '−' + e0(sal), '', 'En la SL es gasto de la empresa')}
+    ${fila('Salario de Rafa', '—', '−' + e0(sal), '', sal === 2 * SL_T.salarioMaquinista ? 'Por dos personas: 2 × ' + e0(SL_T.salarioMaquinista) + ' de maquinista (convenio). Gasto de la empresa' : 'En la SL es gasto de la empresa')}
     ${fila('Beneficio antes de impuestos', e0(rend), e0(benSL), 'sl-neg')}
     ${fila('Impuesto', '−' + e0(irpfA), '−' + e0(isSL), '', 'Autónomo: IRPF de Rafa · SL: Sociedades (19 %)')}
     ${fila('IRPF del salario de Rafa', '—', '−' + e0(irpfSal))}
     ${fila('Limpio si el beneficio se queda en la empresa', e0(netoA), e0(netoSLdeja), 'sl-tot', `Diferencia: <span style="color:${col(difD)};font-weight:800;">${(difD >= 0 ? '+' : '') + e0(difD)}</span>`)}
     ${fila('Limpio si se reparte todo', e0(netoA), e0(netoSLreparte), 'sl-tot', `Dividendos: −${e0(impDiv)} de impuesto · diferencia <span style="color:${col(dif)};font-weight:800;">${(dif >= 0 ? '+' : '') + e0(dif)}</span>`)}
-    <div class="sl-aj"><span>Salario de Rafa en la SL<small>Hoy se lleva ${e0(retiradas)} al año en retiradas</small></span><input type="text" inputmode="numeric" id="sl-sal" value="${sal}"> €</div>
+    <div class="sl-aj"><span>Salario de Rafa en la SL<small>Por dos personas: ${e0(2 * SL_T.salarioMaquinista)} · hoy Rafa y Manolo se llevan ${e0(retiradas)} al año en retiradas</small></span><input type="text" inputmode="numeric" id="sl-sal" value="${sal}"> €</div>
     <div class="sl-aj"><span>Salario que más deja limpio<small>Con ${e0(mejorS)} de salario, repartiendo todo el beneficio</small></span><b>${e0(mejorN)}</b></div>
     <div class="sl-nota">Cálculo aproximado: no cuenta deducciones personales ni lo que va en B. La cuota de autónomo de Rafa (${e0(cuotaRafa)} al año) ya está dentro de los gastos de los dos lados. Confírmalo con la gestoría antes de decidir.</div>
   </div>
@@ -9941,7 +9942,7 @@ async function slPintar(){
     <details class="sl-v"><summary>El dinero ya no es vuestro, es de la empresa</summary><div>Como autónomo, lo que entra en la cuenta es de Rafa: lo que saca para casa o un gasto personal no hay que explicarlo, simplemente no se declara como gasto. En una SL el dinero es de la sociedad: todo lo que sale hacia vosotros tiene que ser salario, dividendo o préstamo, y un gasto personal pagado con dinero de la empresa no se puede deducir y Hacienda puede tratarlo como sueldo encubierto. Por eso en la SL todo tiene que estar justificado.</div></details>
     <details class="sl-v"><summary>Contabilidad completa</summary><div>La SL lleva contabilidad oficial (libro diario, balance), presenta las cuentas anuales en el Registro Mercantil cada año y el Impuesto de Sociedades (modelos 200 y 202). Todos los ingresos y gastos tienen que estar en las cuentas. La gestoría cuesta más.</div></details>
     <details class="sl-v"><summary>Responsabilidad limitada</summary><div>Como autónomo, Rafa responde de las deudas de la empresa con todo lo suyo (casa, ahorros). En la SL responde la sociedad con su capital; lo personal queda a salvo, salvo lo que se avale personalmente (préstamos, leasing).</div></details>
-    <details class="sl-v"><summary>Manolo como socio de verdad</summary><div>Hoy la empresa es de Rafa y Manolo pero solo figura Rafa. En una SL los dos pueden ser socios con su parte escrita, cobrar los dos y repartir el beneficio según su parte. También facilita la herencia o la venta de la empresa.</div></details>
+    <details class="sl-v"><summary>Rafa cobra por los dos</summary><div>Manolo no entra como socio: Rafa es el socio y administrador y cobra un salario de dos personas (el doble del de maquinista de convenio), y lo reparte con Manolo por su cuenta. Así la empresa se queda con muy poco beneficio y casi todo tributa en el IRPF de Rafa. Como el salario es alto, sube el tramo de IRPF: por eso conviene mirar con la gestoría si compensa más un salario algo menor y dejar el resto en la empresa.</div></details>
     <details class="sl-v"><summary>Lo que cuesta cambiar</summary><div>Constituirla (notaría, registro, unos pocos cientos de euros; el capital mínimo es 1 €), nuevo NIF y numeración de facturas, pasar las máquinas y vehículos a la sociedad (seguros, ITV, contratos) y avisar a clientes y proveedores. La cuota de autónomo societario es más alta: mínimo ${e0(SL_T.cuotaSocietarioMes)} al mes.</div></details>
     <details class="sl-v"><summary>Ventajas de la SL además de los impuestos</summary><div>Más imagen ante clientes grandes y administraciones, más facilidad para pedir financiación, y el beneficio que se deja en la empresa paga menos impuesto (19 %) que en el IRPF de Rafa (hasta el 45 %), lo que permite ahorrar para comprar maquinaria.</div></details>
   </div>`;
