@@ -4795,11 +4795,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.67" defer></script>
-<script src="costes/norm.js?v=V11.67" defer></script>
-<script src="ajustes/calc.js?v=V11.67" defer></script>
+<script src="rentabilidad/rent.js?v=V11.68" defer></script>
+<script src="costes/norm.js?v=V11.68" defer></script>
+<script src="ajustes/calc.js?v=V11.68" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.67</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.68</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4951,7 +4951,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.67</div>
+        <div class="sub" id="version-badge">V11.68</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11529,9 +11529,48 @@ async function gpBancoCargar(){   // retiradas y pagos personales del banco desd
     if(data.length < 1000) break; d2 += 1000; } }catch(e){ console.error('Gasto de personal: banco', e); }
   _gpBanco = out; _gpBancoCargando = false; try{ const per = document.querySelector('#gpro-resumen .filters:first-child .chip-filter.active')?.dataset.per || 'trim'; renderGastoPersonal(per, new Date()); }catch(e){}
 }
+// ===== V11.68 (Daniel 14/10/2026): coste de personal de cada uno: pagado, días, horas, €/hora, al mes, bruto, neto y coste =====
+// Horas de cada día: las líneas con fecha de los documentos (Ren. obras). Dani: 100 € por día; si el pago no dice los días, son el día del pago y los anteriores
+// (desde el pago anterior) con más horas de trabajo; sus horas son la mitad de las de ese día (o las que diga el pago, «de 3 horas»).
+let _gpHoras = null, _gpHorasCargando = false;
+async function gpHorasCargar(){
+  if(_gpHoras || _gpHorasCargando || !window.RENT) return; _gpHorasCargando = true;
+  try{ const P = await RENT.cargar(false), m = {}; (RENT.efectivos(P).lista || []).forEach(d => (Array.isArray(d.conceptos) ? d.conceptos : []).forEach(c => { const f = String(c.fecha || '').slice(0, 10), h = Number(c.horas != null ? c.horas : (c.unidad === 'h' ? c.cantidad : 0)) || 0; if(/^\d{4}-\d{2}-\d{2}$/.test(f) && h > 0) m[f] = (m[f] || 0) + h; })); _gpHoras = m; }catch(e){ console.error('Gasto de personal: horas', e); _gpHoras = {}; }
+  _gpHorasCargando = false; try{ const per = document.querySelector('#gpro-resumen .filters:first-child .chip-filter.active')?.dataset.per || 'trim'; renderGastoPersonal(per, new Date()); }catch(e){}
+}
+function gpDiasPago(d, previo){   // días que paga un jornal de Dani y horas de cada uno
+  const H = _gpHoras || {}, t = String(d.concepto || ''), f = String(d.dateRaw || '').slice(0, 10), imp = Number(d.importe || 0);
+  if(!f || /en especie/i.test(t)) return [];
+  const hFija = (t.match(/de\s+(\d+(?:[.,]\d+)?)\s*horas/i) || [])[1], hDe = x => hFija ? Number(String(hFija).replace(',', '.')) : (H[x] || 0) / 2;
+  const lista = t.match(/(\d{1,2}(?:\s*,\s*\d{1,2})*\s+y\s+\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(lista){ const ds = lista[1].split(/\s*,\s*|\s+y\s+/).map(Number); return ds.map(n => { const x = lista[3] + '-' + String(lista[2]).padStart(2, '0') + '-' + String(n).padStart(2, '0'); return {f: x, h: hDe(x)}; }); }
+  const n = Math.max(1, Math.round(imp / 100)), desde = previo || new Date(new Date(f + 'T12:00:00').getTime() - 14 * 86400000).toISOString().slice(0, 10);
+  return Object.keys(H).filter(x => x > desde && x <= f).sort((a, b) => H[b] - H[a] || (b < a ? -1 : 1)).slice(0, n).sort().map(x => ({f: x, h: hDe(x)}));
+}
+function gpResumenPersona(p, l, per, hoy, todos){
+  const euro = n => { const [e, d] = Math.abs(Number(n || 0)).toFixed(2).split('.'); return (Number(n) < 0 ? '−' : '') + e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + d + ' €'; }, hh = n => (Math.round(n * 10) / 10).toLocaleString('es-ES') + ' h';
+  const pag = l.reduce((s, x) => s + x.v, 0), fechas = l.map(x => String(x.d.dateRaw || '').slice(0, 10)).filter(Boolean).sort();
+  const mPer = per === 'mes' ? 1 : per === 'trim' ? hoy.getMonth() % 3 + 1 : per === 'anio' ? hoy.getMonth() + 1 : per === '12m' ? 12 : 0;
+  const desdePrim = fechas.length ? (hoy.getFullYear() - +fechas[0].slice(0, 4)) * 12 + hoy.getMonth() - (+fechas[0].slice(5, 7) - 1) + 1 : 1, meses = Math.max(1, mPer ? Math.min(mPer, desdePrim) : desdePrim);
+  let dias = [], horas = NaN, cuota = 0, notas = [];
+  const H = _gpHoras;
+  if(p === 'Dani'){ if(H){ let prev = null; l.slice().sort((a, b) => String(a.d.dateRaw).localeCompare(String(b.d.dateRaw))).forEach(x => { const ds = gpDiasPago(x.d, prev); if(ds.length){ dias.push(...ds); prev = ds[ds.length - 1].f; } }); horas = dias.reduce((s, x) => s + x.h, 0); }
+    notas.push('Pagos en B: bruto, neto y coste son lo mismo. Desde el 08/10/2026 tiene nómina: faltan el bruto y el neto del contrato (pedido a Nuria).'); }
+  else if(p === 'Rafa' || p === 'Manolo'){
+    if(H && fechas.length){ const d0 = fechas[0], hTot = Object.keys(H).filter(x => x >= d0.slice(0, 7) + '-01' && x <= hoy.toISOString().slice(0, 10)).reduce((s, x) => s + H[x], 0); horas = Math.max(0, hTot - ((todos && todos.daniH) || 0)) / 2; }
+    if(p === 'Rafa'){ const ss = (typeof gastosTodosDocs === 'function' ? gastosTodosDocs() : gastosProDocs()).filter(d => /seguridad social aut/i.test(d.categoria || '')); cuota = filtrarDocsPeriodoComb(ss, per, hoy).reduce((s, d) => s + Number(d.importe || d.total || 0), 0); }
+    notas.push('Retiradas: sin nómina, bruto y neto son lo mismo y no desgravan.' + (p === 'Rafa' ? ' La cuota de autónomos apuntada es la del titular.' : ' No hay cuota de autónomos suya apuntada.')); }
+  const L = (a, b2, sub) => `<div class="gp-pers-f"><span>${a}${sub ? `<small>${sub}</small>` : ''}</span><b>${b2}</b></div>`;
+  return L('Pagado', euro(pag)) + (dias.length ? L('Días pagados', String(dias.length), dias.map(x => x.f.slice(8, 10) + '/' + x.f.slice(5, 7) + ' ' + hh(x.h)).join(' · ')) : '')
+    + (isFinite(horas) ? L('Horas', hh(horas), p === 'Dani' ? 'La mitad de las horas de los albaranes de esos días' : 'La mitad de las horas de los albaranes (sin las de Dani)') : L('Horas', _gpHoras ? '—' : 'Calculando…'))
+    + (isFinite(horas) && horas > 0 ? L('Por hora', euro(pag / horas)) : '') + L('Al mes', euro(pag / meses), meses + (meses === 1 ? ' mes' : ' meses'))
+    + L('Bruto', euro(pag)) + L('Neto', euro(pag)) + L('Coste para la empresa', euro(pag + cuota), cuota ? 'Con ' + euro(cuota) + ' de cuota de autónomos' : '')
+    + (isFinite(horas) && horas > 0 ? L('Coste por hora', euro((pag + cuota) / horas)) : '') + `<div class="gp-pers-f"><span><small>${notas.join(' ')}</small></span></div>`;
+}
 function renderGastoPersonal(per, hoy){
   const el = document.getElementById('gpro-personal'); if(!el) return;
   if(!_gpBanco){ gpBancoCargar(); }
+  if(!_gpHoras) gpHorasCargar();
   const docs = filtrarDocsPeriodoComb(typeof gastosTodosDocs === 'function' ? gastosTodosDocs() : gastosProDocs(), per, hoy || new Date()), banco = filtrarDocsPeriodoComb(_gpBanco || [], per, hoy || new Date());
   const euro = n => { const [e, d] = Math.abs(Number(n || 0)).toFixed(2).split('.'); return (Number(n) < 0 ? '−' : '') + e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + d + ' €'; };   // con punto de miles también en 4 cifras (7.630,89 €)
   const g = {}, mete = (p, it) => (g[p] = g[p] || []).push(it);
@@ -11547,8 +11586,9 @@ function renderGastoPersonal(per, hoy){
     if(c && c === c.toUpperCase()) c = c.toLowerCase();   // solo lo que viene todo en mayúsculas del banco; lo escrito a mano se deja como está
     c = c.split(/\s\(|\.\s|;\s|\s—\s/)[0].replace(/[,:]\s*$/, ''); if(c.length > 70) c = c.slice(0, 68).replace(/\s+\S*$/, '') + '…';   // solo lo primero, sin la explicación larga
     return c.charAt(0).toUpperCase() + c.slice(1); };
+  const todos = {daniH: 0}; try{ const dl = (g['Dani'] || []); if(_gpHoras && dl.length){ let prev = null; dl.slice().sort((a, b) => String(a.d.dateRaw).localeCompare(String(b.d.dateRaw))).forEach(x => { const ds = gpDiasPago(x.d, prev); if(ds.length){ todos.daniH += ds.reduce((s, y) => s + y.h, 0); prev = ds[ds.length - 1].f; } }); } }catch(e){}
   el.innerHTML = filas.length ? filas.map(([p, l, v]) => { const ab = _gpPersAbierta === p;
-    return `<div class="gp-pers${ab ? ' abierta' : ''}" data-gp-pers="${escHtml(p)}"><div class="gp-pers-c"><span>${escHtml(p)}<small>${l.length} ${l.length === 1 ? 'pago' : 'pagos'}</small></span><b>${euro(v)}</b></div>${ab ? `<div class="gp-pers-l">${l.sort((a, b) => String(b.d.dateRaw).localeCompare(String(a.d.dateRaw))).map(x => `<div class="gp-pers-f"${x.d.banco ? '' : ` data-gp-doc="${x.d.id}"`}><span>${fF(x.d)} · ${escHtml(limpio(x.d.concepto || x.d.categoria))}${x.mitad != null ? `<small>Mitad de ${euro(x.mitad)}</small>` : ''}</span><b>${euro(x.v)}</b></div>`).join('')}</div>` : ''}</div>`; }).join('') : '<div class="empty" style="padding:10px;">En este periodo no hay pagos a personas.</div>';
+    return `<div class="gp-pers${ab ? ' abierta' : ''}" data-gp-pers="${escHtml(p)}"><div class="gp-pers-c"><span>${escHtml(p)}<small>${l.length} ${l.length === 1 ? 'pago' : 'pagos'}</small></span><b>${euro(v)}</b></div>${ab ? `<div class="gp-pers-l">${gpResumenPersona(p, l, per, hoy || new Date(), todos)}<div class="gp-pers-f" style="font-weight:800;"><span>Pagos</span></div>${l.sort((a, b) => String(b.d.dateRaw).localeCompare(String(a.d.dateRaw))).map(x => `<div class="gp-pers-f"${x.d.banco ? '' : ` data-gp-doc="${x.d.id}"`}><span>${fF(x.d)} · ${escHtml(limpio(x.d.concepto || x.d.categoria))}${x.mitad != null ? `<small>Mitad de ${euro(x.mitad)}</small>` : ''}</span><b>${euro(x.v)}</b></div>`).join('')}</div>` : ''}</div>`; }).join('') : '<div class="empty" style="padding:10px;">En este periodo no hay pagos a personas.</div>';
   if(!el.dataset.listo){ el.dataset.listo = '1'; el.addEventListener('click', ev => { const f = ev.target.closest('[data-gp-doc]'); if(f){ try{ if(typeof openDocumentViewer === 'function') openDocumentViewer(f.dataset.gpDoc); }catch(e){} return; } const p = ev.target.closest('[data-gp-pers]'); if(!p || ev.target.closest('.gp-pers-l')) return; _gpPersAbierta = _gpPersAbierta === p.dataset.gpPers ? null : p.dataset.gpPers; const per2 = document.querySelector('#gpro-resumen .filters:first-child .chip-filter.active')?.dataset.per || 'trim'; renderGastoPersonal(per2, new Date()); }); }
 }
 function renderGastosProResumen(){
