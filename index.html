@@ -4795,11 +4795,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.70" defer></script>
-<script src="costes/norm.js?v=V11.70" defer></script>
-<script src="ajustes/calc.js?v=V11.70" defer></script>
+<script src="rentabilidad/rent.js?v=V11.71" defer></script>
+<script src="costes/norm.js?v=V11.71" defer></script>
+<script src="ajustes/calc.js?v=V11.71" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.70</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.71</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4951,7 +4951,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.70</div>
+        <div class="sub" id="version-badge">V11.71</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11547,6 +11547,10 @@ function gpDiasPago(d, previo){   // días que paga un jornal de Dani y horas de
   const n = Math.max(1, Math.round(imp / 100)), desde = previo || new Date(new Date(f + 'T12:00:00').getTime() - 14 * 86400000).toISOString().slice(0, 10);
   return Object.keys(H).filter(x => x > desde && x < f).sort((a, b) => H[b] - H[a] || (b < a ? -1 : 1)).slice(0, n).sort().map(x => ({f: x, h: hDe(x)}));
 }
+// V11.71 (Daniel): neto = lo que recibe; bruto = el de una nómina que le dejara ese neto (Seguridad Social del trabajador e IRPF);
+// coste para la empresa = lo que la empresa tiene que ganar antes de impuestos para sacarlo, porque en B (o en retiradas) no desgrava: neto ÷ (1 − impuesto)
+function gpBrutoDe(netoAnual){ try{ const ss = ceSS('indefinido', 6.70).trab, net = b => b - b * ss - ceIrpfTrabajador(b, b * ss); let lo = netoAnual, hi = netoAnual * 2; for(let i = 0; i < 50; i++){ const m = (lo + hi) / 2; if(net(m) < netoAnual) lo = m; else hi = m; } return (lo + hi) / 2; }catch(e){ return NaN; } }
+function gpNominaCoste(bruto){ try{ return bruto * (1 + ceSS('indefinido', 6.70).emp + (CE_REF.flc || 0) / 100); }catch(e){ return NaN; } }
 function gpResumenPersona(p, l, per, hoy, todos){
   const euro = n => { const [e, d] = Math.abs(Number(n || 0)).toFixed(2).split('.'); return (Number(n) < 0 ? '−' : '') + e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + d + ' €'; }, hh = n => (Math.round(n * 10) / 10).toLocaleString('es-ES') + ' h';
   const pag = l.reduce((s, x) => s + x.v, 0), fechas = l.map(x => String(x.d.dateRaw || '').slice(0, 10)).filter(Boolean).sort();
@@ -11555,16 +11559,20 @@ function gpResumenPersona(p, l, per, hoy, todos){
   let dias = [], horas = NaN, cuota = 0, notas = [], nDias = 0, desdeH = null, pagH = NaN;   // pagH: lo pagado desde que hay horas apuntadas (para el €/h)
   const H = _gpHoras;
   if(p === 'Dani'){ if(H){ let prev = null; l.slice().sort((a, b) => String(a.d.dateRaw).localeCompare(String(b.d.dateRaw))).forEach(x => { const ds = gpDiasPago(x.d, prev); if(ds.length){ dias.push(...ds); prev = String(x.d.dateRaw).slice(0, 10); } }); horas = dias.reduce((s, x) => s + x.h, 0); }
-    notas.push('Pagos en B: bruto, neto y coste son lo mismo. Desde el 08/10/2026 tiene nómina: faltan el bruto y el neto del contrato (pedido a Nuria).'); }
+    notas.push('Hasta el 08/10/2026, en B. Desde entonces tiene nómina: su bruto y neto reales saldrán del contrato (pedido a Nuria).'); }
   else if(p === 'Rafa' || p === 'Manolo'){
     if(H && fechas.length){ const h0 = Object.keys(H).sort()[0] || '9999', d0 = fechas[0] > h0 ? fechas[0].slice(0, 7) + '-01' : h0, kd = Object.keys(H).filter(x => x >= d0 && x <= hoy.toISOString().slice(0, 10)), hTot = kd.reduce((s, x) => s + H[x], 0); nDias = kd.length; desdeH = d0; pagH = l.filter(x => String(x.d.dateRaw || '').slice(0, 10) >= d0).reduce((s, x) => s + x.v, 0); horas = Math.max(0, hTot - ((todos && todos.daniH) || 0)) / 2; }
-    notas.push('Retiradas: sin nómina, bruto y neto son lo mismo y no desgravan. Su cuota de autónomos es gasto de la empresa, no suyo.'); }   // V11.70 (Daniel): Rafa como empleado no es Rafa como empresa
+    notas.push('Retiradas: no desgravan. Su cuota de autónomos es gasto de la empresa, no suyo.'); }   // V11.70 (Daniel): Rafa como empleado no es Rafa como empresa
   const L = (a, b2, sub) => `<div class="gp-pers-f"><span>${a}${sub ? `<small>${sub}</small>` : ''}</span><b>${b2}</b></div>`;
-  return L('Pagado', euro(pag)) + (dias.length ? L('Días pagados', String(dias.length), dias.map(x => x.f.slice(8, 10) + '/' + x.f.slice(5, 7) + ' ' + hh(x.h)).join(' · ')) : '') + (isFinite(horas) && (dias.length || nDias) ? L('Media por día trabajado', hh(horas / (dias.length || nDias)), (dias.length || nDias) + ' días con trabajo') : '')
+  return (dias.length ? L('Días pagados', String(dias.length), dias.map(x => x.f.slice(8, 10) + '/' + x.f.slice(5, 7) + ' ' + hh(x.h)).join(' · ')) : '') + (isFinite(horas) && (dias.length || nDias) ? L('Media por día trabajado', hh(horas / (dias.length || nDias)), (dias.length || nDias) + ' días con trabajo') : '')
     + (isFinite(horas) ? L('Horas', hh(horas), p === 'Dani' ? 'La mitad de las horas de los albaranes de esos días' : 'La mitad de las horas de los albaranes (sin las de Dani)') : L('Horas', _gpHoras ? '—' : 'Calculando…'))
-    + (isFinite(horas) && horas > 0 ? L('Por hora', euro((isFinite(pagH) ? pagH : pag) / horas), desdeH ? euro(pagH) + ' cobrados desde el ' + desdeH.split('-').reverse().join('/') + ', cuando empiezan las horas apuntadas' : '') : '') + L('Al mes', euro(pag / meses), meses + (meses === 1 ? ' mes' : ' meses'))
-    + L('Bruto', euro(pag)) + L('Neto', euro(pag)) + L('Coste para la empresa', euro(pag + cuota), cuota ? 'Con ' + euro(cuota) + ' de cuota de autónomos' : '')
-    + (isFinite(horas) && horas > 0 ? L('Coste por hora', euro(((isFinite(pagH) ? pagH : pag) + cuota) / horas)) : '') + `<div class="gp-pers-f"><span><small>${notas.join(' ')}</small></span></div>`;
+    + (isFinite(horas) && horas > 0 && desdeH ? L('Para el precio por hora', euro(pagH), 'Cobrado desde el ' + desdeH.split('-').reverse().join('/') + ', cuando empiezan las horas apuntadas') : '') + L('Al mes', euro(pag / meses), meses + (meses === 1 ? ' mes' : ' meses'))
+    + (() => { const t = Math.max(0, Math.min(0.6, Number((window.RENT && RENT.param && RENT.param.impuesto) || 20) / 100)), base = isFinite(pagH) ? pagH : pag, kAn = 12 / meses, bru = gpBrutoDe(pag * kAn) / kAn, coste = pag / (1 - t), nom = gpNominaCoste(bru), hOk = isFinite(horas) && horas > 0;
+      return L('Neto', euro(pag), 'Lo que ha recibido') + L('Bruto', isFinite(bru) ? euro(bru) : '—', 'El de una nómina que le dejara ese neto (Seguridad Social e IRPF)')
+        + L('Coste para la empresa', euro(coste), 'No desgrava: es lo que hay que ganar antes del ' + Math.round(t * 100) + ' % de impuestos para pagarlo')
+        + (isFinite(nom) ? L('En nómina costaría', euro(nom), 'Bruto + Seguridad Social de empresa; desgrava: ' + euro(nom * (1 - t)) + ' tras impuestos') : '')
+        + (hOk ? L('Neto por hora', euro(base / horas)) + L('Coste por hora', euro(base / (1 - t) / horas)) : ''); })()
+    + `<div class="gp-pers-f"><span><small>${notas.join(' ')}</small></span></div>`;
 }
 function renderGastoPersonal(per, hoy){
   const el = document.getElementById('gpro-personal'); if(!el) return;
