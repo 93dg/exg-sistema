@@ -4794,11 +4794,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.57" defer></script>
-<script src="costes/norm.js?v=V11.57" defer></script>
-<script src="ajustes/calc.js?v=V11.57" defer></script>
+<script src="rentabilidad/rent.js?v=V11.58" defer></script>
+<script src="costes/norm.js?v=V11.58" defer></script>
+<script src="ajustes/calc.js?v=V11.58" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.57</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.58</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4950,7 +4950,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.57</div>
+        <div class="sub" id="version-badge">V11.58</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12486,9 +12486,15 @@ function transicionesDocumento(doc){
     out.push({tipo:'factura', principal:false});
   } else if(doc.type==='proforma'){
     out.push({tipo:'factura', principal:true});
+    out.push({tipo:'albaran', principal:false});
+  } else if(doc.type==='factura' && !doc.enviado_gestor){
+    out.push({tipo:'albaran', principal:false});
   }
-  // V11.57 (Daniel 14/10: «no se vuelve para atrás»): un documento solo avanza (presupuesto → albarán → proforma → factura); ya no hay «Volver a…»
-  return out;
+  // V11.58 (Daniel 14/10: «en cualquier momento se vuelve para atrás o se restaura lo anterior»): es el MISMO documento; «Volver a…» lo deja como estaba antes de su último paso
+  const H = Array.isArray(doc.historial_tipos) ? doc.historial_tipos : [], ult = [...H].reverse().find(x => x && x.paso_a === doc.type && !x.volvio);
+  const res = out.filter(t => !(ult && ult.tipo === t.tipo));   // si lo anterior era de ese tipo, se ofrece volver (lo restaura tal cual), no pasar
+  if(ult && !(doc.type === 'factura' && doc.enviado_gestor)) res.push({tipo: ult.tipo, principal: false, volver: true});
+  return res;
   // "volver a la fase anterior" solo si de verdad existe en este expediente, y nunca en una
   // factura ya emitida (pendiente de cobro / parcial / cobrada)
   const puedeVolver = doc.documento_anterior_id && !(doc.type==='factura' && doc.status!=='Borrador');
@@ -12586,6 +12592,15 @@ async function avanzarFaseDocumento(id, tipoDestino){
 async function volverAFaseAnterior(id){
   if(!exigirNivelDoc(id,'editar')) return;
   const doc = documentosRealesById[id];
+  // V11.58: el mismo documento vuelve a como estaba (tipo, número, fecha, importe y estado); el historial guarda la vuelta
+  const H = doc && Array.isArray(doc.historial_tipos) ? doc.historial_tipos : [], ult = [...H].reverse().find(x => x && x.paso_a === doc.type && !x.volvio);
+  if(doc && ult && sb){
+    if(!(await confirmarAccion(`¿Volver a ${tipoDocEtiqueta(ult.tipo).toLowerCase()}${ult.numero ? ' ' + ult.numero : ''}? Es el mismo documento: queda como estaba antes y en su historial.`))) return;
+    const {error} = await sb.rpc('restaurar_fase_anterior', {p_documento_id: id});
+    if(error){ mostrarToast('Error: ' + errText(error)); return; }
+    mostrarToast(`Vuelto a ${tipoDocEtiqueta(ult.tipo).toLowerCase()}: como estaba antes.`);
+    await cargarDocumentosEconomicosReales(); openDocumentViewer(id); return;
+  }
   if(!doc || !doc.documento_anterior_id || !sb) return;
   if(!(await confirmarAccion(`¿Volver a ${tipoDocEtiqueta(documentosRealesById[doc.documento_anterior_id]?.tipo || '')}? Este documento (${tipoDocEtiqueta(doc.type)}) quedará en el historial del expediente, no se borra.`))) return;
   const {error} = await sb.rpc('retroceder_fase', {p_expediente_id: doc.expediente_id, p_documento_destino_id: doc.documento_anterior_id});
@@ -19212,7 +19227,7 @@ function fcAlternar(card){
   const x = document.createElement('div'); x.className = 'fc-detalle'; const pie = card.querySelector(':scope > .fte-doc'); pie ? card.insertBefore(x, pie) : card.appendChild(x);
   // V11.57 (Daniel: «tiene que ser un documento con su historial»): al abrir la tarjeta se ve de qué era antes este mismo documento
   const histH = () => { const H = Array.isArray(d.historial_tipos) ? d.historial_tipos : []; if(!H.length) return ''; const f = x => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(x || '')); return m ? m[3] + '/' + m[2] + '/' + m[1].slice(2) : ''; };
-    return '<div class="fc-hist">' + H.map(h => '<div><span>' + escHtml(tipoDocEtiqueta(h.tipo)) + (h.numero ? ' ' + escHtml(h.numero) : '') + (h.fecha ? ' · ' + f(h.fecha) : '') + '</span><span>Pasó a ' + escHtml(tipoDocEtiqueta(h.paso_a).toLowerCase()) + ' el ' + f(h.cuando) + '</span></div>').join('') + '</div>'; };
+    return '<div class="fc-hist">' + H.map(h => '<div><span>' + escHtml(tipoDocEtiqueta(h.tipo)) + (h.numero ? ' ' + escHtml(h.numero) : '') + (h.fecha ? ' · ' + f(h.fecha) : '') + '</span><span>' + (h.volvio_a ? 'Volvió a ' + escHtml(tipoDocEtiqueta(h.volvio_a).toLowerCase()) : 'Pasó a ' + escHtml(tipoDocEtiqueta(h.paso_a).toLowerCase())) + ' el ' + f(h.cuando) + '</span></div>').join('') + '</div>'; };
   const pon = () => { const h = fcLineasHtml(d); x.innerHTML = h == null ? '<div class="fc-sin">Cargando líneas…</div>' : histH() + h; return h != null; };
   if(d.historial_tipos === undefined){ try{ sb.from('documentos_economicos').select('historial_tipos').eq('id', d.id).maybeSingle().then(r => { d.historial_tipos = (r && r.data && r.data.historial_tipos) || []; pon(); }); }catch(e){} }
   if(!pon()){ try{ if(typeof sb !== 'undefined' && sb) sb.from('documentos_economicos').select('conceptos').eq('id', d.id).maybeSingle().then(r => { d.conceptos = (r && r.data && r.data.conceptos) || []; pon(); }).catch(() => { x.innerHTML = '<div class="fc-sin">No se pudieron cargar las líneas</div>'; }); }catch(er){ x.innerHTML = '<div class="fc-sin">No se pudieron cargar las líneas</div>'; } }
