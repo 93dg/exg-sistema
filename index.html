@@ -4795,11 +4795,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.59" defer></script>
-<script src="costes/norm.js?v=V11.59" defer></script>
-<script src="ajustes/calc.js?v=V11.59" defer></script>
+<script src="rentabilidad/rent.js?v=V11.60" defer></script>
+<script src="costes/norm.js?v=V11.60" defer></script>
+<script src="ajustes/calc.js?v=V11.60" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.59</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.60</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4951,7 +4951,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.59</div>
+        <div class="sub" id="version-badge">V11.60</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9883,6 +9883,83 @@ function dirTareas(d, v){
     const r = f(v); return r ? {...t, auto: true, detalle: r.detalle, importe: r.importe, hecha: false} : null;
   }).filter(Boolean);
 }
+// V11.60 (Daniel 14/10): Dirección › Autónomo o SL: cuánto le queda limpio a la familia hoy como autónomo (Rafa) y cuánto le quedaría con una SL, con los números reales
+// de los últimos 12 meses (solo lo oficial: facturas y gastos deducibles) y los tipos de 2026. En la SL el salario de Rafa y la cuota de autónomos son gasto de la empresa.
+const SL_T = {   // 2026 — comprobar con la gestoría antes de decidir
+  estatal: [[12450, .095], [20200, .12], [35200, .15], [60000, .185], [300000, .225], [Infinity, .245]],
+  andalucia: [[13000, .095], [21100, .12], [35200, .15], [60000, .185], [Infinity, .225]],
+  ahorro: [[6000, .19], [50000, .21], [200000, .23], [300000, .27], [Infinity, .30]],
+  minimo: 5550, dificilPct: .05, dificilMax: 2000, otrosGastosTrabajo: 2000,
+  isMicro: [[50000, .19], [Infinity, .21]],   // microempresa (cifra de negocios < 1 M€), Ley 7/2024
+  cuotaSocietarioMes: 448.69,   // base mínima 1.424,40 € × 31,5 %
+  extraGestoriaAno: 1200        // contabilidad, cuentas anuales e Impuesto de Sociedades (estimado)
+};
+const slEscala = (b, E) => { let r = 0, d = 0; for(const [h, t] of E){ if(b <= d) break; r += (Math.min(b, h) - d) * t; d = h; } return r; };
+const slIrpf = b => Math.max(0, slEscala(Math.max(0, b), SL_T.estatal) + slEscala(Math.max(0, b), SL_T.andalucia) - slEscala(SL_T.minimo, SL_T.estatal) - slEscala(SL_T.minimo, SL_T.andalucia));
+let _slSalario = null, _slSoc = null;
+async function slPintar(){
+  const el = document.getElementById('sl-app'); if(!el) return;
+  const hoy = new Date(), desde = new Date(hoy); desde.setFullYear(desde.getFullYear() - 1); const dIso = desde.toISOString().slice(0, 10), hIso = hoy.toISOString().slice(0, 10);
+  const en12 = d => { const f = String(d.dateRaw || d.fecha_devengo || '').slice(0, 10); return f > dIso && f <= hIso; };
+  let F = [], G = []; try{ F = impFacturasValidas().filter(en12); G = impGastosOficiales().filter(d => !impMotivoExclusion(d)).filter(en12); }catch(e){}
+  if(!_slSoc){ try{ const S = await costeSociosCargar(); _slSoc = S; }catch(e){ _slSoc = []; } }
+  const sum = (a, f) => a.reduce((t, x) => t + (Number(f(x)) || 0), 0);
+  const ing = sum(F, impBaseFactura), gas = sum(G, impGastoDeducible);
+  const esSS = d => /seguridad social|aut[oó]nomo/i.test(String(d.categoria || '')), cuotaRafa = sum(G.filter(esSS), impGastoDeducible);
+  const retiradas = sum((_slSoc || []).filter(x => x.f > dIso && x.f <= hIso), x => x.imp);
+  if(_slSalario == null) _slSalario = Math.round(retiradas / 100) * 100 || 18000;
+  // AUTÓNOMO (estimación directa simplificada): rendimiento neto − 5 % de gastos de difícil justificación (máx. 2.000 €) → IRPF
+  const rend = ing - gas, dificil = Math.min(SL_T.dificilMax, Math.max(0, rend) * SL_T.dificilPct), baseA = Math.max(0, rend - dificil), irpfA = slIrpf(baseA), netoA = rend - irpfA;
+  // SL: la empresa paga el salario de Rafa y su cuota de autónomo societario; Impuesto de Sociedades; Rafa paga IRPF por su salario; lo que sobra se queda en la empresa o se reparte (dividendos)
+  const sal = Math.max(0, Number(_slSalario) || 0), cuotaSoc = SL_T.cuotaSocietarioMes * 12, gasSL = gas - cuotaRafa + cuotaSoc + SL_T.extraGestoriaAno;
+  const benSL = ing - gasSL - sal, isSL = slEscala(Math.max(0, benSL), SL_T.isMicro), trasIS = benSL - isSL;
+  const irpfSal = slIrpf(Math.max(0, sal - SL_T.otrosGastosTrabajo)), salNeto = sal - irpfSal;
+  const impDiv = slEscala(Math.max(0, trasIS), SL_T.ahorro), netoSLdeja = salNeto + trasIS, netoSLreparte = salNeto + trasIS - impDiv;
+  // salario de Rafa que más deja limpio repartiéndolo todo (se prueba de 500 en 500 €)
+  const netoCon = S => { const b = ing - gasSL - S, t = b - slEscala(Math.max(0, b), SL_T.isMicro); return S - slIrpf(Math.max(0, S - SL_T.otrosGastosTrabajo)) + t - slEscala(Math.max(0, t), SL_T.ahorro); };
+  let mejorS = 0, mejorN = -Infinity; for(let S = 0; S <= Math.max(0, ing - gasSL); S += 500){ const n = netoCon(S); if(n > mejorN){ mejorN = n; mejorS = S; } }
+  const e0 = n => (n < 0 ? '−' : '') + Math.round(Math.abs(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €';
+  const fila = (t, a, b, cls, sub) => `<div class="sl-f ${cls || ''}"><span>${t}${sub ? `<small>${sub}</small>` : ''}</span><b>${a}</b><b>${b}</b></div>`;
+  const dif = netoSLreparte - netoA, difD = netoSLdeja - netoA;
+  const col = n => n >= 0 ? 'var(--green)' : 'var(--red)';
+  el.innerHTML = `<div class="sl-c">
+    <h3>Autónomo o SL</h3><div class="sl-sub">Lo que le queda limpio a la familia en un año, con lo facturado y gastado de verdad en los últimos 12 meses (solo lo oficial) y los impuestos de 2026.</div>
+    <div class="sl-f sl-cab"><span></span><b>Autónomo</b><b>SL</b></div>
+    ${fila('Ingresos', e0(ing), e0(ing), '', F.length + ' facturas, sin IVA')}
+    ${fila('Gastos de la empresa', '−' + e0(gas), '−' + e0(gasSL), '', 'En la SL: cuota de autónomo societario y gestoría más cara')}
+    ${fila('Salario de Rafa', '—', '−' + e0(sal), '', 'En la SL es gasto de la empresa')}
+    ${fila('Beneficio antes de impuestos', e0(rend), e0(benSL), 'sl-neg')}
+    ${fila('Impuesto', '−' + e0(irpfA), '−' + e0(isSL), '', 'Autónomo: IRPF de Rafa · SL: Sociedades (19 %)')}
+    ${fila('IRPF del salario de Rafa', '—', '−' + e0(irpfSal))}
+    ${fila('Limpio si el beneficio se queda en la empresa', e0(netoA), e0(netoSLdeja), 'sl-tot', `Diferencia: <span style="color:${col(difD)};font-weight:800;">${(difD >= 0 ? '+' : '') + e0(difD)}</span>`)}
+    ${fila('Limpio si se reparte todo', e0(netoA), e0(netoSLreparte), 'sl-tot', `Dividendos: −${e0(impDiv)} de impuesto · diferencia <span style="color:${col(dif)};font-weight:800;">${(dif >= 0 ? '+' : '') + e0(dif)}</span>`)}
+    <div class="sl-aj"><span>Salario de Rafa en la SL<small>Hoy se lleva ${e0(retiradas)} al año en retiradas</small></span><input type="text" inputmode="numeric" id="sl-sal" value="${sal}"> €</div>
+    <div class="sl-aj"><span>Salario que más deja limpio<small>Con ${e0(mejorS)} de salario, repartiendo todo el beneficio</small></span><b>${e0(mejorN)}</b></div>
+    <div class="sl-nota">Cálculo aproximado: no cuenta deducciones personales ni lo que va en B. La cuota de autónomo de Rafa (${e0(cuotaRafa)} al año) ya está dentro de los gastos de los dos lados. Confírmalo con la gestoría antes de decidir.</div>
+  </div>
+  <div class="sl-c"><h3>Lo que no son números</h3>
+    <details class="sl-v"><summary>El dinero ya no es vuestro, es de la empresa</summary><div>Como autónomo, lo que entra en la cuenta es de Rafa: lo que saca para casa o un gasto personal no hay que explicarlo, simplemente no se declara como gasto. En una SL el dinero es de la sociedad: todo lo que sale hacia vosotros tiene que ser salario, dividendo o préstamo, y un gasto personal pagado con dinero de la empresa no se puede deducir y Hacienda puede tratarlo como sueldo encubierto. Por eso en la SL todo tiene que estar justificado.</div></details>
+    <details class="sl-v"><summary>Contabilidad completa</summary><div>La SL lleva contabilidad oficial (libro diario, balance), presenta las cuentas anuales en el Registro Mercantil cada año y el Impuesto de Sociedades (modelos 200 y 202). Todos los ingresos y gastos tienen que estar en las cuentas. La gestoría cuesta más.</div></details>
+    <details class="sl-v"><summary>Responsabilidad limitada</summary><div>Como autónomo, Rafa responde de las deudas de la empresa con todo lo suyo (casa, ahorros). En la SL responde la sociedad con su capital; lo personal queda a salvo, salvo lo que se avale personalmente (préstamos, leasing).</div></details>
+    <details class="sl-v"><summary>Manolo como socio de verdad</summary><div>Hoy la empresa es de Rafa y Manolo pero solo figura Rafa. En una SL los dos pueden ser socios con su parte escrita, cobrar los dos y repartir el beneficio según su parte. También facilita la herencia o la venta de la empresa.</div></details>
+    <details class="sl-v"><summary>Lo que cuesta cambiar</summary><div>Constituirla (notaría, registro, unos pocos cientos de euros; el capital mínimo es 1 €), nuevo NIF y numeración de facturas, pasar las máquinas y vehículos a la sociedad (seguros, ITV, contratos) y avisar a clientes y proveedores. La cuota de autónomo societario es más alta: mínimo ${e0(SL_T.cuotaSocietarioMes)} al mes.</div></details>
+    <details class="sl-v"><summary>Ventajas de la SL además de los impuestos</summary><div>Más imagen ante clientes grandes y administraciones, más facilidad para pedir financiación, y el beneficio que se deja en la empresa paga menos impuesto (19 %) que en el IRPF de Rafa (hasta el 45 %), lo que permite ahorrar para comprar maquinaria.</div></details>
+  </div>`;
+  const inp = document.getElementById('sl-sal'); if(inp) inp.onchange = () => { _slSalario = Number(String(inp.value).replace(/\./g, '').replace(',', '.')) || 0; slPintar(); };
+}
+if(!document.getElementById('sl-css')){ const st = document.createElement('style'); st.id = 'sl-css'; st.textContent = `
+.sl-c{background:var(--paper,#fff);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin:0 0 10px;}
+.sl-c>h3{font-size:14px;font-weight:800;margin:2px 0 4px;}.sl-sub{font-size:11.5px;color:var(--ink-soft);margin-bottom:6px;}
+.sl-f{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 12px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:13px;}
+.sl-f>b{text-align:right;white-space:nowrap;font-weight:700;min-width:74px;}.sl-f>span small{display:block;font-size:11px;color:var(--ink-soft);font-weight:500;}
+.sl-cab{border-top:0;font-size:11.5px;color:var(--ink-soft);padding-bottom:2px;}.sl-cab>b{font-weight:800;color:var(--ink);}
+.sl-neg>span,.sl-neg>b{font-weight:800;}.sl-tot{background:var(--concrete);margin:4px -8px 0;padding:8px;border-radius:10px;border-top:0;}.sl-tot>span,.sl-tot>b{font-weight:800;}
+.sl-aj{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0 4px;font-size:13px;border-top:1px solid var(--line);margin-top:8px;}.sl-aj small{display:block;font-size:11px;color:var(--ink-soft);}
+.sl-aj input{width:90px;text-align:right;font-size:13px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-family:inherit;background:var(--paper,#fff);}
+.sl-nota{font-size:11px;color:var(--ink-soft);padding-top:6px;}
+.sl-v>summary{list-style:none;cursor:pointer;padding:8px 0;border-top:1px solid var(--line);font-size:13px;font-weight:700;-webkit-tap-highlight-color:transparent;}.sl-v>summary::-webkit-details-marker{display:none}
+.sl-v[open]>summary{border-left:2px solid var(--orange);padding-left:8px;}.sl-v>div{font-size:12.5px;line-height:1.45;padding:0 0 10px 10px;color:var(--ink);}
+`; document.head.appendChild(st); }
 async function dirGuardar(){ if(!sb || !_dirId) return; try{ await sb.from('sistema').update({data: _dirDatos, updated_at: new Date().toISOString()}).eq('id', _dirId); }catch(e){ mostrarToast('No se pudo guardar'); } }
 async function dirCargar(forzar){
   const app = document.getElementById('dir-app'); if(!app) return;
@@ -9896,9 +9973,10 @@ async function dirCargar(forzar){
 }
 function dirPintar(){
   const app0 = document.getElementById('dir-app'); if(!app0) return;
-  const pest = `<div class="dir-pest">${[['mando', 'Mando'], ['valor', 'Valor']].map(([k, l]) => `<button type="button" data-dir-pest="${k}" class="${_dirPest === k ? 'act' : ''}">${l}</button>`).join('')}</div>`;
+  const pest = `<div class="dir-pest">${[['mando', 'Mando'], ['valor', 'Valor'], ['sl', 'Autónomo o SL']].map(([k, l]) => `<button type="button" data-dir-pest="${k}" class="${_dirPest === k ? 'act' : ''}">${l}</button>`).join('')}</div>`;
   if(_dirPest === 'equipo') _dirPest = 'mando';   // V8.42: Equipo está ahora en Empresa › Personal
   if(_dirPest === 'valor'){ app0.innerHTML = pest + '<div id="vl-app"></div>'; if(_vl) vlPintar(); else vlCargar(); return; }
+  if(_dirPest === 'sl'){ app0.innerHTML = pest + '<div id="sl-app"></div>'; slPintar(); return; }
   app0.innerHTML = pest + '<div id="dir-mando"></div>'; const app = document.getElementById('dir-mando');
   const d = _dirDatos; if(!d){ app.innerHTML = '<div class="ce-nota">Todavía no hay datos de Dirección.</div>'; return; }
   const v = _dirVivo, tareas = dirTareas(d, _dirVivo), hechas = tareas.filter(t => t.hecha).length, pct = tareas.length ? hechas / tareas.length : 0;
