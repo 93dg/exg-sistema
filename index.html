@@ -4797,11 +4797,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.75" defer></script>
-<script src="costes/norm.js?v=V11.75" defer></script>
-<script src="ajustes/calc.js?v=V11.75" defer></script>
+<script src="rentabilidad/rent.js?v=V11.76" defer></script>
+<script src="costes/norm.js?v=V11.76" defer></script>
+<script src="ajustes/calc.js?v=V11.76" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.75</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.76</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4953,7 +4953,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.75</div>
+        <div class="sub" id="version-badge">V11.76</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -24988,7 +24988,9 @@ function tbCartaHtml(j, esHis, botonesHtml, extraHtml){
       (j.lugar ? `<span class="tb-chip">${escHtml(j.lugar)}</span>` : '');
     const botones = botonesHtml != null ? botonesHtml : (esHis ? '<button type="button" class="tb-ok tb-reabrir" data-a="reabrir" title="Volver a pendientes">↩</button>' : `<button type="button" class="tb-ok tb-eur" data-a="cobrar" title="Cobro, albarán o factura">€</button><button type="button" class="tb-ok" data-a="fin" title="Terminado: a Trámites">✓</button><button type="button" class="tb-ok tb-x" data-a="cancelar" title="Cancelar este trabajo">✕</button>`);
     const extraCancel = j.estado === 'Cancelado' && j.cancelado ? `<div class="tb-nota">Cancelado: ${escHtml((j.cancelado.motivos || []).join(' · '))}</div>` : j.cobro && j.cobro.forma ? `<div class="tb-nota">€ ${escHtml(j.cobro.importe != null ? Number(j.cobro.importe).toLocaleString('es-ES', {minimumFractionDigits: 2}) + ' € cobrados' : j.cobro.forma)}</div>` : '';
-    extraHtml = (extraHtml || '') + extraCancel;
+    // V11.76 (reporte 4558734e): en Trámites, hacer el albarán o la factura directamente desde la tarjeta
+    const accTra = !esHis && botonesHtml == null && TB_EST_TRAMITES.includes(j.estado) ? `<div class="tb-nota" style="display:flex;gap:14px;">${(j.estado === 'Albarán' ? [['alb', 'Hacer albarán'], ['fac', 'Hacer factura']] : j.estado === 'Factura' ? [['fac', 'Hacer factura']] : [['cobrar', 'Marcar cobrado']]).map(([a, t]) => `<button type="button" class="fte-lnk" data-a="${a}" style="background:none;border:0;padding:0;cursor:pointer;">${t}</button>`).join('')}</div>` : '';
+    extraHtml = (extraHtml || '') + extraCancel + accTra;
     return `<div class="tb-card" data-id="${j.id}" style="--pc:${TB_COLOR_PRIO[tbPrioPrincipal(pr)]};--pcb:${tbHexAlfa(TB_COLOR_PRIO[tbPrioPrincipal(pr)], 0.4)}"><div class="tb-bp" style="background:${barra};"></div><div class="tb-cuerpo"><div class="tb-l1">${titulo}</div>${chips ? `<div class="tb-l2">${chips}</div>` : ''}${nota}${extraHtml || ''}</div>${botones}</div>`;
   }
 
@@ -25176,6 +25178,8 @@ async function tbEliminar(id){
   _tbJobs = _tbJobs.filter(x => x.id !== j.id); if(_tbEditando) tbCerrarEditor(); tbRender(); mostrarToast('Trabajo quitado', 'ok');
 }
 // V8.53 (Daniel): € en cada trabajo — ya cobrado (con importe), hacer albarán, hacer factura u otra forma
+// V11.76 (reporte 4558734e): el albarán o la factura de un trabajo se hacen en el MISMO editor que el resto de la web, con el cliente y el trabajo ya puestos
+function tbHacerDoc(j, tipo){ tbHojaCerrar(); openNewInvoiceModal({tipo, clientName: j.cliente || '', jobLabel: j.trabajo || [j.cliente, j.lugar].filter(Boolean).join(' · ')}, true); }
 function tbCobro(j){
   tbHoja(j, 'Cobro de ' + (j.cliente || j.trabajo || 'este trabajo'), `<div class="tb-cob">
     <button type="button" data-cob="cobrado"><b>Ya cobrado</b><span>Escribe cuánto</span></button>
@@ -25184,13 +25188,12 @@ function tbCobro(j){
     <button type="button" data-cob="factura"><b>Hacer factura</b><span>Se abre ya rellenada</span></button>
     <button type="button" data-cob="otra"><b>Otra forma</b><span>Escribe cómo</span></button>
     <div id="tb-cob-otra" style="display:none;"><input type="text" id="tb-cob-txt" placeholder="Cómo se va a cobrar"><button type="button" class="btn primary" id="tb-cob-ok2">Guardar</button></div></div>`);
-  const ctx = {clientName: j.cliente || '', jobLabel: j.trabajo || ''};
   document.querySelectorAll('[data-cob]').forEach(b => b.onclick = async () => {
     const k = b.dataset.cob;
     if(k === 'cobrado'){ document.getElementById('tb-cob-imp').style.display = ''; document.getElementById('tb-cob-eur').focus(); return; }
     if(k === 'otra'){ document.getElementById('tb-cob-otra').style.display = ''; document.getElementById('tb-cob-txt').focus(); return; }
-    tbHojaCerrar(); j.estado = k === 'albaran' ? 'Albarán' : 'Factura'; tbRender(); await tbPersistir(j);
-    openNewInvoiceModal({...ctx, tipo: k === 'albaran' ? 'albaran' : 'factura'});
+    tbHojaCerrar(); if(!TB_EST_TRAMITES.includes(j.estado)){ j.estado = k === 'albaran' ? 'Albarán' : 'Factura'; tbRender(); await tbPersistir(j); }
+    tbHacerDoc(j, k === 'albaran' ? 'albaran' : 'factura');
   });
   document.getElementById('tb-cob-ok').onclick = async () => {
     const v = parseFloat(String(document.getElementById('tb-cob-eur').value).replace(/\./g, '').replace(',', '.')); if(!(v > 0)){ mostrarToast('Pon el importe', 'err'); return; }
@@ -25214,9 +25217,10 @@ function tbCancelar(j){
   };
 }
 // V11.42 (reporte 096ee9bb): lo que cambia un trabajo de golpe se puede deshacer durante 5 segundos (cuenta atrás en el aviso)
-function avisoDeshacer(html, deshacer, seg){
+function avisoDeshacer(html, deshacer, seg, ir){   // V11.76 (reporte 4558734e): «ir» = {txt, fn}: enlace para ir a donde ha pasado lo cambiado
   seg = seg || 5; document.querySelector('.c2-toast')?.remove(); clearTimeout(c2Aviso._t);
-  const t = document.createElement('div'); t.className = 'c2-toast'; t.innerHTML = `<span>${html}</span><button type="button" class="dsh">Deshacer <b>${seg}</b></button>`; document.body.appendChild(t);
+  const t = document.createElement('div'); t.className = 'c2-toast'; t.innerHTML = `<span>${html}</span>${ir ? `<button type="button" class="ir">${escHtml(ir.txt)}</button>` : ''}<button type="button" class="dsh">Deshacer <b>${seg}</b></button>`; document.body.appendChild(t);
+  if(ir){ const bi = t.querySelector('.ir'); bi.style.color = '#f0997b'; bi.onclick = () => { t.remove(); try{ ir.fn(); }catch(e){} }; }
   let n = seg; const iv = setInterval(() => { n--; if(n <= 0){ clearInterval(iv); t.remove(); } else { const b = t.querySelector('.dsh b'); if(b) b.textContent = n; } }, 1000);
   t.querySelector('.dsh').onclick = async () => { clearInterval(iv); t.remove(); try{ await deshacer(); mostrarToast('Deshecho', 'ok'); }catch(e){ mostrarToast('No se pudo deshacer: ' + errText(e), 'err'); } };
 }
@@ -25236,11 +25240,12 @@ async function tbAccion(id, a){
   if(a === 'borrar') return tbEliminar(id);
   if(a === 'cancelar') return tbCancelar(j);
   if(a === 'cobrar') return tbCobro(j);
+  if(a === 'alb' || a === 'fac') return tbHacerDoc(j, a === 'alb' ? 'albaran' : 'factura');
   if(a === 'fin'){   // V8.53 (Daniel): ✓ = trabajo terminado, pasa a Trámites (falta el albarán); en Trámites sigue avanzando hasta Cobrado
     const sig = TB_EST_TRAMITES.includes(j.estado) ? TB_ESTADOS[Math.min(TB_ESTADOS.indexOf(j.estado) + 1, TB_ESTADOS.length - 1)] : 'Albarán';
     if(sig === j.estado) return;
     const antes = tbFoto(j); j.estado = sig; if(sig === 'Cobrado') j.terminado_at = new Date().toISOString();
-    tbRender(); if(await tbPersistir(j)) avisoDeshacer(escHtml(j.cliente || j.trabajo || 'Trabajo') + ': ' + (sig === 'Cobrado' ? 'cobrado, al historial' : 'ahora <b>' + escHtml(sig) + '</b>'), () => tbVolver(j, antes));
+    tbRender(); if(await tbPersistir(j)) avisoDeshacer(escHtml(j.cliente || j.trabajo || 'Trabajo') + ': ' + (sig === 'Cobrado' ? 'cobrado, al historial' : 'ahora <b>' + escHtml(sig) + '</b>'), () => tbVolver(j, antes), 5, sig !== 'Cobrado' && _tbVista !== 'tramites' ? {txt: 'Ver en Trámites', fn: () => { _tbVista = 'tramites'; tbRender(); window.scrollTo(0, 0); }} : null);
   }
   else if(a === 'reabrir'){ const antes = tbFoto(j); j.estado = 'Pendiente'; j.terminado_at = null; j.orden = ((tbActivos()[0] || {}).orden || 1000) - 1000; tbRender(); if(await tbPersistir(j)) avisoDeshacer('Vuelve a pendientes, arriba del todo', () => tbVolver(j, antes)); }
 }
@@ -28704,10 +28709,7 @@ function abrirEditorConDatosIA(datos){
 }
 function openNewInvoiceModal(contexto, forzarEditorCompleto){
   contexto = contexto || {};
-  if(window.matchMedia('(max-width: 768px)').matches && !forzarEditorCompleto){
-    openInvoiceWizard(contexto);
-    return;
-  }
+  // V11.76 (reporte 4558734e): siempre el mismo editor completo, también en el móvil (el asistente de pasos era distinto al resto de la web)
   editingDocId = null;
   { const w = document.getElementById('ni-estado-modo-wrap'); if(w) w.style.display = 'none'; }
   document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview');
