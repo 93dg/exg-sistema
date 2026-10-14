@@ -4795,11 +4795,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.68" defer></script>
-<script src="costes/norm.js?v=V11.68" defer></script>
-<script src="ajustes/calc.js?v=V11.68" defer></script>
+<script src="rentabilidad/rent.js?v=V11.69" defer></script>
+<script src="costes/norm.js?v=V11.69" defer></script>
+<script src="ajustes/calc.js?v=V11.69" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.68</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.69</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4951,7 +4951,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.68</div>
+        <div class="sub" id="version-badge">V11.69</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -11530,8 +11530,8 @@ async function gpBancoCargar(){   // retiradas y pagos personales del banco desd
   _gpBanco = out; _gpBancoCargando = false; try{ const per = document.querySelector('#gpro-resumen .filters:first-child .chip-filter.active')?.dataset.per || 'trim'; renderGastoPersonal(per, new Date()); }catch(e){}
 }
 // ===== V11.68 (Daniel 14/10/2026): coste de personal de cada uno: pagado, días, horas, €/hora, al mes, bruto, neto y coste =====
-// Horas de cada día: las líneas con fecha de los documentos (Ren. obras). Dani: 100 € por día; si el pago no dice los días, son el día del pago y los anteriores
-// (desde el pago anterior) con más horas de trabajo; sus horas son la mitad de las de ese día (o las que diga el pago, «de 3 horas»).
+// Horas de cada día: las líneas con fecha de los documentos (Ren. obras). Dani: 100 € por día; si el pago no dice los días, son los días ANTERIORES al pago
+// (desde el pago anterior, sin el día del pago; V11.69, Daniel) con más horas de trabajo; sus horas son la mitad de las de ese día (o las que diga el pago, «de 3 horas»).
 let _gpHoras = null, _gpHorasCargando = false;
 async function gpHorasCargar(){
   if(_gpHoras || _gpHorasCargando || !window.RENT) return; _gpHorasCargando = true;
@@ -11545,7 +11545,7 @@ function gpDiasPago(d, previo){   // días que paga un jornal de Dani y horas de
   const lista = t.match(/(\d{1,2}(?:\s*,\s*\d{1,2})*\s+y\s+\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if(lista){ const ds = lista[1].split(/\s*,\s*|\s+y\s+/).map(Number); return ds.map(n => { const x = lista[3] + '-' + String(lista[2]).padStart(2, '0') + '-' + String(n).padStart(2, '0'); return {f: x, h: hDe(x)}; }); }
   const n = Math.max(1, Math.round(imp / 100)), desde = previo || new Date(new Date(f + 'T12:00:00').getTime() - 14 * 86400000).toISOString().slice(0, 10);
-  return Object.keys(H).filter(x => x > desde && x <= f).sort((a, b) => H[b] - H[a] || (b < a ? -1 : 1)).slice(0, n).sort().map(x => ({f: x, h: hDe(x)}));
+  return Object.keys(H).filter(x => x > desde && x < f).sort((a, b) => H[b] - H[a] || (b < a ? -1 : 1)).slice(0, n).sort().map(x => ({f: x, h: hDe(x)}));
 }
 function gpResumenPersona(p, l, per, hoy, todos){
   const euro = n => { const [e, d] = Math.abs(Number(n || 0)).toFixed(2).split('.'); return (Number(n) < 0 ? '−' : '') + e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + d + ' €'; }, hh = n => (Math.round(n * 10) / 10).toLocaleString('es-ES') + ' h';
@@ -11554,7 +11554,7 @@ function gpResumenPersona(p, l, per, hoy, todos){
   const desdePrim = fechas.length ? (hoy.getFullYear() - +fechas[0].slice(0, 4)) * 12 + hoy.getMonth() - (+fechas[0].slice(5, 7) - 1) + 1 : 1, meses = Math.max(1, mPer ? Math.min(mPer, desdePrim) : desdePrim);
   let dias = [], horas = NaN, cuota = 0, notas = [];
   const H = _gpHoras;
-  if(p === 'Dani'){ if(H){ let prev = null; l.slice().sort((a, b) => String(a.d.dateRaw).localeCompare(String(b.d.dateRaw))).forEach(x => { const ds = gpDiasPago(x.d, prev); if(ds.length){ dias.push(...ds); prev = ds[ds.length - 1].f; } }); horas = dias.reduce((s, x) => s + x.h, 0); }
+  if(p === 'Dani'){ if(H){ let prev = null; l.slice().sort((a, b) => String(a.d.dateRaw).localeCompare(String(b.d.dateRaw))).forEach(x => { const ds = gpDiasPago(x.d, prev); if(ds.length){ dias.push(...ds); prev = String(x.d.dateRaw).slice(0, 10); } }); horas = dias.reduce((s, x) => s + x.h, 0); }
     notas.push('Pagos en B: bruto, neto y coste son lo mismo. Desde el 08/10/2026 tiene nómina: faltan el bruto y el neto del contrato (pedido a Nuria).'); }
   else if(p === 'Rafa' || p === 'Manolo'){
     if(H && fechas.length){ const d0 = fechas[0], hTot = Object.keys(H).filter(x => x >= d0.slice(0, 7) + '-01' && x <= hoy.toISOString().slice(0, 10)).reduce((s, x) => s + H[x], 0); horas = Math.max(0, hTot - ((todos && todos.daniH) || 0)) / 2; }
@@ -11586,7 +11586,7 @@ function renderGastoPersonal(per, hoy){
     if(c && c === c.toUpperCase()) c = c.toLowerCase();   // solo lo que viene todo en mayúsculas del banco; lo escrito a mano se deja como está
     c = c.split(/\s\(|\.\s|;\s|\s—\s/)[0].replace(/[,:]\s*$/, ''); if(c.length > 70) c = c.slice(0, 68).replace(/\s+\S*$/, '') + '…';   // solo lo primero, sin la explicación larga
     return c.charAt(0).toUpperCase() + c.slice(1); };
-  const todos = {daniH: 0}; try{ const dl = (g['Dani'] || []); if(_gpHoras && dl.length){ let prev = null; dl.slice().sort((a, b) => String(a.d.dateRaw).localeCompare(String(b.d.dateRaw))).forEach(x => { const ds = gpDiasPago(x.d, prev); if(ds.length){ todos.daniH += ds.reduce((s, y) => s + y.h, 0); prev = ds[ds.length - 1].f; } }); } }catch(e){}
+  const todos = {daniH: 0}; try{ const dl = (g['Dani'] || []); if(_gpHoras && dl.length){ let prev = null; dl.slice().sort((a, b) => String(a.d.dateRaw).localeCompare(String(b.d.dateRaw))).forEach(x => { const ds = gpDiasPago(x.d, prev); if(ds.length){ todos.daniH += ds.reduce((s, y) => s + y.h, 0); prev = String(x.d.dateRaw).slice(0, 10); } }); } }catch(e){}
   el.innerHTML = filas.length ? filas.map(([p, l, v]) => { const ab = _gpPersAbierta === p;
     return `<div class="gp-pers${ab ? ' abierta' : ''}" data-gp-pers="${escHtml(p)}"><div class="gp-pers-c"><span>${escHtml(p)}<small>${l.length} ${l.length === 1 ? 'pago' : 'pagos'}</small></span><b>${euro(v)}</b></div>${ab ? `<div class="gp-pers-l">${gpResumenPersona(p, l, per, hoy || new Date(), todos)}<div class="gp-pers-f" style="font-weight:800;"><span>Pagos</span></div>${l.sort((a, b) => String(b.d.dateRaw).localeCompare(String(a.d.dateRaw))).map(x => `<div class="gp-pers-f"${x.d.banco ? '' : ` data-gp-doc="${x.d.id}"`}><span>${fF(x.d)} · ${escHtml(limpio(x.d.concepto || x.d.categoria))}${x.mitad != null ? `<small>Mitad de ${euro(x.mitad)}</small>` : ''}</span><b>${euro(x.v)}</b></div>`).join('')}</div>` : ''}</div>`; }).join('') : '<div class="empty" style="padding:10px;">En este periodo no hay pagos a personas.</div>';
   if(!el.dataset.listo){ el.dataset.listo = '1'; el.addEventListener('click', ev => { const f = ev.target.closest('[data-gp-doc]'); if(f){ try{ if(typeof openDocumentViewer === 'function') openDocumentViewer(f.dataset.gpDoc); }catch(e){} return; } const p = ev.target.closest('[data-gp-pers]'); if(!p || ev.target.closest('.gp-pers-l')) return; _gpPersAbierta = _gpPersAbierta === p.dataset.gpPers ? null : p.dataset.gpPers; const per2 = document.querySelector('#gpro-resumen .filters:first-child .chip-filter.active')?.dataset.per || 'trim'; renderGastoPersonal(per2, new Date()); }); }
