@@ -4793,11 +4793,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.55" defer></script>
-<script src="costes/norm.js?v=V11.55" defer></script>
-<script src="ajustes/calc.js?v=V11.55" defer></script>
+<script src="rentabilidad/rent.js?v=V11.56" defer></script>
+<script src="costes/norm.js?v=V11.56" defer></script>
+<script src="ajustes/calc.js?v=V11.56" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.55</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.56</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4949,7 +4949,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.55</div>
+        <div class="sub" id="version-badge">V11.56</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -15253,10 +15253,11 @@ async function guardarDocEmpresaInline(id){
   if(archivo){
     statusEl.textContent = 'Subiendo archivo...';
     const path = `EXCAVACIONES-GOMEZ/EMPRESA/${sanitizeFileName(categoria)}/${sanitizeFileName(archivo.name)}`;
-    const {error: upErr} = await sb.storage.from(DOC_BUCKET).upload(path, archivo, {upsert:true});
+    const privado = /\.(p12|pfx)$/i.test(archivo.name || '');   // V11.56: los certificados digitales van siempre al almacenamiento privado
+    const {error: upErr} = await sb.storage.from(privado ? 'exg-privado' : DOC_BUCKET).upload(path, archivo, {upsert:true});
     if(upErr){ statusEl.textContent = 'Error al subir: '+upErr.message; statusEl.style.color = 'var(--red)'; return; }
-    payload.archivo_path = path;
-    payload.archivo_url = sb.storage.from(DOC_BUCKET).getPublicUrl(path).data.publicUrl;
+    payload.archivo_path = privado ? null : path;
+    payload.archivo_url = privado ? 'privado:exg-privado/' + path : sb.storage.from(DOC_BUCKET).getPublicUrl(path).data.publicUrl;
   }
   const {error} = await sb.from('documentos_empresa').update(payload).eq('id', id);
   if(error){ statusEl.textContent = 'Error: '+errText(error); statusEl.style.color = 'var(--red)'; return; }
@@ -15283,6 +15284,7 @@ function descargarSeleccionEmpresaDocs(){
   if(!docs.length){ mostrarToast('Ninguno de los seleccionados tiene archivo adjunto.'); return; }
   docs.forEach(d=>{
     const a = document.createElement('a');
+    if(/^privado:/.test(d.archivo_url)){ abrirArchivoPrivado(d.archivo_url); return; }
     a.href = d.archivo_url; a.download = ''; a.target = '_blank';
     document.body.appendChild(a); a.click(); a.remove();
   });
@@ -15353,10 +15355,11 @@ async function guardarDocEmpresa(){
   if(archivo){
     statusEl.textContent = 'Subiendo archivo...'; statusEl.style.color = 'var(--ink-soft)';
     const path = `EXCAVACIONES-GOMEZ/EMPRESA/${sanitizeFileName(categoria)}/${sanitizeFileName(archivo.name)}`;
-    const {error: upErr} = await sb.storage.from(DOC_BUCKET).upload(path, archivo, {upsert:true});
+    const privado = /\.(p12|pfx)$/i.test(archivo.name || '');   // V11.56: los certificados digitales van siempre al almacenamiento privado
+    const {error: upErr} = await sb.storage.from(privado ? 'exg-privado' : DOC_BUCKET).upload(path, archivo, {upsert:true});
     if(upErr){ statusEl.textContent = 'Error al subir: '+upErr.message; statusEl.style.color = 'var(--red)'; return; }
-    payload.archivo_path = path;
-    payload.archivo_url = sb.storage.from(DOC_BUCKET).getPublicUrl(path).data.publicUrl;
+    payload.archivo_path = privado ? null : path;
+    payload.archivo_url = privado ? 'privado:exg-privado/' + path : sb.storage.from(DOC_BUCKET).getPublicUrl(path).data.publicUrl;
   }
 
   const {error} = empresaDocEditandoId
@@ -21305,6 +21308,12 @@ async function navUsoCargar(){
   try{ if(!window.sb) return; const {data} = await sb.rpc('uso_vistas_30d'); if(data && typeof data === 'object' && Object.keys(data).length){ try{ localStorage.setItem('nav_uso_v1', JSON.stringify(data)); }catch(e){} navOrdenarPorUso(data); } }catch(e){}
 }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(navUsoCargar, 1500)); else setTimeout(navUsoCargar, 1500);
+// V11.56 (seguridad): los archivos delicados (certificados digitales) están en el almacenamiento privado. Su enlace es «privado:exg-privado/ruta»:
+// al tocarlo se pide un enlace temporal de 5 minutos y se abre igual que antes. Sin sesión no se pueden ver.
+async function abrirArchivoPrivado(ref){ const m = String(ref || '').match(/^privado:([^/]+)\/(.+)$/); if(!m) return; const ventana = window.open('', '_blank');
+  try{ const {data, error} = await sb.storage.from(m[1]).createSignedUrl(m[2], 300, {download: /\.(p12|pfx)$/i.test(m[2])}); if(error || !data) throw error || new Error('sin enlace'); if(ventana) ventana.location = data.signedUrl; else location.href = data.signedUrl; }
+  catch(e){ if(ventana) ventana.close(); mostrarToast('No se pudo abrir el archivo: ' + (e.message || e)); } }
+document.addEventListener('click', ev => { const a = ev.target.closest && ev.target.closest('a[href^="privado:"]'); if(!a) return; ev.preventDefault(); ev.stopPropagation(); abrirArchivoPrivado(a.getAttribute('href')); }, true);
 (function capitalizarPrimeras(){
   const BLOQ = /^(block|flex|grid|list-item|table-cell|inline-block|inline-flex|inline-grid|flow-root|table-caption)$/, MIN = /[a-zñáéíóúü]/;
   const EXC = /^(h|d|x|kg|km|ud|uds|cm|mm|t|l|ml|cv)\b|^\S+@\S+|^(https?:|www\.)/;
