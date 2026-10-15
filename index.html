@@ -4861,11 +4861,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.91" defer></script>
-<script src="costes/norm.js?v=V11.91" defer></script>
-<script src="ajustes/calc.js?v=V11.91" defer></script>
+<script src="rentabilidad/rent.js?v=V11.92" defer></script>
+<script src="costes/norm.js?v=V11.92" defer></script>
+<script src="ajustes/calc.js?v=V11.92" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.91</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.92</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5017,7 +5017,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.91</div>
+        <div class="sub" id="version-badge">V11.92</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8065,7 +8065,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
         </div>
         <div id="ni-lineas-panel">
         <div class="ie-items-toolbar" style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-          <button type="button" class="btn sm" onclick="ordenarLineasPorFecha()">📅 Ordenar por fecha</button>
+          <button type="button" class="btn sm" id="ie-btn-orden-fecha" onclick="ordenarLineasPorFecha()">📅 Ordenar por fecha</button>
           <button type="button" class="btn sm" id="ie-toggle-colapsar-btn" onclick="toggleColapsarTodasLasLineas()">▾ Plegar todas</button>
           <button type="button" class="btn sm" id="ie-sel-btn" style="display:none;" onclick="selLineasToggleModo()">☑ Seleccionar líneas</button>
         </div>
@@ -23923,14 +23923,22 @@ function toggleColapsarTodasLasLineas(){
 }
 // ordena las líneas ya introducidas por su fecha (las que no tienen fecha van al final,
 // manteniendo su orden relativo) — reordena las filas reales en la tabla, sin tocar datos
+function ieResetOrdenFecha(){
+  window._ieOrdenFechaDesc=false;
+  const b=document.getElementById('ie-btn-orden-fecha'); if(b) b.textContent='📅 Ordenar por fecha';
+}
 function ordenarLineasPorFecha(){
   const tbody = document.getElementById('ie-items-body');
   const filas = Array.from(tbody.querySelectorAll('tr'));
   const conFecha = filas.filter(tr=>tr.querySelector('.ie-linea-fecha')?.value);
   const sinFecha = filas.filter(tr=>!tr.querySelector('.ie-linea-fecha')?.value);
-  conFecha.sort((a,b)=> a.querySelector('.ie-linea-fecha').value.localeCompare(b.querySelector('.ie-linea-fecha').value));
+  // 1ª pulsación: más nuevas arriba; cada pulsación siguiente invierte el orden
+  const desc = window._ieOrdenFechaDesc = !window._ieOrdenFechaDesc;
+  conFecha.sort((a,b)=>{ const r=a.querySelector('.ie-linea-fecha').value.localeCompare(b.querySelector('.ie-linea-fecha').value); return desc?-r:r; });
   [...conFecha, ...sinFecha].forEach(tr=>tbody.appendChild(tr));
-  mostrarToast('Líneas ordenadas por fecha.');
+  const b=document.getElementById('ie-btn-orden-fecha');
+  if(b) b.textContent = desc ? '📅 Más nuevas arriba' : '📅 Más antiguas arriba';
+  mostrarToast(desc ? 'Más nuevas arriba. Pulsa otra vez para invertir.' : 'Más antiguas arriba. Pulsa otra vez para invertir.');
 }
 function renderConceptCombo(input, comboId){
   const box = document.getElementById(comboId);
@@ -28845,7 +28853,7 @@ function abrirEditorConDatosIA(datos){
     // asociado como texto libre, aunque no coincida con un trabajo ya dado de alta
     if(datos.obra){ const job = document.getElementById('ni-job'); if(job && !job.value) job.value = datos.obra; }
     if(Array.isArray(datos.conceptos) && datos.conceptos.length){
-      document.getElementById('ie-items-body').innerHTML = '';
+      document.getElementById('ie-items-body').innerHTML = ''; ieResetOrdenFecha();
       // orden cronológico por si acaso — defensa adicional aunque el extractor ya debe
       // devolverlas ordenadas; las líneas sin fecha se quedan al final, en su orden original
       const conFecha = datos.conceptos.map((c,i)=>({c,i})).filter(x=>x.c.fecha);
@@ -28868,7 +28876,7 @@ function openNewInvoiceModal(contexto, forzarEditorCompleto){
   document.querySelector('.invoice-editor')?.classList.remove('ie-modo-preview');
   document.getElementById('ni-doctype').value = contexto.tipo || 'factura';
   document.getElementById('ni-doctype').disabled = false;
-  document.getElementById('ie-items-body').innerHTML = '';
+  document.getElementById('ie-items-body').innerHTML = ''; ieResetOrdenFecha();
   document.getElementById('ie-iva-pct').value = 21;
   document.getElementById('ie-tratamiento-iva').value = 'normal';
   cambiarTratamientoIva();
@@ -29235,7 +29243,7 @@ async function wizGuardar(isDraft){
   setClientPickerValue('ni', wiz.clientName);
   document.getElementById('ni-job').value = wiz.jobLabel || '—';
   document.getElementById('ni-date').value = wiz.fecha;
-  document.getElementById('ie-items-body').innerHTML = '';
+  document.getElementById('ie-items-body').innerHTML = ''; ieResetOrdenFecha();
   wiz.conceptos.forEach(c => addItemRow(c.cantidad, c.desc, c.precio, ''));
   abrirPanelLineasPorDefecto();
   document.getElementById('ie-iva-pct').value = 21;
@@ -29305,7 +29313,7 @@ function selLineasPasarAFactura(){
   editingDocId = null;
   document.getElementById('ni-doctype').value = 'factura';
   document.getElementById('ni-doctype').disabled = false;
-  document.getElementById('ie-items-body').innerHTML = '';
+  document.getElementById('ie-items-body').innerHTML = ''; ieResetOrdenFecha();
   document.getElementById('ie-iva-pct').value = origen.ivaPct ?? 21;
   document.getElementById('ie-tratamiento-iva').value = origen.tratamientoIva || 'normal';
   cambiarTratamientoIva();
@@ -29359,7 +29367,7 @@ function convertirDocumento(){
 
   document.getElementById('ni-doctype').value = siguienteTipo;
   document.getElementById('ni-doctype').disabled = false;
-  document.getElementById('ie-items-body').innerHTML = '';
+  document.getElementById('ie-items-body').innerHTML = ''; ieResetOrdenFecha();
   document.getElementById('ie-iva-pct').value = origen.ivaPct ?? 21;
   document.getElementById('ie-tratamiento-iva').value = origen.tratamientoIva || 'normal'; cambiarTratamientoIva();
   setClientPickerValue('ni', origen.client);
@@ -29435,7 +29443,7 @@ function openDocumentViewer(id){
   document.getElementById('ni-doctype').value = doc.type;
   document.getElementById('ni-doctype').disabled = true; // no cambiar tipo de un documento ya creado
   actualizarControlesEditor(doc);
-  document.getElementById('ie-items-body').innerHTML = '';
+  document.getElementById('ie-items-body').innerHTML = ''; ieResetOrdenFecha();
   document.getElementById('ie-iva-pct').value = doc.ivaPct;
   document.getElementById('ie-tratamiento-iva').value = doc.tratamientoIva || 'normal';
   cambiarTratamientoIva();
