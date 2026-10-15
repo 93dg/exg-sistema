@@ -4063,6 +4063,13 @@ svg.ic{width:1.25em;height:1.25em;flex:0 0 auto;display:inline-block;vertical-al
 #sel-flotante .self-b{color:var(--orange) !important;} #sel-flotante .self-rojo{color:var(--red) !important;} #sel-flotante .self-b:active{background:rgba(216,86,15,.08) !important;}
 .toast.err{border-color:var(--red) !important;color:var(--red) !important;} .toast.ok{border-color:var(--green) !important;color:var(--green) !important;}
 #report-bug-bar{border-width:1.5px 0 0 !important;} #report-bug-bar #report-bug-text{border:1px solid var(--line) !important;} #report-bug-bar .close-x, #report-bug-bar #report-bug-status{color:var(--ink) !important;}
+
+/* V11.93 (reporte 2b34cc1b): todo apartado (panel con título) se puede plegar: se toca su título o el botón de vista plegada de la derecha (el mismo de Documentos y Recordatorios); se recuerda */
+.panel.pnl-plegado > :not(.panel-head){display:none !important;}
+.panel.pnl-plegado > .panel-head{border-bottom:0 !important;}
+.panel-head.pnl-pleg-head > h3{cursor:pointer;}
+.panel-head .pnl-pleg-btn{margin-left:auto;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:0 !important;background:transparent !important;box-shadow:none !important;color:var(--ink-soft) !important;cursor:pointer;}
+.panel-head .pnl-pleg-btn.doc-cli-on{color:var(--orange) !important;}
 </style>
 <style>
 /* required styles */
@@ -4861,11 +4868,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.92" defer></script>
-<script src="costes/norm.js?v=V11.92" defer></script>
-<script src="ajustes/calc.js?v=V11.92" defer></script>
+<script src="rentabilidad/rent.js?v=V11.93" defer></script>
+<script src="costes/norm.js?v=V11.93" defer></script>
+<script src="ajustes/calc.js?v=V11.93" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.92</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.93</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5017,7 +5024,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.92</div>
+        <div class="sub" id="version-badge">V11.93</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14344,6 +14351,57 @@ let _recItems = [], _recItv = null, _recCargado = false;
 const CC_DOC_TIPOS = [['presupuesto', 'Presupuesto'], ['albaran', 'Albarán'], ['proforma', 'Proforma'], ['factura', 'Factura']], CC_DOC_ESTADOS = [['trabajo_activo', 'Trabajo activo'], ['pendiente_enviar', 'Listo p. entregar'], ['entregado', 'Entregada'], ['pendiente_cobrar', 'Por cobrar'], ['por_cobrar_otra', 'Por cobrar en otra'], ['parcial', 'Cobrado parcial'], ['parcial_otra', 'Parcial en otra'], ['cobrado_otra', 'Cobrada en otra'], ['borrador', 'Borrador'], ['revisar', 'Por revisar'], ['aceptado', 'Aceptado'], ['enviado', 'Enviado'], ['rectificativa', 'Rectificativa'], ['cobrado', 'Cobrado'], ['cobrado_efectivo', 'Cobrado en efectivo'], ['rechazado', 'Rechazado'], ['anulado', 'Anulado'], ['nula', 'Nula']];   // V9.82 (Daniel 10/10): todos los estados, para poder organizarse; sin elegir ninguno sigue saliendo lo pendiente
 // V8.76 (reporte de Daniel: «un botón a la derecha de los filtros para cambiar de vista: tarjetas plegadas para ver el máximo número; al darle a cada una se despliega la tarjeta normal»)
 const ICO_VISTA_PLEGADA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:18px;height:18px;"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/></svg>';
+// V11.93 (reporte 2b34cc1b, Daniel: «que en toda la web todos los apartados se puedan plegar, que tenga también su botón de plegar»):
+// cada panel con título dentro de una pantalla recibe el botón de vista plegada a la derecha de su título; tocar el título o el botón
+// lo pliega o despliega ahí mismo. Se recuerda en el móvil y en el servidor (filtros_persistentes, pnl-…). No se toca lo que ya tenía su
+// propio plegado (Centro de control) ni las listas de documentos (V10.72: plegar esas listas no sirve)
+const PNL_SIN_PLEGAR_VISTAS = ['view-documentos', 'view-facturas', 'view-albaranes', 'view-presupuestos', 'view-trabajos'];
+let _pnlEstado = {};
+try{ Object.keys(localStorage).filter(k => k.startsWith('pnl-')).forEach(k => _pnlEstado[k] = localStorage.getItem(k)); }catch(e){}
+function pnlClave(panel){
+  if(panel.dataset.pnlClave) return panel.dataset.pnlClave;
+  const v = panel.closest('.view'), sv = panel.closest('.sub-view'), h = panel.querySelector(':scope > .panel-head h3');
+  const t = (h?.textContent || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 60);
+  return panel.dataset.pnlClave = 'pnl-' + (panel.id || ((v?.id || '') + '|' + (sv?.id || '') + '|' + t));
+}
+function pnlPoner(panel, plegado){
+  panel.classList.toggle('pnl-plegado', plegado);
+  const b = panel.querySelector(':scope > .panel-head > .pnl-pleg-btn');
+  if(b){ b.classList.toggle('doc-cli-on', plegado); b.title = plegado ? 'Desplegar' : 'Plegar'; }
+}
+function pnlToggle(panel){
+  const plegado = !panel.classList.contains('pnl-plegado'), k = pnlClave(panel);
+  pnlPoner(panel, plegado); _pnlEstado[k] = plegado ? '1' : '0';
+  try{ localStorage.setItem(k, _pnlEstado[k]); }catch(e){}
+  try{ if(typeof sb !== 'undefined' && sb) sb.from('filtros_persistentes').upsert({container_id: k, valor: _pnlEstado[k]}, {onConflict: 'container_id'}).then(() => {}); }catch(e){}
+}
+function pnlMontar(raiz){
+  (raiz || document).querySelectorAll('.view .panel:not([data-pnl])').forEach(panel => {
+    panel.dataset.pnl = '1';
+    const head = panel.querySelector(':scope > .panel-head'), h3 = head?.querySelector(':scope > h3, :scope > div > h3');
+    if(!head || !h3 || head.hasAttribute('onclick') || panel.id === 'tb-panel' || panel.hasAttribute('data-no-pleg')) return;
+    if(PNL_SIN_PLEGAR_VISTAS.some(v => panel.closest('#' + v)) || panel.querySelector('.doc-toolbar')) return;
+    if(!head.nextElementSibling) return;
+    head.classList.add('pnl-pleg-head');
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'pnl-pleg-btn'; b.innerHTML = ICO_VISTA_PLEGADA; b.title = 'Plegar';
+    b.addEventListener('click', ev => { ev.stopPropagation(); pnlToggle(panel); });
+    h3.addEventListener('click', ev => { ev.stopPropagation(); pnlToggle(panel); });
+    head.appendChild(b);
+    if(_pnlEstado[pnlClave(panel)] === '1') pnlPoner(panel, true);
+  });
+}
+(function pnlArrancar(){
+  let t = null; const programar = () => { clearTimeout(t); t = setTimeout(() => pnlMontar(), 250); };
+  const ini = () => { pnlMontar(); try{ new MutationObserver(programar).observe(document.body, {childList: true, subtree: true}); }catch(e){} };
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ini); else ini();
+  const servidor = () => { if(typeof sb === 'undefined' || !sb) return setTimeout(servidor, 800);
+    sb.from('filtros_persistentes').select('container_id,valor').like('container_id', 'pnl-%').then(({data}) => {
+      (data || []).forEach(f => { _pnlEstado[f.container_id] = f.valor; try{ localStorage.setItem(f.container_id, f.valor); }catch(e){} });
+      document.querySelectorAll('.panel[data-pnl-clave]').forEach(p => { const v = _pnlEstado[p.dataset.pnlClave]; if(v != null && p.querySelector(':scope > .panel-head > .pnl-pleg-btn')) pnlPoner(p, v === '1'); });
+    });
+  };
+  setTimeout(servidor, 600);
+})();
 function ccDocsVistaPlegada(guardar){
   window._ccCompacto = !window._ccCompacto;
   const lista = document.getElementById('control-docs-lista-movil');
