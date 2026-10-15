@@ -127,15 +127,16 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 #btn-dictar.escuchando svg{animation:pulso 1s infinite;}
 #btn-enviar{background:var(--orange);color:#fff;}
 #btn-enviar:disabled{background:var(--line);color:var(--ink-soft);}
+.msg-etq{display:inline-flex;align-items:center;padding:1px 8px;border-radius:20px;border:1px solid var(--line,#E4E1DA);font-size:11px;font-weight:600;color:var(--ink-soft,#6B6F76);background:transparent;}
 </style>
 </head>
 <body>
 
-<script>/* S3.33 (Daniel 13/10): dentro del asistente de la web (pestaña Subir) va sin cabecera */ if(new URLSearchParams(location.search).get('embed')){ document.documentElement.classList.add('embed'); document.write('<style>.embed body>header,.embed body>button[title=Actualizar]{display:none!important}</style>'); }</script>
+<script>/* S3.34 (Daniel 13/10): dentro del asistente de la web (pestaña Subir) va sin cabecera */ if(new URLSearchParams(location.search).get('embed')){ document.documentElement.classList.add('embed'); document.write('<style>.embed body>header,.embed body>button[title=Actualizar]{display:none!important}</style>'); }</script>
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.33 · Sistema …</div>
+    <div class="ver" id="ver-subir">Subir S3.34 · Sistema …</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -690,6 +691,19 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     subiendo = false; btnEnviar.disabled = pendientes.length===0 && chatTexto.value.trim()==="";
   }
 
+  // S3.34 (Daniel 15/10): sin el icono de bocadillo en los mensajes de texto (no servía para nada); cada mensaje lleva una etiqueta
+  // de lo que trae (Texto, 2 fotos, Audio, PDF) y las fotos se ven en miniatura
+  function etiquetaMensaje(m){
+    const a = m.attachments || [], n = k => a.filter(x => x.kind === k || (k === "pdf" && /\.pdf($|\?)/i.test(x.file_url || ""))).length;
+    const pdf = n("pdf"), fotos = a.filter(x => x.kind === "foto" && !/\.pdf($|\?)/i.test(x.file_url || "")).length, audio = n("audio"), otros = a.length - pdf - fotos - audio;
+    const partes = [];
+    if (!a.length) partes.push("Texto");
+    if (fotos) partes.push(fotos === 1 ? "1 foto" : fotos + " fotos");
+    if (pdf) partes.push(pdf === 1 ? "PDF" : pdf + " PDF");
+    if (audio) partes.push(audio === 1 ? "Audio" : audio + " audios");
+    if (otros > 0) partes.push(otros === 1 ? "1 archivo" : otros + " archivos");
+    return `<span class="msg-etq">${partes.join(" · ")}</span>`;
+  }
   function construirContenidoMensaje(m){
     let filaHtml = "";
     if (m.attachments && m.attachments.length > 0){
@@ -706,16 +720,15 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
           <div class="msg-adjuntos">${miniaturas}</div>
           <div class="msg-cuerpo">
             ${m.nota ? `<div class="msg-texto">"${esc(m.nota)}"</div>` : ""}
-            <div class="msg-meta"><span class="msg-pill cargando" id="pill-${m.msg_id}">…</span> ${fechaCorta(m.created_at)}</div>
+            <div class="msg-meta"><span class="msg-pill cargando" id="pill-${m.msg_id}">…</span> ${etiquetaMensaje(m)} ${fechaCorta(m.created_at)}</div>
           </div>
         </div>`;
     } else {
       filaHtml = `
         <div class="msg-fila">
-          <div class="msg-thumb">💬</div>
           <div class="msg-cuerpo">
             <div class="msg-texto">${esc(m.nota || "")}</div>
-            <div class="msg-meta"><span class="msg-pill cargando" id="pill-${m.msg_id}">…</span> ${fechaCorta(m.created_at)}</div>
+            <div class="msg-meta"><span class="msg-pill cargando" id="pill-${m.msg_id}">…</span> ${etiquetaMensaje(m)} ${fechaCorta(m.created_at)}</div>
           </div>
         </div>`;
     }
@@ -823,7 +836,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
       const resp = await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=in.(${ids.join(",")})&select=id,status,interpretacion,linked_label,action_type`, { headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY } });
       const filas = await resp.json();
       if (!Array.isArray(filas) || filas.length === 0) return;
-      // S3.33 (Daniel 15/10): una entrada descartada ya está revisada (duplicado, prueba, foto repetida): antes salía como «Sin revisar»
+      // S3.34 (Daniel 15/10): una entrada descartada ya está revisada (duplicado, prueba, foto repetida): antes salía como «Sin revisar»
       const estados = filas.map(f => f.status || "pendiente");
       const cerrado = s => s === "verificado" || s === "descartado";
       const status = estados.includes("revisar") ? "revisar" : estados.every(s => s === "descartado") ? "descartado" : estados.every(cerrado) ? "verificado" : estados.every(s => s === "validado" || cerrado(s)) ? "validado" : "pendiente";
@@ -931,7 +944,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   window.abrirMenuAnadir = abrirMenuAnadir;
   // Versión del sistema desde BD (no hay que actualizarla a mano)
   fetch(SUPABASE_URL+"/rest/v1/arranque?clave=eq.web_version_actual&select=valor",{headers:{"Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY}})
-    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.33 · Sistema '+d[0].valor; }).catch(()=>{});
+    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.34 · Sistema '+d[0].valor; }).catch(()=>{});
   window.abrirEnlaceDesdeSubir = abrirEnlaceDesdeSubir;
   window.toggleMsgVerificado = toggleMsgVerificado;
   menuAnadir.addEventListener("click", (e) => { if (e.target === menuAnadir) menuAnadir.classList.remove("activo"); });
@@ -1043,6 +1056,6 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 </script>
 
   <script src="escaner/escaner.js?v=S3.26" defer></script>
-  <script src="marcar/marcar.js?v=S3.33" defer></script>
+  <script src="marcar/marcar.js?v=S3.34" defer></script>
 </body>
 </html>
