@@ -4838,11 +4838,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.89" defer></script>
-<script src="costes/norm.js?v=V11.89" defer></script>
-<script src="ajustes/calc.js?v=V11.89" defer></script>
+<script src="rentabilidad/rent.js?v=V11.90" defer></script>
+<script src="costes/norm.js?v=V11.90" defer></script>
+<script src="ajustes/calc.js?v=V11.90" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.89</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.90</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -4994,7 +4994,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.89</div>
+        <div class="sub" id="version-badge">V11.90</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12758,7 +12758,7 @@ function abrirMenuAccionesMovil(docId, event){
   const gestor = doc.enviado_gestor
     ? [{t: 'Gestor: enviada' + (doc.enviado_gestor_fecha ? ' el ' + String(doc.enviado_gestor_fecha).slice(0, 10).split('-').reverse().join('/') : '') + ' · marcar pendiente', fn: `cambiarGestorDesdeMenu('${doc.id}', false, '')`}]
     : [{t: 'Enviar al gestor', fn: `enviarAlGestorDoc('${doc.id}')`}, {t: 'Gestor: marcar como enviada', fn: `cambiarGestorDesdeMenu('${doc.id}', true, '')`}];
-  const botones = gestor.concat(accionesDocumento(doc).filter(x=>x.t!=='Editar'))
+  const botones = [{t: 'Imprimir en la oficina', fn: `imprimirDocumento('${doc.id}', 'oficina')`}].concat(gestor, accionesDocumento(doc).filter(x=>x.t!=='Editar'))   // V11.90 (Daniel): también desde los tres puntos de la tarjeta
     .map(x=>`<button class="btn" style="width:100%;text-align:left;margin-bottom:6px;" onclick="cerrarModalGenerico();${x.fn}">${x.t}</button>`).join('');
   mostrarModalGenerico(tipoDocEtiqueta(doc.type)+' '+(doc.num||'')+' — '+doc.client, `<div style="display:flex;flex-direction:column;">${botones}</div>`);
 }
@@ -30977,14 +30977,14 @@ function enviarDocumentoAlCliente(id){
 }
 // V7.58 (Daniel: «al cerrar el PDF me aparece el editor entre medias»): desde la tarjeta, el editor se abre escondido solo para preparar
 // el PDF y se cierra en cuanto el PDF está en el visor; al cerrar el visor se sigue donde se estaba
-async function imprimirDocumento(id){
+async function imprimirDocumento(id, accion){   // V11.90: accion 'oficina' = a la impresora de la oficina
   const ov = document.getElementById('newinvoice-overlay');
   const yaAbierto = ov && ov.classList.contains('active') && editingDocId === id;
   if(!yaAbierto && ov) ov.classList.add('imp-oculto');
   const conPortada = yaAbierto && !!document.getElementById('ni-portada')?.checked;   // V9.20: reabrir el documento desmarcaba la casilla y la portada nunca salía al imprimir
   openDocumentViewer(id);
   await new Promise(r => setTimeout(r, 300));
-  try{ if(await confirmarFacturaCompleta('Imprimirla')) await generarPDFDocumento('imprimir', undefined, conPortada); }
+  try{ if(await confirmarFacturaCompleta('Imprimirla')) await generarPDFDocumento(accion === 'oficina' ? 'oficina' : 'imprimir', undefined, conPortada); }
   finally{
     if(!yaAbierto){ try{ closeNewInvoiceModal(); }catch(e){} if(ov) ov.classList.remove('imp-oculto'); }
   }
