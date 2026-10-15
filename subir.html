@@ -49,6 +49,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 .msg-pill.revisar{background:var(--orange-soft);color:var(--orange);}
 .msg-pill.validado{background:#e8f0fe;color:#1a73e8;} /* Añadido al sistema */
 .msg-pill.verificado{background:#e8f5e9;color:#2e7d32;}
+.msg-pill.descartado{background:#F1EFEA;color:#6B6F76;}
 .msg.msg-plegado .msg-texto{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;color:var(--ink-soft);}
 .msg.msg-plegado .msg-interpretacion{display:none;}
 .msg.msg-plegado .msg-pie{display:none;}
@@ -130,11 +131,11 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 </head>
 <body>
 
-<script>/* S3.32 (Daniel 13/10): dentro del asistente de la web (pestaña Subir) va sin cabecera */ if(new URLSearchParams(location.search).get('embed')){ document.documentElement.classList.add('embed'); document.write('<style>.embed body>header,.embed body>button[title=Actualizar]{display:none!important}</style>'); }</script>
+<script>/* S3.33 (Daniel 13/10): dentro del asistente de la web (pestaña Subir) va sin cabecera */ if(new URLSearchParams(location.search).get('embed')){ document.documentElement.classList.add('embed'); document.write('<style>.embed body>header,.embed body>button[title=Actualizar]{display:none!important}</style>'); }</script>
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.32 · Sistema …</div>
+    <div class="ver" id="ver-subir">Subir S3.33 · Sistema …</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -822,17 +823,19 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
       const resp = await fetch(`${SUPABASE_URL}/rest/v1/documentos?id=in.(${ids.join(",")})&select=id,status,interpretacion,linked_label,action_type`, { headers:{ "Authorization":`Bearer ${SUPABASE_ANON_KEY}`, "apikey":SUPABASE_ANON_KEY } });
       const filas = await resp.json();
       if (!Array.isArray(filas) || filas.length === 0) return;
+      // S3.33 (Daniel 15/10): una entrada descartada ya está revisada (duplicado, prueba, foto repetida): antes salía como «Sin revisar»
       const estados = filas.map(f => f.status || "pendiente");
-      const status = estados.includes("revisar") ? "revisar" : estados.every(s => s === "verificado") ? "verificado" : estados.every(s => s === "validado" || s === "verificado") ? "validado" : "pendiente";
+      const cerrado = s => s === "verificado" || s === "descartado";
+      const status = estados.includes("revisar") ? "revisar" : estados.every(s => s === "descartado") ? "descartado" : estados.every(cerrado) ? "verificado" : estados.every(s => s === "validado" || cerrado(s)) ? "validado" : "pendiente";
       const pill = document.getElementById(`pill-${msgId}`);
-      if (pill){ pill.className = "msg-pill " + status; pill.textContent = status === "pendiente" ? "Sin revisar" : status === "revisar" ? "Revisar" : status === "verificado" ? "✓ Verificado" : "Añadido"; }
+      if (pill){ pill.className = "msg-pill " + (status === "descartado" ? "verificado descartado" : status); pill.textContent = status === "pendiente" ? "Sin revisar" : status === "revisar" ? "Revisar" : status === "verificado" ? "✓ Verificado" : status === "descartado" ? "Descartado" : "Añadido"; }
 
       const fila0 = filas[0];
       const interp = filas.find(f => f.interpretacion)?.interpretacion;
       const linkedLabel = filas.find(f => f.linked_label)?.linked_label;
       const actionType = filas.find(f => f.action_type)?.action_type;
       const esFlota = actionType === 'flota_incidencia' || actionType === 'flota_incidencias' || (linkedLabel && linkedLabel.toLowerCase().includes('iveco'));
-      const esVerificado = status === 'verificado';
+      const esVerificado = status === 'verificado' || status === 'descartado';
 
       const msgDiv = feed.querySelector(`.msg[data-msg-id="${msgId}"]`);
       const cuerpo = msgDiv?.querySelector(".msg-cuerpo");
@@ -842,7 +845,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 
         if (esVerificado && linkedLabel){
           // Verificado: texto + detalle directamente en la tarjeta (sin botón)
-          caja.style.background = "var(--green-soft)"; caja.style.color = "var(--green)";
+          caja.style.background = status === 'descartado' ? "var(--line-soft, #F1EFEA)" : "var(--green-soft)"; caja.style.color = status === 'descartado' ? "var(--ink-soft, #6B6F76)" : "var(--green)";
           const interpV = filas.find(f => f.interpretacion)?.interpretacion || {};
           const elementoId = interpV.elemento_id || interpV.albaran_id || null;
           caja.innerHTML = `<div>✓ ${linkedLabel.replace('✓ ','').replace('verificado','').replace('Verificado','').trim().replace(/[—-]\s*$/,'').trim()}</div><div class="msg-detalle"></div>`;
@@ -928,7 +931,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   window.abrirMenuAnadir = abrirMenuAnadir;
   // Versión del sistema desde BD (no hay que actualizarla a mano)
   fetch(SUPABASE_URL+"/rest/v1/arranque?clave=eq.web_version_actual&select=valor",{headers:{"Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY}})
-    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.32 · Sistema '+d[0].valor; }).catch(()=>{});
+    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.33 · Sistema '+d[0].valor; }).catch(()=>{});
   window.abrirEnlaceDesdeSubir = abrirEnlaceDesdeSubir;
   window.toggleMsgVerificado = toggleMsgVerificado;
   menuAnadir.addEventListener("click", (e) => { if (e.target === menuAnadir) menuAnadir.classList.remove("activo"); });
@@ -1040,6 +1043,6 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 </script>
 
   <script src="escaner/escaner.js?v=S3.26" defer></script>
-  <script src="marcar/marcar.js?v=S3.32" defer></script>
+  <script src="marcar/marcar.js?v=S3.33" defer></script>
 </body>
 </html>
