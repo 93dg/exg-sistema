@@ -4070,6 +4070,11 @@ svg.ic{width:1.25em;height:1.25em;flex:0 0 auto;display:inline-block;vertical-al
 .panel-head.pnl-pleg-head > h3{cursor:pointer;}
 .panel-head .pnl-pleg-btn{margin-left:auto;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:0 !important;background:transparent !important;box-shadow:none !important;color:var(--ink-soft) !important;cursor:pointer;}
 .panel-head .pnl-pleg-btn.doc-cli-on{color:var(--orange) !important;}
+
+/* V11.95 (reporte 6f3016ba): vista plegada de las tarjetas de trabajo: solo la primera línea */
+body.tb-compacto #tb-panel .tb-card .tb-cuerpo > :not(.tb-l1){display:none !important;}
+/* V11.95 (reporte 99e1670a): colores de los apartados de la vista por lo que toca hacer */
+.t-est-toca{--c:var(--orange);--cf:#fbeee8;} .t-est-decidir{--c:#1c1f24;--cf:#efeee9;} .t-est-espera{--c:#2B5C8F;--cf:#e8f0f8;} .t-est-mejora{--c:#8a877f;--cf:#f1efea;}
 </style>
 <style>
 /* required styles */
@@ -4868,11 +4873,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.94" defer></script>
-<script src="costes/norm.js?v=V11.94" defer></script>
-<script src="ajustes/calc.js?v=V11.94" defer></script>
+<script src="rentabilidad/rent.js?v=V11.95" defer></script>
+<script src="costes/norm.js?v=V11.95" defer></script>
+<script src="ajustes/calc.js?v=V11.95" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.94</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.95</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5024,7 +5029,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.94</div>
+        <div class="sub" id="version-badge">V11.95</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14483,7 +14488,7 @@ function tpPintar(raiz){ try{
   const arrancar = () => { tpPintar(document.body); obs.observe(document.body, {childList: true, subtree: true, characterData: true}); };
   if(document.body) arrancar(); else document.addEventListener('DOMContentLoaded', arrancar);
 })();
-function recMontarFiltro(){ try{ if(!PLEG2.rec) pleg2Crear({id: 'rec', despuesDe: '#rec-filtro-ancla', plegados: ['plazo', 'tema', 'donde'], grupos: [['plazo', 'Plazo', 'rec-filtro-plazo-chips', 'unico'], ['tema', 'Tipo', 'rec-filtro-tema-chips'], ['donde', 'PC', 'rec-filtro-donde-chips']], extra: {id: 'rec-vista-btn', titulo: 'Plegar o desplegar todos los apartados', html: ICO_VISTA_PLEGADA, fn: 'recVistaPlegada', activo: recTodoPlegado}});
+function recMontarFiltro(){ try{ if(!PLEG2.rec) pleg2Crear({id: 'rec', despuesDe: '#rec-filtro-ancla', plegados: ['plazo', 'tema', 'donde'], grupos: [['plazo', 'Plazo', 'rec-filtro-plazo-chips', 'unico'], ['tema', 'Tipo', 'rec-filtro-tema-chips'], ['donde', 'PC', 'rec-filtro-donde-chips']], extra2: {id: 'rec-agrupar-btn', titulo: 'Ver por lo que me toca hacer y lo que está en espera', html: ICO_REC_ESTADO, fn: 'recAgruparToggle', activo: () => _recPorEstado}, extra: {id: 'rec-vista-btn', titulo: 'Plegar o desplegar todos los apartados', html: ICO_VISTA_PLEGADA, fn: 'recVistaPlegada', activo: recTodoPlegado}});
     if(PLEG2.rec && !localStorage.getItem('rec_donde_v1')){ localStorage.setItem('rec_donde_v1', '1'); if(!PLEG2.rec.plegados.includes('donde')){ PLEG2.rec.plegados.push('donde'); pleg2Guardar('rec'); pleg2Render('rec'); } } }catch(e){} }
 document.addEventListener('DOMContentLoaded', () => setTimeout(recMontarFiltro, 0));
 function recVence(d){ const v = d.vence || d.fecha_limite || null; if(v) return String(v).slice(0, 10); const f = d.fecha ? String(d.fecha).slice(0, 10) : null; return f && f > new Date().toISOString().slice(0, 10) ? f : null; }
@@ -14538,7 +14543,16 @@ function recCambiarEstado(id){
 let _recPC = (() => { try{ return localStorage.getItem('rec-donde') === 'pc'; }catch(e){ return false; } })(), _recPCLeido = false;
 function recPCGuardar(){ const v = _recPC ? 'pc' : ''; try{ localStorage.setItem('rec-donde', v); }catch(e){} try{ if(sb) sb.from('filtros_persistentes').upsert({container_id: 'rec-donde', valor: v}, {onConflict: 'container_id'}).then(() => {}); }catch(e){} }
 function recPCToggle(){ _recPC = !_recPC; recPCGuardar(); recRender(); try{ if(PLEG2.rec) pleg2Refrescar('rec'); }catch(e){} }
+// V11.95 (reporte 99e1670a, Daniel: «una vista alternativa: pendiente de hacer yo una acción o en espera»): el botón de la izquierda del de
+// vista plegada agrupa los recordatorios por lo que toca hacer en vez de por tipo. Se recuerda (móvil y servidor)
+const ICO_REC_ESTADO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:18px;height:18px;"><circle cx="9" cy="7" r="3.2"/><path d="M3.5 20c.6-3.4 2.8-5.5 5.5-5.5s4.9 2.1 5.5 5.5"/><circle cx="18" cy="13" r="3.6"/><path d="M18 11.4v1.8l1.2.8"/></svg>';
+const REC_GRUPOS_ESTADO = [['est-toca', 'Me toca hacer algo'], ['est-decidir', 'Por decidir'], ['est-espera', 'En espera'], ['est-mejora', 'Mejoras de la web']];
+function recGrupoEstado(d){ const e = d.estado_rec || ''; return e === 'por_decidir' ? 'est-decidir' : ['en_espera', 'bloqueado', 'programado'].includes(e) ? 'est-espera' : e === 'mejora' ? 'est-mejora' : 'est-toca'; }
+let _recPorEstado = false; try{ _recPorEstado = localStorage.getItem('rec-agrupar') === 'estado'; }catch(e){}
+let _recAgruparLeido = false;
+function recAgruparToggle(){ _recPorEstado = !_recPorEstado; const v = _recPorEstado ? 'estado' : 'tipo'; try{ localStorage.setItem('rec-agrupar', v); }catch(e){} try{ if(sb) sb.from('filtros_persistentes').upsert({container_id: 'rec-agrupar', valor: v}, {onConflict: 'container_id'}).then(() => {}); }catch(e){} document.getElementById('rec-agrupar-btn')?.classList.toggle('doc-cli-on', _recPorEstado); recRender(); }
 function recRender(){
+  if(!_recAgruparLeido && typeof sb !== 'undefined' && sb){ _recAgruparLeido = true; try{ sb.from('filtros_persistentes').select('valor').eq('container_id', 'rec-agrupar').maybeSingle().then(({data}) => { if(data){ const n = data.valor === 'estado'; try{ localStorage.setItem('rec-agrupar', data.valor || ''); }catch(e){} if(n !== _recPorEstado){ _recPorEstado = n; document.getElementById('rec-agrupar-btn')?.classList.toggle('doc-cli-on', n); recRender(); } } }); }catch(e){} }
   if(!_recPCLeido && typeof sb !== 'undefined' && sb){ _recPCLeido = true; try{ sb.from('filtros_persistentes').select('valor').eq('container_id', 'rec-donde').maybeSingle().then(({data}) => { if(data){ const n = data.valor === 'pc'; if(n !== _recPC){ _recPC = n; try{ localStorage.setItem('rec-donde', data.valor || ''); }catch(e){} recRender(); } } }); }catch(e){} }
   const cont = document.getElementById('alertas-list-bd'); if(!cont) return;
   const plazo0 = recPlazo(), enPlazo = _recItems.filter(r => recVisible(r.data || {}, plazo0));
@@ -14582,7 +14596,9 @@ function recRender(){
   const sec = (k, titulo, lista, extra) => (lista.length || extra) ? `<div class="rec-sec t-${k}${pleg.includes(k) ? ' plegado' : ''}" data-rec-sec="${k}"><span class="rec-sec-bar"></span><b>${titulo}</b><i>${lista.length + (extra ? (String(extra).match(/<details /g) || []).length : 0)}</i><span class="rec-sec-fl">${pleg.includes(k) ? '▸' : '▾'}</span></div><div class="rec-sec-cuerpo"${pleg.includes(k) ? ' style="display:none;"' : ''}>${extra || ''}${lista.map(pinta).join('')}</div>` : '';
   const normales = items.filter(r => !(r.data||{}).anclado), fijos = items.filter(r => (r.data||{}).anclado);
   const ocultos = _recItems.length - items.length;
-  cont.innerHTML = sec('fijos', 'Anclados', fijos) + REC_TEMAS.map(([k, l]) => sec(k, l, normales.filter(r => recTema(r) === k), k === 'itv' ? (_recItv || '') : '')).join('') + (ocultos ? `<div class="rec-mas">${ocultos} más adelante</div>` : '');
+  cont.innerHTML = sec('fijos', 'Anclados', fijos) + (_recPorEstado
+    ? REC_GRUPOS_ESTADO.map(([k, l]) => sec(k, l, normales.filter(r => recGrupoEstado(r.data || {}) === k), k === 'est-toca' ? (_recItv || '') : '')).join('')
+    : REC_TEMAS.map(([k, l]) => sec(k, l, normales.filter(r => recTema(r) === k), k === 'itv' ? (_recItv || '') : '')).join('')) + (ocultos ? `<div class="rec-mas">${ocultos} más adelante</div>` : '');
   actualizarVacioAlertas();
   { const cnt = document.getElementById('alertas-count'); if(cnt){ const nItv = (String(_recItv || '').match(/<details /g) || []).length; cnt.textContent = items.length + nItv; cnt.style.display = ''; } }   // V7.61: contador junto al título
 }
@@ -21758,7 +21774,8 @@ function pleg2Render(id){
   cols.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:6px;';   // V11.02: las pastillas, al ancho de su texto
   cols.innerHTML = cfg.grupos.map(g => { const ab = !pleg.includes(g[0]); return `<button type="button" class="tb-ftit tb-plegado ${tieneAct(g) ? 'con' : ''} ${ab ? 'abierto' : ''}" data-pl="${g[0]}" title="${ab ? 'Plegar' : 'Desplegar'} ${escHtml(g[1])}">${pleg2Texto(id, g)}</button>`; }).join('');
   if(cfg.lupa){ const bl = document.createElement('button'); bl.style.marginLeft = 'auto'; bl.type = 'button'; bl.className = 'cli-icon-btn'; bl.title = 'Buscar'; bl.setAttribute('aria-label', 'Buscar'); bl.innerHTML = ICO_LUPA_PLEG; bl.onclick = ev => { ev.stopPropagation(); window[cfg.lupa](); }; cols.appendChild(bl); }   // V11.26 (Daniel): la lupa va en la fila de los filtros
-  if(cfg.extra){ const bx = document.createElement('button'); bx.style.marginLeft = cfg.lupa ? '0' : 'auto'; bx.type = 'button'; bx.id = cfg.extra.id; bx.className = 'cli-icon-btn doc-ord-btn ' + (cfg.extra.clase || ''); bx.title = cfg.extra.titulo; bx.setAttribute('aria-label', cfg.extra.titulo); bx.innerHTML = cfg.extra.html; bx.onclick = () => window[cfg.extra.fn](); if(cfg.extra.activo && cfg.extra.activo()) bx.classList.add('doc-cli-on'); cols.appendChild(bx); }   // V8.76: botón extra a la derecha de los filtros (vista plegada de tarjetas)
+  if(cfg.extra2){ const b2 = document.createElement('button'); b2.style.marginLeft = cfg.lupa ? '0' : 'auto'; b2.type = 'button'; b2.id = cfg.extra2.id; b2.className = 'cli-icon-btn doc-ord-btn doc-vista-btn'; b2.title = cfg.extra2.titulo; b2.setAttribute('aria-label', cfg.extra2.titulo); b2.innerHTML = cfg.extra2.html; b2.onclick = () => window[cfg.extra2.fn](); if(cfg.extra2.activo && cfg.extra2.activo()) b2.classList.add('doc-cli-on'); cols.appendChild(b2); }   // V11.95 (reporte 99e1670a): otro botón de vista a la izquierda del de vista plegada
+  if(cfg.extra){ const bx = document.createElement('button'); bx.style.marginLeft = (cfg.lupa || cfg.extra2) ? '0' : 'auto'; bx.type = 'button'; bx.id = cfg.extra.id; bx.className = 'cli-icon-btn doc-ord-btn ' + (cfg.extra.clase || ''); bx.title = cfg.extra.titulo; bx.setAttribute('aria-label', cfg.extra.titulo); bx.innerHTML = cfg.extra.html; bx.onclick = () => window[cfg.extra.fn](); if(cfg.extra.activo && cfg.extra.activo()) bx.classList.add('doc-cli-on'); cols.appendChild(bx); }   // V8.76: botón extra a la derecha de los filtros (vista plegada de tarjetas)
   if(cfg.mover){ if(!P._mov){ P._mov = [...document.querySelectorAll(cfg.mover)]; P._mov.forEach(b => { const pa = b.parentElement; if(pa && pa.children.length <= P._mov.length) pa.style.display = 'none'; }); } P._mov.forEach(b => cols.appendChild(b)); }   // V11.46: botones que vivían en otra línea (lupa, quitar filtros) pasan a la fila de los filtros
   cfg.grupos.forEach(g => { const f = document.getElementById(g[2]); if(f) guard.appendChild(f); });
   filas.innerHTML = '';
@@ -24907,12 +24924,13 @@ function tbRenderFiltros(todos, idCont){
   const abiertos = visibles.filter(g => !_tbPleg.includes(g));
   // ARRIBA: todas las cabeceras, siempre en su columna y sin moverse; la abierta se marca. ABAJO: cada filtro abierto repite su cabecera a la izquierda de sus opciones. Tocar cualquiera de las dos lo abre o lo pliega.
   // V11.85 (reporte 0709cc2a): si la lista enseña tarjetas de documento, al final de la fila de filtros va el MISMO botón de vista plegada de Documentos
-  const bVista = window._tbConDocs ? `<button type="button" class="cli-icon-btn doc-vista-btn${window._docCompacto ? ' doc-cli-on' : ''}" title="Vista plegada o desplegada" aria-label="Vista plegada o desplegada" onclick="docsVistaPlegada()" style="justify-self:end;">${ICO_VISTA_PLEGADA}</button>` : '';
+  const bVista = (window._tbConDocs || (idCont || 'tb-filtros2') === 'tb-filtros2') ? `<button type="button" class="cli-icon-btn doc-vista-btn${window._docCompacto ? ' doc-cli-on' : ''}" title="Vista plegada o desplegada" aria-label="Vista plegada o desplegada" onclick="docsVistaPlegada()" style="justify-self:end;">${ICO_VISTA_PLEGADA}</button>` : '';
   const cols = visibles.length ? `<div class="tb-fcols" style="grid-template-columns:${bVista ? `repeat(${visibles.length}, auto) 30px;justify-content:space-between` : `repeat(${visibles.length}, minmax(0, 1fr))`};"${bVista ? ' data-convista="1"' : ''}>${visibles.map((g, i) => { const ab = abiertos.includes(g); return `<button type="button" class="tb-ftit tb-plegado ${_tbFil[g].length ? 'con' : ''} ${ab ? 'abierto' : ''}" data-t="${g}" style="grid-column:${i + 1};" title="${ab ? 'Plegar' : 'Desplegar'} ${escHtml(TB_TIT_FILTRO[g])}">${escHtml(TB_TIT_FILTRO[g])}${_tbFil[g].length ? ` <b>${_tbFil[g].length}</b>` : ''}</button>`; }).join('')}${bVista}</div>` : '';
   const filas = abiertos.map(g => `<div class="tb-frow"><button type="button" class="tb-ftit" data-t="${g}" title="Plegar ${escHtml(TB_TIT_FILTRO[g])}">${escHtml(TB_TIT_FILTRO[g])}</button><div>${ops[g].map(o => `<button type="button" class="tb-fchip ${_tbFil[g].includes(o.v) ? 'active' : o.n ? '' : 'cero'}" data-g="${g}" data-v="${escHtml(o.v)}">${escHtml(g === 'maquina' ? TB_MAQ_NOM[o.v] : o.v)} <b>${o.n}</b></button>`).join('')}</div></div>`).join('');
   const quitar = tbHayFiltros() ? '<div class="tb-frow"><span></span><div><button type="button" class="tb-fchip tb-quitar" data-g="todos">Quitar filtros</button></div></div>' : '';
   // V11.88 (Daniel): sin filtros no queda una fila vacía solo con el botón de vista: va en la fila de las pestañas, al final
   window._tbVistaSuelta = !visibles.length && bVista && (idCont || 'tb-filtros2') === 'tb-filtros2' ? bVista : '';   // V11.88: sin filtros, el botón va al final de la línea de ayuda (sin fila vacía y sin apretar las pestañas)
+  document.body.classList.toggle('tb-compacto', !!window._docCompacto);   // V11.95 (reporte 6f3016ba): las tarjetas de trabajo también se pliegan con el botón de vista
   const html = cols + filas + quitar, abrio = _tbAnimar; _tbAnimar = null;
   cont.innerHTML = html; cont.style.display = html ? '' : 'none';
   // solo se anima lo que aparece (las opciones del filtro recién abierto); ninguna cabecera se mueve
@@ -30744,8 +30762,10 @@ function filaCompactaDocHtml(doc, tipo, estadoHtml, cliente, obra){
 }
 const DOC_LISTAS_MOVIL = ['econ-facturas-lista-movil', 'alb-lista-movil', 'pres-lista-movil', 'docm-lista-movil'];
 try{ window._docCompacto = localStorage.getItem('docs_compacto') !== '0'; }catch(e){ window._docCompacto = true; }
+try{ document.documentElement && document.addEventListener('DOMContentLoaded', () => document.body.classList.toggle('tb-compacto', !!window._docCompacto)); if(document.body) document.body.classList.toggle('tb-compacto', !!window._docCompacto); }catch(e){}
 function docsAplicarVista(){
   document.querySelectorAll('.tb-doc').forEach(l => l.classList.toggle('cc-compacto', window._docCompacto));
+  document.body.classList.toggle('tb-compacto', !!window._docCompacto);
   DOC_LISTAS_MOVIL.forEach(id => { const l = document.getElementById(id); if(l){ l.classList.toggle('cc-compacto', window._docCompacto); if(!window._docCompacto) l.querySelectorAll('.cc-abierta').forEach(c => c.classList.remove('cc-abierta')); } });
   document.querySelectorAll('.doc-vista-btn').forEach(b => b.classList.toggle('doc-cli-on', window._docCompacto));
 }
