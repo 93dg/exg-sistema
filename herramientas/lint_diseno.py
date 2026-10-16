@@ -23,12 +23,27 @@ def relleno_naranja(txt, f):
         if SEL.search(sel) and FONDO_NARANJA.search(cuerpo):
             out.append({'f': f, 'regla': 'relleno-naranja-en-seleccionado', 'txt': re.sub(r'\s+', ' ', sel)[-120:]})
     return out
+# 16/10/2026 (reporte 906b6061, Daniel: «textos tan poco profesionales y tan chapuceros»): los textos de la web
+# se escriben en registro profesional; nunca se copia literalmente cómo habla Daniel al dar instrucciones.
+# Solo mira el código (se quitan los comentarios, donde sí se citan sus palabras).
+COLOQUIAL = re.compile(r"\b(?:me toca|te toca|nos toca|cosas|de golpe|un montón|mogollón|follón|chapuz\w*|joder|coño|put[oa]s?|mierda|curro|pasta|guay|cutre|lo de abajo|lo de arriba|tu padre|mi padre|ya te digo|o sea)\b", re.I)
+COLOQUIAL_MAY = re.compile(r"\bVale,|\bVale con\b|\bNO con\b")
+COMENT = re.compile(r'(^|[\s;{}(,])//.*$|/\*.*?\*/|<!--.*?-->')
+def coloquial(txt, f):
+    out = []
+    for linea in txt.split('\n'):
+        s = COMENT.sub(r'\1', linea)
+        if 'base64,' in s: continue
+        for m in list(COLOQUIAL.finditer(s)) + list(COLOQUIAL_MAY.finditer(s)):
+                out.append({'f': f, 'regla': 'texto-coloquial', 'txt': s.strip()[max(0, m.start() - 60):m.end() + 60]})
+    return out
 def hallazgos():
     out = []
     for f in FICHEROS:
         ruta = os.path.join(RAIZ, f)
         if not os.path.exists(ruta): continue
         out += relleno_naranja(open(ruta, encoding='utf-8').read(), f)
+        out += coloquial(open(ruta, encoding='utf-8').read(), f)
         for n, linea in enumerate(open(ruta, encoding='utf-8').read().split('\n'), 1):
             for clave, _, rx in REGLAS:
                 if clave == 'tabla-en-rent' and not f.endswith('rent.js'): continue
@@ -41,6 +56,7 @@ def cuenta(h):
     for x in h: c[x['f'] + '|' + x['regla']] = c.get(x['f'] + '|' + x['regla'], 0) + 1
     return c
 DESC = {c: d for c, d, _ in REGLAS}
+DESC['texto-coloquial'] = 'Texto coloquial en la web: escríbelo en registro profesional, no copies cómo lo dice Daniel (reporte 906b6061)'
 DESC['relleno-naranja-en-seleccionado'] = 'Seleccionado = SOLO borde naranja, nunca relleno naranja (guía 1)'
 if __name__ == '__main__':
     h = hallazgos(); c = cuenta(h)
