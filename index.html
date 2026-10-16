@@ -717,6 +717,9 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
   padding:7px 12px;border:1px solid var(--line);border-radius:var(--radius);font-size:13px;
   background:var(--paper);min-width:200px;color:var(--ink);
 }
+/* V12.00 (reporte ce8e6b68): dentro de un campo de formulario la caja nunca se sale ni pisa a la de al lado (el min-width de 200px la hacía montarse sobre la vecina en el móvil); en el móvil, un campo por línea */
+.field .search-box{min-width:0;max-width:100%;box-sizing:border-box;}
+@media (max-width:700px){ .drawer-body div:has(> .field + .field){flex-direction:column;gap:0 !important;} .drawer-body div:has(> .field + .field) > .field{min-width:0 !important;flex:none !important;width:100%;} }
 
 /* fleet cards */
 
@@ -4877,11 +4880,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V11.99" defer></script>
-<script src="costes/norm.js?v=V11.99" defer></script>
-<script src="ajustes/calc.js?v=V11.99" defer></script>
+<script src="rentabilidad/rent.js?v=V12.00" defer></script>
+<script src="costes/norm.js?v=V12.00" defer></script>
+<script src="ajustes/calc.js?v=V12.00" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V11.99</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.00</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5033,7 +5036,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V11.99</div>
+        <div class="sub" id="version-badge">V12.00</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -22770,8 +22773,10 @@ async function buscarOCrearClienteApp(nombre, extra){
   if(nifLimpio) match = (existentes||[]).find(e => e.nif && e.nif.replace(/[^A-Za-z0-9]/g,'').toUpperCase() === nifLimpio);
   if(!match) match = (existentes||[]).find(e => normalizarNombreCliente(e.nombre) === norm);
   if(match) return match.id;
-  const {data, error} = await sb.from('entidades').insert({nombre: nombre.trim(), tipo:'cliente', ...extra}).select().single();
-  if(error){ console.error('No se pudo crear el cliente', error); return null; }
+  // V12.00 (reporte ce8e6b68): «tipo» en la base solo admite cliente/proveedor/ambos; lo de Particular/Empresa/Ayuntamiento del formulario no se mete ahí (antes rompía el alta y el cliente no se guardaba)
+  const {tipo: tipoForm, ...resto} = extra; const tipoEnt = ['cliente','proveedor','ambos'].includes(tipoForm) ? tipoForm : 'cliente'; if(tipoForm === 'ayuntamiento') resto.es_administracion = true;
+  const {data, error} = await sb.from('entidades').insert({nombre: nombre.trim(), ...resto, tipo: tipoEnt}).select().single();
+  if(error){ console.error('No se pudo crear el cliente', error); try{ mostrarToast('No se pudo guardar el cliente: ' + error.message); }catch(e){} return null; }
   return data.id;
 }
 // sugerencias clicables en tiempo real al crear/editar un cliente a mano
@@ -23419,7 +23424,7 @@ function submitNewClient(){
     if(provincia) extra.provincia = provincia.toUpperCase();
     if(telefono) extra.telefono = telefono;
     if(email) extra.email = email;
-    const guardarExtra = (id)=>{ if(id && Object.keys(extra).length) sb.from('entidades').update(extra).eq('id', id); };
+    const guardarExtra = (id)=>{ if(id && Object.keys(extra).length) sb.from('entidades').update(extra).eq('id', id).then(({error})=>{ if(error) mostrarToast('No se guardaron el teléfono, el correo o la dirección: ' + error.message); }); };   // V12.00: sin .then() la consulta no llegaba a lanzarse
     if(window.__clienteSugeridoSeleccionado){
       nuevoCliente.id = window.__clienteSugeridoSeleccionado;
       guardarExtra(nuevoCliente.id);
