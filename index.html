@@ -4880,11 +4880,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.00" defer></script>
-<script src="costes/norm.js?v=V12.00" defer></script>
-<script src="ajustes/calc.js?v=V12.00" defer></script>
+<script src="rentabilidad/rent.js?v=V12.01" defer></script>
+<script src="costes/norm.js?v=V12.01" defer></script>
+<script src="ajustes/calc.js?v=V12.01" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.00</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.01</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5036,7 +5036,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.00</div>
+        <div class="sub" id="version-badge">V12.01</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -28069,11 +28069,28 @@ const CALIDAD_DETALLE = {
   archivo: {titulo:'Sin archivo original enlazado', explicacion:'No hay ningún archivo vinculado, así que no se puede reprocesar automáticamente — solo revisar a mano.', corregible:false},
   precio: {titulo:'Líneas con detalle incompleto', explicacion:'Algunas líneas de este documento sí tienen horas/cantidad y precio unitario, y otras no — dentro del mismo documento, lo que indica que el original sí las trae y a alguna línea no se le extrajo bien.', corregible:true},
 };
+// V12.01 (Daniel 16/10/2026, «los fallos siempre dan problemas sin sentido»): los fallos se apuntan al crear el documento y no se recalculaban
+// al cambiarlo; ahora cada uno se vuelve a comprobar con los datos de ahora y, si ya no se cumple, no se enseña
+function calidadYaArreglado(doc, cod){
+  const lineas = Array.isArray(doc.conceptos) ? doc.conceptos : (Array.isArray(doc.items) ? doc.items : []);
+  const suma = lineas.reduce((a, l) => a + (Number(l.importe) || (Number(l.cantidad) || 0) * (Number(l.precio_unitario) || 0)), 0);
+  const conIva = !(DOC_TYPES[doc.type] && DOC_TYPES[doc.type].hasIva === false) && (doc.tratamiento_iva || 'normal') !== 'isp' && doc.type !== 'albaran';
+  const pct = Number(doc.iva_pct != null ? doc.iva_pct : 21), total = Number(doc.importe != null ? doc.importe : doc.total || 0), esperado = conIva ? suma * (1 + pct / 100) : suma;
+  switch(cod){
+    case 'lineas': return lineas.length > 0;
+    case 'total': return total > 0 && lineas.length > 0 && (Math.abs(esperado - total) < 0.02 || Math.abs(suma - total) < 0.02);
+    case 'cliente': return !!(doc.entidad_id || (doc.client && !/^(—|-|falta cliente|sin cliente)$/i.test(String(doc.client).trim())));
+    case 'fecha': return !!(doc.fecha_devengo || doc.dateRaw);
+    case 'numero': return !!(doc.numero || doc.num);
+    case 'precio': return lineas.length > 0 && lineas.every(l => !(l.cantidad == null && l.precio_unitario == null && l.horas == null));
+    default: return false;
+  }
+}
 function calidadCorta(doc){
   // estados finales del circuito de calidad: OK · CORREGIDO · REVISAR · CONFLICTO (+ EN CURSO mientras pasa)
   const estado = doc.estado_calidad;
   const m = (doc.info_faltante||'').match(/\[control-calidad: ([^\]]+)\]/);
-  const codigos = m ? m[1].split(', ').map(s=>s.trim()).filter(Boolean) : [];
+  const codigos = (m ? m[1].split(', ').map(s=>s.trim()).filter(Boolean) : []).filter(cod => !calidadYaArreglado(doc, cod));   // V12.01 (Daniel 16/10): un fallo que ya no se cumple (se añadieron líneas, cliente, total…) deja de salir
   if(estado==='pendiente' || estado==='en_circuito') return {texto:'En curso', color:'var(--ink-soft,#999)', codigos};
   if(estado==='conflicto') return {texto:'Conflicto', color:'#9B6BD3', codigos, conflicto:true};
   if(estado==='corregido_automatico') return {texto:'Corregido', color:'var(--orange)', codigos:[]};
