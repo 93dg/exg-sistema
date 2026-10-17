@@ -4880,11 +4880,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.06" defer></script>
-<script src="costes/norm.js?v=V12.06" defer></script>
-<script src="ajustes/calc.js?v=V12.06" defer></script>
+<script src="rentabilidad/rent.js?v=V12.07" defer></script>
+<script src="costes/norm.js?v=V12.07" defer></script>
+<script src="ajustes/calc.js?v=V12.07" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.06</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.07</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5036,7 +5036,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.06</div>
+        <div class="sub" id="version-badge">V12.07</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14285,6 +14285,8 @@ function avisosItvFlota(filasFlota, hoy){
     .filter(a => a.dias <= DIAS_AVISO_ITV)
     .sort((a,b) => a.dias - b.dias);
 }
+// V12.06: misma cuenta atrás real que el resto de recordatorios; si lleva mucho vencida, en años y meses
+function recTiempo(n){ if(n < 60) return n + (n === 1 ? ' día' : ' días'); const me = Math.floor(n / 30.44); if(me < 24) return me + ' meses'; const a = Math.floor(me / 12), r = me % 12; return a + ' años' + (r ? ' y ' + r + (r === 1 ? ' mes' : ' meses') : ''); }
 function htmlAvisoItv(a){
   const v = a.v, d = a.dias;
   const [y,m,dd] = String(v.itv_vence).split('-');
@@ -14293,7 +14295,7 @@ function htmlAvisoItv(a){
   const ico = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:15px;height:15px;vertical-align:-2px;margin-right:2px;"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><circle cx="8" cy="17" r="1.6"/><circle cx="16" cy="17" r="1.6"/></svg>';
   // V8.50 (Daniel: «dentro de cada grupo, unas tarjetas gordas y otras finas»): el aviso de ITV con la misma tarjeta que los demás recordatorios
   return `<details class="alert-det rec-card t-itv">
-      <summary class="alert-sum"><div class="rec-ico">${ico}</div><div class="t">ITV ${escHtml(v.nombre)}</div><div class="rec-pil ${d < 0 ? 'roja' : 'ambar'}">${d < 0 ? 'vencida · ' : ''}${dd}/${m}/${String(y).slice(2)}</div></summary>
+      <summary class="alert-sum"><div class="rec-ico">${ico}</div><div class="t">ITV ${escHtml(v.nombre)}</div><div class="rec-pil ${d < 0 || d <= 3 ? 'roja' : d <= 14 ? 'ambar' : ''}">${d > 1 ? 'Quedan ' + d + ' días' : d === 1 ? 'Mañana' : d === 0 ? 'Hoy' : 'Vencida hace ' + recTiempo(-d)} · ${dd}/${m}/${String(y).slice(2)}</div></summary>
       <div class="alert-det-b"><div class="s" style="font-weight:600;color:var(--ink);">ITV ${escHtml(v.nombre)}${v.matricula ? ' (' + escHtml(v.matricula) + ')' : ''} — ${cuando}</div><div class="rec-fte">Fuente · ficha del vehículo (Flota)</div><div class="s" style="margin-top:6px;">Válida hasta ${dd}/${m}/${y}. Aviso automático: desaparece al actualizar la fecha de ITV en la ficha del vehículo.</div></div>
     </details>`;
 }
@@ -14583,7 +14585,7 @@ function recRender(){
     const tema = recTema(r), dias = v ? Math.round((new Date(v + 'T12:00:00') - new Date(hoy + 'T12:00:00')) / 86400000) : null;
     // V12.04 (Daniel: «quiero cuentas atrás reales»): cuenta atrás hasta la fecha límite real (vence), con la fecha al lado; sin fecha real no se inventa
     const fCorta = v ? v.slice(8, 10) + '/' + v.slice(5, 7) : '';
-    const pild = v == null ? '' : `<div class="rec-pil ${dias < 0 || dias <= 3 ? 'roja' : dias <= 14 ? 'ambar' : ''}">${dias > 1 ? 'Quedan ' + dias + ' días · ' + fCorta : dias === 1 ? 'Mañana · ' + fCorta : dias === 0 ? 'Hoy · ' + fCorta : 'Vencido hace ' + (-dias) + (dias === -1 ? ' día · ' : ' días · ') + fCorta}</div>`;
+    const pild = v == null ? '' : `<div class="rec-pil ${dias < 0 || dias <= 3 ? 'roja' : dias <= 14 ? 'ambar' : ''}">${dias > 1 ? 'Quedan ' + dias + ' días · ' + fCorta : dias === 1 ? 'Mañana · ' + fCorta : dias === 0 ? 'Hoy · ' + fCorta : 'Vencido hace ' + recTiempo(-dias) + ' · ' + fCorta}</div>`;
     // V8.51 (Daniel): estado, con quién o motivo, y cuánto lleva así
     // V12.04: el estado ya no muestra días desde que se puso (se confundía con una cuenta atrás); la cuenta atrás real está en la pastilla de fecha
     const E = REC_ESTADOS[d.estado_rec], desde = d.estado_desde ? Math.max(0, Math.round((new Date(hoy + 'T12:00:00') - new Date(d.estado_desde + 'T12:00:00')) / 86400000)) : null;
