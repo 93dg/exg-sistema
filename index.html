@@ -4880,11 +4880,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.08" defer></script>
-<script src="costes/norm.js?v=V12.08" defer></script>
-<script src="ajustes/calc.js?v=V12.08" defer></script>
+<script src="rentabilidad/rent.js?v=V12.09" defer></script>
+<script src="costes/norm.js?v=V12.09" defer></script>
+<script src="ajustes/calc.js?v=V12.09" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.08</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.09</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5036,7 +5036,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.08</div>
+        <div class="sub" id="version-badge">V12.09</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14929,6 +14929,14 @@ document.addEventListener('pointerdown', () => mayusCampo(document.activeElement
 function formatMoneda(n){
   return (Number(n)||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:true}) + ' €';
 }
+// V12.09 (Daniel): en el PDF y al imprimir, la unidad va pegada al número en la columna Cant.: 6H, 12M3, 2 DÍAS (sin unidad o «ud», solo el número)
+function formatCantidadUnidad(n, u){
+  const q = formatCantidad(n), k = String(u || '').trim().toLowerCase();
+  const m = {h: 'H', hora: 'H', horas: 'H', 'm³': 'M3', m3: 'M3', 'm²': 'M2', m2: 'M2', ml: 'ML', km: 'KM'}[k];
+  if(m) return q + m;
+  if(k === 'día' || k === 'dia' || k === 'días' || k === 'dias') return q + ((Number(n) || 0) === 1 ? ' DÍA' : ' DÍAS');
+  return q;
+}
 function formatCantidad(n){
   return (Number(n)||0).toLocaleString('es-ES',{maximumFractionDigits:2,useGrouping:true});
 }
@@ -24536,7 +24544,7 @@ function generarPDFDocumento(accion, modoForzado, portadaForzada){
     altoAcumuladoPagina += altoFila;
     const lineTotal = it.totalFijo != null ? it.totalFijo : (Number(it.qty)||0)*it.price;
     if(hayFechas) doc.text(it.fecha ? formatFechaCorta(it.fecha) : '—', 15, y);
-    doc.text(formatCantidad(it.qty), hayFechas ? 40 : 15, y);
+    doc.text(formatCantidadUnidad(it.qty, it.unidad), hayFechas ? 40 : 15, y);
     doc.text(lineasConcepto, xConcepto + (hayFechas?0:20), y);
     if(cfg.hasPrecios){
       doc.text(formatMoneda(it.price), xPrecio, y, {align:'right'});
@@ -24684,7 +24692,7 @@ function togglePreview(){
     <table class="ie-items" style="table-layout:fixed;">
       <colgroup>${items.some(i=>i.fecha)?'<col style="width:14%;">':''}<col style="width:8%;"><col style="width:${items.some(i=>i.fecha)?(cfg.hasPrecios?'54%':'66%'):(cfg.hasPrecios?'68%':'80%')};">${cfg.hasPrecios?'<col style="width:12%;">':''}<col style="width:12%;"></colgroup>
       <thead><tr>${items.some(i=>i.fecha)?'<th>Fecha</th>':''}<th>Cant.</th><th>Concepto</th>${cfg.hasPrecios ? '<th style="text-align:right;">Precio</th>' : ''}<th style="text-align:right;">Total</th></tr></thead>
-      <tbody>${items.map(i=>`<tr>${items.some(x=>x.fecha)?`<td class="mono">${i.fecha ? formatFechaCorta(i.fecha) : '—'}</td>`:''}<td>${formatCantidad(i.qty)}</td><td style="overflow-wrap:break-word;word-break:break-word;">${i.concept||'—'}</td>${cfg.hasPrecios ? `<td style="text-align:right;white-space:nowrap;" class="mono">${formatMoneda(i.price)}</td>` : ''}<td style="text-align:right;white-space:nowrap;" class="mono">${formatMoneda(i.total)}</td></tr>`).join('')}</tbody>
+      <tbody>${items.map(i=>`<tr>${items.some(x=>x.fecha)?`<td class="mono">${i.fecha ? formatFechaCorta(i.fecha) : '—'}</td>`:''}<td>${formatCantidadUnidad(i.qty, i.unidad)}</td><td style="overflow-wrap:break-word;word-break:break-word;">${i.concept||'—'}</td>${cfg.hasPrecios ? `<td style="text-align:right;white-space:nowrap;" class="mono">${formatMoneda(i.price)}</td>` : ''}<td style="text-align:right;white-space:nowrap;" class="mono">${formatMoneda(i.total)}</td></tr>`).join('')}</tbody>
     </table>
     <div class="ie-footer">
       <div class="ie-payment" style="font-size:13px;">
