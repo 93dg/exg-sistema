@@ -11,6 +11,7 @@ FLECHAS = '▾▴▸◂▼▲►◄▶◀⌄⌃›‹'
 REGLAS = [
  ('flecha', 'Sin flechas ni triángulos en filas (guía 2)', re.compile('[' + FLECHAS + ']')),
  ('subrayado', 'NI UN subrayado en la web (guía 2, decisión de Daniel 12/10/2026)', re.compile(r'text-decoration\s*:\s*underline|text-underline|<u[ >]|border-bottom\s*:\s*[^;"}]*dotted', re.I)),
+ ('emoji', 'Sin emojis en la web (Daniel 18/10/2026: «odio los emojis»)', re.compile('[\U0001F300-\U0001FAFF\u2600-\u26FF\u2700-\u2714\u2716-\u27BF]')),
  ('tabla-en-rent', 'Sin <table> en las vistas móviles de rentabilidad (guía 3)', re.compile(r'<table', re.I)),
 ]
 CSS_BLOQUE = re.compile(r'([^{};<>]{1,200})\{([^{}]{1,500})\}')
