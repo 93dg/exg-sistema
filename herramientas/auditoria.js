@@ -30,9 +30,9 @@
     const soloInline = !e.querySelector('br') && [...e.querySelectorAll('*')].every(x => getComputedStyle(x).display === 'inline');
     if (txt.length <= 60 && soloInline) {
       const rg = document.createRange(); rg.selectNodeContents(e);
-      const rs = [...rg.getClientRects()].filter(x => x.width > 1), tops = [...new Set(rs.map(x => Math.round(x.top)))].sort((a, b) => a - b);
+      const rs = [...rg.getClientRects()].filter(x => x.width > 1), tops = [...new Set(rs.map(x => Math.round(x.top)))].sort((a, b) => a - b).filter((t, i, arr) => i === 0 || t - arr[i - 1] > 6);   // V12.14: un número más grande en la misma línea («Estado 7») no es otra línea
       // partido feo: una etiqueta/importe corto en dos líneas, o una última línea con un trozo suelto (p. ej. «h», «€/h», «%»)
-      const anchoLinea = t => rs.filter(x => Math.round(x.top) === t).reduce((m, x) => m + x.width, 0);
+      const anchoLinea = t => rs.filter(x => Math.abs(Math.round(x.top) - t) <= 6).reduce((m, x) => m + x.width, 0);
       const huerfano = tops.length > 1 && anchoLinea(tops[tops.length - 1]) < 0.25 * anchoLinea(tops[0]);
       if (tops.length > 1 && (txt.length <= 25 || huerfano)) { const k = 'p' + txt; if (!vistos.has(k)) { vistos.add(k); out.push(['partido', txt]); } }
     }
