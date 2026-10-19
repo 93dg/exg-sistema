@@ -4919,11 +4919,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.15" defer></script>
-<script src="costes/norm.js?v=V12.15" defer></script>
-<script src="ajustes/calc.js?v=V12.15" defer></script>
+<script src="rentabilidad/rent.js?v=V12.16" defer></script>
+<script src="costes/norm.js?v=V12.16" defer></script>
+<script src="ajustes/calc.js?v=V12.16" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.15</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.16</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5075,7 +5075,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.15</div>
+        <div class="sub" id="version-badge">V12.16</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5199,7 +5199,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
       </div>
 
             <div id="rec-filtro-ancla"></div>
-            <div class="filters" id="rec-filtro-plazo-chips"><div class="chip-filter" data-plazo="7">1 semana</div><div class="chip-filter active" data-plazo="30">1 mes</div><div class="chip-filter" data-plazo="365">1 año</div><div class="chip-filter" data-plazo="0">Todos</div></div>
+            <div class="filters" id="rec-filtro-plazo-chips"><div class="chip-filter" data-plazo="7">1S</div><div class="chip-filter active" data-plazo="30">1M</div><div class="chip-filter" data-plazo="365">1A</div><div class="chip-filter" data-plazo="0">Todos</div></div>
             <div class="filters" id="rec-filtro-tema-chips"></div>
             <div class="filters" id="rec-filtro-donde-chips"></div>
             <div id="alertas-list-atencion"></div>
@@ -5217,7 +5217,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
           <div style="display:flex;align-items:center;gap:10px;"><b id="pg-total-cab" class="n-neg cc-total-movil" style="font-size:13.5px;white-space:nowrap;"></b><span id="gastosprev-chevron" style="color:var(--ink-soft);font-size:16px;">▾</span></div>
         </div>
         <div id="gastosprev-body"><div class="panel-body" style="padding-bottom:12px;">
-          <div class="filters" id="pg-plazo-chips"><div class="chip-filter active" data-pg="30">1 mes</div><div class="chip-filter" data-pg="60">2 meses</div><div class="chip-filter" data-pg="90">3 meses</div><div class="chip-filter" data-pg="trim">Trimestre</div></div>
+          <div id="pg-filtro-ancla"></div><div class="filters" id="pg-plazo-chips"><div class="chip-filter active" data-pg="30">1M</div><div class="chip-filter" data-pg="60">2M</div><div class="chip-filter" data-pg="90">3M</div><div class="chip-filter" data-pg="trim">Trimestre</div></div>
           <div id="pg-lista" class="rec-cont"><div class="s" style="color:var(--ink-soft);">Cargando…</div></div>
         </div></div>
       </div>
@@ -14386,7 +14386,9 @@ let _pgPlazo = (() => { try{ return localStorage.getItem('pg-plazo') || '30'; }c
 function pgHasta(p){ const h = new Date(); if(p === 'trim'){ const f = new Date(h.getFullYear(), Math.floor(h.getMonth() / 3) * 3 + 3, 0); return f.getFullYear() + '-' + String(f.getMonth() + 1).padStart(2, '0') + '-' + String(f.getDate()).padStart(2, '0'); } return new Date(Date.now() + Number(p) * 864e5).toISOString().slice(0, 10); }
 async function pgCargar(){
   const box = document.getElementById('pg-lista'); if(!box || !sb) return;
-  document.querySelectorAll('#pg-plazo-chips .chip-filter').forEach(c => c.classList.toggle('active', c.dataset.pg === _pgPlazo));
+  // V12.16 (reporte 697aa16c: «otra vez la falta de consistencia con los filtros»): el plazo va en la misma pastilla plegable que el de Tareas («Plazo 1M»)
+  try{ if(!PLEG2.pg) pleg2Crear({id: 'pg', despuesDe: '#pg-filtro-ancla', plegados: ['plazo'], grupos: [['plazo', 'Plazo', 'pg-plazo-chips', 'unico']]}); }catch(e){}
+  document.querySelectorAll('#pg-plazo-chips .chip-filter').forEach(c => c.classList.toggle('active', c.dataset.pg === _pgPlazo)); try{ pleg2Refrescar('pg'); }catch(e){}
   const hasta = pgHasta(_pgPlazo), {data, error} = await sb.rpc('proximos_gastos', {p_hasta: hasta}, {get: true});
   if(error){ box.innerHTML = '<div class="s" style="color:var(--red);">No se pudo calcular</div>'; return; }
   const filas = data || [], eur = n => { const [e, d] = Math.abs(Number(n) || 0).toFixed(2).split('.'); return (Number(n) < 0 ? '−' : '') + e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + d + ' €'; }, hoy = new Date().toISOString().slice(0, 10);
