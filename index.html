@@ -4917,11 +4917,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.24" defer></script>
-<script src="costes/norm.js?v=V12.24" defer></script>
-<script src="ajustes/calc.js?v=V12.24" defer></script>
+<script src="rentabilidad/rent.js?v=V12.25" defer></script>
+<script src="costes/norm.js?v=V12.25" defer></script>
+<script src="ajustes/calc.js?v=V12.25" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.24</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.25</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5073,7 +5073,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.24</div>
+        <div class="sub" id="version-badge">V12.25</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8557,7 +8557,7 @@ function bandejaVivoIniciar(){
     const act = document.querySelector('.view.active'), ed = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);   // si estás escribiendo, no se repinta la lista
     try{ if(act && !ed){ if(act.id === 'view-reportes') loadSistema(); else if(act.id === 'view-entradas') loadInbox(); } }catch(e){}
   }, 600); };
-  try{ _bandejaVivo = sb.channel('bandeja-vivo').on('postgres_changes', {event: '*', schema: 'public', table: 'documentos'}, alto).on('postgres_changes', {event: '*', schema: 'public', table: 'sistema'}, alto).subscribe(); }catch(e){ console.warn('Bandeja en vivo', e); }
+  try{ _bandejaVivo = sbTiempoReal().channel('bandeja-vivo').on('postgres_changes', {event: '*', schema: 'public', table: 'documentos'}, alto).on('postgres_changes', {event: '*', schema: 'public', table: 'sistema'}, alto).subscribe(); }catch(e){ console.warn('Bandeja en vivo', e); }
   bandejaContadores(true); bandejaCorreoContar();
   setInterval(() => { if(document.visibilityState === 'visible'){ bandejaCorreoContar(); bandejaContadores(true); } }, 20000);
 }
@@ -8612,7 +8612,7 @@ function vivoIniciar(){
     sb.from = (tabla) => { const q = fromOrig(tabla); ['insert', 'update', 'upsert', 'delete'].forEach(m => { const f = q[m]; if(typeof f === 'function') q[m] = (...a) => { if(VIVO_TABLAS.includes(tabla)) _vivoPropio = Date.now(); return f.apply(q, a); }; }); return q; };
   }catch(e){}
   try{
-    let c = sb.channel('exg-datos-al-dia');
+    let c = sbTiempoReal().channel('exg-datos-al-dia');
     VIVO_TABLAS.forEach(tabla => { c = c.on('postgres_changes', {event: '*', schema: 'public', table: tabla}, p => {
       if(tabla === 'documentos_economicos') vivoDoc(p);
       _vivoCambios.add(tabla); clearTimeout(_vivoDeb); _vivoDeb = setTimeout(vivoAplicar, 900);
@@ -9530,12 +9530,19 @@ function c3HojaDia(iso){   // V7.99 (Daniel): un día con trabajos = sus tarjeta
   const albBtn = a => `<button type="button" data-c3-albdoc="${a.id}" style="border-left-color:#8a8f98"><b>${escHtml(a.tipos.join(' · '))}</b><span>${escHtml([tbMay(a.cliente || ''), a.obra, ...a.lineas.slice(0, 2).map(l => l.descripcion)].filter(Boolean).join(' · ').slice(0, 90))}${a.importe ? ' · ' + eur(a.importe) : ''}</span></button>`;
   const albBloque = AL.length ? `<div class="c2-lbl">Albaranes de este día · ${AL.length}</div><div class="c3-poner">${AL.map(albBtn).join('')}</div>` : '';
   const abierto = _c3Poner === iso, extraHtml = alrededor.length && abierto ? `<div class="c2-lbl">Trabajar este día en</div><div class="c3-poner">${alrededor.map(j => `<button type="button" data-c3-finde="${j.id}" data-dia="${iso}" style="border-left-color:${COL[j.id] || '#5A6B7D'}"><b>${escHtml(c3Corto(j))}</b><span>cuenta como 1 día</span></button>`).join('')}</div>` : '';
+  // V12.24 (reporte 5ff4b8eb, Daniel: «si le doy al día 21, cómo añado un trabajo de los pendientes que está más adelante»): además de los que no tienen día,
+  // se puede traer aquí cualquier trabajo que ya está puesto más adelante (se mueve con la misma pregunta de siempre si pisa otro)
+  const despues = pasadoD ? [] : c3Cola().filter(j => j.plan && j.plan.fecha && j.plan.fecha > iso && !L.some(x => x.j === j)).sort((a, b) => a.plan.fecha.localeCompare(b.plan.fecha));
+  const btnPoner = (j, txt) => `<button type="button" data-c3-poner="${j.id}" data-dia="${iso}" style="border-left-color:${C3_COL[j.prioridad] || '#2B5C8F'}"><b>${escHtml(c3Corto(j))}</b><span>${txt}</span></button>`;
+  const ponerHtml = (sin.length || alrededor.length || despues.length) && !abierto ? `<button type="button" class="c2-ok gris" data-c3-mostrar="${iso}">Añadir trabajo a este día</button>`
+    : abierto ? (sin.length ? `<div class="c2-lbl">Sin día</div><div class="c3-poner">${sin.map(j => btnPoner(j, tbN(c3Dias(j)) + ' d')).join('')}</div>` : '')
+      + (despues.length ? `<div class="c2-lbl">Más adelante</div><div class="c3-poner">${despues.map(j => btnPoner(j, c2FechaTxt(j.plan.fecha) + ' · ' + tbN(c3Dias(j)) + ' d')).join('')}</div>` : '') : '';
   c3Hoja(`<h2>${c2FechaTxt(iso).replace(/^./, c => c.toUpperCase())}</h2>
     ${L.length ? `<div class="c3-dcards">${L.map(({j, i}) => { const o = c3Ocupa(j), ip = o.indexOf(iso);
         const paso = `<div class="c3-mini"><button type="button" data-c3-dias="-1" data-id="${j.id}" data-dia="${iso}" ${c3Dias(j) <= 1 ? 'disabled' : ''} aria-label="Un día menos">−</button><b>${c3Dias(j)}<small>día${c3Dias(j) === 1 ? '' : 's'}</small></b><button type="button" data-c3-dias="1" data-id="${j.id}" data-dia="${iso}" aria-label="Un día más">+</button></div>`;
         const quitarFinde = finde && (j.plan.findes || []).includes(iso) ? `<button type="button" class="c3-nofinde" data-c3-nofinde="${j.id}" data-dia="${iso}">No trabajar este día</button>` : '';
-        const docs = docsDe(j); return tbCartaHtml(j, false, '', quitarFinde + (docs.length ? `<div class="c2-lbl" style="margin-top:6px;">Documentos de este día</div><div class="c3-poner">${docs.map(albBtn).join('')}</div>` : '') + `<div class="c3-dc-pie"><div class="c3-dc-fechas" style="--jc:${COL[j.id] || '#5A6B7D'}">${ip >= 0 ? `Día ${ip + 1} de ${c3Dias(j)}<br>${c2FechaTxt(o[0])} → ${c2FechaTxt(o[o.length - 1])}` : 'Trabajado este día'}</div>${ip >= 0 ? paso : ''}</div>`); }).join('')}</div>`
-    : `${extraHtml}<div class="c3-libre${finde ? ' finde' : ''}">${C2_FESTIVOS.includes(iso) ? 'Festivo' : finde ? 'Fin de semana' : pasadoD ? 'Sin trabajo' : 'Día libre'}</div>${(sin.length || alrededor.length) && !abierto ? `<button type="button" class="c2-ok gris" data-c3-mostrar="${iso}">+ Añadir trabajo a este día</button>` : ''}${sin.length && abierto ? `<div class="c2-lbl">Poner aquí</div><div class="c3-poner">${sin.map(j => `<button type="button" data-c3-poner="${j.id}" data-dia="${iso}" style="border-left-color:${C3_COL[j.prioridad] || '#2B5C8F'}"><b>${escHtml(c3Corto(j))}</b><span>${tbN(c3Dias(j))} d</span></button>`).join('')}</div>` : ''}`}
+        const docs = docsDe(j); return tbCartaHtml(j, false, '', quitarFinde + (docs.length ? `<div class="c2-lbl" style="margin-top:6px;">Documentos de este día</div><div class="c3-poner">${docs.map(albBtn).join('')}</div>` : '') + `<div class="c3-dc-pie"><div class="c3-dc-fechas" style="--jc:${COL[j.id] || '#5A6B7D'}">${ip >= 0 ? `Día ${ip + 1} de ${c3Dias(j)}<br>${c2FechaTxt(o[0])} → ${c2FechaTxt(o[o.length - 1])}` : 'Trabajado este día'}</div>${ip >= 0 ? paso : ''}</div>`); }).join('')}</div>${ponerHtml}`
+    : `${extraHtml}<div class="c3-libre${finde ? ' finde' : ''}">${C2_FESTIVOS.includes(iso) ? 'Festivo' : finde ? 'Fin de semana' : pasadoD ? 'Sin trabajo' : 'Día libre'}</div>${ponerHtml}`}
     ${albBloque}<button type="button" class="c2-ok gris" data-c2-cerrar="1">Cerrar</button>`);
 }
 // V7.96 (Daniel: «seleccionar uno que ya está en el calendario para añadir o quitar días, súper sencillo, más/menos»): tocar un trabajo
@@ -15016,6 +15023,11 @@ renderJobs('todos');
 */
 const SUPABASE_URL = 'https://sshctqnpuolawtcujxkt.supabase.co'; // proyecto EXG (real)
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzaGN0cW5wdW9sYXd0Y3VqeGt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NDMxNDQsImV4cCI6MjEwNDUxOTE0NH0.NgqSwwtdQjKot2kiCabmF6f_kvl-27QU1kWgfzYPFsQ';
+// V12.24: el tiempo real rechaza la clave anon antigua (JwtSignatureError en los registros de Realtime: la bandeja en vivo nunca llegó a conectar).
+// Los canales usan la clave publicable del proyecto; las consultas y las funciones siguen con la de siempre.
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_vCZTS0mVXSgb2Tqe_K2H2g_dJAbFxfh';
+let _sbRT = null;
+function sbTiempoReal(){ if(!_sbRT && window.supabase) _sbRT = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {auth: {persistSession: false, autoRefreshToken: false, storageKey: 'exg-rt'}}); return _sbRT; }
 const DOC_BUCKET = 'documentos-exg'; // bucket real ya existente en el proyecto EXG
 // Mapa único de tipo de documento -> icono + etiqueta. Fuente única de verdad:
 // no crear otro mapa parecido en ningún sitio nuevo, usar TIPO_DOC_ICONO/TIPO_DOC_LABEL.
