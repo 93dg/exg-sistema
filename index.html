@@ -4919,11 +4919,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.20" defer></script>
-<script src="costes/norm.js?v=V12.20" defer></script>
-<script src="ajustes/calc.js?v=V12.20" defer></script>
+<script src="rentabilidad/rent.js?v=V12.21" defer></script>
+<script src="costes/norm.js?v=V12.21" defer></script>
+<script src="ajustes/calc.js?v=V12.21" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.20</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.21</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5075,7 +5075,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.20</div>
+        <div class="sub" id="version-badge">V12.21</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -25847,9 +25847,13 @@ function impRes303(D){ return D.rep - D.ded; }
 // Base del 130 acumulado: hasta el último trimestre presentado vale lo DECLARADO por el gestor (la app no tiene todos los documentos de antes de julio)
 // más los intereses del préstamo de esos trimestres, que el gestor no contó; después se suman los trimestres siguientes con los datos de la app.
 function impRend130(q, anio, D){
-  const decl = _impDeclaraciones.filter(d => d.modelo === '130' && Number(d.anio) === anio && Number(d.trimestre) <= q).sort((a, b) => Number(b.trimestre) - Number(a.trimestre))[0];
+  // V12.21 (Daniel 20/10: «¿por qué ha cambiado esto con respecto a lo que le mandamos a José Alberto?»): la base es el último 130 PRESENTADO con sus
+  // ingresos y gastos (los números oficiales del gestor) de un trimestre ANTERIOR; el trimestre que se mira se calcula siempre con la estimación,
+  // así un trimestre ya presentado sigue enseñando lo que calculamos y se compara con lo presentado en Presentadas.
+  const decl = _impDeclaraciones.filter(d => d.modelo === '130' && Number(d.anio) === anio && d.ingresos != null && d.gastos != null
+    && (Number(d.trimestre) < q || (Number(d.trimestre) === q && !impTrimCompleto(q, anio)))).sort((a, b) => Number(b.trimestre) - Number(a.trimestre))[0];
   const suma = (arr, a, b) => { let s = 0; for(let k = a; k <= b; k++) s += arr[k] || 0; return s; };
-  if(decl && !impTrimCompleto(Number(decl.trimestre), anio)){
+  if(decl){
     const p = Number(decl.trimestre), ajuste = suma(D.gasFinPorQ, 1, p), ingN = suma(D.ingPorQ, p + 1, q), gasN = suma(D.gasPorQ, p + 1, q);
     const ing = Number(decl.ingresos) + ingN, gas = Number(decl.gastos) + ajuste + gasN;
     return {desdeDecl: true, p, ingDecl: Number(decl.ingresos), gasDecl: Number(decl.gastos), ajuste, ingN, gasN, ing, gas, rend: ing - gas, sinIva: suma(D.sinIvaPorQ, p + 1, q)};
