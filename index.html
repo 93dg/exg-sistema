@@ -1619,7 +1619,8 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .e2-t{cursor:pointer;}
 .e2-t.abierto{outline:2px solid var(--orange);outline-offset:1px;}
 .e2-det{grid-column:1/-1;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:6px 10px;animation:e2Baja .22s ease;}
-.e2-hero .e2-det{margin-top:10px;}   /* V12.23: la cabecera ya es clara; los textos del detalle van en su color normal */
+.e2-hero .e2-det{margin-top:10px;}
+.rec-aver{margin:6px 0;} .rec-aver-m{font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin:0 2px 3px;}   /* V12.23: la cabecera ya es clara; los textos del detalle van en su color normal */
 @keyframes e2Baja{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
 .e2-fila{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:7px 2px;border-bottom:1px solid var(--line);cursor:default;}
 button.e2-fila{cursor:pointer;}
@@ -4916,11 +4917,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.23" defer></script>
-<script src="costes/norm.js?v=V12.23" defer></script>
-<script src="ajustes/calc.js?v=V12.23" defer></script>
+<script src="rentabilidad/rent.js?v=V12.24" defer></script>
+<script src="costes/norm.js?v=V12.24" defer></script>
+<script src="ajustes/calc.js?v=V12.24" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.23</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.24</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5072,7 +5073,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.23</div>
+        <div class="sub" id="version-badge">V12.24</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8559,6 +8560,65 @@ function bandejaVivoIniciar(){
   try{ _bandejaVivo = sb.channel('bandeja-vivo').on('postgres_changes', {event: '*', schema: 'public', table: 'documentos'}, alto).on('postgres_changes', {event: '*', schema: 'public', table: 'sistema'}, alto).subscribe(); }catch(e){ console.warn('Bandeja en vivo', e); }
   bandejaContadores(true); bandejaCorreoContar();
   setInterval(() => { if(document.visibilityState === 'visible'){ bandejaCorreoContar(); bandejaContadores(true); } }, 20000);
+}
+/* V12.23 DATOS AL DÍA (Daniel 20/10: «que se actualice todo al mismo tiempo, que esté todo interconectado»):
+   un solo canal en tiempo real con todas las tablas de negocio. Cualquier cambio (de esta pantalla, de otro móvil, del correo,
+   del banco o de Claude) pone al día la memoria de la web, borra las cachés que dependen de ese dato y repinta la sección abierta.
+   Si estás escribiendo o con algo abierto, espera a que termines. Lo que guarda esta misma pantalla ya se repinta al guardar:
+   en ese caso solo se ponen al día las demás secciones (sin repintar la que tienes delante). */
+const VIVO_TABLAS = ['documentos_economicos', 'entidades', 'sistema', 'trabajos', 'flota', 'flota_incidencias', 'movimientos_banco', 'recibos_banco', 'contratos_recurrentes', 'tarifas', 'polizas_seguro', 'gastos_correo', 'documentos_empresa', 'documentos'];
+let _vivoCanal = null, _vivoCambios = new Set(), _vivoDeb = null, _vivoPropio = 0;
+function vivoOcupado(){
+  return document.querySelector('.visor.abierto, .modal.open, .modal-overlay.open, .drawer.open, dialog[open], .c2-sheet') || (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) || document.querySelector('[contenteditable="true"]:focus');
+}
+function vivoDoc(p){   // un documento económico cambiado: se rehace solo ese en memoria, en su fila y en su tarjeta
+  try{
+    const nuevo = p && p.new && p.new.id ? p.new : null, id = (nuevo || (p && p.old) || {}).id; if(!id) return;
+    const fuera = !nuevo || nuevo.deleted_at || (nuevo.fase_estado && nuevo.fase_estado !== 'activo');
+    ['docrow-', 'presrow-', 'albrow-', 'gasrow-', 'mcard-'].forEach(pre => document.getElementById(pre + id)?.remove());
+    delete documentosRealesById[id];
+    if(typeof _historico !== 'undefined' && _historico.pendientes) _historico.pendientes.delete(id);
+    if(fuera || typeof _historico === 'undefined' || !_historico.procesar) return;
+    _historico.procesar(nuevo, 'datos'); _historico.procesar(nuevo, 'filas');
+  }catch(e){ console.warn('Datos al día · documento', e); }
+}
+async function vivoAplicar(){
+  if(vivoOcupado()){ clearTimeout(_vivoDeb); _vivoDeb = setTimeout(vivoAplicar, 2500); return; }
+  const t = new Set(_vivoCambios); _vivoCambios.clear(); if(!t.size) return;
+  const toca = (...xs) => xs.some(x => t.has(x)), propio = Date.now() - _vivoPropio < 4000;
+  try{
+    if(toca('documentos_economicos') && typeof _historico !== 'undefined' && _historico.finalizar) await _historico.finalizar(true);
+    if(toca('entidades')) await cargarEntidadesReales();
+    if(toca('trabajos', 'flota')) await cargarDatosReales();
+    if(toca('flota_incidencias', 'flota')){ try{ cargarFlotaIncidencias(); cargarAveriasReales(); cargarHistorialFlota(); }catch(e){} }
+    if(toca('sistema', 'flota', 'documentos_economicos', 'movimientos_banco')){ try{ cargarAlertasYRecordatorios(); }catch(e){} }
+    // las cachés que salen de estos datos se vacían: cada sección vuelve a calcular con lo último la próxima vez que se pinta
+    _e2 = null; _c3Alb = null; _costeBase = null; _sociosCache = null; _costeHora = null; _dirVivo = null; _gpBanco = null; _deudas = null;
+    _tbCliNombres = null; _tbTarifas = null; _valFlota = null; _asis = null; _flAsis = null; _impPagosCargados = false;
+    if(_impBanco) _impBanco.cargado = false;
+    if(toca('sistema')) _tbCargado = false;
+    try{ if(window.RENT) window.RENT.invalidar(); if(window.COSTES) window.COSTES.D = null; }catch(e){}
+    try{ e2DeudaCargar(); }catch(e){}
+    if(propio) return;
+    const v = localStorage.getItem('vista_activa'), b = v && document.querySelector('.nav button[data-view="' + v + '"]');
+    if(b) b.click();
+    try{ if(window.RENT && window.RENT.el && window.RENT.el.offsetParent) window.RENT.pintar(window.RENT.el, true); if(window.COSTES && window.COSTES.el && window.COSTES.el.offsetParent) window.COSTES.pintar(window.COSTES.el, true); }catch(e){}
+  }catch(e){ console.warn('Datos al día', e); }
+}
+function vivoIniciar(){
+  if(_vivoCanal || typeof sb === 'undefined' || !sb || !sb.channel) return;
+  try{   // lo que guarda esta pantalla se marca, para no repintarle encima la sección mientras la usa
+    const fromOrig = sb.from.bind(sb);
+    sb.from = (tabla) => { const q = fromOrig(tabla); ['insert', 'update', 'upsert', 'delete'].forEach(m => { const f = q[m]; if(typeof f === 'function') q[m] = (...a) => { if(VIVO_TABLAS.includes(tabla)) _vivoPropio = Date.now(); return f.apply(q, a); }; }); return q; };
+  }catch(e){}
+  try{
+    let c = sb.channel('exg-datos-al-dia');
+    VIVO_TABLAS.forEach(tabla => { c = c.on('postgres_changes', {event: '*', schema: 'public', table: tabla}, p => {
+      if(tabla === 'documentos_economicos') vivoDoc(p);
+      _vivoCambios.add(tabla); clearTimeout(_vivoDeb); _vivoDeb = setTimeout(vivoAplicar, 900);
+    }); });
+    _vivoCanal = c.subscribe();
+  }catch(e){ console.warn('Datos al día', e); }
 }
 async function bandejaContadores(forzar){
   if(typeof sb === 'undefined' || !sb) return;
@@ -13620,18 +13680,24 @@ function renderFlotaDocumentacion(){   // pestaña Documentación: un resumen po
   }).join('') || '<div class="fl-vacio">Todavía no hay máquinas.</div>';
 }
 function flIncFiltro(g, v){ _flIncF[g] = v; flIncRender(); }
+// V12.23: la misma tarjeta de avería, mantenimiento o mejora en Flota → Averías y en la ficha de cada máquina
+const FL_INC_TIPO = {averia: 'Avería', mantenimiento: 'Mantenimiento', mejora: 'Mejora'};
+function flIncCard(i){
+  const res = x => x.estado === 'resuelta';
+  const fmt = d => d ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(d) ? d + 'T00:00:00' : d).toLocaleDateString('es-ES', {day: '2-digit', month: 'short', year: 'numeric'}) : '';
+  const prio = p => p === 'alta' ? '<span class="fl-chip mal">Prioridad alta</span>' : p === 'media' ? '<span class="fl-chip aviso">Prioridad media</span>' : p ? `<span class="fl-chip">Prioridad ${flE(p)}</span>` : '';
+  return `<div class="fl-inc ${i.tipo === 'averia' ? 'averia' : ''} ${res(i) ? 'res' : ''}"><div class="fl-inc-top"><span class="pill ${i.tipo === 'averia' ? 'encurso' : 'porconfirmar'} pill-sm">${FL_INC_TIPO[i.tipo] || 'Mejora'}</span>${!res(i) && i.sigue_trabajando === false ? '<span class="fl-chip mal">Parada</span>' : ''}${res(i) ? '<span class="pill terminado pill-sm">Resuelta</span>' : ''}${prio(i.prioridad)}<span class="fl-inc-f">${flE(fmt(i.fecha || i.created_at))}</span></div><div class="fl-inc-d">${flE(i.descripcion || '—')}</div>${(i.pieza || i.pedido || i.coste != null || (res(i) && i.resuelta_at)) ? `<div class="fl-inc-r">${[i.pieza ? 'Pieza: ' + flE(i.pieza) : '', i.pedido ? 'Pedido: ' + flE(i.pedido) : '', i.coste != null ? 'Coste: ' + flE(flEur(i.coste)) : '', res(i) && i.resuelta_at ? 'Resuelta ' + flE(fmt(i.resuelta_at)) : ''].filter(Boolean).join(' · ')}</div>` : ''}<div class="fl-inc-pie"><span class="fl-inc-r">Registrada ${flE(fmt(i.created_at))}</span>${res(i) ? `<button type="button" class="btn sm" style="color:var(--ink-soft);" onclick="marcarIncidencia('${i.id}','pendiente')">Reabrir</button>` : `<button type="button" class="btn sm" style="color:var(--green);border-color:var(--green);" onclick="marcarIncidencia('${i.id}','resuelta')">✓ Marcar resuelta</button>`}</div></div>`;
+}
 function flIncRender(){
   const cont = document.getElementById('flota-incidencias-cards'); if(!cont) return;
   const all = _flInc, res = i => i.estado === 'resuelta';
   const pE = (i, e) => e === 'todas' || (e === 'resueltas' ? res(i) : !res(i)), pT = (i, t) => t === 'todos' || i.tipo === t;
   const nE = e => all.filter(i => pE(i, e) && pT(i, _flIncF.tipo)).length, nT = t => all.filter(i => pT(i, t) && pE(i, _flIncF.estado)).length;
   const ch = (g, v, l, n) => `<button type="button" class="tb-fchip ${_flIncF[g] === v ? 'active' : ''}" onclick="flIncFiltro('${g}','${v}')">${l} <b>${n}</b></button>`;
-  const filtros = `<div class="fl-sec" style="padding:10px 12px;"><div class="tb-frow" style="margin-bottom:8px;"><span class="tb-ftit" style="cursor:default;">Estado</span><div>${ch('estado', 'pendientes', 'Pendientes', nE('pendientes'))}${ch('estado', 'resueltas', 'Resueltas', nE('resueltas'))}${ch('estado', 'todas', 'Todas', nE('todas'))}</div></div><div class="tb-frow"><span class="tb-ftit" style="cursor:default;">Tipo</span><div>${ch('tipo', 'todos', 'Todos', nT('todos'))}${ch('tipo', 'averia', 'Avería', nT('averia'))}${ch('tipo', 'mejora', 'Mejora', nT('mejora'))}</div></div></div>`;
+  const filtros = `<div class="fl-sec" style="padding:10px 12px;"><div class="tb-frow" style="margin-bottom:8px;"><span class="tb-ftit" style="cursor:default;">Estado</span><div>${ch('estado', 'pendientes', 'Pendientes', nE('pendientes'))}${ch('estado', 'resueltas', 'Resueltas', nE('resueltas'))}${ch('estado', 'todas', 'Todas', nE('todas'))}</div></div><div class="tb-frow"><span class="tb-ftit" style="cursor:default;">Tipo</span><div>${ch('tipo', 'todos', 'Todos', nT('todos'))}${ch('tipo', 'averia', 'Avería', nT('averia'))}${ch('tipo', 'mantenimiento', 'Mantenimiento', nT('mantenimiento'))}${ch('tipo', 'mejora', 'Mejora', nT('mejora'))}</div></div></div>`;
   const lista = all.filter(i => pE(i, _flIncF.estado) && pT(i, _flIncF.tipo)).sort((a, b) => (res(a) - res(b)) || String(b.fecha || b.created_at).localeCompare(String(a.fecha || a.created_at)));
   const grupos = []; lista.forEach(i => { const n = i.flota?.nombre || '—'; let g = grupos.find(x => x.n === n); if(!g){ g = {n, a: []}; grupos.push(g); } g.a.push(i); });
-  const fmt = d => d ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(d) ? d + 'T00:00:00' : d).toLocaleDateString('es-ES', {day: '2-digit', month: 'short', year: 'numeric'}) : '';
-  const prio = p => p === 'alta' ? '<span class="fl-chip mal">Prioridad alta</span>' : p === 'media' ? '<span class="fl-chip aviso">Prioridad media</span>' : p ? `<span class="fl-chip">Prioridad ${flE(p)}</span>` : '';
-  cont.innerHTML = filtros + (grupos.map(g => `<div class="fl-grupo-t"><span>${flE(g.n)}</span><span>${g.a.length}</span></div>` + g.a.map(i => `<div class="fl-inc ${i.tipo === 'averia' ? 'averia' : ''} ${res(i) ? 'res' : ''}"><div class="fl-inc-top"><span class="pill ${i.tipo === 'averia' ? 'encurso' : 'porconfirmar'} pill-sm">${i.tipo === 'averia' ? 'Avería' : 'Mejora'}</span>${res(i) ? '<span class="pill terminado pill-sm">Resuelta</span>' : ''}${prio(i.prioridad)}<span class="fl-inc-f">${flE(fmt(i.fecha || i.created_at))}</span></div><div class="fl-inc-d">${flE(i.descripcion || '—')}</div><div class="fl-inc-pie"><span class="fl-inc-r">Registrada ${flE(fmt(i.created_at))}</span>${res(i) ? `<button type="button" class="btn sm" style="color:var(--ink-soft);" onclick="marcarIncidencia('${i.id}','pendiente')">Reabrir</button>` : `<button type="button" class="btn sm" style="color:var(--green);border-color:var(--green);" onclick="marcarIncidencia('${i.id}','resuelta')">✓ Marcar resuelta</button>`}</div></div>`).join('')).join('') || '<div class="fl-sec"><div class="fl-vacio">No hay incidencias con estos filtros.</div></div>');
+  cont.innerHTML = filtros + (grupos.map(g => `<div class="fl-grupo-t"><span>${flE(g.n)}</span><span>${g.a.length}</span></div>` + g.a.map(flIncCard).join('')).join('') || '<div class="fl-sec"><div class="fl-vacio">No hay incidencias con estos filtros.</div></div>');
   const cnt = document.getElementById('averias-count'); if(cnt) cnt.textContent = all.length + ' registros';
 }
 async function cargarFlotaIncidencias(){
@@ -13639,7 +13705,7 @@ async function cargarFlotaIncidencias(){
   try{
     const {data,error} = await sb.from('flota_incidencias').select('*,flota(nombre)').order('created_at',{ascending:false});
     if(error||!data) return;
-    _flInc = data; flIncRender();
+    _flInc = data; flIncRender(); try{ if(_recCargado) recRender(); if(typeof _flFichaId !== 'undefined' && _flFichaId) renderFichaMaquina(); }catch(e){}
   }catch(e){}
 }
 
@@ -14023,8 +14089,10 @@ async function marcarIncidencia(id, nuevoEstado){
 async function cargarAveriasReales(){
   if(!sb) return;
   try{
-    const {data, error} = await sb.from('averias').select('*').order('created_at',{ascending:false});
-    if(error || !data) return;
+    // V12.23: una sola fuente de averías (flota_incidencias), la misma que Flota → Averías, la bandeja y la ficha de cada máquina
+    const {data: _avR, error} = await sb.from('flota_incidencias').select('*').eq('tipo', 'averia').order('created_at',{ascending:false});
+    if(error || !_avR) return;
+    const data = _avR.map(a => ({...a, sintoma: a.descripcion, resuelta_at: a.resuelta_at || (a.estado === 'resuelta' ? a.created_at : null)}));
     data.forEach(a=>{
       const maquina = fleet.find(f=>f.id===a.flota_id);
       const d = new Date(a.created_at);
@@ -14098,9 +14166,10 @@ async function abrirAveriaMaquina(){
   const sintoma = (await pedirCampos('¿Qué le pasa?', [{id:'sintoma', label:'Síntoma', tipo:'textarea', requerido:true}])) ?.sintoma;
   if(!sintoma) return;
 
-  const {data, error} = await sb.from('averias').insert({flota_id: maquina.id, sintoma: sintoma.trim()}).select().single();
+  const {data: _avN, error} = await sb.from('flota_incidencias').insert({flota_id: maquina.id, fecha: new Date().toISOString().slice(0, 10), tipo: 'averia', prioridad: 'alta', descripcion: sintoma.trim(), estado: 'pendiente', sigue_trabajando: false}).select().single();   // V12.23: misma tabla que el resto de averías; la máquina pasa a «avería» sola
   if(error){ mostrarToast('Error al guardar: '+errText(error)); return; }
-  await sb.from('flota').update({estado:'averia'}).eq('id', maquina.id);
+  const data = {..._avN, sintoma: _avN.descripcion};
+  try{ cargarFlotaIncidencias(); }catch(e){}
   maquina.state = 'averia';
   renderFleetGrid();
 
@@ -14159,9 +14228,9 @@ function closeBreakdownDrawer(){ document.getElementById('breakdown-overlay').cl
 async function marcarReparada(id){
   const b = averiasById[id];
   if(!b || !sb) return;
-  const {error} = await sb.from('averias').update({resuelta_at: new Date().toISOString()}).eq('id', id);
+  const {error} = await sb.from('flota_incidencias').update({estado: 'resuelta', resuelta_at: new Date().toISOString().slice(0, 10)}).eq('id', id);   // V12.23: la máquina vuelve a «activo» sola si no le queda otra avería que la pare
   if(error){ mostrarToast('Error al guardar: '+errText(error)); return; }
-  await sb.from('flota').update({estado:'activo'}).eq('id', b.flota_id);
+  try{ cargarFlotaIncidencias(); }catch(e){}
   const maquina = fleet.find(f=>f.id===b.flota_id);
   if(maquina) maquina.state = 'disponible';
   renderFleetGrid();
@@ -14431,6 +14500,8 @@ async function cargarAlertasYRecordatorios(){
 }
 // RECORDATORIOS POR PLAZO (Daniel 02/10/2026): solo se ven los que tocan en la semana, el mes o el año elegido; los vencidos y los que no tienen fecha salen siempre
 let _recItems = [], _recItv = null, _recCargado = false;
+// V12.23 (Daniel 20/10: las averías en Tareas, en Flota → Averías y en la ficha): las averías y mantenimientos abiertos salen también en Tareas, con la misma tarjeta
+function recAveriasHtml(){ return (typeof _flInc !== 'undefined' ? _flInc : []).filter(i => i.estado !== 'resuelta' && (i.tipo === 'averia' || i.tipo === 'mantenimiento')).sort((a, b) => ((b.sigue_trabajando === false) - (a.sigue_trabajando === false)) || String(a.fecha || '').localeCompare(String(b.fecha || ''))).map(i => `<div class="rec-aver"><div class="rec-aver-m">${flE(i.flota?.nombre || '')}</div>${flIncCard(i)}</div>`).join(''); }
 
 // V8.57 (reporte de Daniel: «los filtros no están actualizados como estaba la web»): Documentos pendientes usa las mismas píldoras que el resto. Sin ninguna elegida = todos. Antes los desplegables del móvil no filtraban nada: renderControlDocs solo leía los de escritorio
 const CC_DOC_TIPOS = [['presupuesto', 'Presupuesto'], ['albaran', 'Albarán'], ['proforma', 'Proforma'], ['factura', 'Factura']], CC_DOC_ESTADOS = [['trabajo_activo', 'Trabajo activo'], ['pendiente_enviar', 'Listo p. entregar'], ['entregado', 'Entregada'], ['pendiente_cobrar', 'Por cobrar'], ['por_cobrar_otra', 'Por cobrar en otra'], ['parcial', 'Cobrado parcial'], ['parcial_otra', 'Parcial en otra'], ['cobrado_otra', 'Cobrada en otra'], ['borrador', 'Borrador'], ['revisar', 'Por revisar'], ['aceptado', 'Aceptado'], ['enviado', 'Enviado'], ['rectificativa', 'Rectificativa'], ['cobrado', 'Cobrado'], ['cobrado_efectivo', 'Cobrado en efectivo'], ['rechazado', 'Rechazado'], ['anulado', 'Anulado'], ['nula', 'Nula']];   // V9.82 (Daniel 10/10): todos los estados, para poder organizarse; sin elegir ninguno sigue saliendo lo pendiente
@@ -14681,7 +14752,7 @@ function recRender(){
   // V8.48: apartados por tipo, cada uno con su color, su título y su número; los fijos (suscripciones) arriba
   // V8.50 (Daniel): cada apartado se pliega tocando su título; se recuerda
   let pleg = []; try{ pleg = JSON.parse(localStorage.getItem('rec_plegados') || '[]'); }catch(e){}
-  const sec = (k, titulo, lista, extra) => (lista.length || extra) ? `<div class="rec-sec t-${k}${pleg.includes(k) ? ' plegado' : ''}" data-rec-sec="${k}"><span class="rec-sec-bar"></span><b>${titulo}</b><i>${lista.length + (extra ? (String(extra).match(/<details /g) || []).length : 0)}</i><span class="rec-sec-fl">${pleg.includes(k) ? '▸' : '▾'}</span></div><div class="rec-sec-cuerpo"${pleg.includes(k) ? ' style="display:none;"' : ''}>${extra || ''}${lista.map(pinta).join('')}</div>` : '';
+  const sec = (k, titulo, lista, extra) => (lista.length || extra) ? `<div class="rec-sec t-${k}${pleg.includes(k) ? ' plegado' : ''}" data-rec-sec="${k}"><span class="rec-sec-bar"></span><b>${titulo}</b><i>${lista.length + (extra ? (String(extra).match(/<details |class="fl-inc /g) || []).length : 0)}</i><span class="rec-sec-fl">${pleg.includes(k) ? '▸' : '▾'}</span></div><div class="rec-sec-cuerpo"${pleg.includes(k) ? ' style="display:none;"' : ''}>${extra || ''}${lista.map(pinta).join('')}</div>` : '';
   const normales = items.filter(r => !(r.data||{}).anclado), fijos = items.filter(r => (r.data||{}).anclado);
   // V12.12 (Daniel: «eso de 8 más adelante no se puede clicar y debería desplegarse»): al tocarlo se despliegan debajo, con los mismos filtros de tipo y lugar
   const masAdel = _recItems.filter(r => !recAparte(r) && !recVisible(r.data || {}, plazo0)).filter(r => !temasSel.size || temasSel.has(recTema(r))).filter(r => !_recPC || ((r.data || {}).lugar || '') === 'PC')
@@ -14691,10 +14762,10 @@ function recRender(){
     if(bc){ bc.innerHTML = aparte.filter(r => recTema(r) === 'cobros').map(pinta).join(''); bc.style.display = bc.innerHTML ? '' : 'none'; }
     window._ppAvisos = aparte.filter(r => recTema(r) === 'pagos').map(pinta).join(''); if(bp) bp.innerHTML = window._ppAvisos; }
   cont.innerHTML = sec('fijos', 'Anclados', fijos) + (_recPorEstado
-    ? REC_GRUPOS_ESTADO.map(([k, l]) => sec(k, l, normales.filter(r => recGrupoEstado(r.data || {}) === k), k === 'est-toca' && !_recPC ? (_recItv || '') : '')).join('')
-    : REC_TEMAS.map(([k, l]) => sec(k, l, normales.filter(r => recTema(r) === k), k === 'itv' && !_recPC ? (_recItv || '') : '')).join('')) + (ocultos ? `<button type="button" class="rec-mas" onclick="_recVerMas=!_recVerMas;recRender()">${_recVerMas ? 'Ocultar los ' + ocultos + ' de más adelante' : ocultos + ' más adelante'}</button>${_recVerMas ? masAdel.map(pinta).join('') : ''}` : '');
+    ? REC_GRUPOS_ESTADO.map(([k, l]) => sec(k, l, normales.filter(r => recGrupoEstado(r.data || {}) === k), k === 'est-toca' && !_recPC ? (_recItv || '') + recAveriasHtml() : '')).join('')
+    : REC_TEMAS.map(([k, l]) => sec(k, l, normales.filter(r => recTema(r) === k), k === 'itv' && !_recPC ? (_recItv || '') : k === 'flota' && !_recPC ? recAveriasHtml() : '')).join('')) + (ocultos ? `<button type="button" class="rec-mas" onclick="_recVerMas=!_recVerMas;recRender()">${_recVerMas ? 'Ocultar los ' + ocultos + ' de más adelante' : ocultos + ' más adelante'}</button>${_recVerMas ? masAdel.map(pinta).join('') : ''}` : '');
   actualizarVacioAlertas();
-  { const cnt = document.getElementById('alertas-count'); if(cnt){ const nItv = _recPC ? 0 : (String(_recItv || '').match(/<details /g) || []).length; cnt.textContent = items.length + nItv; cnt.style.display = ''; } }   // V7.61: contador junto al título
+  { const cnt = document.getElementById('alertas-count'); if(cnt){ const nItv = _recPC ? 0 : (String(_recItv || '').match(/<details /g) || []).length + (String(recAveriasHtml()).match(/class="fl-inc /g) || []).length; cnt.textContent = items.length + nItv; cnt.style.display = ''; } }   // V7.61: contador junto al título
 }
 document.addEventListener('click', ev => { const ch = ev.target.closest('#rec-filtro-plazo-chips .chip-filter'); if(!ch) return; document.querySelectorAll('#rec-filtro-plazo-chips .chip-filter').forEach(c => c.classList.toggle('active', c === ch)); recRender(); try{ if(PLEG2.rec) pleg2Refrescar('rec'); }catch(e){} });
 function actualizarVacioAlertas(){
@@ -19862,7 +19933,7 @@ function renderFichaMaquina(){
   if(_flTab === 'resumen'){
     if(R.proxima) h += `<div class="fl-itv-hero ${R.proxima.estado}"><div><div class="pq">${flE(R.proxima.base)}</div><div class="gr">${flE(R.proxima.txt.length ? String(R.proxima.f.getDate()).padStart(2, '0') + '/' + String(R.proxima.f.getMonth() + 1).padStart(2, '0') + '/' + R.proxima.f.getFullYear() : '')}</div></div><div class="pq" style="margin-left:auto;text-align:right;font-size:13px;">${flTextoDias(R.proxima.d)}</div></div>`;
     else h += `<div class="fl-itv-hero nd"><div><div class="pq">ITV</div><div class="gr" style="font-size:18px;">Sin fecha de próxima ITV</div></div></div>`;
-    h += `<div class="fl-sec"><h4>Estado</h4><div class="fl-estado">${[['disponible', 'Operativa'], ['averiada', 'Averiada'], ['taller', 'En taller'], ['vendida', 'Vendida']].map(([k, l]) => `<button type="button" class="${(m.state === k || (k === 'disponible' && m.state === 'activo')) ? 'act' : ''}" onclick="flCambiarEstado('${m.id}', '${k}')">${l}</button>`).join('')}</div></div>`;
+    h += `<div class="fl-sec"><h4>Estado</h4><div class="fl-estado">${[['disponible', 'Operativa'], ['averia', 'Averiada'], ['taller', 'En taller'], ['vendida', 'Vendida']].map(([k, l]) => `<button type="button" class="${(m.state === k || (k === 'disponible' && m.state === 'activo')) ? 'act' : ''}" onclick="flCambiarEstado('${m.id}', '${k}')">${l}</button>`).join('')}</div></div>`;
     h += flTitularHtml(m) + flSeguroResumenHtml(m, R);
     const tiles = []; if(R.ivtm) tiles.push(['Impuesto ' + R.ivtm.anio, R.ivtm.importe + ' €' + (R.ivtm.pagado ? ' · pagado ' + R.ivtm.pagado : ' · sin pagar')]);
     { const adq = (/(?:fecha de adquisici[oó]n|adquirid[oa]|fecha de compra)\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i.exec(m.fichaTecnica || '') || /permiso expedido\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i.exec(m.fichaTecnica || '') || /^Compra\s*:[^\n]*?(\d{1,2}\/\d{1,2}\/\d{4})/im.exec(m.fichaTecnica || '') || [])[1];   // V8.56 (regla de Daniel): la adquisición es la fecha de expedición del permiso, la que sale bajo la matriculación; si no, «Compra: … dd/mm/aaaa»   // V8.39 (reporte de Daniel)
@@ -19913,6 +19984,8 @@ function renderFichaMaquina(){
     const per = R.ident.filter(([k]) => /permiso|matr[ií]cul|servicio|expedi|bastidor|identificaci|marca|denominaci/i.test(k));   // V8.56: el permiso muestra solo datos del permiso (matrícula con tilde, marca, denominación, expedición); nº de serie, certificado y clasificación son de la ficha técnica   // el titular ya va arriba, en su bloque
     h += flTitularHtml(m) + (per.length ? `<div class="fl-sec"><h4>Permiso de circulación</h4>${flKvHtml(per)}</div>` : '<div class="fl-sec"><div class="fl-vacio">Sin datos del permiso en la ficha.</div></div>') + flDocsHtml(m, 'Permiso');
   } else if(_flTab === 'mant'){
+    const _inc = (_flInc || []).filter(i => i.flota_id === m.id).sort((a, b) => ((a.estado === 'resuelta') - (b.estado === 'resuelta')) || String(b.fecha || b.created_at).localeCompare(String(a.fecha || a.created_at)));   // V12.23: sus averías y mantenimientos, de la misma lista que Flota → Averías
+    if(_inc.length) h += `<div class="fl-sec"><h4>Averías y mantenimiento · ${_inc.filter(i => i.estado !== 'resuelta').length} abiertas</h4>${_inc.map(flIncCard).join('')}</div>`;
     if(m.notas_historial) h += `<div class="fl-sec"><h4>Reparaciones e historial</h4>${recDetalleHtml(m.notas_historial)}</div>`;
     h += flDocsHtml(m, 'Mantenimiento');
     if(!h) h = '<div class="fl-sec"><div class="fl-vacio">Sin reparaciones ni facturas de taller todavía.</div></div>';
@@ -19970,7 +20043,7 @@ async function flCambiarEstado(id, estado){   // operativa, averiada, en taller 
   if(error){ mostrarToast('No se pudo cambiar el estado: ' + errText(error), 'err'); return; }
   m.state = estado;
   if(estado === 'vendida'){ const k = fleet.indexOf(m); if(k >= 0) fleet.splice(k, 1); cerrarFichaMaquina(); try{ await cargarHistorialFlota(); }catch(e){} }
-  mostrarToast('Estado: ' + ({disponible: 'operativa', averiada: 'averiada', taller: 'en taller', vendida: 'vendida'})[estado] + ' ✓', 'ok');
+  mostrarToast('Estado: ' + ({disponible: 'operativa', averia: 'averiada', averiada: 'averiada', taller: 'en taller', vendida: 'vendida'})[estado] + ' ✓', 'ok');
   renderFleetGrid();
 }
 async function guardarFichaMaquinaInline(id){
@@ -20489,7 +20562,7 @@ async function cargarDatosReales(){
     const {data: trabajosReales} = await sb.from('trabajos').select('*, entidades(nombre)').order('created_at',{ascending:false});
     if(trabajosReales && trabajosReales.length){
       trabajosReales.forEach(t=>{
-        if(jobs.some(j=>j.code===t.codigo)) return; // ya está (lo acabamos de crear nosotros mismos)
+        const _jEx = jobs.find(j=>j.code===t.codigo);   // V12.23: si ya está, se pone al día con lo guardado (antes se saltaba y se quedaba viejo)
         const dRaw = t.fecha_inicio ? new Date(t.fecha_inicio) : null;
         const dateLabel = dRaw && !isNaN(dRaw) ? dRaw.getDate()+' '+MESES_CORTOS[dRaw.getMonth()] : 'sin fecha';
         jobs.push({
@@ -20498,6 +20571,7 @@ async function cargarDatosReales(){
           state: t.estado || 'pendiente', price: t.presupuesto ? Number(t.presupuesto).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €' : '— est.',
           urgent: t.prioridad === 'Alta'
         });
+        if(_jEx){ const _jN = jobs.pop(); delete _jN.machine; delete _jN.machines; Object.assign(_jEx, _jN); }
       });
       renderJobFilters();
       renderJobs(document.querySelector('#job-filters .chip-filter.active')?.dataset.f || 'todos');
@@ -31419,7 +31493,7 @@ async function cargarDocumentosEconomicosReales(){
         // Tarjeta móvil — misma estructura que Facturas
         row2._mkCard = () => { construirCardMovil(doc, doc.tipo, 'pres-lista-movil', 'pres-sel-chk', amountLabel, fechaCortaP, entidad, trabajo, archivoUrlRealP, calidadCorta(doc)); return document.getElementById('mcard-'+doc.id); };
       } else if(doc.tipo==='gasto'){
-        const row = document.createElement('tr');
+        const row = document.createElement('tr'); row.id = 'gasrow-' + doc.id;
         row.dataset.contabilidad = doc.contabilidad || 'oficial';
         row.dataset.recurrencia = doc.recurrencia || '';
         row.dataset.justificante = doc.estado_justificante || 'pendiente';
@@ -31579,6 +31653,7 @@ configurarOrdenDropdown('presupuestos-tbody-standalone', 'pres-orden-chips', 'pr
   ['total','Total',6,'num'], ['estado','Estado',7,'text'], ['calidad','Calidad',9,'text'],
 ]);
 cargarDocumentosEconomicosReales().then(()=>{
+  try{ vivoIniciar(); }catch(e){}   // V12.23: datos al día en todas las secciones
   try{
     const raw = localStorage.getItem('exg_goto');
     if(!raw) return;
