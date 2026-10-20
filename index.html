@@ -4919,11 +4919,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.21" defer></script>
-<script src="costes/norm.js?v=V12.21" defer></script>
-<script src="ajustes/calc.js?v=V12.21" defer></script>
+<script src="rentabilidad/rent.js?v=V12.22" defer></script>
+<script src="costes/norm.js?v=V12.22" defer></script>
+<script src="ajustes/calc.js?v=V12.22" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.21</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.22</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5075,7 +5075,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.21</div>
+        <div class="sub" id="version-badge">V12.22</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -25800,7 +25800,9 @@ async function impAsignarTodos(per){
 }
 function impGastosTardios(q, anio){
   const iniQ = new Date(anio, (q-1)*3, 1);
-  return impGastosOficiales().filter(d => !d.periodo_fiscal && !impMotivoExclusion(d) && impFecha(d.dateRaw) && impFecha(d.dateRaw) < iniQ && impFecha(d.dateRaw).getFullYear() === anio && impFecha(d.created_at) && impFecha(d.created_at) >= iniQ)
+  // V12.22 (Daniel 20/10: «¿cómo me va a sugerir un cambio de algo que ya está metido en otro trimestre oficialmente?»): lo ya mandado al gestor
+  // pertenece al trimestre con el que se mandó y no se ofrece para otro; tampoco lo que no deduce nada (amortizaciones, solo control)
+  return impGastosOficiales().filter(d => !d.periodo_fiscal && !d.enviado_gestor && (impGastoDeducible(d) > 0.004 || impIvaDeducible(d) > 0.004) && !impMotivoExclusion(d) && impFecha(d.dateRaw) && impFecha(d.dateRaw) < iniQ && impFecha(d.dateRaw).getFullYear() === anio && impFecha(d.created_at) && impFecha(d.created_at) >= iniQ)
     .sort((a, b) => String(a.dateRaw || '').localeCompare(String(b.dateRaw || '')));
 }
 function impOrigenGasto(d){   // de dónde sale un gasto, en una o dos palabras
