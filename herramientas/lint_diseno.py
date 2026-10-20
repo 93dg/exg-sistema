@@ -27,7 +27,7 @@ def relleno_naranja(txt, f):
 # 16/10/2026 (reporte 906b6061, Daniel: «textos tan poco profesionales y tan chapuceros»): los textos de la web
 # se escriben en registro profesional; nunca se copia literalmente cómo habla Daniel al dar instrucciones.
 # Solo mira el código (se quitan los comentarios, donde sí se citan sus palabras).
-COLOQUIAL = re.compile(r"\b(?:me toca|te toca|nos toca|cosas|de golpe|un montón|mogollón|follón|chapuz\w*|joder|coño|put[oa]s?|mierda|curro|pasta|guay|cutre|lo de abajo|lo de arriba|tu padre|mi padre|ya te digo|o sea)\b", re.I)
+COLOQUIAL = re.compile(r"\b(?:me toca|te toca|nos toca|cosas|de golpe|un montón|mogollón|follón|chapuz\w*|joder|coño|put[oa]s?|mierda|curro|pasta|guay|cutre|lo de abajo|lo de arriba|tu padre|mi padre|ya te digo|o sea|esta gente|la gente|gente pagada|lo de dos|lo de hoy|echan sus|se lleva|vs hoy|desgrav\w*|cobráis|lo que deja|que más dejan|limpio al año|se podría hacer|se trabajaría)\b", re.I)   # 20/10/2026 (Daniel: «si hay una regla que dijimos hace poco, que no más cosas coloquiales»): frases del simulador
 COLOQUIAL_MAY = re.compile(r"\bVale,|\bVale con\b|\bNO con\b")
 COMENT = re.compile(r'(^|[\s;{}(,])//.*$|/\*.*?\*/|<!--.*?-->')
 def coloquial(txt, f):
