@@ -4917,11 +4917,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.25" defer></script>
-<script src="costes/norm.js?v=V12.25" defer></script>
-<script src="ajustes/calc.js?v=V12.25" defer></script>
+<script src="rentabilidad/rent.js?v=V12.26" defer></script>
+<script src="costes/norm.js?v=V12.26" defer></script>
+<script src="ajustes/calc.js?v=V12.26" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.25</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.26</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5073,7 +5073,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.25</div>
+        <div class="sub" id="version-badge">V12.26</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8617,8 +8617,14 @@ function vivoIniciar(){
       if(tabla === 'documentos_economicos') vivoDoc(p);
       _vivoCambios.add(tabla); clearTimeout(_vivoDeb); _vivoDeb = setTimeout(vivoAplicar, 900);
     }); });
-    _vivoCanal = c.subscribe();
+    let fallos = 0;
+    _vivoCanal = c.subscribe(st => {   // si la sesión no la acepta el tiempo real, se vuelve a la clave publicable (al menos lo público llega al momento)
+      if(st === 'CHANNEL_ERROR' || st === 'TIMED_OUT'){ fallos++; if(fallos === 2){ try{ sbTiempoReal().realtime.setAuth(null); }catch(e){} } }
+      if(st === 'SUBSCRIBED') fallos = 0;
+    });
   }catch(e){ console.warn('Datos al día', e); }
+  // red de seguridad: si el canal no está conectado, cada 2 minutos se vacían las cachés para que cada sección, al abrirla, salga con lo último
+  setInterval(() => { if(document.visibilityState !== 'visible' || (_vivoCanal && _vivoCanal.state === 'joined')) return; _vivoPropio = Date.now(); VIVO_TABLAS.forEach(t => _vivoCambios.add(t)); _vivoCambios.delete('documentos_economicos'); vivoAplicar(); }, 120000);
 }
 async function bandejaContadores(forzar){
   if(typeof sb === 'undefined' || !sb) return;
@@ -15027,7 +15033,14 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Los canales usan la clave publicable del proyecto; las consultas y las funciones siguen con la de siempre.
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_vCZTS0mVXSgb2Tqe_K2H2g_dJAbFxfh';
 let _sbRT = null;
-function sbTiempoReal(){ if(!_sbRT && window.supabase) _sbRT = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {auth: {persistSession: false, autoRefreshToken: false, storageKey: 'exg-rt'}}); return _sbRT; }
+function sbTiempoReal(){
+  if(!_sbRT && window.supabase){
+    _sbRT = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {auth: {persistSession: false, autoRefreshToken: false, storageKey: 'exg-rt'}});
+    // con la sesión de quien está dentro (las tablas solo se ven con sesión iniciada); se renueva cuando se renueva la sesión
+    try{ sb.auth.getSession().then(({data}) => { const t = data && data.session && data.session.access_token; if(t) _sbRT.realtime.setAuth(t); }); sb.auth.onAuthStateChange((ev, ses) => { try{ if(ses && ses.access_token) _sbRT.realtime.setAuth(ses.access_token); }catch(e){} }); }catch(e){}
+  }
+  return _sbRT;
+}
 const DOC_BUCKET = 'documentos-exg'; // bucket real ya existente en el proyecto EXG
 // Mapa único de tipo de documento -> icono + etiqueta. Fuente única de verdad:
 // no crear otro mapa parecido en ningún sitio nuevo, usar TIPO_DOC_ICONO/TIPO_DOC_LABEL.
