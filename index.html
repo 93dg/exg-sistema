@@ -1064,7 +1064,7 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
   .ie-items tbody tr.colapsada{padding:10px 12px;cursor:pointer;}
 .ie-lineas-resumen{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;margin-bottom:10px;background:var(--concrete);border-radius:var(--radius);cursor:pointer;font-weight:600;font-size:13.5px;}
 .ie-lineas-resumen-chevron{color:var(--ink-soft);}
-#ni-lineas-panel.colapsado{display:none;}
+#ni-lineas-panel.colapsado, #ie-payment-fields.colapsado{display:none;}
   .ie-items tbody tr.colapsada > td:not(.ie-linea-resumen-td){display:none;}
   /* LÍNEAS EDITOR MÓVIL — flex divs internos, 3 filas */
   .ie-items tbody tr:not(.colapsada) td{display:block;width:100%;box-sizing:border-box;padding:2px 0;}
@@ -4918,11 +4918,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.28" defer></script>
-<script src="costes/norm.js?v=V12.28" defer></script>
-<script src="ajustes/calc.js?v=V12.28" defer></script>
+<script src="rentabilidad/rent.js?v=V12.29" defer></script>
+<script src="costes/norm.js?v=V12.29" defer></script>
+<script src="ajustes/calc.js?v=V12.29" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.28</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.29</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5074,7 +5074,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.28</div>
+        <div class="sub" id="version-badge">V12.29</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8157,7 +8157,9 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
         </div>
 
         <div class="ie-footer" id="ie-payment-block">
-          <div class="ie-payment" id="ie-payment-fields">
+          <!-- V12.29 (Daniel: «la forma de pago siempre aparece desplegada»): plegada siempre, como las líneas; se despliega al tocarla -->
+          <div class="ie-lineas-resumen" id="ni-pago-resumen" onclick="togglePanelPago()"><span id="ni-pago-resumen-texto">Forma de pago</span><span class="ie-lineas-resumen-chevron">▸</span></div>
+          <div class="ie-payment colapsado" id="ie-payment-fields">
             <div class="field" style="margin-bottom:10px;"><div class="l">Forma de pago</div>
               <select class="search-box" style="width:100%;" id="ni-payment" onchange="onPaymentChange()">
                 <option value="">— Sin definir —</option>
@@ -19727,7 +19729,7 @@ function fcLineasHtml(d){
   const e = x => escHtml(String(x == null ? '' : x)), eur = x => Number(x || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €', num = x => Number(x).toLocaleString('es-ES', {maximumFractionDigits: 2});
   const corta = f => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(f || '')); return m ? m[3] + '/' + m[2] : ''; };
   const MAX = 25;
-  const filas = cs.slice(0, MAX).map(x => { const q = x.cantidad != null && x.cantidad !== '' ? num(x.cantidad) + (x.unidad ? ' ' + x.unidad : '') : '', pu = x.precio_unitario != null && x.precio_unitario !== '' ? eur(x.precio_unitario) : '';
+  const filas = cs.slice(0, MAX).map(x => { const q = x.cantidad != null && x.cantidad !== '' ? num(x.cantidad) + (x.unidad ? ' ' + x.unidad : '') : '', pu = precioLinea(x) != null ? eur(precioLinea(x)) : '';
     const sub = [q && pu ? q + ' × ' + pu : (q || pu), corta(x.fecha), x.maquina || ''].filter(Boolean).join(' · ');
     return '<div class="fc-l"><div class="fc-l-t"><span>' + e(x.descripcion || x.desc || x.concepto) + '</span><b>' + (x.importe != null && x.importe !== '' ? e(eur(x.importe)) : '') + '</b></div>' + (sub ? '<div class="fc-l-s">' + e(sub) + '</div>' : '') + '</div>'; }).join('');
   const mas = cs.length > MAX ? '<button type="button" class="fc-l-mas" onclick="event.stopPropagation();openDocumentViewer(\'' + d.id + '\')">Ver las ' + cs.length + ' líneas</button>' : '';
@@ -24061,6 +24063,7 @@ function onMachineChange(select){
 }
 
 function onPaymentChange(){
+  try{ actualizarResumenPago(); }catch(e){}
   const t = document.getElementById('ni-doctype').value;
   const cfg = DOC_TYPES[t];
   const val = document.getElementById('ni-payment').value;
@@ -24439,14 +24442,28 @@ function togglePanelLineas(){
 function colapsarPanelLineasPorDefecto(){
   const panel = document.getElementById('ni-lineas-panel');
   const resumen = document.getElementById('ni-lineas-resumen');
+  plegarPanelPago();
   if(!panel || !resumen) return;
   actualizarResumenLineas();
   panel.classList.add('colapsado');
   resumen.style.display = 'flex';
   const chevron = resumen.querySelector('.ie-lineas-resumen-chevron'); if(chevron) chevron.textContent = '▸';
 }
+function actualizarResumenPago(){
+  const el = document.getElementById('ni-pago-resumen-texto'); if(!el) return;
+  const fp = document.getElementById('ni-payment')?.value || '', iban = (document.getElementById('ni-iban')?.value || '').replace(/\s/g, '');
+  el.textContent = 'Forma de pago · ' + (fp || 'sin definir') + (fp === 'Transferencia' && iban ? ' · …' + iban.slice(-4) : '');
+}
+function togglePanelPago(){
+  const panel = document.getElementById('ie-payment-fields'), resumen = document.getElementById('ni-pago-resumen'); if(!panel) return;
+  const abrir = panel.classList.contains('colapsado'); panel.classList.toggle('colapsado', !abrir);
+  const ch = resumen?.querySelector('.ie-lineas-resumen-chevron'); if(ch) ch.textContent = abrir ? '▾' : '▸';
+  actualizarResumenPago();
+}
+function plegarPanelPago(){ const panel = document.getElementById('ie-payment-fields'); if(panel) panel.classList.add('colapsado'); const ch = document.querySelector('#ni-pago-resumen .ie-lineas-resumen-chevron'); if(ch) ch.textContent = '▸'; setTimeout(actualizarResumenPago, 0); }
 // Documento NUEVO (se está rellenando ahora mismo) → siempre abierto.
 function abrirPanelLineasPorDefecto(){
+  plegarPanelPago();
   const panel = document.getElementById('ni-lineas-panel');
   const resumen = document.getElementById('ni-lineas-resumen');
   if(!panel || !resumen) return;
@@ -29178,7 +29195,7 @@ function abrirEditorConDatosIA(datos){
       const sinFecha = datos.conceptos.map((c,i)=>({c,i})).filter(x=>!x.c.fecha);
       conFecha.sort((a,b)=> a.c.fecha < b.c.fecha ? -1 : a.c.fecha > b.c.fecha ? 1 : a.i - b.i);
       const ordenados = [...conFecha, ...sinFecha].map(x=>x.c);
-      ordenados.forEach(c=> addItemRow(c.cantidad ?? 1, c.descripcion || '', c.precio_unitario ?? '', '', c.unidad || undefined, c.fecha || undefined));
+      ordenados.forEach(c=> addItemRow(c.cantidad ?? 1, c.descripcion || '', precioLinea(c) ?? '', '', c.unidad || undefined, c.fecha || undefined));
       abrirPanelLineasPorDefecto();
     }
     recalcTotals();
@@ -31458,6 +31475,15 @@ async function marcarTrimestreEnviado(){
   }
   mostrarToast(`${hechos} factura(s) marcadas como enviadas.`, 'ok');
 }
+// V12.29 (Daniel: «he ido a editar esta proforma y me sale todo a 0»): algunas líneas guardaron el precio como «precio» o solo con «importe»;
+// el precio de una línea se lee igual en todas partes: precio_unitario, si no precio, si no importe ÷ cantidad
+function precioLinea(c){
+  if(!c) return null;
+  if(c.precio_unitario != null && c.precio_unitario !== '') return Number(c.precio_unitario);
+  if(c.precio != null && c.precio !== '') return Number(c.precio);
+  if(c.importe != null && c.importe !== ''){ const q = Number(c.cantidad) || 1; return Math.round(Number(c.importe) / q * 10000) / 10000; }
+  return null;
+}
 async function cargarDocumentosEconomicosReales(){
   if(!sb) return;
   try{
@@ -31487,7 +31513,7 @@ async function cargarDocumentosEconomicosReales(){
       if(fase !== 'filas' && documentosRealesById[doc.id]) return; // ya está (lo acabamos de guardar nosotros mismos)
       const entidad = clientes.find(c=>c.id===doc.entidad_id);
       const trabajo = jobs.find(j=>j.id===doc.trabajo_id);
-      const items = (doc.conceptos||[]).map(c=>({qty:c.cantidad, concept:c.descripcion, price:c.precio_unitario, machine:c.maquina, fecha:c.fecha, unidad:c.unidad, nuevo:c.nuevo||false, origen_entrada_id:c.origen_entrada_id||null, origen_entrada_ids:c.origen_entrada_ids||null}));
+      const items = (doc.conceptos||[]).map(c=>({qty:c.cantidad, concept:c.descripcion, price:precioLinea(c), machine:c.maquina, fecha:c.fecha, unidad:c.unidad, nuevo:c.nuevo||false, origen_entrada_id:c.origen_entrada_id||null, origen_entrada_ids:c.origen_entrada_ids||null}));
       const dRaw = doc.fecha_devengo ? new Date(doc.fecha_devengo) : null;
       const dateLabel = formatFechaLabel(dRaw);
       const amountLabel = Number(doc.importe||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
