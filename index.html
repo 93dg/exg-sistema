@@ -1598,9 +1598,11 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 :is(#alertas-list-bd,.rec-cont) details.rec-card > summary.alert-sum{padding:7px 8px 7px 9px;gap:6px;}
 :is(#alertas-list-bd,.rec-cont) .rec-card .rec-ico{display:none;}
 :is(#alertas-list-bd,.rec-cont) .rec-card .alert-sum .t{white-space:normal;overflow:visible;gap:4px;}
-:is(#alertas-list-bd,.rec-cont) .rec-card .rec-tit{font-weight:500;font-size:14px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
-:is(#alertas-list-bd,.rec-cont) .rec-card[open] .rec-tit{-webkit-line-clamp:unset;font-weight:700;}
+:is(#alertas-list-bd,.rec-cont) .rec-card .rec-tit{font-weight:500;font-size:14px;line-height:1.25;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}   /* V12.39 (reporte 2e54a969): plegada, una línea de título y una de etiquetas */
+:is(#alertas-list-bd,.rec-cont) .rec-card[open] .rec-tit{white-space:normal;font-weight:700;}
 :is(#alertas-list-bd,.rec-cont) .rec-card .rec-fila{display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0;}
+:is(#alertas-list-bd,.rec-cont) .rec-card > summary .rec-fila{flex-wrap:nowrap;overflow:hidden;}
+:is(#alertas-list-bd,.rec-cont) .rec-card > summary .rec-fila > *{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 :is(#alertas-list-bd,.rec-cont) .rec-card .rec-fila .rec-est{flex:0 1 auto;min-width:0;}
 :is(#alertas-list-bd,.rec-cont) .rec-card .rec-pil{font-size:11px;padding:2px 7px;font-weight:700;}
 :is(#alertas-list-bd,.rec-cont) .rec-card > summary::after{align-self:flex-start;font-size:11px;margin-top:2px;}
@@ -4941,11 +4943,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.38" defer></script>
-<script src="costes/norm.js?v=V12.38" defer></script>
-<script src="ajustes/calc.js?v=V12.38" defer></script>
+<script src="rentabilidad/rent.js?v=V12.39" defer></script>
+<script src="costes/norm.js?v=V12.39" defer></script>
+<script src="ajustes/calc.js?v=V12.39" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.38</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.39</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5097,7 +5099,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.38</div>
+        <div class="sub" id="version-badge">V12.39</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -14556,7 +14558,13 @@ async function cargarAlertasYRecordatorios(){
 // RECORDATORIOS POR PLAZO (Daniel 02/10/2026): solo se ven los que tocan en la semana, el mes o el año elegido; los vencidos y los que no tienen fecha salen siempre
 let _recItems = [], _recItv = null, _recCargado = false;
 // V12.23 (Daniel 20/10: las averías en Tareas, en Flota → Averías y en la ficha): las averías y mantenimientos abiertos salen también en Tareas, con la misma tarjeta
-function recAveriasHtml(){ return (typeof _flInc !== 'undefined' ? _flInc : []).filter(i => i.estado !== 'resuelta' && (i.tipo === 'averia' || i.tipo === 'mantenimiento')).sort((a, b) => ((b.sigue_trabajando === false) - (a.sigue_trabajando === false)) || String(a.fecha || '').localeCompare(String(b.fecha || ''))).map(i => `<div class="rec-aver"><div class="rec-aver-m">${flE(i.flota?.nombre || '')}</div>${flIncCard(i)}</div>`).join(''); }
+function recAveriasHtml(){   // V12.39 (reporte f409de12): en Tareas solo las averías que urgen (máquina parada o prioridad alta/media), plegadas en una línea como las demás tareas; el detalle, al abrirla
+  const hoy = Date.now();
+  return (typeof _flInc !== 'undefined' ? _flInc : []).filter(i => i.estado !== 'resuelta' && (i.tipo === 'averia' || i.tipo === 'mantenimiento') && (i.sigue_trabajando === false || ['alta', 'media'].includes(i.prioridad)))
+    .sort((a, b) => ((b.sigue_trabajando === false) - (a.sigue_trabajando === false)) || String(a.fecha || '').localeCompare(String(b.fecha || '')))
+    .map(i => { const dias = i.fecha ? Math.max(0, Math.floor((hoy - new Date(i.fecha + 'T00:00:00')) / 864e5)) : null, parada = i.sigue_trabajando === false;
+      return `<details class="alert-det rec-card t-flota"><summary class="alert-sum"><div class="t"><span class="rec-tit">${flE((i.flota?.nombre || '') + ': ' + String(i.descripcion || '').split(/[.\n]/)[0])}</span><span class="rec-fila"><span class="rec-est" style="--e:${parada ? 'var(--red)' : '#B7791F'}">${parada ? 'Parada' : (FL_INC_TIPO[i.tipo] || 'Avería') + ' · prioridad ' + flE(i.prioridad || '')}</span>${dias != null ? `<div class="rec-pil ${parada || dias > 14 ? 'roja' : dias > 3 ? 'ambar' : ''}">Desde hace ${dias} día${dias === 1 ? '' : 's'}</div>` : ''}</span></div></summary><div class="alert-det-b">${flIncCard(i)}</div></details>`; }).join('');
+}
 
 // V8.57 (reporte de Daniel: «los filtros no están actualizados como estaba la web»): Documentos pendientes usa las mismas píldoras que el resto. Sin ninguna elegida = todos. Antes los desplegables del móvil no filtraban nada: renderControlDocs solo leía los de escritorio
 const CC_DOC_TIPOS = [['presupuesto', 'Presupuesto'], ['albaran', 'Albarán'], ['proforma', 'Proforma'], ['factura', 'Factura']], CC_DOC_ESTADOS = [['trabajo_activo', 'Trabajo activo'], ['pendiente_enviar', 'Listo p. entregar'], ['entregado', 'Entregada'], ['pendiente_cobrar', 'Por cobrar'], ['por_cobrar_otra', 'Por cobrar en otra'], ['parcial', 'Cobrado parcial'], ['parcial_otra', 'Parcial en otra'], ['cobrado_otra', 'Cobrada en otra'], ['borrador', 'Borrador'], ['revisar', 'Por revisar'], ['aceptado', 'Aceptado'], ['enviado', 'Enviado'], ['rectificativa', 'Rectificativa'], ['cobrado', 'Cobrado'], ['cobrado_efectivo', 'Cobrado en efectivo'], ['rechazado', 'Rechazado'], ['anulado', 'Anulado'], ['nula', 'Nula']];   // V9.82 (Daniel 10/10): todos los estados, para poder organizarse; sin elegir ninguno sigue saliendo lo pendiente
@@ -14790,7 +14798,7 @@ function recRender(){
     // V8.51 (Daniel): estado, con quién o motivo, y cuánto lleva así
     // V12.04: el estado ya no muestra días desde que se puso (se confundía con una cuenta atrás); la cuenta atrás real está en la pastilla de fecha
     const E = REC_ESTADOS[d.estado_rec], desde = d.estado_desde ? Math.max(0, Math.round((new Date(hoy + 'T12:00:00') - new Date(d.estado_desde + 'T12:00:00')) / 86400000)) : null;
-    const est = E ? `<span class="rec-est" style="--e:${E[1]}" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">${E[0]}${d.con ? ` <em>· ${escHtml(d.con)}</em>` : ''}${''}</span>` : `<span class="rec-est sin" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">Poner estado</span>`;
+    const est = E ? `<span class="rec-est" style="--e:${E[1]}" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">${E[0]}${d.con && !String(d.con).includes('@') ? ` <em>· ${escHtml(d.con)}</em>` : ''}${''}</span>` : `<span class="rec-est sin" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">Poner estado</span>`;
     return `<details class="alert-det rec-card t-${tema}">
       <summary class="alert-sum">
         <div class="t"><span class="rec-tit">${escHtml(corto)}</span><span class="rec-fila">${est}${pild}</span></div>
@@ -14807,7 +14815,7 @@ function recRender(){
   // V8.48: apartados por tipo, cada uno con su color, su título y su número; los fijos (suscripciones) arriba
   // V8.50 (Daniel): cada apartado se pliega tocando su título; se recuerda
   let pleg = []; try{ pleg = JSON.parse(localStorage.getItem('rec_plegados') || '[]'); }catch(e){}
-  const sec = (k, titulo, lista, extra) => (lista.length || extra) ? `<div class="rec-sec t-${k}${pleg.includes(k) ? ' plegado' : ''}" data-rec-sec="${k}"><span class="rec-sec-bar"></span><b>${titulo}</b><i>${lista.length + (extra ? (String(extra).match(/<details |class="fl-inc /g) || []).length : 0)}</i><span class="rec-sec-fl">${pleg.includes(k) ? '▸' : '▾'}</span></div><div class="rec-sec-cuerpo"${pleg.includes(k) ? ' style="display:none;"' : ''}>${extra || ''}${lista.map(pinta).join('')}</div>` : '';
+  const sec = (k, titulo, lista, extra) => (lista.length || extra) ? `<div class="rec-sec t-${k}${pleg.includes(k) ? ' plegado' : ''}" data-rec-sec="${k}"><span class="rec-sec-bar"></span><b>${titulo}</b><i>${lista.length + (extra ? (String(extra).match(/<details /g) || []).length : 0)}</i><span class="rec-sec-fl">${pleg.includes(k) ? '▸' : '▾'}</span></div><div class="rec-sec-cuerpo"${pleg.includes(k) ? ' style="display:none;"' : ''}>${extra || ''}${lista.map(pinta).join('')}</div>` : '';
   const normales = items.filter(r => !(r.data||{}).anclado), fijos = items.filter(r => (r.data||{}).anclado);
   // V12.12 (Daniel: «eso de 8 más adelante no se puede clicar y debería desplegarse»): al tocarlo se despliegan debajo, con los mismos filtros de tipo y lugar
   const masAdel = _recItems.filter(r => !recAparte(r) && !recVisible(r.data || {}, plazo0)).filter(r => !temasSel.size || temasSel.has(recTema(r))).filter(r => !_recPC || ((r.data || {}).lugar || '') === 'PC')
@@ -14820,7 +14828,7 @@ function recRender(){
     ? REC_GRUPOS_ESTADO.map(([k, l]) => sec(k, l, normales.filter(r => recGrupoEstado(r.data || {}) === k), k === 'est-toca' && !_recPC ? (_recItv || '') + recAveriasHtml() : '')).join('')
     : REC_TEMAS.map(([k, l]) => sec(k, l, normales.filter(r => recTema(r) === k), k === 'itv' && !_recPC ? (_recItv || '') : k === 'flota' && !_recPC ? recAveriasHtml() : '')).join('')) + (ocultos ? `<button type="button" class="rec-mas" onclick="_recVerMas=!_recVerMas;recRender()">${_recVerMas ? 'Ocultar los ' + ocultos + ' de más adelante' : ocultos + ' más adelante'}</button>${_recVerMas ? masAdel.map(pinta).join('') : ''}` : '');
   actualizarVacioAlertas();
-  { const cnt = document.getElementById('alertas-count'); if(cnt){ const nItv = _recPC ? 0 : (String(_recItv || '').match(/<details /g) || []).length + (String(recAveriasHtml()).match(/class="fl-inc /g) || []).length; cnt.textContent = items.length + nItv; cnt.style.display = ''; } }   // V7.61: contador junto al título
+  { const cnt = document.getElementById('alertas-count'); if(cnt){ const nItv = _recPC ? 0 : (String(_recItv || '').match(/<details /g) || []).length + (String(recAveriasHtml()).match(/<details /g) || []).length; cnt.textContent = items.length + nItv; cnt.style.display = ''; } }   // V7.61: contador junto al título
 }
 document.addEventListener('click', ev => { const ch = ev.target.closest('#rec-filtro-plazo-chips .chip-filter'); if(!ch) return; document.querySelectorAll('#rec-filtro-plazo-chips .chip-filter').forEach(c => c.classList.toggle('active', c === ch)); recRender(); try{ if(PLEG2.rec) pleg2Refrescar('rec'); }catch(e){} });
 function actualizarVacioAlertas(){
