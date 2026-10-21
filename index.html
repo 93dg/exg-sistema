@@ -1067,6 +1067,11 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 #ni-lineas-panel.colapsado, #ie-payment-fields.colapsado{display:none;}
 #ie-items-body tr:not(.colapsada) > td.ie-linea-resumen-td{display:none !important;}   /* V12.30: una línea abierta no repite su resumen encima: un solo desplegable */
 #ni-pago-resumen{width:100%;box-sizing:border-box;}
+/* V12.31 (reporte 158420a0, Daniel: «¿por qué se ve en gris y tan feo?»): los dos plegables del editor (líneas y forma de pago) como una fila más:
+   fondo claro, borde fino, texto en el color de acento (se puede tocar) y sin triángulos; abierto = borde naranja */
+#ni-lineas-resumen, #ni-pago-resumen{background:var(--paper);border:1px solid var(--line);border-radius:14px;color:var(--orange);font-weight:800;font-size:14px;padding:12px 14px;}
+#ni-lineas-resumen .ie-lineas-resumen-chevron, #ni-pago-resumen .ie-lineas-resumen-chevron{display:none;}
+#ni-lineas-resumen.abierto, #ni-pago-resumen.abierto{border-color:var(--orange);}
   .ie-items tbody tr.colapsada > td:not(.ie-linea-resumen-td){display:none;}
   /* LÍNEAS EDITOR MÓVIL — flex divs internos, 3 filas */
   .ie-items tbody tr:not(.colapsada) td{display:block;width:100%;box-sizing:border-box;padding:2px 0;}
@@ -4920,11 +4925,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.30" defer></script>
-<script src="costes/norm.js?v=V12.30" defer></script>
-<script src="ajustes/calc.js?v=V12.30" defer></script>
+<script src="rentabilidad/rent.js?v=V12.31" defer></script>
+<script src="costes/norm.js?v=V12.31" defer></script>
+<script src="ajustes/calc.js?v=V12.31" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.30</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.31</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5076,7 +5081,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.30</div>
+        <div class="sub" id="version-badge">V12.31</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -24436,7 +24441,7 @@ function togglePanelLineas(){
   const panel = document.getElementById('ni-lineas-panel');
   const resumen = document.getElementById('ni-lineas-resumen');
   const seVaAbrir = panel.classList.contains('colapsado');
-  panel.classList.toggle('colapsado', !seVaAbrir);
+  panel.classList.toggle('colapsado', !seVaAbrir); resumen?.classList.toggle('abierto', seVaAbrir);
   const chevron = resumen?.querySelector('.ie-lineas-resumen-chevron');
   if(chevron) chevron.textContent = seVaAbrir ? '▾' : '▸';
 }
@@ -24447,7 +24452,7 @@ function colapsarPanelLineasPorDefecto(){
   plegarPanelPago();
   if(!panel || !resumen) return;
   actualizarResumenLineas();
-  panel.classList.add('colapsado');
+  panel.classList.add('colapsado'); resumen.classList.remove('abierto');
   resumen.style.display = 'flex';
   const chevron = resumen.querySelector('.ie-lineas-resumen-chevron'); if(chevron) chevron.textContent = '▸';
 }
@@ -24458,11 +24463,11 @@ function actualizarResumenPago(){
 }
 function togglePanelPago(){
   const panel = document.getElementById('ie-payment-fields'), resumen = document.getElementById('ni-pago-resumen'); if(!panel) return;
-  const abrir = panel.classList.contains('colapsado'); panel.classList.toggle('colapsado', !abrir);
+  const abrir = panel.classList.contains('colapsado'); panel.classList.toggle('colapsado', !abrir); resumen?.classList.toggle('abierto', abrir);
   const ch = resumen?.querySelector('.ie-lineas-resumen-chevron'); if(ch) ch.textContent = abrir ? '▾' : '▸';
   actualizarResumenPago();
 }
-function plegarPanelPago(){ const panel = document.getElementById('ie-payment-fields'); if(panel) panel.classList.add('colapsado'); const ch = document.querySelector('#ni-pago-resumen .ie-lineas-resumen-chevron'); if(ch) ch.textContent = '▸'; setTimeout(actualizarResumenPago, 0); }
+function plegarPanelPago(){ const panel = document.getElementById('ie-payment-fields'); if(panel) panel.classList.add('colapsado'); document.getElementById('ni-pago-resumen')?.classList.remove('abierto'); const ch = document.querySelector('#ni-pago-resumen .ie-lineas-resumen-chevron'); if(ch) ch.textContent = '▸'; setTimeout(actualizarResumenPago, 0); }
 // Documento NUEVO (se está rellenando ahora mismo) → siempre abierto.
 function abrirPanelLineasPorDefecto(){
   plegarPanelPago();
