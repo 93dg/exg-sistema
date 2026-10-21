@@ -1067,6 +1067,10 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 #ni-lineas-panel.colapsado, #ie-payment-fields.colapsado{display:none;}
 #ie-items-body tr:not(.colapsada) > td.ie-linea-resumen-td{display:none !important;}   /* V12.30: una línea abierta no repite su resumen encima: un solo desplegable */
 #ni-pago-resumen{width:100%;box-sizing:border-box;}
+.ie-iva-sel{border:1px solid var(--line);border-radius:10px;padding:5px 8px;font-size:16px;background:var(--paper);color:var(--ink);font-weight:700;width:auto !important;max-width:190px;}
+#ie-iva-row{display:flex !important;flex-wrap:nowrap !important;flex-direction:row !important;align-items:center;justify-content:space-between;gap:8px;}
+#ie-iva-row > #ie-iva{flex:0 0 auto !important;width:auto !important;margin:0 !important;}
+#ie-iva-row > span:first-child{display:flex !important;align-items:center;gap:8px;min-width:0;}
 /* V12.31 (reporte 158420a0, Daniel: «¿por qué se ve en gris y tan feo?»): los dos plegables del editor (líneas y forma de pago) como una fila más:
    fondo claro, borde fino, texto en el color de acento (se puede tocar) y sin triángulos; abierto = borde naranja */
 #ni-lineas-resumen, #ni-pago-resumen{background:var(--paper);border:1px solid var(--line);border-radius:14px;color:var(--orange);font-weight:800;font-size:14px;padding:12px 14px;}
@@ -4925,11 +4929,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.31" defer></script>
-<script src="costes/norm.js?v=V12.31" defer></script>
-<script src="ajustes/calc.js?v=V12.31" defer></script>
+<script src="rentabilidad/rent.js?v=V12.32" defer></script>
+<script src="costes/norm.js?v=V12.32" defer></script>
+<script src="ajustes/calc.js?v=V12.32" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.31</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.32</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5081,7 +5085,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.31</div>
+        <div class="sub" id="version-badge">V12.32</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8143,12 +8147,15 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
         <div class="ie-totals" style="margin-bottom:10px;">
           <div class="econ-line"><span>Base imponible</span><span class="v mono" id="ie-base">0,00 €</span></div>
           <div class="econ-line" id="ie-iva-row"><span>IVA
-            <select id="ie-tratamiento-iva" style="border:1px solid var(--line);border-radius:3px;padding:2px 4px;font-size:12px;background:var(--paper);color:var(--ink);margin-right:4px;" onchange="cambiarTratamientoIva()">
+            <!-- V12.32 (Daniel: «lo del IVA, en un solo desplegable»): tipo y porcentaje en un solo selector; los dos de antes quedan ocultos y siguen mandando en los cálculos -->
+            <select id="ie-iva-sel" class="ie-iva-sel" onchange="ivaSelCambiar()">
+              <option value="21">21 %</option><option value="10">10 %</option><option value="4">4 %</option><option value="0">Sin IVA</option><option value="isp">Inversión del sujeto pasivo</option><option value="otro" hidden>Otro</option>
+            </select>
+            <select id="ie-tratamiento-iva" style="display:none;" onchange="cambiarTratamientoIva()">
               <option value="normal">Normal</option>
               <option value="isp">Inversión sujeto pasivo</option>
             </select>
-            <input type="number" id="ie-iva-pct" value="21" min="0" max="100" style="width:44px;border:1px solid var(--line);border-radius:3px;padding:2px 4px;font-family:'IBM Plex Mono',monospace;background:var(--paper);color:var(--ink);" onchange="recalcTotals()">%
-          </span><span class="v mono" id="ie-iva">0,00 €</span></div>
+            <input type="number" id="ie-iva-pct" value="21" min="0" max="100" style="display:none !important;" onchange="recalcTotals()"></span><span class="v mono" id="ie-iva">0,00 €</span></div>
           <div id="ie-isp-aviso" style="display:none;font-size:11px;color:var(--sub);padding:2px 0 6px;">Se añadirá la mención legal: "Inversión del sujeto pasivo. Art. 84.Uno.2º.f) de la Ley 37/1992 del IVA."</div>
           <div class="econ-line"><span>TOTAL</span><span class="v mono" id="ie-total">0,00 €</span></div>
         </div>
@@ -24254,20 +24261,27 @@ function calcularIva(base, tratamiento, ivaPct){
   const iva = base * (ivaPct||0) / 100;
   return {iva, total: base + iva, ivaPctEfectivo: ivaPct||0};
 }
+function ivaSelCambiar(){
+  const v = document.getElementById('ie-iva-sel').value, tr = document.getElementById('ie-tratamiento-iva'), pc = document.getElementById('ie-iva-pct');
+  if(v === 'isp'){ tr.value = 'isp'; } else { tr.value = 'normal'; if(v !== 'otro') pc.value = v; }
+  cambiarTratamientoIva();
+}
+function ivaSelSincronizar(){   // lo cargado en los campos ocultos (al abrir un documento) se enseña en el selector único
+  const sel = document.getElementById('ie-iva-sel'); if(!sel) return;
+  const tr = document.getElementById('ie-tratamiento-iva')?.value, pc = String(Number(document.getElementById('ie-iva-pct')?.value || 0));
+  const o = sel.querySelector('option[value="otro"]');
+  if(tr === 'isp') sel.value = 'isp'; else if(['21', '10', '4', '0'].includes(pc)) sel.value = pc; else { o.textContent = pc + ' %'; o.hidden = false; sel.value = 'otro'; }
+}
 function cambiarTratamientoIva(){
   const tratamiento = document.getElementById('ie-tratamiento-iva').value;
   const pctInput = document.getElementById('ie-iva-pct');
   const aviso = document.getElementById('ie-isp-aviso');
-  if(tratamiento === 'isp'){
-    pctInput.style.display = 'none';
-    aviso.style.display = '';
-  } else {
-    pctInput.style.display = '';
-    aviso.style.display = 'none';
-  }
+  pctInput.style.display = 'none';   // V12.32: se elige en el selector único
+  aviso.style.display = tratamiento === 'isp' ? '' : 'none';
   recalcTotals();
 }
 function recalcTotals(){
+  try{ ivaSelSincronizar(); }catch(e){}
   const t = document.getElementById('ni-doctype').value;
   const hasIva = DOC_TYPES[t].hasIva;
   let base = 0;
