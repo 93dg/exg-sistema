@@ -4938,11 +4938,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.35" defer></script>
-<script src="costes/norm.js?v=V12.35" defer></script>
-<script src="ajustes/calc.js?v=V12.35" defer></script>
+<script src="rentabilidad/rent.js?v=V12.36" defer></script>
+<script src="costes/norm.js?v=V12.36" defer></script>
+<script src="ajustes/calc.js?v=V12.36" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.35</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.36</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5094,7 +5094,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.35</div>
+        <div class="sub" id="version-badge">V12.36</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8607,6 +8607,15 @@ function vivoDoc(p){   // un documento económico cambiado: se rehace solo ese e
     if(fuera || typeof _historico === 'undefined' || !_historico.procesar) return;
     _historico.procesar(nuevo, 'datos'); _historico.procesar(nuevo, 'filas');
   }catch(e){ console.warn('Datos al día · documento', e); }
+}
+async function docRefrescarDesdeBase(id){
+  if(!sb || !id) return;
+  const {data} = await sb.from('documentos_economicos').select('*').eq('id', id).maybeSingle();
+  vivoDoc({new: data || null, old: {id}});
+  try{ if(typeof _historico !== 'undefined' && _historico.finalizar) await _historico.finalizar(true); }catch(e){}
+  try{ renderControlDocs(); }catch(e){}
+  try{ if(document.getElementById('tb-lista')?.offsetParent) tbRender(); }catch(e){}
+  _e2 = null; _c3Alb = null; try{ if(window.RENT) window.RENT.invalidar(); }catch(e){}
 }
 async function vivoAplicar(){
   if(vivoOcupado()){ clearTimeout(_vivoDeb); _vivoDeb = setTimeout(vivoAplicar, 2500); return; }
@@ -30204,7 +30213,8 @@ async function submitNewInvoice(ev, isDraft){
     const rowHtml = `<td class="mono">${num}</td><td>${client}</td><td class="mono">${job}</td><td>${dateLabel}</td><td class="num" data-num="${total}">${amountLabel}</td><td>${estadoPill}</td>`;
     const row1 = document.createElement('tr'); row1.id = 'docrow-'+savedId; row1.onclick = () => openDocumentViewer(savedId); row1.innerHTML = rowHtml;
     document.getElementById('econ-presupuestos-tbody').prepend(row1);
-    const row2 = document.createElement('tr'); row2.onclick = () => openDocumentViewer(savedId); row2.innerHTML = rowHtml; row2.dataset.tipo = type;
+    document.getElementById('presrow-'+savedId)?.remove();
+    const row2 = document.createElement('tr'); row2.id = 'presrow-'+savedId; row2.onclick = () => openDocumentViewer(savedId); row2.innerHTML = rowHtml; row2.dataset.tipo = type;
     document.getElementById('presupuestos-tbody-standalone').prepend(row2);
     actualizarContadorPresupuestosStandalone();
     if(!_docPrevio && !_deTrabajo) document.querySelector(`[data-view="${type==='proforma'?'proformas':'presupuestos'}"]`).click();
@@ -30220,6 +30230,9 @@ async function submitNewInvoice(ev, isDraft){
     if(!_docPrevio && !_deTrabajo) document.querySelector('[data-view="control"]').click();
   }
 
+  // V12.36 (Daniel: «la línea no sale actualizada»): al guardar, el documento se vuelve a leer de la base y se rehace en TODAS sus vistas
+  // (Control, tarjetas, listas de Proformas/Presupuestos/Albaranes, Trabajos), sea del tipo que sea; antes solo las facturas se repintaban enteras
+  try{ await docRefrescarDesdeBase(savedId); }catch(e){ console.warn('Refrescar documento', e); }
   aiRegistrarEvento('documento_creado', 'documentos', {type, client});
   if(sb && savedId){
     sb.rpc('verificar_calidad', {p_anio:null, p_id:savedId}).then(async ({data})=>{
