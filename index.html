@@ -4786,6 +4786,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <style id="v860-compacto">
 
 /* V8.64 (Daniel: cada palabra de tipo con su color en todos los sitios, y el tipo entre el estado y el icono de imprimir) */
+span.tp-albaran, span.tp-factura, span.tp-proforma, span.tp-presupuesto, span.tp-proyecto, span.tp-expediente{display:inline !important;font-size:inherit !important;margin:0 !important;}   /* V12.27: la palabra coloreada (Factura, Albarán…) nunca parte su línea en dos, en ninguna pantalla */
 .tp-albaran{color:#A8731F;font-weight:700;} .tp-factura{color:#1F7A77;font-weight:700;} .tp-proforma{color:#6E4FA0;font-weight:700;} .tp-presupuesto{color:#5A6B82;font-weight:700;}
 .tp-albaran.tp-claro{color:#F0C46A;} .tp-factura.tp-claro{color:#86D8D3;} .tp-proforma.tp-claro{color:#C9B6EC;} .tp-presupuesto.tp-claro{color:#BCC8DA;}
 .fc-tipo-tag{flex:none;margin-left:9px;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;}
@@ -4917,11 +4918,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.26" defer></script>
-<script src="costes/norm.js?v=V12.26" defer></script>
-<script src="ajustes/calc.js?v=V12.26" defer></script>
+<script src="rentabilidad/rent.js?v=V12.27" defer></script>
+<script src="costes/norm.js?v=V12.27" defer></script>
+<script src="ajustes/calc.js?v=V12.27" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.26</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.27</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5073,7 +5074,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.26</div>
+        <div class="sub" id="version-badge">V12.27</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -9808,17 +9809,18 @@ document.addEventListener('click', e => { const t = e.target.closest && e.target
 // en barras tumbadas (el año a la izquierda: no se pisan); trimestres. Ingresos con la norma activa: legal = facturas; sin factura = proformas y
 // albaranes de particulares cobrados sin factura enlazada; la Administración nunca es «sin factura»
 let _e2det = null, _e2cli = null;   // V8.13: dato abierto (se despliega debajo)
-let _e2 = null, _e2cf = 'todo', _e2anio = new Date().getFullYear(), _e2per = 'año', _e2menu = null;
+let _e2 = null, _e2Cargando = null, _e2cf = 'todo', _e2anio = new Date().getFullYear(), _e2per = 'año', _e2menu = null;
 async function econ2Cargar(){
   const box = document.getElementById('econ2'); if(!box || !sb) return;
   e2DeudaCargar();
-  if(!_e2){ box.innerHTML = '<div class="dir-cargando">Cargando…</div>';
+  if(!_e2 && _e2Cargando) await _e2Cargando;   // V12.27: dos cargas a la vez sumaban dos veces las retiradas (Gastos 2026 salía 4.580 € de más)
+  if(!_e2){ let _fin; _e2Cargando = new Promise(r => _fin = r); box.innerHTML = '<div class="dir-cargando">Cargando…</div>';
     const docs = []; let desde = 0;
     while(true){ const {data, error} = await sb.from('documentos_economicos').select('id, tipo, numero, importe, iva_pct, cobrado_importe, cobrado_en, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id, categoria, relacion_actividad').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'proforma', 'albaran', 'gasto']).range(desde, desde + 999);
       if(error || !data || !data.length) break; docs.push(...data); if(data.length < 1000) break; desde += 1000; }
     const {data: ents} = await sb.from('entidades').select('id, nombre'); const E = {}; (ents || []).forEach(x => { E[x.id] = x.nombre; });
     const enl = new Set(); docs.forEach(d => { if(d.tipo !== 'factura') return; if(d.documento_anterior_id) enl.add(d.documento_anterior_id); (d.origen_albaran_ids || []).forEach(x => enl.add(x)); });
-    _e2 = docs.filter(d => d.fecha_devengo).map(d => { const f = d.fecha_devengo, an = Number(f.slice(0, 4)), tr = Math.floor((Number(f.slice(5, 7)) - 1) / 3) + 1, imp = Number(d.importe || 0);
+    const E2 = docs.filter(d => d.fecha_devengo).map(d => { const f = d.fecha_devengo, an = Number(f.slice(0, 4)), tr = Math.floor((Number(f.slice(5, 7)) - 1) / 3) + 1, imp = Number(d.importe || 0);
       const legal = d.tipo === 'factura' && !['nula', 'rectificativa'].includes(d.estado_cobro) ? imp : 0;
       const sinF = econImporteSinFactura({type: d.tipo === 'albaran' ? 'albaran' : d.tipo, id: d.id, documento_siguiente_id: d.documento_siguiente_id, client: E[d.entidad_id] || '', estado_cobro: d.estado_cobro, total: imp, iva_pct: d.iva_pct, cobrado_importe: d.cobrado_importe}, enl);
       // V8.13: cada fila guarda lo necesario para enseñar el detalle al tocar un dato
@@ -9831,14 +9833,15 @@ async function econ2Cargar(){
       const ajeno = d.tipo === 'gasto' && /^gasto personal\s*[–-]\s*alberto/i.test(d.categoria || '');   // V11.31 (Daniel: «tiene la instrucción de que no cuenta»): lo personal de Alberto no es de la empresa ni de los socios, no suma en ningún sitio
       const gper = d.tipo === 'gasto' && !ajeno && d.relacion_actividad === 'no_relacionada' ? imp : 0;   // gasto personal de Rafa y Manolo (no relacionado con la actividad)
       return {id: d.id, tipo: d.tipo, numero: d.numero, fecha: f, cli: E[d.entidad_id] || (d.tipo === 'gasto' ? (d.categoria || 'Sin proveedor') : '—'), an, tr, legal, sinF, gasto: d.tipo === 'gasto' && !ajeno ? imp : 0, gper, ret: 0, pend, sinFact}; });
-    try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').order('data->>ts', {ascending: false}).limit(12); _e2.avisos = (data || []).map(r => r.data); }catch(e){ _e2.avisos = []; }
+    try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').order('data->>ts', {ascending: false}).limit(12); E2.avisos = (data || []).map(r => r.data); }catch(e){ E2.avisos = []; }
     try{ const rt = []; let d2 = 0;   // V9.13: retiradas en efectivo del cajero = la manera de cobrar de Rafa y Manolo; van aparte, no son gasto
       while(true){ const {data, error} = await sb.from('movimientos_banco').select('id, fecha, importe, nota').eq('categoria', 'efectivo').lt('importe', 0).range(d2, d2 + 999); if(error || !data || !data.length) break; rt.push(...data); if(data.length < 1000) break; d2 += 1000; }
-      _e2.ret = rt.filter(m => m.fecha && (!m.nota || /^EFECTIVO DE USO PERSONAL/i.test(m.nota))).map(m => ({id: m.id, fecha: m.fecha, an: Number(m.fecha.slice(0, 4)), tr: Math.floor((Number(m.fecha.slice(5, 7)) - 1) / 3) + 1, imp: -Number(m.importe), nota: m.nota || ''}));
-      _e2.ret.forEach(m => _e2.push({id: 'ret-' + m.id, tipo: 'retirada', numero: '', fecha: m.fecha, cli: 'Retiradas de socios', an: m.an, tr: m.tr, legal: 0, sinF: 0, gasto: m.imp, gper: m.imp, ret: m.imp, pend: 0, sinFact: 0})); }catch(e){ _e2.ret = []; }   // V11.31 (reporte f6ce967d): las retiradas son como el sueldo de Rafa y Manolo: cuentan como gasto (Gastos, Resultado, barras por año y por trimestre)
-    try{ _e2.vivo = await dirVivo(); }catch(e){ _e2.vivo = {}; }
-    try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').not('data->>saldo', 'is', null).order('data->>ts', {ascending: false}).limit(1); _e2.alerta = data && data[0] ? data[0].data : null; }catch(e){}
+      E2.ret = rt.filter(m => m.fecha && (!m.nota || /^EFECTIVO DE USO PERSONAL/i.test(m.nota))).map(m => ({id: m.id, fecha: m.fecha, an: Number(m.fecha.slice(0, 4)), tr: Math.floor((Number(m.fecha.slice(5, 7)) - 1) / 3) + 1, imp: -Number(m.importe), nota: m.nota || ''}));
+      E2.ret.forEach(m => E2.push({id: 'ret-' + m.id, tipo: 'retirada', numero: '', fecha: m.fecha, cli: 'Retiradas de socios', an: m.an, tr: m.tr, legal: 0, sinF: 0, gasto: m.imp, gper: m.imp, ret: m.imp, pend: 0, sinFact: 0})); }catch(e){ E2.ret = []; }   // V11.31 (reporte f6ce967d): las retiradas son como el sueldo de Rafa y Manolo: cuentan como gasto (Gastos, Resultado, barras por año y por trimestre)
+    try{ E2.vivo = await dirVivo(); }catch(e){ E2.vivo = {}; }
+    try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').not('data->>saldo', 'is', null).order('data->>ts', {ascending: false}).limit(1); E2.alerta = data && data[0] ? data[0].data : null; }catch(e){}
     try{ if(!_valFlotaRaw) await valFlotaCargar(); }catch(e){}
+    _e2 = E2; _e2Cargando = null; _fin();
   }
   econ2Pintar();
 }
@@ -9873,7 +9876,7 @@ async function e2DeudaCargar(){
     const hoyIso = new Date().toISOString().slice(0, 10), items = [];
     (data || []).forEach(r => { const d = r.data || {};
       if(r.tipo === 'prestamo'){ if(d.estado === 'cerrado') return; let saldo = Number(d.capital || 0); try{ const c = prCuadro(d), pag = c.filter(f => f.iso <= hoyIso); if(pag.length) saldo = pag[pag.length - 1].pendiente; }catch(e){}
-        items.push({quien: d.entidad || 'Préstamo', que: (d.nombre || 'Préstamo') + ' · cuota ' + Number(d.cuota || 0).toLocaleString('es-ES', {minimumFractionDigits: 2}) + ' €/mes hasta ' + String(d.vencimiento || '').split('-').reverse().join('/'), imp: saldo}); }
+        items.push({quien: d.entidad || 'Préstamo', que: (d.nombre || 'Préstamo') + ' · cuota ' + Number(d.cuota || 0).toLocaleString('es-ES', {minimumFractionDigits: 2}) + ' €/mes hasta ' + String((() => { try{ return prVence(d); }catch(e){ return d.vencimiento; } })() || '').split('-').reverse().join('/'), imp: saldo}); }
     });
     try{ const {data: pv} = await sb.rpc('pagos_pendientes_vivos'); (pv || []).forEach(x => items.push({quien: x.acreedor, que: x.concepto, imp: x.queda == null ? null : Number(x.queda)})); }catch(e){}
     _e2Deuda = items.sort((a, b) => (b.imp || 0) - (a.imp || 0)); }catch(e){ _e2Deuda = []; }
@@ -24971,16 +24974,22 @@ const PR_EUR = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2
 const PR_R2 = x => Math.round((x + Number.EPSILON) * 100) / 100;
 function prFechaCorta(iso){ const d = new Date(iso + 'T00:00:00'); return d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}).replace(/\./g,''); }
 function prCuadro(p){
+  // V12.27 (reporte d61a11a0, Economía con la deuda del préstamo sin poner al día): las amortizaciones anticipadas (p.amortizaciones) bajan el capital
+  // el día que se pagan; con «plazo» se mantiene la cuota y el préstamo acaba antes (la última cuota es lo que quede)
   const filas = []; let pend = Number(p.capital); const ini = new Date(p.primera_cuota + 'T00:00:00'), dia = Number(p.dia_recibo) || ini.getDate();
-  for(let i = 1; i <= Number(p.n_cuotas); i++){
+  const am = (p.amortizaciones || []).filter(a => a && a.fecha && Number(a.capital) > 0).sort((a, b) => a.fecha.localeCompare(b.fecha)); let k = 0;
+  for(let i = 1; i <= Number(p.n_cuotas) + 1 && pend > 0.005; i++){
     const f = new Date(ini.getFullYear(), ini.getMonth() + i - 1, dia), iso = f.getFullYear() + '-' + String(f.getMonth()+1).padStart(2,'0') + '-' + String(dia).padStart(2,'0');
+    while(k < am.length && am[k].fecha < iso){ const a = am[k++], c = Math.min(pend, Number(a.capital)), it = Number(a.intereses || 0); pend = PR_R2(pend - c); filas.push({n: 'A', iso: a.fecha, cuota: PR_R2(c + it), capital: PR_R2(c), interes: PR_R2(it), pendiente: pend, anticipada: true}); }
+    if(pend <= 0.005) break;
     const interes = PR_R2(pend * Number(p.tipo_interes) / 1200); let cuota = Number(p.cuota), capital = PR_R2(cuota - interes);
-    if(i === Number(p.n_cuotas)){ capital = pend; cuota = PR_R2(pend + interes); }
+    if(i >= Number(p.n_cuotas) || capital >= pend){ capital = pend; cuota = PR_R2(pend + interes); }
     pend = PR_R2(pend - capital);
     filas.push({n: i, iso, cuota, capital, interes, pendiente: pend});
   }
   return filas;
 }
+function prVence(p){ const c = prCuadro(p); return c.length ? c[c.length - 1].iso : p.vencimiento; }
 function prNumeroGasto(p, iso){ const [y, m, d] = iso.split('-'); return `PRESTAMO ${p.num_acuerdo} ${d}/${m}/${y}`; }
 function prGastoDe(p, iso){ const num = prNumeroGasto(p, iso); return Object.values(documentosRealesById).find(d => d.type === 'gasto' && d.numero === num) || null; }
 async function cargarPrestamos(){
@@ -25010,21 +25019,21 @@ function renderPrestamos(){
     const cuadro = prCuadro(p), pagadas = cuadro.filter(f => f.iso <= hoyIso), pendientes = cuadro.filter(f => f.iso > hoyIso);
     const capPagado = pagadas.reduce((s, f) => s + f.capital, 0), saldo = pagadas.length ? pagadas[pagadas.length-1].pendiente : Number(p.capital), prox = pendientes[0];
     const pct = Math.round(capPagado / Number(p.capital) * 100);
-    const deEsteAnio = pagadas.filter(f => f.iso.startsWith(String(anio)));
+    const deEsteAnio = pagadas.filter(f => f.iso.startsWith(String(anio)) && !f.anticipada);   // la amortización anticipada tiene su propio gasto de intereses
     const contadas = deEsteAnio.filter(f => prGastoDe(p, f.iso)), sinContar = deEsteAnio.filter(f => !prGastoDe(p, f.iso));
     const sum = (a, k) => a.reduce((s, f) => s + f[k], 0);
     const porAnio = {}; cuadro.forEach(f => { const a = f.iso.slice(0,4); porAnio[a] = PR_R2((porAnio[a] || 0) + f.interes); });
-    const estado = f => { if(f.iso > hoyIso) return ['○','pr-pend','pendiente']; if(!f.iso.startsWith(String(anio))) return ['✓','pr-ok','pagada (año anterior)']; return prGastoDe(p, f.iso) ? ['✓','pr-ok','pagada y contada como gasto'] : ['●','pr-sin','pagada, intereses sin contar como gasto']; };
+    const estado = f => { if(f.anticipada) return ['✓','pr-ok','amortización anticipada']; if(f.iso > hoyIso) return ['○','pr-pend','pendiente']; if(!f.iso.startsWith(String(anio))) return ['✓','pr-ok','pagada (año anterior)']; return prGastoDe(p, f.iso) ? ['✓','pr-ok','pagada y contada como gasto'] : ['●','pr-sin','pagada, intereses sin contar como gasto']; };
     return `<div class="pr-card panel">
       <div class="panel-head" style="flex-wrap:wrap;gap:6px;"><h3>${escHtml(p.nombre || 'Préstamo')}</h3><span class="count">${p.uso === 'empresa' ? 'de la empresa' : escHtml(p.uso || '')}</span></div>
       <div class="panel-body">
-        <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:10px;">${escHtml(p.entidad || '')} · nº ${escHtml(p.num_acuerdo || '')} · ${Number(p.tipo_interes).toLocaleString('es-ES')} % ${escHtml((p.modalidad || '').toLowerCase())} · formalizado el ${prFechaCorta(p.fecha_formalizacion)} · vence el ${prFechaCorta(p.vencimiento)} · cuenta ${escHtml(p.cuenta_cargo || '')}</div>
+        <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:10px;">${escHtml(p.entidad || '')} · nº ${escHtml(p.num_acuerdo || '')} · ${Number(p.tipo_interes).toLocaleString('es-ES')} % ${escHtml((p.modalidad || '').toLowerCase())} · formalizado el ${prFechaCorta(p.fecha_formalizacion)} · vence el ${prFechaCorta(prVence(p))} · cuenta ${escHtml(p.cuenta_cargo || '')}</div>
         <div style="height:10px;background:var(--concrete);border-radius:5px;overflow:hidden;"><div style="height:10px;width:${Math.max(2, pct)}%;background:var(--green);"></div></div>
         <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin:4px 0 12px;"><span class="n-pos" style="font-weight:600;">Pagado ${PR_EUR(capPagado)} (${pct} %)</span><span>Concedido ${PR_EUR(p.capital)}</span></div>
         <div class="imp-grid">
           <div class="imp-k"><div class="l">Pendiente</div><div class="v n-neg">${PR_EUR(saldo)}</div></div>
           <div class="imp-k"><div class="l">Próximo recibo</div><div class="v">${prox ? PR_EUR(prox.cuota) : '—'}</div><div class="s">${prox ? prFechaCorta(prox.iso) : 'préstamo terminado'}</div></div>
-          <div class="imp-k"><div class="l">Cuotas pendientes</div><div class="v">${pendientes.length}</div><div class="s">de ${cuadro.length}</div></div>
+          <div class="imp-k"><div class="l">Cuotas pendientes</div><div class="v">${pendientes.length}</div><div class="s">de ${cuadro.filter(f => !f.anticipada).length}</div></div>
           <div class="imp-k"><div class="l">Intereses ${anio}</div><div class="v n-warn">${PR_EUR(sum(deEsteAnio, 'interes'))}</div><div class="s">${deEsteAnio.length} recibo${deEsteAnio.length === 1 ? '' : 's'} pagado${deEsteAnio.length === 1 ? '' : 's'}</div></div>
         </div>
         <div class="imp-linea" style="margin-top:6px;"><span>Intereses de ${anio} ya contados como gasto</span><span class="mono">${PR_EUR(sum(contadas, 'interes'))}</span></div>
@@ -25032,7 +25041,7 @@ function renderPrestamos(){
         ${sinContar.length ? `<button type="button" class="btn primary" style="width:100%;margin:10px 0 4px;padding:12px;" onclick="prRegistrarPendientes('${p.id}')">Registrar ${sinContar.length} recibo${sinContar.length === 1 ? '' : 's'} como gasto (${PR_EUR(sum(sinContar, 'interes'))})</button><div style="font-size:11.5px;color:var(--ink-soft);line-height:1.45;">Solo los intereses. Los de años anteriores no se tocan. Cada gasto lleva adjunto el recibo del banco que llegó por correo; si falta alguno queda pendiente de justificante.</div>` : ''}
         <details class="imp-det" style="margin-top:10px;"><summary>Cuadro de amortización (${cuadro.length} cuotas)</summary><div class="imp-det-body" style="padding:0 0 8px;">
           <div class="pr-fila pr-cab"><span></span><span>Fecha</span><span>Capital</span><span>Interés</span><span>Pendiente</span></div>
-          ${cuadro.map(f => { const e = estado(f); return `<div class="pr-fila ${e[1]}" title="${e[2]}"><span class="pr-ic">${e[0]}</span><span>${prFechaCorta(f.iso)}<span class="pr-cuota">cuota ${f.cuota.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></span><span class="mono">${f.capital.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span><span class="mono">${f.interes.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span><span class="mono">${f.pendiente.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>`; }).join('')}
+          ${cuadro.map(f => { const e = estado(f); return `<div class="pr-fila ${e[1]}" title="${e[2]}"><span class="pr-ic">${e[0]}</span><span>${prFechaCorta(f.iso)}<span class="pr-cuota">${f.anticipada ? 'amortización anticipada' : 'cuota'} ${f.cuota.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></span><span class="mono">${f.capital.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span><span class="mono">${f.interes.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span><span class="mono">${f.pendiente.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>`; }).join('')}
           <div style="font-size:11.5px;color:var(--ink-soft);padding:8px 14px 0;">✓ pagada · ● pagada y con intereses sin contar · ○ pendiente</div>
         </div></details>
         <details class="imp-det"><summary>Intereses por año</summary><div class="imp-det-body">${Object.entries(porAnio).map(([a, v]) => `<div class="imp-linea"><span>${a}</span><span class="mono">${PR_EUR(v)}</span></div>`).join('')}<div class="imp-linea tot"><span>Total de intereses del préstamo</span><span class="mono">${PR_EUR(Object.values(porAnio).reduce((s, v) => s + v, 0))}</span></div></div></details>
@@ -25043,7 +25052,7 @@ function renderPrestamos(){
 async function prRegistrarPendientes(id){
   const p = _prestamos.find(x => String(x.id) === String(id)); if(!p || !sb) return;
   const hoy = new Date(), hoyIso = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0') + '-' + String(hoy.getDate()).padStart(2,'0'), anio = hoy.getFullYear();
-  const lista = prCuadro(p).filter(f => f.iso <= hoyIso && f.iso.startsWith(String(anio)) && !prGastoDe(p, f.iso));
+  const lista = prCuadro(p).filter(f => !f.anticipada && f.iso <= hoyIso && f.iso.startsWith(String(anio)) && !prGastoDe(p, f.iso));
   if(!lista.length) return;
   const total = lista.reduce((s, f) => s + f.interes, 0);
   if(!(await confirmarAccion(`Se crearán ${lista.length} gasto(s) de intereses del préstamo de ${p.entidad} (${PR_EUR(total)} en total). No se cuenta nada de amortización. ¿Continuar?`))) return;
@@ -25570,8 +25579,12 @@ document.addEventListener('exg-docs-listos', () => { if((_tbVista === 'tramites'
 // V11.89 (Daniel 14/10): un trabajo en Activos es su albarán en «Trabajo activo»: al darle ✓ en Pendientes se crea ya, con el cliente y la obra puestos; «Ir al albarán» lo abre para editarlo
 async function tbEmpezar(j){
   const antes = tbFoto(j), nom = escHtml(j.cliente || j.trabajo || 'Trabajo');
-  const ent = clientes.find(c => c.esCli !== false && tbNorm(c.name) === tbNorm(j.cliente)), hoy = new Date().toISOString().slice(0, 10), num = 'A' + siguienteNumeroNuevo('albaran');
-  const fila = {tipo: 'albaran', estado: 'emitido', numero: num, fecha_devengo: hoy, entidad_id: ent ? ent.id : null, obra_texto: [j.trabajo, j.lugar].filter(Boolean).join(' · ') || null, importe: 0, concepto: '', conceptos: [], contabilidad: 'oficial', iva_pct: 21, tratamiento_iva: 'normal', estado_cobro: 'trabajo_activo'};
+  let ent = clientes.find(c => c.esCli !== false && tbNorm(c.name) === tbNorm(j.cliente)), entId = ent ? ent.id : null;
+  // V12.27 (reporte 793ae2b6, Daniel: «¿por qué pone falta cliente si viene del trabajo de José Carrasca?»): el cliente del trabajo SIEMPRE pasa al albarán;
+  // si todavía no está en Clientes, se da de alta con ese nombre (antes el albarán se creaba sin cliente y salía «Falta cliente»)
+  if(!entId && j.cliente && String(j.cliente).trim()){ try{ entId = await buscarOCrearClienteApp(tbMay(j.cliente)); if(entId){ await cargarEntidadesReales(); ent = clientes.find(c => c.id === entId) || {id: entId, name: tbMay(j.cliente)}; } }catch(e){ console.error('Cliente del trabajo', e); } }
+  const hoy = new Date().toISOString().slice(0, 10), num = 'A' + siguienteNumeroNuevo('albaran');
+  const fila = {tipo: 'albaran', estado: 'emitido', numero: num, fecha_devengo: hoy, entidad_id: entId, obra_texto: [j.trabajo, j.lugar].filter(Boolean).join(' · ') || null, importe: 0, concepto: '', conceptos: [], contabilidad: 'oficial', iva_pct: 21, tratamiento_iva: 'normal', estado_cobro: 'trabajo_activo'};
   const {data, error} = await sb.from('documentos_economicos').insert(fila).select().single();
   if(error){ mostrarToast('No se pudo crear el albarán: ' + errText(error), 'err'); return; }
   documentosRealesById[data.id] = {...data, type: 'albaran', num: data.numero, client: ent ? ent.name : '—', job: '—', dateRaw: data.fecha_devengo, dateLabel: formatFechaLabel(new Date(data.fecha_devengo)), amountLabel: '0,00 €', status: 'Validado', items: [], ivaPct: 21, tratamientoIva: 'normal', total: 0, base: 0, iva: 0};
