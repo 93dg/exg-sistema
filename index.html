@@ -4944,11 +4944,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.40" defer></script>
-<script src="costes/norm.js?v=V12.40" defer></script>
-<script src="ajustes/calc.js?v=V12.40" defer></script>
+<script src="rentabilidad/rent.js?v=V12.41" defer></script>
+<script src="costes/norm.js?v=V12.41" defer></script>
+<script src="ajustes/calc.js?v=V12.41" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.40</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.41</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5100,7 +5100,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.40</div>
+        <div class="sub" id="version-badge">V12.41</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -12952,10 +12952,14 @@ function abrirMenuAccionesMovil(docId, event){
   event?.stopPropagation();
   const doc = documentosRealesById[docId];
   if(!doc) return;
+  // V12.41 (reporte 90d52980, Daniel: «deja solo oficina, enviar al gestor, duplicar, eliminar, enviar al cliente y añade volver a trabajo»)
   const gestor = doc.enviado_gestor
     ? [{t: 'Gestor: enviada' + (doc.enviado_gestor_fecha ? ' el ' + String(doc.enviado_gestor_fecha).slice(0, 10).split('-').reverse().join('/') : '') + ' · marcar pendiente', fn: `cambiarGestorDesdeMenu('${doc.id}', false, '')`}]
-    : [{t: 'Enviar al gestor', fn: `enviarAlGestorDoc('${doc.id}')`}, {t: 'Gestor: marcar como enviada', fn: `cambiarGestorDesdeMenu('${doc.id}', true, '')`}];
-  const botones = [{t: 'Imprimir en la oficina', fn: `imprimirDocumento('${doc.id}', 'oficina')`}].concat(gestor, accionesDocumento(doc).filter(x=>x.t!=='Editar'))   // V11.90 (Daniel): también desde los tres puntos de la tarjeta
+    : [{t: 'Enviar al gestor', fn: `enviarAlGestorDoc('${doc.id}')`}];
+  const otras = accionesDocumento(doc).filter(x => ['Duplicar', 'Eliminar', 'Enviar al cliente'].includes(x.t));
+  const trab = (typeof _tbJobs !== 'undefined' ? _tbJobs : []).find(j => (j.docs || []).includes(doc.id) && j.estado !== 'Pendiente');
+  const volver = trab ? [{t: 'Volver a trabajo', fn: `tbVolverAPendientes('${doc.id}')`}] : [];
+  const botones = [{t: 'Imprimir en la oficina', fn: `imprimirDocumento('${doc.id}', 'oficina')`}].concat(gestor, otras, volver)
     .map(x=>`<button class="btn" style="width:100%;text-align:left;margin-bottom:6px;" onclick="cerrarModalGenerico();${x.fn}">${x.t}</button>`).join('');
   mostrarModalGenerico(tipoDocEtiqueta(doc.type)+' '+(doc.num||'')+' — '+doc.client, `<div style="display:flex;flex-direction:column;">${botones}</div>`);
 }
@@ -25735,6 +25739,13 @@ function avisoDeshacer(html, deshacer, seg, ir){   // V11.76 (reporte 4558734e):
   t.querySelector('.dsh').onclick = async () => { clearInterval(iv); t.remove(); try{ await deshacer(); mostrarToast('Deshecho', 'ok'); }catch(e){ mostrarToast('No se pudo deshacer: ' + errText(e), 'err'); } };
 }
 function tbFoto(j){ return JSON.parse(JSON.stringify({estado: j.estado, terminado_at: j.terminado_at || null, orden: j.orden, cobro: j.cobro || null, cancelado: j.cancelado || null})); }
+// V12.41: desde los tres puntos de su albarán, el trabajo vuelve a Pendientes en Trabajos (el documento se queda como está)
+async function tbVolverAPendientes(docId){
+  if(!_tbCargado) await tbCargar();
+  const j = _tbJobs.find(x => (x.docs || []).includes(docId)); if(!j){ mostrarToast('Este documento no está unido a ningún trabajo.'); return; }
+  const antes = tbFoto(j); j.estado = 'Pendiente'; delete j.terminado_at; tbRender(); await tbPersistir(j);
+  avisoDeshacer(escHtml(j.cliente || j.trabajo || 'Trabajo') + ': vuelve a <b>Pendientes</b>', async () => { await tbVolver(j, antes); }, 6);
+}
 async function tbVolver(j, f){ Object.assign(j, f); if(!f.cobro) delete j.cobro; if(!f.cancelado) delete j.cancelado; tbRender(); await tbPersistir(j); }
 // ✕ y € se abren ahí mismo, debajo de su tarjeta (sin ventanas)
 function tbHoja(j, titulo, html){
