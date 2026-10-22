@@ -4944,11 +4944,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.41" defer></script>
-<script src="costes/norm.js?v=V12.41" defer></script>
-<script src="ajustes/calc.js?v=V12.41" defer></script>
+<script src="rentabilidad/rent.js?v=V12.42" defer></script>
+<script src="costes/norm.js?v=V12.42" defer></script>
+<script src="ajustes/calc.js?v=V12.42" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.41</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.42</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5100,7 +5100,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.41</div>
+        <div class="sub" id="version-badge">V12.42</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -8637,7 +8637,7 @@ async function vivoAplicar(){
     if(toca('sistema', 'flota', 'documentos_economicos', 'movimientos_banco')){ try{ cargarAlertasYRecordatorios(); }catch(e){} }
     // las cachés que salen de estos datos se vacían: cada sección vuelve a calcular con lo último la próxima vez que se pinta
     _e2 = null; _c3Alb = null; _costeBase = null; _sociosCache = null; _costeHora = null; _dirVivo = null; _gpBanco = null; _deudas = null;
-    _tbCliNombres = null; _tbTarifas = null; _valFlota = null; _asis = null; _flAsis = null; _impPagosCargados = false;
+    _tbCliNombres = null; _tbTarifas = null; _valFlota = null; _asis = null; _flAsis = null; _impPagosCargados = false; if(toca('sistema')) _combProv = null;
     if(_impBanco) _impBanco.cargado = false;
     if(toca('sistema')) _tbCargado = false;
     try{ if(window.RENT) window.RENT.invalidar(); if(window.COSTES) window.COSTES.D = null; }catch(e){}
@@ -11628,17 +11628,63 @@ function renderGastosProControl(){
   $('gpro-ctl-aviso').textContent = 'Incluye Oficial y En B, con IVA. Toca una fila para ver el detalle.' + (sinLineas ? ` ${sinLineas} gasto(s) no tienen líneas: cuentan con su categoría y como "Sin detalle".` : '');
 }
 // ===== V11.75 (Daniel 14/10/2026): proveedores de combustible con lo que les escribimos y lo que contestaron (sistema tipo=proveedor_combustible), para poder comparar o cambiar en el futuro =====
-let _combProv = null, _combProvAb = null;
-async function combProvCargar(){ try{ const {data} = await sb.from('sistema').select('id,data').eq('tipo', 'proveedor_combustible'); _combProv = (data || []).map(r => ({id: r.id, ...(r.data || {})})); }catch(e){ _combProv = []; } combProvPintar(); }
+let _combProv = null, _combProvAb = null, _combRef = null;
+async function combProvCargar(){ try{ const {data} = await sb.from('sistema').select('id,tipo,data').in('tipo', ['proveedor_combustible', 'combustible_referencia']); _combProv = (data || []).filter(r => r.tipo === 'proveedor_combustible').map(r => ({id: r.id, ...(r.data || {})})); const ref = (data || []).find(r => r.tipo === 'combustible_referencia'); _combRef = ref ? ref.data : null; }catch(e){ _combProv = []; } combProvPintar(); }
+// V12.42 (Daniel 22/10/2026): todas las ofertas se comparan con la misma referencia. El día de referencia se conoce el precio de García-Camacho y el del surtidor del pueblo
+// (su factura de ese mes); esa diferencia en % se aplica al último precio del surtidor para estimar cuánto costaría hoy Camacho y comparar cada oferta con los dos.
+function combSurtidorMes(){
+  const meses = new Map();
+  gastosProDocs().filter(d => /SURTIDORES/i.test(String(d.client || ''))).forEach(d => {
+    const f = String(d.dateRaw || '').slice(0, 7); if(!f) return;
+    (Array.isArray(d.conceptos) ? d.conceptos : []).filter(c => c.grupo === 'combustible' && c.tipo === 'diesel').forEach(c => {
+      const l = Number(c.litros || c.cantidad || 0), pr = Number(c.precio_unitario || c.precio || 0); if(!(l > 0 && pr > 0)) return;
+      const m = meses.get(f) || {l: 0, imp: 0}; m.l += l; m.imp += l * pr; meses.set(f, m); }); });
+  return Array.from(meses.entries()).map(([mes, m]) => ({mes, precio: m.imp / m.l})).sort((a, b) => a.mes.localeCompare(b.mes));
+}
+function combSurtidorEn(lista, fecha){ const ym = String(fecha || '').slice(0, 7); const prev = lista.filter(x => x.mes <= ym); return prev.length ? prev[prev.length - 1] : (lista.length ? lista[lista.length - 1] : null); }
+function combComparar(){
+  const lista = combSurtidorMes(); if(!_combRef || !lista.length) return null;
+  const sRef = combSurtidorEn(lista, _combRef.fecha); if(!sRef) return null;
+  const dif = Number(_combRef.precio) / sRef.precio - 1, ult = lista[lista.length - 1];
+  return {lista, sRef, dif, ult, camHoy: ult.precio * (1 + dif),
+    oferta: o => { const s = combSurtidorEn(lista, o.fecha), cam = s.precio * (1 + dif); return {vsCam: Number(o.precio) / cam - 1, vsSur: Number(o.precio) / s.precio - 1, cam, s}; }};
+}
+const COMB_EST_ORDEN = {oferta: 0, respondido: 1, esperando: 2, sin_contactar: 3, descartado: 4};
 function combProvPintar(){
   const el = document.getElementById('gpro-comb-prov'); if(!el) return; if(!_combProv){ el.innerHTML = '<div class="empty" style="padding:8px;">Cargando…</div>'; combProvCargar(); return; }
   const fF = f => { const d = String(f || ''); return d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(2, 4) + (d.length > 10 ? ' ' + d.slice(11, 16) : '') : ''; };
-  const lista = _combProv.slice().sort((a, b) => { const ua = (a.historial || []).slice(-1)[0], ub = (b.historial || []).slice(-1)[0]; return String((ub || {}).fecha || '').localeCompare(String((ua || {}).fecha || '')); });
-  el.innerHTML = lista.length ? lista.map(p => { const h = p.historial || [], resp = h.filter(x => x.quien === 'ellos').length, ult = h.slice(-1)[0], ab = _combProvAb === p.id;
-    return `<div class="gp-pers${ab ? ' abierta' : ''}" data-cprov="${escHtml(p.id)}"><div class="gp-pers-c"><span>${escHtml(p.nombre || '')}<small>${escHtml(p.producto || 'Gasóleo A')}${ult ? ' · ' + fF(ult.fecha) : ''}</small></span><b style="color:${resp ? 'var(--green)' : 'var(--ink-soft)'};">${resp ? (resp === 1 ? '1 respuesta' : resp + ' respuestas') : 'Sin respuesta'}</b></div>`
-      + (ab ? `<div class="gp-pers-l">${[['Correo', p.correo], ['Teléfono', p.telefono], ['Zona', p.zona]].filter(x => x[1]).map(([a, v]) => `<div class="gp-pers-f"><span>${a}</span><b class="no-cap">${escHtml(v)}</b></div>`).join('')}`
-        + h.map(x => `<div class="gp-pers-f"><span>${x.quien === 'ellos' ? 'Ellos' : 'Nosotros'}<small>${escHtml(fF(x.fecha))}</small><small style="color:var(--ink);font-size:12px;">${escHtml(x.texto || '')}</small></span></div>`).join('') + `</div>` : '') + `</div>`; }).join('') : '<div class="empty" style="padding:8px;">Aún no hay proveedores.</div>';
-  if(!el.dataset.listo){ el.dataset.listo = '1'; el.addEventListener('click', ev => { const r = ev.target.closest('[data-cprov]'); if(!r || ev.target.closest('.gp-pers-l')) return; _combProvAb = _combProvAb === r.dataset.cprov ? null : r.dataset.cprov; combProvPintar(); }); }
+  const pr = n => Number(n).toLocaleString('es-ES', {minimumFractionDigits: 3, maximumFractionDigits: 4}) + ' €/l';
+  const pc = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v * 100).toLocaleString('es-ES', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' %';
+  const mesTxt = ym => MESES_ES[Number(ym.slice(5, 7)) - 1] + ' ' + ym.slice(0, 4);
+  const cmp = combComparar();
+  const estado = p => p.estado || ((p.historial || []).some(x => x.quien === 'ellos') ? 'respondido' : ((p.historial || []).length ? 'esperando' : 'sin_contactar'));
+  const lista = _combProv.slice().sort((a, b) => { const ea = COMB_EST_ORDEN[estado(a)] ?? 2, eb = COMB_EST_ORDEN[estado(b)] ?? 2; if(ea !== eb) return ea - eb;
+    if(a.oferta && b.oferta) return Number(a.oferta.precio) - Number(b.oferta.precio);
+    const ua = (a.historial || []).slice(-1)[0], ub = (b.historial || []).slice(-1)[0]; return String((ub || {}).fecha || '').localeCompare(String((ua || {}).fecha || '')); });
+  let cab = '';
+  if(cmp){
+    cab = `<div class="gp-pers-l" style="padding:6px 0 8px;">`
+      + `<div class="gp-pers-f" style="border-top:0;"><span>Referencia ${escHtml(fF(_combRef.fecha))}<small>${escHtml(_combRef.proveedor || 'García-Camacho')}, ${String(Math.round(Number(_combRef.litros || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, '.')} l con IVA y transporte</small></span><b>${pr(_combRef.precio)}</b></div>`
+      + `<div class="gp-pers-f"><span>Surtidor del pueblo en ${escHtml(mesTxt(cmp.sRef.mes))}<small>Camacho salió ${pc(cmp.dif)} respecto al surtidor</small></span><b>${pr(cmp.sRef.precio)}</b></div>`
+      + (cmp.ult.mes === cmp.sRef.mes ? '' : `<div class="gp-pers-f"><span>Surtidor, último mes (${escHtml(mesTxt(cmp.ult.mes))})<small>Camacho estimado con la misma diferencia: ${pr(cmp.camHoy)}</small></span><b>${pr(cmp.ult.precio)}</b></div>`) + `</div>`;
+  }else if(_combRef && !gastosProDocs().length && !el.dataset.reint){ el.dataset.reint = '1'; setTimeout(() => { delete el.dataset.reint; combProvPintar(); }, 3000);
+  }
+  el.innerHTML = cab + (lista.length ? lista.map(p => { const h = p.historial || [], ult = h.slice(-1)[0], ab = _combProvAb === p.id, est = estado(p), o = p.oferta;
+    let der = '', color = 'var(--ink-soft)', sub2 = '';
+    if(o && o.precio){ der = pr(o.precio); color = est === 'descartado' ? 'var(--ink-soft)' : 'var(--ink)';
+      if(cmp){ const c = cmp.oferta(o); sub2 = [pc(c.vsCam) + ' respecto a Camacho', pc(c.vsSur) + ' respecto al surtidor'].concat(o.iva_incluido ? [] : ['IVA sin aclarar']); } }
+    else if(p.revisar) { der = 'Nueva respuesta'; color = 'var(--orange)'; }
+    else if(est === 'descartado') der = p.motivo || 'Descartado';
+    else if(est === 'sin_contactar') der = 'Sin contactar';
+    else if(est === 'respondido') { der = p.motivo || 'Respondido'; color = 'var(--green)'; }
+    else der = p.motivo || 'Sin respuesta';
+    const motivoPeq = o && est === 'descartado' && p.motivo ? ' · ' + p.motivo : '';
+    return `<div class="gp-pers${ab ? ' abierta' : ''}" data-cprov="${escHtml(p.id)}"><div class="gp-pers-c"><span>${escHtml(p.nombre || '')}<small>${escHtml(p.producto || 'Gasóleo A')}${ult ? ' · ' + fF(ult.fecha) : ''}${escHtml(motivoPeq)}</small>${sub2 ? sub2.map(x => `<small>${escHtml(x)}</small>`).join('') : ''}</span><b style="color:${color};">${escHtml(der)}</b></div>`
+      + (ab ? `<div class="gp-pers-l">${[['Correo', p.correo], ['Teléfono', p.telefono], ['Zona', p.zona], ['Condiciones', o ? [o.litros ? o.litros + ' l' : '', o.iva_incluido ? 'IVA incluido' : (o.iva_incluido === false ? 'Sin IVA' : 'IVA sin aclarar'), o.transporte_incluido ? 'transporte incluido' : '', o.nota || ''].filter(Boolean).join(' · ') : ''], ['Nota', p.nota]].filter(x => x[1]).map(([a, v]) => `<div class="gp-pers-f"><span>${a}</span><b class="no-cap" style="white-space:normal;text-align:right;">${escHtml(v)}</b></div>`).join('')}`
+        + h.map(x => `<div class="gp-pers-f"><span>${x.quien === 'ellos' ? 'Ellos' : 'Nosotros'}<small>${escHtml(fF(x.fecha))}</small><small style="color:var(--ink);font-size:12px;">${escHtml(x.texto || '')}</small></span></div>`).join('') + `</div>` : '') + `</div>`; }).join('') : '<div class="empty" style="padding:8px;">Aún no hay proveedores.</div>');
+  if(!el.dataset.listo){ el.dataset.listo = '1'; el.addEventListener('click', ev => { const r = ev.target.closest('[data-cprov]'); if(!r || ev.target.closest('.gp-pers-l')) return; const id = r.dataset.cprov; _combProvAb = _combProvAb === id ? null : id;
+    const p = (_combProv || []).find(x => x.id === id); if(p && p.revisar && _combProvAb === id){ p.revisar = false; sb.from('sistema').select('data').eq('id', id).maybeSingle().then(({data}) => { if(data && data.data){ const d = {...data.data}; delete d.revisar; sb.from('sistema').update({data: d}).eq('id', id).then(() => {}); } }); }
+    combProvPintar(); }); }
 }
 function renderGastosProCombustible(){
   try{ combProvPintar(); }catch(e){ console.error('Proveedores de combustible', e); }
