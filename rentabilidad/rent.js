@@ -29,8 +29,12 @@ R.baseIngreso = d => { const t = num(d.importe), p = d.iva_pct != null ? num(d.i
 const CLASES = [['giratoria', /giratoria|excavadora|oruga|miniexcavadora/i], ['niveladora', /niveladora|motoniveladora/i], ['camion', /cami[oó]n|doble carro|multilift|volquete|portes?\b|carro\b/i], ['mixta', /retro|mixta|cargadora|pala\b|martillo/i], ['rulo', /rulo|compactad/i], ['cuba', /cuba|riego|agua/i]];
 R.claseLinea = txt => { const t = String(txt || '').trim(), ini = t.split(/\s+/).slice(0, 2).join(' '); const c = CLASES.find(([, re]) => re.test(ini)) || CLASES.find(([, re]) => re.test(t)); return c ? c[0] : 'otros'; };   // la máquina va al principio de la línea («Retro cargando camión» es retro, no camión)
 R.NOMBRE_CLASE = {mixta: 'Mixta (retro)', camion: 'Camión', giratoria: 'Giratoria', niveladora: 'Niveladora', rulo: 'Rulo', cuba: 'Cuba de agua', otros: 'Otros / sin máquina'};
-R.lineas = d => (Array.isArray(d.conceptos) ? d.conceptos : []).map(c => ({f: dia(c.fecha) || dia(d.fecha_devengo), h: num(c.horas != null ? c.horas : (c.unidad === 'h' ? c.cantidad : 0)) || (/cuba\s+de\s+agua/i.test(c.descripcion || '') ? 1 : 0),   // V10.52 (Daniel): una cuba de agua cuenta como 1 h
-    imp: num(c.importe), clase: R.claseLinea(c.descripcion), desc: c.descripcion || ''})).filter(l => l.f);
+// V12.43 (Daniel 23/10/2026): una línea de viajes/portes puede llevar las horas internas de cada máquina (horas_internas = {niveladora: 7, mixta: 5, ...}).
+// No se cobran: sirven para repartir el coste por máquina y calcular a cuánto hay que poner el viaje para no perder dinero.
+R.lineas = d => (Array.isArray(d.conceptos) ? d.conceptos : []).flatMap(c => { const f = dia(c.fecha) || dia(d.fecha_devengo), hi = c.horas_internas && typeof c.horas_internas === 'object' ? Object.entries(c.horas_internas).filter(([, v]) => num(v) > 0) : [];
+    if(hi.length){ const ht = sum(hi, x => num(x[1])), v = c.unidad === 'h' ? 0 : num(c.cantidad); return hi.map(([k, h], i) => ({f, h: num(h), imp: num(c.importe) * num(h) / ht, clase: R.NOMBRE_CLASE[k] ? k : R.claseLinea(k), desc: c.descripcion || '', v: i === 0 ? v : 0, impV: i === 0 && v > 0 ? num(c.importe) : 0, vg: v > 0})); }
+    return [{f, h: num(c.horas != null ? c.horas : (c.unidad === 'h' ? c.cantidad : 0)) || (/cuba\s+de\s+agua/i.test(c.descripcion || '') ? 1 : 0),   // V10.52 (Daniel): una cuba de agua cuenta como 1 h
+    imp: num(c.importe), clase: R.claseLinea(c.descripcion), desc: c.descripcion || '', v: 0, impV: 0}]; }).filter(l => l.f);
 
 // ---------- carga ----------
 async function pag(q, cols, fn){ const out = []; let o = 0; while(true){ let b = sb.from(q).select(cols); if(fn) b = fn(b); const {data, error} = await b.order(q === 'polizas_seguro' ? 'flota_id' : 'id', {ascending: true}).range(o, o + 999); if(error){ console.error('RENT carga ' + q, error); R.errores.push(q + ': ' + (error.message || error)); break; } out.push(...(data || [])); if(!data || data.length < 1000) break; o += 1000; } const vistos = new Set(); return out.filter(r => { if(r.id == null) return true; if(vistos.has(r.id)) return false; vistos.add(r.id); return true; }); }
@@ -251,7 +255,10 @@ R.calcular = function(job, P, asig){
   const rel = x => /^(maq:|amort:|gen:ss|gen:coches|gen:gestoria)/.test(x.clave), relI = sum(lineasI.filter(rel), x => x.valor), gloI = indirecto - relI;
   const n1 = directo, n2 = directo + relI + sociosV, n3 = directo + indirecto + sociosV;
   res.niv = {n1, n2, n3, relI, gloI, socios: sociosV, r1: ejecutado - n1, r2: ejecutado - n2, r3: ejecutado - n3, h1: H ? n1 / H : NaN, h2: H ? n2 / H : NaN, h3: H ? n3 / H : NaN, tarifa: H ? ejecutado / H : NaN};
-  { const t = num(prm.impuesto) / 100, di = directo + indirecto, eMin = (n3 - t * di) / (1 - t); res.niv.t = t; res.niv.minImp = H ? eMin / H : NaN; res.niv.margenH = H ? (ejecutado - n3) / H : NaN; res.niv.margenPct = n3 ? (ejecutado - n3) / n3 * 100 : NaN; res.niv.impH = H ? (res.niv.minImp - res.niv.h3) : NaN; }
+  { const t = num(prm.impuesto) / 100, di = directo + indirecto, eMin = (n3 - t * di) / (1 - t); res.niv.t = t; res.niv.minImp = H ? eMin / H : NaN; res.niv.margenH = H ? (ejecutado - n3) / H : NaN; res.niv.margenPct = n3 ? (ejecutado - n3) / n3 * 100 : NaN; res.niv.impH = H ? (res.niv.minImp - res.niv.h3) : NaN;
+    // V12.43: viajes con horas internas: las horas de esos viajes ÷ número de viajes × precio mínimo por hora = precio mínimo por viaje
+    const lv = lin.filter(l => l.vg), V = sum(lin, l => l.v || 0), hV = sum(lv, l => l.h), cobV = sum(lin, l => l.impV || 0);
+    res.niv.viajes = V; res.niv.hViaje = V ? hV / V : NaN; res.niv.minViaje = V && H ? eMin / H * hV / V : NaN; res.niv.tarifaViaje = V ? cobV / V : NaN; }
   res.m = {pctIngresos: ejecutado ? beneficioReal / ejecutado * 100 : NaN, porJornada: beneficioReal / D, porHora: H ? beneficioReal / H : NaN, directoPctIng: ejecutado ? (ejecutado - directo) / ejecutado * 100 : NaN};
   // ---- coste de oportunidad (independiente del beneficio real) ----
   const hMaq = sum(['mixta', 'camion', 'giratoria', 'niveladora'], c => hClase[c] || 0);
@@ -362,6 +369,8 @@ R.cardNiveles = r => { const v = r.niv, fl = (t, c, res, hh, n) => fila('<b>' + 
     + fl('3. Coste completo', v.n3, v.r3, v.h3, 'Añade el resto de la estructura de la empresa (' + eur(v.gloI) + '), prorrateada por días de obra.')
     + fila('Precio mínimo por hora que cubre todo e impuestos', '<b>' + (isFinite(v.minImp) ? eur(v.minImp, 2) + '/h' : 'sin horas') + '</b>', 'Coste completo más los impuestos estimados (' + R.param.impuesto + ' %, hipótesis). Por debajo pierdes dinero.')
     + fila('Margen sobre el coste completo', '<b style="color:' + col(v.margenH) + ';">' + (isFinite(v.margenH) ? eur(v.margenH, 2) + '/h · ' + pct(v.margenPct) : 'sin horas') + '</b>', 'Lo cobrado por hora − el coste del nivel 3. Cuando haya precios de compra se descontará la reposición.')
+    + (v.viajes ? fila('Precio mínimo por viaje', '<b>' + (isFinite(v.minViaje) ? eur(v.minViaje, 2) : 'sin horas') + '</b>', h1(v.viajes) + ' viajes con ' + h1(v.hViaje) + ' h de máquina de media por viaje × ' + (isFinite(v.minImp) ? eur(v.minImp, 2) : '—') + '/h. Por debajo pierdes dinero.')
+      + fila('Lo que se cobró por viaje', '<b style="color:' + col((v.tarifaViaje || 0) - (v.minViaje || 0)) + ';">' + (isFinite(v.tarifaViaje) ? eur(v.tarifaViaje, 2) : '—') + '</b>', 'Importe de los viajes ÷ número de viajes. Solo cuentan los viajes con horas internas apuntadas.') : '')
     + fila('Lo que se cobró por hora', '<b>' + (isFinite(v.tarifa) ? eur(v.tarifa, 2) + '/h' : 'sin horas') + '</b>', 'Ingreso ejecutado ÷ horas de máquina. Para ganar de verdad debe superar el coste por hora del nivel 3.') + '<div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Falta la reposición de las máquinas (amortizadas, pendiente de dato) y el camión (deuda con Alberto).</div>'); };
 R.secReal = r => {
   const m = r.m, ind = r.lineasI.map(x => R.lineaHtml(r, x, 'indirecto')).join('') + R.lineaHtml(r, r.socios, 'indirecto');
@@ -922,6 +931,15 @@ R.preciosDe = function(r){
   return {filas, obra: r.job.trabajo, horas: r.H, tarifaMedia: tm, minMedio: R.objetivo(r.directo + r.indirecto, r.socios.valor, t, 0) / r.H, objMedio: nv.n4 / r.H, impuesto: R.param.impuesto, margen: R.param.margen};
 };
 R.tablaPrecios = function(P){ const ref = R.referencia(P); if(!ref || !P.costes) return null; return R.preciosDe(R.calcular(ref.job, P, R.asignar(P))); };
+// V12.43 (Daniel 23/10/2026): cuenta de un viaje en el editor del albarán: horas internas de cada máquina ÷ número de viajes, a los precios por hora de «¿Estamos en precio?»
+R.cuentaViaje = async function(hi, viajes, precio){
+  const P = await R.cargar(false), T = R.tablaPrecios(P); if(!T) return null;
+  const V = num(viajes), hs = Object.entries(hi || {}).map(([k, h]) => [k, num(h)]).filter(x => x[1] > 0); if(!V || !hs.length) return null;
+  const H = sum(hs, x => x[1]), cMedio = sum(T.filas, x => x.coste * x.horas) / Math.max(1e-9, sum(T.filas, x => x.horas));
+  const de = k => T.filas.find(x => x.clase === k) || {coste: cMedio, min: T.minMedio, obj: T.objMedio, media: true};
+  const tot = campo => sum(hs, ([k, h]) => de(k)[campo] * h), sinPropio = hs.filter(([k]) => de(k).media).map(([k]) => R.NOMBRE_CLASE[k] || k);
+  return {H, hViaje: H / V, coste: tot('coste') / V, min: tot('min') / V, obj: tot('obj') / V, precio: num(precio), margen: R.param.margen, impuesto: R.param.impuesto, obra: T.obra, sinPropio};
+};
 R.htmlPrecios = (T, enObra) => {
   const caja = h => enObra ? '<div class="rt-c">' + h + '</div>' : '<div class="panel" style="padding:12px;margin-top:12px;">' + h + '</div>';
   if(!T) return caja('<div style="font-size:12.5px;color:var(--ink-soft);">¿Estamos en precio? Aún no hay una obra con horas completas para calcularlo.</div>');
