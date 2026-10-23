@@ -4948,11 +4948,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.48" defer></script>
-<script src="costes/norm.js?v=V12.48" defer></script>
-<script src="ajustes/calc.js?v=V12.48" defer></script>
+<script src="rentabilidad/rent.js?v=V12.49" defer></script>
+<script src="costes/norm.js?v=V12.49" defer></script>
+<script src="ajustes/calc.js?v=V12.49" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.48</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.49</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5104,7 +5104,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.48</div>
+        <div class="sub" id="version-badge">V12.49</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13030,7 +13030,7 @@ async function cambiarTipoDocumento(id, tipo){
   if(error){ mostrarToast('Error: ' + errText(error)); return; }
   if(!restaura && tipo === 'factura'){ await sb.from('documentos_economicos').update({forma_pago: 'TRANSFERENCIA', iban: EMPRESA_BANCO.iban, titular: EMPRESA_BANCO.titular, concepto_transferencia: conceptoDeFactura(extra.numero)}).eq('id', id); }
   mostrarToast(restaura ? `Vuelve a ${tipoDocEtiqueta(tipo).toLowerCase()} como estaba antes.` : `Pasado a ${tipoDocEtiqueta(tipo).toLowerCase()}: es el mismo documento y guarda de qué era antes.`);
-  await cargarDocumentosEconomicosReales(); openDocumentViewer(id);
+  await docRefrescarDesdeBase(id); openDocumentViewer(id);   // V12.49: se recarga ESE documento (la carga general se saltaba los que ya estaban en memoria y seguía saliendo la proforma)
 }
 async function avanzarFaseDocumento(id, tipoDestino){
   if(!exigirNivelTipo(tipoDestino,'editar') || !exigirNivelDoc(id,'editar')) return;
@@ -13052,7 +13052,7 @@ async function avanzarFaseDocumento(id, tipoDestino){
   }
   await sb.from('documentos_economicos').update(extra).eq('id', nuevoId);
   mostrarToast(`Pasado a ${tipoDocEtiqueta(tipoDestino).toLowerCase()}: es el mismo documento y guarda de qué era antes.`);
-  await cargarDocumentosEconomicosReales();
+  await docRefrescarDesdeBase(nuevoId);
   openDocumentViewer(nuevoId);
 }
 async function volverAFaseAnterior(id){
@@ -23946,9 +23946,15 @@ function submitNewJob(ev){
 /* ---------------- EDITOR DE FACTURA / PROFORMA / PRESUPUESTO / ALBARÁN ---------------- */
 let itemSeq = 0;
 
-function proximoNumero(tipoDoc){
-  // cuenta solo los documentos EMITIDOS de este tipo — un borrador nunca consolida su
-  // numeración, así que no debe ocupar el hueco del siguiente número en firme
+function proximoNumero(tipoDoc, fecha){
+  // V12.49 (Daniel 23/10/2026: «que se ponga el número por donde va la última factura»): las facturas se numeran por año: la mayor de ese año + 1
+  // (antes contaba todas las facturas de todos los años y salía la 1212). Albarán, proforma y presupuesto siguen su numeración A/P/PR.
+  if(tipoDoc === 'factura'){
+    const an = String(fecha || new Date().toISOString()).slice(0, 4); let max = 0;
+    Object.values(documentosRealesById).forEach(d => { if(d.type !== 'factura' || d.deleted_at || d.estado === 'borrador' || String(d.dateRaw || d.fecha_devengo || '').slice(0, 4) !== an) return; const n = String(d.numero || d.num || '').trim(); if(/^\d+$/.test(n)) max = Math.max(max, Number(n)); });
+    return String(max + 1);
+  }
+  if(NUM_NUEVA_PREFIJO[tipoDoc]) return NUM_NUEVA_PREFIJO[tipoDoc] + siguienteNumeroNuevo(tipoDoc);
   const existentes = Object.values(documentosRealesById).filter(d=>d.type===tipoDoc && d.estado==='emitido').length;
   return String(existentes + 1);
 }
@@ -31708,6 +31714,10 @@ async function cargarDocumentosEconomicosReales(){
     _cargaMarcas.red = Math.round(performance.now() - _t0);
     if(!data.length){ _docsListos = true; document.dispatchEvent(new Event('exg-docs-listos')); return; }
     _diferirTarjetas = true;
+    // V12.49 (Daniel 23/10/2026: «todo cambio tiene que verse al instante»): antes, al recargar, un documento que ya estaba en memoria se saltaba aunque
+    // hubiera cambiado en la base (por eso tras «Pasar a factura» seguía saliendo la proforma). Ahora el que ha cambiado se quita y se vuelve a montar con lo último.
+    { const firma = d => JSON.stringify([d.tipo, d.numero, d.estado, d.estado_cobro, Number(d.importe || 0), d.fecha_devengo, Number(d.cobrado_importe || 0), d.entidad_id, d.trabajo_id, d.conceptos, d.obra_texto, d.iva_pct, d.tratamiento_iva, d.enviado_gestor, d.documento_siguiente_id, d.documento_anterior_id, d.documento_relacionado_id, d.forma_pago, d.categoria, d.contabilidad, d.archivo_path, d.concepto, d.concepto_transferencia, d.relacion_actividad]);
+      data.forEach(doc => { const v = documentosRealesById[doc.id]; if(!v || firma(v) === firma(doc)) return; ['docrow-', 'docrow-detalle-', 'presrow-', 'albrow-', 'gasrow-', 'mcard-'].forEach(pre => document.getElementById(pre + doc.id)?.remove()); delete documentosRealesById[doc.id]; }); }
     const yaEstaban = new Set(Object.keys(documentosRealesById));
     // fase 'datos': solo registra el documento en memoria (rápido). fase 'filas': construye su fila de tabla y su tarjeta (lo caro).
     const procesar = (doc, fase)=>{
