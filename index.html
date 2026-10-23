@@ -1353,6 +1353,8 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .c3-dia i{font-style:normal;font-size:12px;font-weight:800;}
 .c3-dia span{display:block;color:#fff;font-size:10.5px;font-weight:800;border-radius:6px;padding:5px 4px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .c3-dia b{font-size:9.5px;color:var(--ink-soft);}
+.ie-items .ie-resumen-hi{flex:1 1 100%;order:2;font-size:11px;font-weight:700;color:var(--green);} .ie-items .ie-resumen-hi.pierde{color:var(--red);}
+.c3-dia > *{flex-shrink:0;} .c3-dia{position:relative;} .c3-dia > b{position:absolute;right:5px;bottom:3px;}   /* V12.44: con «+1» el día tiene más cosas que alto; sin esto las barras de ese día se encogían y quedaban más arriba que las de los días de al lado */
 .c3-dia em{font-style:normal;font-size:9px;color:var(--ink-soft);}
 .c3-dia.libre{background:#eef6e6;border-color:#cfe5b8;}
 .c3-dia.hoy{border:2px solid var(--orange);}
@@ -4946,11 +4948,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.43" defer></script>
-<script src="costes/norm.js?v=V12.43" defer></script>
-<script src="ajustes/calc.js?v=V12.43" defer></script>
+<script src="rentabilidad/rent.js?v=V12.44" defer></script>
+<script src="costes/norm.js?v=V12.44" defer></script>
+<script src="ajustes/calc.js?v=V12.44" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.43</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.44</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5102,7 +5104,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.43</div>
+        <div class="sub" id="version-badge">V12.44</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -24289,10 +24291,11 @@ async function ieHiCuenta(id){
   let c = null; try{ c = window.RENT && RENT.cuentaViaje ? await RENT.cuentaViaje(hi, V, pr) : null; }catch(e){ console.error('Cuenta del viaje', e); }
   if(!c){ out.innerHTML = '<div class="sub-t" style="padding:4px 0;">Todavía no hay datos de Rentabilidad para calcular el viaje.</div>'; return; }
   const f = (a, v, col) => `<div class="gp-pers-f"><span>${a}</span><b${col ? ` style="color:${col};"` : ''}>${v}</b></div>`, dif = pr - c.min;
-  out.innerHTML = f('Horas por viaje', fh(c.hViaje)) + f('Coste por viaje', eur(c.coste)) + f('Mínimo por viaje (coste e impuestos)', eur(c.min)) + f(`Precio objetivo (${c.margen} % limpio)`, eur(c.obj))
+  out.innerHTML = f('Horas de máquina por viaje (todas sumadas)', fh(c.hViaje)) + f('Coste por viaje', eur(c.coste)) + f('Mínimo por viaje (coste e impuestos)', eur(c.min)) + f(`Precio objetivo (${c.margen} % limpio)`, eur(c.obj))
     + (pr ? f('Cobras por viaje', eur(pr)) + f('Diferencia con el mínimo', (dif >= 0 ? '+' : '') + eur(dif), dif >= 0 ? 'var(--green)' : 'var(--red)') : '')
     + `<div class="sub-t" style="padding:4px 0;">${fh(c.H)} en ${V} viajes, a los precios por hora de la obra «${escHtml(c.obra || '')}».${c.sinPropio.length ? ' ' + escHtml(c.sinPropio.join(', ')) + ': sin precio propio, se usa la media.' : ''}</div>`;
   if(res) res.textContent = ' · mínimo ' + eur(c.min) + ' por viaje';
+  tr.dataset.hires = 'Mínimo ' + eur(c.min) + ' por viaje' + (pr ? (dif >= 0 ? ' · ganas ' : ' · pierdes ') + eur(Math.abs(dif)) : ''); tr.dataset.hipierde = pr && dif < 0 ? '1' : ''; actualizarResumenLinea(id);   // V12.44: la cuenta también se ve con la línea plegada
 }
 // resumen de una línea (fecha · cantidad · concepto · precio · total), visible solo cuando la
 // línea está plegada en móvil — para poder identificarla sin tener que desplegarla
@@ -24308,7 +24311,7 @@ function actualizarResumenLinea(id){
   const resumenTd = tr.querySelector('.ie-linea-resumen-td');
   if(resumenTd){
     const chk = (typeof _selLineasModo !== 'undefined' && _selLineasModo) ? `<input type="checkbox" class="ie-sel-chk" ${tr.dataset.sel ? 'checked' : ''} onclick="event.stopPropagation(); selLineaToggle('${id}', this.checked)">` : '';
-    resumenTd.innerHTML = `${chk}<span class="ie-resumen-fecha">${fecha ? formatFechaCorta(fecha) : '—'}</span><span class="ie-resumen-cant">${cantidad ?? ''}${unidad}</span><span class="ie-resumen-concepto">${concepto}</span><span class="ie-resumen-precio">${precio ? precio+'€' : ''}</span><span class="ie-resumen-total">${total}</span><span class="ie-resumen-chevron">▾</span>`;
+    resumenTd.innerHTML = `${chk}<span class="ie-resumen-fecha">${fecha ? formatFechaCorta(fecha) : '—'}</span><span class="ie-resumen-cant">${cantidad ?? ''}${unidad}</span><span class="ie-resumen-concepto">${concepto}</span><span class="ie-resumen-precio">${precio ? precio+'€' : ''}</span><span class="ie-resumen-total">${total}</span><span class="ie-resumen-chevron">▾</span>${tr.dataset.hires ? `<span class="ie-resumen-hi${tr.dataset.hipierde ? ' pierde' : ''}">${escHtml(tr.dataset.hires)}</span>` : ''}`;
   }
 }
 // tamaño del input de CONCEPTO desplegado, por longitud — misma técnica de clases CSS
