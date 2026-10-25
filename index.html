@@ -1962,7 +1962,7 @@ button.e2-fila{cursor:pointer;}
 .cc-fc-num{font-family:var(--mono, monospace);color:var(--ink-soft);flex:none;}
 .cc-fc-cli{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cc-fc-bloque{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;line-height:1.2;}   /* V9.84: cliente más pequeño y la obra en chiquitito debajo */
-.cc-fc-bloque .cc-fc-cli{flex:none;font-size:12.5px;}
+.cc-fc-bloque .cc-fc-cli{flex:none;font-size:11px;align-self:flex-start;max-width:100%;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}   /* V12.51 (reporte 0768ff66): el nombre se ve entero, letra más pequeña, y solo el propio texto abre la ficha del cliente (antes la caja ocupaba todo el ancho) */
 .cc-fc-obra{font-size:10.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cc-fc-imp{flex:none;font-weight:800;}
 .pleg-cols .doc-cli-btn.doc-cli-on, .pleg-cols .doc-ord-btn.doc-cli-on, .pleg-cols .doc-vista-btn.doc-cli-on{border-color:transparent !important;background:transparent !important;box-shadow:none !important;color:var(--orange) !important;}   /* V11.50: botones de icono puestos, sin círculo (Daniel) */
@@ -4948,11 +4948,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.50" defer></script>
-<script src="costes/norm.js?v=V12.50" defer></script>
-<script src="ajustes/calc.js?v=V12.50" defer></script>
+<script src="rentabilidad/rent.js?v=V12.51" defer></script>
+<script src="costes/norm.js?v=V12.51" defer></script>
+<script src="ajustes/calc.js?v=V12.51" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.50</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.51</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5104,7 +5104,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.50</div>
+        <div class="sub" id="version-badge">V12.51</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -19841,15 +19841,20 @@ function fcLineasHtml(d){
 }
 function fcAlternar(card){
   const abrir = !card.classList.contains('fc-abierta'); card.classList.toggle('fc-abierta', abrir);
-  if(!abrir || card.querySelector(':scope > .fc-detalle')) return;
-  const d = documentosRealesById[card.dataset.docId]; if(!d) return;
+  if(!abrir) return;
+  // V12.51 (reporte acb39191: «¿por qué no se ven las líneas en este?»): si el documento cambió en la base y se recargó, la tarjeta abierta
+  // se quedaba sin líneas (el documento ya no estaba en memoria y no se pintaba nada). Ahora el detalle se rehace cada vez que se abre y, si el
+  // documento no está en memoria, sus líneas se leen de la base.
+  const viejo = card.querySelector(':scope > .fc-detalle'); if(viejo) viejo.remove();
+  const d = documentosRealesById[card.dataset.docId] || {id: card.dataset.docId};
   const x = document.createElement('div'); x.className = 'fc-detalle'; const pie = card.querySelector(':scope > .fte-doc'); pie ? card.insertBefore(x, pie) : card.appendChild(x);
   // V11.57 (Daniel: «tiene que ser un documento con su historial»): al abrir la tarjeta se ve de qué era antes este mismo documento
   const histH = () => { const H = Array.isArray(d.historial_tipos) ? d.historial_tipos : []; if(!H.length) return ''; const f = x => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(x || '')); return m ? m[3] + '/' + m[2] + '/' + m[1].slice(2) : ''; };
     return '<div class="fc-hist">' + H.map(h => '<div><span>' + escHtml(tipoDocEtiqueta(h.tipo)) + (h.numero ? ' ' + escHtml(h.numero) : '') + (h.fecha ? ' · ' + f(h.fecha) : '') + '</span><span>' + (h.volvio_a ? 'Volvió a ' + escHtml(tipoDocEtiqueta(h.volvio_a).toLowerCase()) : 'Pasó a ' + escHtml(tipoDocEtiqueta(h.paso_a).toLowerCase())) + ' el ' + f(h.cuando) + '</span></div>').join('') + '</div>'; };
   const pon = () => { const h = fcLineasHtml(d); x.innerHTML = h == null ? '<div class="fc-sin">Cargando líneas…</div>' : histH() + h; return h != null; };
   if(d.historial_tipos === undefined){ try{ sb.from('documentos_economicos').select('historial_tipos').eq('id', d.id).maybeSingle().then(r => { d.historial_tipos = (r && r.data && r.data.historial_tipos) || []; pon(); }); }catch(e){} }
-  if(!pon()){ try{ if(typeof sb !== 'undefined' && sb) sb.from('documentos_economicos').select('conceptos').eq('id', d.id).maybeSingle().then(r => { d.conceptos = (r && r.data && r.data.conceptos) || []; pon(); }).catch(() => { x.innerHTML = '<div class="fc-sin">No se pudieron cargar las líneas</div>'; }); }catch(er){ x.innerHTML = '<div class="fc-sin">No se pudieron cargar las líneas</div>'; } }
+  const habia = pon();   // V12.51: se pinta lo que hay en memoria y se comprueba siempre con la base, para que un cambio se vea al momento
+  try{ if(typeof sb !== 'undefined' && sb) sb.from('documentos_economicos').select('conceptos').eq('id', d.id).maybeSingle().then(r => { const c = (r && r.data && r.data.conceptos) || []; if(!habia || JSON.stringify(c) !== JSON.stringify(d.conceptos)){ d.conceptos = c; if(x.isConnected) pon(); } }).catch(() => { if(!habia) x.innerHTML = '<div class="fc-sin">No se pudieron cargar las líneas</div>'; }); }catch(er){ if(!habia) x.innerHTML = '<div class="fc-sin">No se pudieron cargar las líneas</div>'; }
 }
 document.addEventListener('click', ev => { const t = ev.target; if(!t || !t.closest) return; const card = t.closest('.factura-card-movil'); if(!card || card.classList.contains('fc-gasto') || !card.dataset.docId) return;
   if(t.closest('button, a, input, select, label, .fc-estado-wrap, .fte-lnk, .fc-fallos, .fc-detalle, .fc-cliente[data-cli], .cc-fc-cli[data-cli]')) return; ev.stopImmediatePropagation(); ev.preventDefault(); fcAlternar(card); }, true);   // V9.02: el nombre del cliente abre su ficha, no despliega la tarjeta
