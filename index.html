@@ -4948,11 +4948,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.49" defer></script>
-<script src="costes/norm.js?v=V12.49" defer></script>
-<script src="ajustes/calc.js?v=V12.49" defer></script>
+<script src="rentabilidad/rent.js?v=V12.50" defer></script>
+<script src="costes/norm.js?v=V12.50" defer></script>
+<script src="ajustes/calc.js?v=V12.50" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.49</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.50</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5104,7 +5104,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.49</div>
+        <div class="sub" id="version-badge">V12.50</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -13083,7 +13083,10 @@ async function duplicarDocumento(id){
   if(!original) return;
   const copia = {...original};
   delete copia.id; delete copia.created_at; delete copia.reprocesado_at; delete copia.estado_calidad; delete copia.info_faltante;
-  copia.numero = ['factura','presupuesto','proforma'].includes(copia.tipo) ? proximoNumero(copia.tipo) : null;
+  // V12.50 (Daniel 25/10/2026: «error al duplicar: cannot insert a non-DEFAULT value into column anio»): anio la calcula la base, no se copia.
+  // La copia es un documento nuevo: sin trabajo, expediente, historial ni adjuntos del original, y con su propio número.
+  delete copia.anio; copia.deleted_at = null; copia.trabajo_id = null; copia.expediente_id = null; copia.documento_anterior_id = null; copia.historial_tipos = []; copia.adjuntos = [];
+  copia.numero = ['factura','presupuesto','proforma','albaran'].includes(copia.tipo) ? proximoNumero(copia.tipo) : null;
   copia.fecha_devengo = new Date().toISOString().slice(0,10);
   copia.estado_cobro = 'pendiente_enviar'; // 'borrador' no es válido en estado_cobro — esa es la columna 'estado'
   copia.estado_albaran = copia.tipo==='albaran' ? 'en_proceso' : copia.estado_albaran;
@@ -13099,7 +13102,8 @@ async function rectificarFactura(id){
   const {data: original} = await sb.from('documentos_economicos').select('*').eq('id', id).single();
   if(!original) return;
   const rect = {...original};
-  delete rect.id; delete rect.created_at; delete rect.reprocesado_at; delete rect.estado_calidad;
+  delete rect.id; delete rect.created_at; delete rect.reprocesado_at; delete rect.estado_calidad; delete rect.anio; // V12.50: anio la calcula la base
+  rect.deleted_at = null; rect.historial_tipos = []; rect.adjuntos = [];
   rect.numero = proximoNumero('factura');
   rect.fecha_devengo = new Date().toISOString().slice(0,10);
   rect.estado_cobro = 'pendiente_enviar'; // 'borrador' no es válido en estado_cobro
