@@ -65,9 +65,15 @@ def nombre_fila_plegada():
     m = re.search(r'\.cc-fc-bloque \.cc-fc-cli\{([^}]*)\}', t)
     ok = m and 'align-self:flex-start' in m.group(1) and 'cliAjustar' in t
     return [] if ok else [{'f': 'index.html', 'regla': 'nombre-fila-plegada', 'txt': m.group(0) if m else 'falta la regla .cc-fc-bloque .cc-fc-cli'}]
+def hoja_movil():
+    # V12.55: en el móvil ninguna ficha puede quedar tapada abajo: todas son hoja deslizante por encima de la barra
+    t = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'index.html'), encoding='utf-8').read()
+    ok = '.overlay:has(> .drawer){align-items:flex-end;padding:0;z-index:3200;}' in t and '@keyframes hoja-sube' in t
+    return [] if ok else [{'f': 'index.html', 'regla': 'hoja-movil', 'txt': 'falta la hoja deslizante de las fichas en el móvil'}]
+DESC['hoja-movil'] = 'Fichas en el móvil: hoja deslizante por encima de la barra de abajo, nada tapado (Daniel 25/10)'
 DESC['nombre-fila-plegada'] = 'Fila plegada: el nombre del cliente en una línea con la letra ajustada para verse entero y solo su texto abre la ficha (reporte 0768ff66)'
 if __name__ == '__main__':
-    h = hallazgos() + nombre_fila_plegada(); c = cuenta(h)
+    h = hallazgos() + nombre_fila_plegada() + hoja_movil(); c = cuenta(h)
     if '--baseline' in sys.argv:
         json.dump(c, open(BASE, 'w'), indent=0); print('baseline guardada:', len(h)); sys.exit(0)
     if '--todo' in sys.argv:

@@ -501,6 +501,7 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 #client-overlay .cli-dato > span{flex:none;font-size:13px;color:var(--ink-soft);min-width:84px;}
 #client-overlay .cli-dato > input{flex:1;min-width:0;border:0;background:transparent;text-align:right;padding:6px 0;color:var(--ink);font-weight:600;font-family:inherit;}
 #client-overlay .cli-dato > input:focus{outline:none;color:var(--orange);}
+#client-overlay .cli-dato > input::placeholder{color:var(--orange);font-weight:600;opacity:1;}
 html body #client-overlay .cli-dato > input:not(:focus):not(#_zoom){font-size:13px !important;text-overflow:ellipsis;}   /* al escribir va a 16 px (el iPhone amplía con menos) */
 #client-overlay #c-datos-mas, #client-overlay .cli-mas{margin-top:8px;}
 #client-overlay .cli-sub-tit{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;}
@@ -612,6 +613,18 @@ html body #client-overlay .cli-dato > input:not(:focus):not(#_zoom){font-size:13
 .close-x{font-size:20px;color:var(--ink-soft);padding:4px 8px;}
 .close-x:hover{color:var(--ink);}
 .drawer-body{padding:18px 22px;}@media(max-width:768px){.drawer-body{padding:14px 14px;}}
+/* V12.55 (Daniel 25/10: «eso no puede pasar en ningún popup, que no se vea la parte de abajo; ¿no sería mejor un modal deslizante?»):
+   en el móvil todas las fichas (.overlay > .drawer) son una hoja que sube desde abajo, por encima de la barra de abajo y de los botones flotantes,
+   con su asa para bajarla y cerrarla; lo último siempre se puede subir por encima del botón de reportar */
+@media(max-width:768px){
+  .overlay:has(> .drawer){align-items:flex-end;padding:0;z-index:3200;}
+  .overlay:has(> .drawer) > .drawer{width:100vw;max-width:100vw;max-height:calc(100dvh - env(safe-area-inset-top, 0px) - 28px);border-radius:18px 18px 0 0;animation:hoja-sube .22s ease-out;box-shadow:0 -10px 40px rgba(0,0,0,0.3);}
+  .overlay:has(> .drawer) > .drawer > .drawer-head{border-radius:18px 18px 0 0;padding-top:22px;touch-action:none;}
+  .overlay:has(> .drawer) > .drawer > .drawer-head::before{content:'';position:absolute;top:8px;left:50%;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--line);}
+  .overlay:has(> .drawer) > .drawer > .drawer-body{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 72px);}
+  body:has(.overlay.active > .drawer) #asistente-ia-fab, body:has(.overlay.active > .drawer) #busq-fab{display:none !important;}
+}
+@keyframes hoja-sube{from{transform:translateY(100%);}to{transform:translateY(0);}}
 .block{margin-bottom:20px;}
 .block h4{font-size:11.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-soft);margin-bottom:10px;}
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;}
@@ -4977,11 +4990,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.54" defer></script>
-<script src="costes/norm.js?v=V12.54" defer></script>
-<script src="ajustes/calc.js?v=V12.54" defer></script>
+<script src="rentabilidad/rent.js?v=V12.55" defer></script>
+<script src="costes/norm.js?v=V12.55" defer></script>
+<script src="ajustes/calc.js?v=V12.55" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.54</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.55</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5133,7 +5146,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.54</div>
+        <div class="sub" id="version-badge">V12.55</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -7285,7 +7298,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
         <div class="panel-head"><h3>Actividad por año</h3></div>
         <div id="c-anios-wrap"></div>
       </div>
-      <div class="panel cli-pan" id="cpan-contacto" data-pnl-clave="pnl-cli-contacto" data-pleg-def="1">
+      <div class="panel cli-pan" id="cpan-contacto" data-pnl-clave="pnl-cli-contacto2">
         <div class="panel-head"><h3>Datos de contacto</h3></div>
         <div id="c-datos">
           <div class="cli-dato" data-c="nif"><span>NIF</span><input id="c-nif" onchange="guardarContactoCliente()"></div>
@@ -23298,8 +23311,8 @@ function openClientDrawer(name){
   document.getElementById('cpan-docs').style.display = _cliDocsOrden.length ? '' : 'none';
   cliDocsPintar(false);
 
-  // datos de contacto: solo se ven los rellenos; «Añadir dato» enseña los vacíos
-  cliDatosTodos(false);
+  // V12.55 (Daniel: «¿dónde están los datos de contacto por si los quiero ver o editar?»): abiertos y todos a la vista; los vacíos con «Añadir»
+  cliDatosTodos(true, true);
   const PRIO_TXT = {alta:'alta', media:'media', baja:'baja'};
   document.getElementById('c-cab-sub').textContent = [c.type || '', c.prio ? 'Prioridad ' + (PRIO_TXT[(c.prio||'').toLowerCase()] || c.prio) : ''].filter(Boolean).join(' · ');
   try{ document.querySelectorAll('#client-overlay .panel').forEach(p => { if(p.dataset.plegDef === '1' && _pnlEstado[p.dataset.pnlClave] == null) pnlPoner(p, true); }); }catch(e){}
@@ -23320,11 +23333,12 @@ function cliDocsPintar(todos){
     return `<div class="econ-line cli-lin" onclick="closeClientDrawer();openDocumentViewer('${d.id}')"><span>${escHtml(tipoDocEtiqueta(d.type))} ${escHtml(d.num || d.numero || '')} · ${formatFechaCorta(d.dateRaw) || ''}</span><span class="v">${d.amountLabel || eur(d.importe)}</span></div>`;
   }).join('') + (!todos && _cliDocsOrden.length > MAX ? `<button type="button" class="btn sm cli-mas" onclick="cliDocsPintar(true)">${_cliDocsOrden.length - MAX} más</button>` : '');
 }
-function cliDatosTodos(todos){
+function cliDatosTodos(todos, sinFoco){
   const filas = document.querySelectorAll('#c-datos .cli-dato'); let vacios = 0;
+  filas.forEach(f => { const i = f.querySelector('input'); if(i && !i.placeholder) i.placeholder = 'Añadir'; });
   filas.forEach(f => { const v = (f.querySelector('input')?.value || '').trim(); const ver = todos || !!v; f.style.display = ver ? '' : 'none'; if(!v) vacios++; });
   const b = document.getElementById('c-datos-mas'); if(b) b.style.display = (!todos && vacios) ? '' : 'none';
-  if(todos){ const pri = [...filas].find(f => !(f.querySelector('input')?.value || '').trim()); pri?.querySelector('input')?.focus(); }
+  if(todos && !sinFoco){ const pri = [...filas].find(f => !(f.querySelector('input')?.value || '').trim()); pri?.querySelector('input')?.focus(); }
 }
 function closeClientDrawer(){ document.getElementById('client-overlay').classList.remove('active'); document.body.classList.remove('overlay-open'); }
 
@@ -32691,6 +32705,17 @@ if('serviceWorker' in navigator){
 })();
 </script>
 
+<script>
+/* V12.55: en el móvil, la hoja de una ficha se cierra deslizándola hacia abajo desde su cabecera (asa) */
+(function(){
+  let hoja = null, y0 = 0, dy = 0;
+  document.addEventListener('touchstart', ev => { if(window.innerWidth > 768) return; const cab = ev.target.closest && ev.target.closest('.overlay.active > .drawer > .drawer-head'); if(!cab || ev.target.closest('button, input, select, textarea, a')) return; hoja = cab.parentElement; y0 = ev.touches[0].clientY; dy = 0; hoja.style.transition = 'none'; }, {passive: true});
+  document.addEventListener('touchmove', ev => { if(!hoja) return; dy = Math.max(0, ev.touches[0].clientY - y0); hoja.style.transform = 'translateY(' + dy + 'px)'; }, {passive: true});
+  document.addEventListener('touchend', () => { if(!hoja) return; const h = hoja, ov = h.parentElement; hoja = null; h.style.transition = 'transform .18s ease-out';
+    if(dy > 90){ h.style.transform = 'translateY(100%)'; setTimeout(() => { h.style.transform = ''; h.style.transition = ''; const x = ov.querySelector(':scope > .drawer > .drawer-head .close-x'); if(x) x.click(); else ov.dispatchEvent(new MouseEvent('click', {bubbles: true})); }, 180); }
+    else { h.style.transform = ''; setTimeout(() => { h.style.transition = ''; }, 200); } });
+})();
+</script>
 </body>
 </html>
 
