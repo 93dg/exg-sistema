@@ -63,9 +63,9 @@ def nombre_fila_plegada():
     # V12.51 (reporte 0768ff66): en la fila plegada el nombre del cliente se ve entero y solo su propio texto abre la ficha
     t = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'index.html'), encoding='utf-8').read()
     m = re.search(r'\.cc-fc-bloque \.cc-fc-cli\{([^}]*)\}', t)
-    ok = m and 'align-self:flex-start' in m.group(1) and 'white-space:normal' in m.group(1)
+    ok = m and 'align-self:flex-start' in m.group(1) and 'cliAjustar' in t
     return [] if ok else [{'f': 'index.html', 'regla': 'nombre-fila-plegada', 'txt': m.group(0) if m else 'falta la regla .cc-fc-bloque .cc-fc-cli'}]
-DESC['nombre-fila-plegada'] = 'Fila plegada: el nombre del cliente entero (sin cortar) y solo su texto abre la ficha (reporte 0768ff66)'
+DESC['nombre-fila-plegada'] = 'Fila plegada: el nombre del cliente en una línea con la letra ajustada para verse entero y solo su texto abre la ficha (reporte 0768ff66)'
 if __name__ == '__main__':
     h = hallazgos() + nombre_fila_plegada(); c = cuenta(h)
     if '--baseline' in sys.argv:
