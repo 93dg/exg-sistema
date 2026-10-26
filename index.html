@@ -5045,11 +5045,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.59" defer></script>
-<script src="costes/norm.js?v=V12.59" defer></script>
-<script src="ajustes/calc.js?v=V12.59" defer></script>
+<script src="rentabilidad/rent.js?v=V12.60" defer></script>
+<script src="costes/norm.js?v=V12.60" defer></script>
+<script src="ajustes/calc.js?v=V12.60" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.59</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.60</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5201,7 +5201,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.59</div>
+        <div class="sub" id="version-badge">V12.60</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -25909,7 +25909,7 @@ async function tbEliminar(id){
 }
 // V8.53 (Daniel): € en cada trabajo — ya cobrado (con importe), hacer albarán, hacer factura u otra forma
 // V11.76 (reporte 4558734e): el albarán o la factura de un trabajo se hacen en el MISMO editor que el resto de la web, con el cliente y el trabajo ya puestos
-function tbHacerDoc(j, tipo){ tbHojaCerrar(); openNewInvoiceModal({tipo, clientName: j.cliente || '', jobLabel: j.trabajo || [j.cliente, j.lugar].filter(Boolean).join(' · ')}, true); window._tbDocPara = {id: j.id, tipo}; }   // V11.77: el documento que se guarde queda enlazado a este trabajo
+function tbHacerDoc(j, tipo){ tbHojaCerrar(); openNewInvoiceModal({tipo, clientName: j.cliente || '', jobLabel: j.trabajo || ''}   /* V12.60: ni el lugar ni el cliente como obra */, true); window._tbDocPara = {id: j.id, tipo}; }   // V11.77: el documento que se guarde queda enlazado a este trabajo
 // V11.77 (Daniel 14/10): el documento hecho desde un trabajo queda enlazado (j.docs) y el trabajo pasa a Por cobrar; en Trámites se ve la tarjeta del documento
 async function tbEnlazarDoc(docId, tipo){
   const p = window._tbDocPara; window._tbDocPara = null; if(!p || !docId) return false;
@@ -25941,7 +25941,7 @@ async function tbEmpezar(j){
   // si todavía no está en Clientes, se da de alta con ese nombre (antes el albarán se creaba sin cliente y salía «Falta cliente»)
   if(!entId && j.cliente && String(j.cliente).trim()){ try{ entId = await buscarOCrearClienteApp(tbMay(j.cliente)); if(entId){ await cargarEntidadesReales(); ent = clientes.find(c => c.id === entId) || {id: entId, name: tbMay(j.cliente)}; } }catch(e){ console.error('Cliente del trabajo', e); } }
   const hoy = new Date().toISOString().slice(0, 10), num = 'A' + siguienteNumeroNuevo('albaran');
-  const fila = {tipo: 'albaran', estado: 'emitido', numero: num, fecha_devengo: hoy, entidad_id: entId, obra_texto: [j.trabajo, j.lugar].filter(Boolean).join(' · ') || null, importe: 0, concepto: '', conceptos: [], contabilidad: 'oficial', iva_pct: 21, tratamiento_iva: 'normal', estado_cobro: 'trabajo_activo'};
+  const fila = {tipo: 'albaran', estado: 'emitido', numero: num, fecha_devengo: hoy, entidad_id: entId, obra_texto: (j.trabajo && String(j.trabajo).trim()) || null,   /* V12.60 (Daniel 26/10): el lugar nunca se pone como obra */ importe: 0, concepto: '', conceptos: [], contabilidad: 'oficial', iva_pct: 21, tratamiento_iva: 'normal', estado_cobro: 'trabajo_activo'};
   const {data, error} = await sb.from('documentos_economicos').insert(fila).select().single();
   if(error){ mostrarToast('No se pudo crear el albarán: ' + errText(error), 'err'); return; }
   documentosRealesById[data.id] = {...data, type: 'albaran', num: data.numero, client: ent ? ent.name : '—', job: '—', dateRaw: data.fecha_devengo, dateLabel: formatFechaLabel(new Date(data.fecha_devengo)), amountLabel: '0,00 €', status: 'Validado', items: [], ivaPct: 21, tratamientoIva: 'normal', total: 0, base: 0, iva: 0};
