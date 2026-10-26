@@ -194,6 +194,13 @@ table{border-collapse:collapse;width:100%;}
 .app.sidebar-collapsed .nav .grp-label::after{content:'···';font-size:12px;}
 .app.sidebar-collapsed .sidebar-foot{display:none;}
 
+/* V12.58: Buscar y Crear en la barra lateral (solo PC) */
+.nav.sb-acc{flex:none;overflow:visible;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--line-dark);}
+.nav.sb-acc button .ico{color:var(--orange);opacity:1;}
+.nav.sb-acc #sb-crear.open{border:1px solid var(--orange);}
+@media(min-width:769px){ html body #busq-fab, html body #global-add-fab{display:none !important;} }
+@media(max-width:768px){ .nav.sb-acc{display:none !important;} }
+
 .main{padding:22px 28px 60px 28px;max-width:1400px;}
 .topbar{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:20px;}
 .topbar h1{font-size:22px;}
@@ -5024,11 +5031,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.57" defer></script>
-<script src="costes/norm.js?v=V12.57" defer></script>
-<script src="ajustes/calc.js?v=V12.57" defer></script>
+<script src="rentabilidad/rent.js?v=V12.58" defer></script>
+<script src="costes/norm.js?v=V12.58" defer></script>
+<script src="ajustes/calc.js?v=V12.58" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.57</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.58</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5180,7 +5187,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.57</div>
+        <div class="sub" id="version-badge">V12.58</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú">◀</button>
       <button class="sidebar-toggle" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;">🌓</button>
@@ -5189,6 +5196,11 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
       <div class="user-badge-dot"></div>
       <div class="user-badge-name" id="user-badge-name">Cargando...</div>
       <div class="user-badge-switch">Cambiar</div>
+    </div>
+    <!-- V12.58 (Daniel 26/10: en PC el buscador y el botón de crear van en la barra lateral; el asistente y Reportar siguen flotando) -->
+    <div class="nav sb-acc" id="sb-acc">
+      <button type="button" id="sb-buscar" onclick="busqAbrir()" title="Buscar en todo"><span class="ico"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg></span><span class="label"> Buscar</span></button>
+      <button type="button" id="sb-crear" onclick="toggleGlobalAddMenu(this)" title="Crear"><span class="ico"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span><span class="label"> Crear</span></button>
     </div>
     <div class="nav" id="nav">
       <button class="active" data-view="control"><span class="ico"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg></span><span class="label"> Centro de control</span></button>
@@ -10417,17 +10429,24 @@ function navGruposRefrescar(){
 document.querySelectorAll('.nav button[data-view]').forEach(btn => btn.addEventListener('click', () => { try{ navGruposRefrescar(); }catch(e){} }));
 navGruposConstruir();
 
-function toggleGlobalAddMenu(){
+function toggleGlobalAddMenu(ancla){
   const fab = document.getElementById('global-add-fab');
   const backdrop = document.getElementById('global-add-backdrop');
   const menu = document.getElementById('global-add-menu');
   const abrir = !menu.classList.contains('active');
   fab.classList.toggle('open', abrir);
+  const sbc = document.getElementById('sb-crear'); if(sbc) sbc.classList.toggle('open', abrir);
+  // V12.58: desde la barra lateral el menú sale al lado del botón
+  if(abrir && ancla && ancla.getBoundingClientRect){
+    const r = ancla.getBoundingClientRect(), sbr = document.getElementById('sidebar').getBoundingClientRect();
+    menu.style.left = (sbr.right + 8) + 'px'; menu.style.top = Math.max(8, r.top) + 'px'; menu.style.right = 'auto'; menu.style.bottom = 'auto';
+  } else if(abrir){ menu.style.left = menu.style.top = menu.style.right = menu.style.bottom = ''; }
   backdrop.classList.toggle('active', abrir);
   menu.classList.toggle('active', abrir);
 }
 function closeGlobalAddMenuAndRun(fn){
   document.getElementById('global-add-fab').classList.remove('open');
+  { const sbc=document.getElementById('sb-crear'); if(sbc) sbc.classList.remove('open'); }
   document.getElementById('global-add-backdrop').classList.remove('active');
   document.getElementById('global-add-menu').classList.remove('active');
   setTimeout(fn, 60);
