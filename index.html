@@ -5058,11 +5058,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.62" defer></script>
-<script src="costes/norm.js?v=V12.62" defer></script>
-<script src="ajustes/calc.js?v=V12.62" defer></script>
+<script src="rentabilidad/rent.js?v=V12.63" defer></script>
+<script src="costes/norm.js?v=V12.63" defer></script>
+<script src="ajustes/calc.js?v=V12.63" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.62</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.63</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5214,7 +5214,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.62</div>
+        <div class="sub" id="version-badge">V12.63</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -14907,6 +14907,8 @@ function recVistaPlegada(){ const ks = [...document.querySelectorAll('[data-rec-
   try{ localStorage.setItem('rec_plegados', JSON.stringify(pleg)); }catch(e){}
   try{ recRender(); }catch(e){} document.getElementById('rec-vista-btn')?.classList.toggle('doc-cli-on', plegar); }
 // V8.51: estados de los recordatorios (aprobados por Daniel): qué toca o por qué está parado, con quién o el motivo, y desde cuándo
+// V12.62 (reporte 23345ddf, Daniel: «¿por qué tanta repetición? Ahí pone simplemente Por cobrar, ya está ahí arriba Rafael Sánchez»): la etiqueta no repite lo que ya dice el título
+function recRepite(titulo, con){ const n = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9ñ ]+/g, ' ').replace(/\s+/g, ' ').trim(); const t = n(titulo), c = n(con); if(!c) return true; if(t.includes(c)) return true; const p = c.split(' ').filter(w => w.length >= 4); return p.length > 0 && p.every(w => t.includes(w)); }
 const REC_ESTADOS = {en_espera: ['En espera', '#2B5C8F'], por_pagar: ['Por pagar', '#B4471A'], por_cobrar: ['Por cobrar', '#3B6D11'], por_facturar: ['Por facturar', '#BA7517'], por_consultar: ['Por consultar', '#7B4FA0'], por_tramitar: ['Por tramitar', '#16706F'], bloqueado: ['Bloqueado', '#A32D2D'], programado: ['Programado', '#6b6860'], por_decidir: ['Por decidir', '#1c1f24'], mejora: ['Mejora', '#8a877f']};
 function recCambiarEstado(id){
   const r = _recItems.find(x => String(x.id) === String(id)); if(!r) return; const d = r.data || {};
@@ -14968,7 +14970,7 @@ function recRender(){
     // V8.51 (Daniel): estado, con quién o motivo, y cuánto lleva así
     // V12.04: el estado ya no muestra días desde que se puso (se confundía con una cuenta atrás); la cuenta atrás real está en la pastilla de fecha
     const E = REC_ESTADOS[d.estado_rec], desde = d.estado_desde ? Math.max(0, Math.round((new Date(hoy + 'T12:00:00') - new Date(d.estado_desde + 'T12:00:00')) / 86400000)) : null;
-    const est = E ? `<span class="rec-est" style="--e:${E[1]}" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">${E[0]}${d.con && !String(d.con).includes('@') ? ` <em>· ${escHtml(d.con)}</em>` : ''}${''}</span>` : `<span class="rec-est sin" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">Poner estado</span>`;
+    const est = E ? `<span class="rec-est" style="--e:${E[1]}" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">${E[0]}${d.con && !String(d.con).includes('@') && !recRepite(corto, d.con) ? ` <em>· ${escHtml(d.con)}</em>` : ''}</span>` : `<span class="rec-est sin" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">Poner estado</span>`;
     return `<details class="alert-det rec-card t-${tema}">
       <summary class="alert-sum">
         <div class="t"><span class="rec-tit">${escHtml(corto)}</span><span class="rec-fila">${est}${pild}</span></div>
