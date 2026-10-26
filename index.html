@@ -194,6 +194,24 @@ table{border-collapse:collapse;width:100%;}
 .app.sidebar-collapsed .nav .grp-label::after{content:'···';font-size:12px;}
 .app.sidebar-collapsed .sidebar-foot{display:none;}
 
+/* V12.64 (reporte e862c44c, Daniel: «¿por qué es todo tan grande?»): Impuestos más compacto */
+#imp-anio-chips{display:none;} .pleg #imp-anio-chips{display:flex;}
+#view-impuestos .imp-q button{padding:7px 4px;font-size:13px;border-radius:9px;}
+#view-impuestos .imp-tabs > button{padding:7px 6px !important;font-size:12px !important;}
+#view-impuestos .imp-fechas{font-size:12px;margin-bottom:8px;}
+#view-impuestos .imp-k{padding:8px 10px;border-radius:10px;}
+#view-impuestos .imp-k .l{font-size:10.5px;}
+#view-impuestos .imp-k .v{font-size:15px;}
+#view-impuestos .imp-k .s{font-size:11px;}
+#view-impuestos .imp-big{padding:9px 10px;}
+#view-impuestos .imp-big .v{font-size:17px;}
+#view-impuestos .imp-total{padding:10px;}
+#view-impuestos .imp-total .l{font-size:11px;}
+#view-impuestos .imp-total .v{font-size:21px;}
+#view-impuestos .imp-total .s{font-size:11.5px;}
+#view-impuestos .imp-inc{font-size:12.5px;padding:4px 0;}
+#view-impuestos .imp-grid{gap:6px;margin-bottom:6px;}
+
 /* V12.62: panel de Revisar del editor */
 .rev-host .rev-panel{border:1px solid var(--line);border-radius:12px;background:var(--paper);padding:4px 12px;margin:8px 0;}
 .rev-host .rev-tit{font-size:13px;font-weight:800;padding:8px 0 6px;display:flex;gap:6px;align-items:center;}
@@ -5058,11 +5076,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.63" defer></script>
-<script src="costes/norm.js?v=V12.63" defer></script>
-<script src="ajustes/calc.js?v=V12.63" defer></script>
+<script src="rentabilidad/rent.js?v=V12.64" defer></script>
+<script src="costes/norm.js?v=V12.64" defer></script>
+<script src="ajustes/calc.js?v=V12.64" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.63</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.64</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5214,7 +5232,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.63</div>
+        <div class="sub" id="version-badge">V12.64</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -6710,6 +6728,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
 
       <!-- ===== TRIMESTRES ===== -->
       <div id="imp-pag-trim">
+        <div id="imp-anio-ancla"></div><div class="filters" id="imp-anio-chips"></div>
         <div class="imp-q" id="imp-q">
           <button type="button" data-q="1">1T</button><button type="button" data-q="2">2T</button><button type="button" data-q="3">3T</button><button type="button" data-q="4">4T</button>
         </div>
@@ -22240,7 +22259,7 @@ async function pleg2Guardar(id){
 function pleg2Texto(id, g){
   if(g[3] === 'toggle') return escHtml(g[1]);
   const P = PLEG2[id], cont = document.getElementById(g[2]); const act = cont ? Array.from(cont.querySelectorAll('.chip-filter.active')) : [];
-  if(g[3] === 'unico'){ const a = act[0]; return g[1] + (a ? ' <b>' + escHtml(a.textContent.replace(/\s+/g, ' ').trim().replace(/\s*\d+$/, '')) + '</b>' : ''); }
+  if(g[3] === 'unico'){ const a = act[0]; if(!a) return g[1]; const t = a.textContent.replace(/\s+/g, ' ').trim(); return g[1] + ' <b>' + escHtml(/^\d+$/.test(t) ? t : t.replace(/\s*\d+$/, '')) + '</b>'; }   // V12.64: un año (solo cifras) no se toma por la cuenta
   return g[1] + (act.length ? ' <b>' + act.length + '</b>' : '');
 }
 function pleg2Render(id){
@@ -26428,13 +26447,26 @@ function impMostrarPresentado(q, anio){
   $('imp-estado').innerHTML = '<div class="imp-inc ok"><span class="ic">·</span><span>Empezaste a subir las facturas en julio, así que el 1T y el 2T valen lo que presentó el gestor. Lo ves completo en la pestaña Presentadas.</span></div>';
   impBloquesTrimestre(false);
 }
+// V12.64 (reporte e862c44c, Daniel: «en el trimestre, ¿dónde está la opción de años?»): pastilla plegable «Año» como las de Tareas; por defecto el año en curso (no se recuerda)
+let _impAnio = new Date().getFullYear();
+function impAnioSel(){ return _impAnio; }
+function impAnioMontar(){
+  const box = document.getElementById('imp-anio-chips'); if(!box || box.dataset.ok) return; box.dataset.ok = '1';
+  const hoy = new Date().getFullYear(), anios = []; for(let a = hoy; a >= 2024; a--) anios.push(a);
+  box.innerHTML = anios.map(a => `<div class="chip-filter${a === _impAnio ? ' active' : ''}" data-imp-anio="${a}">${a}</div>`).join('');
+  box.addEventListener('click', async ev => { const c = ev.target.closest('[data-imp-anio]'); if(!c) return; const a = Number(c.dataset.impAnio); if(a === _impAnio) return;
+    _impAnio = a; box.querySelectorAll('.chip-filter').forEach(x => x.classList.toggle('active', x === c)); try{ pleg2Refrescar('imp-anio'); }catch(e){}
+    await impCargarPagos(); renderImpuestos(_impQ); });
+  try{ pleg2Crear({id: 'imp-anio', despuesDe: '#imp-anio-ancla', plegados: ['anio'], grupos: [['anio', 'Año', 'imp-anio-chips', 'unico']]}); }catch(e){}
+}
 function renderImpuestos(q){
+  try{ impAnioMontar(); }catch(e){}
   if(q == null) q = _impQ || (Math.floor(new Date().getMonth()/3)+1);
   if(!_docsListos){ impMostrarCargando(); return; }
-  if(!impTrimCompleto(q, new Date().getFullYear())){ _impQ = q; try{ localStorage.setItem('imp_q', String(q)); }catch(e){}; document.querySelectorAll('#imp-q button').forEach(b => b.classList.toggle('active', Number(b.dataset.q) === q)); impMostrarPresentado(q, new Date().getFullYear()); return; }
+  if(!impTrimCompleto(q, impAnioSel())){ _impQ = q; try{ localStorage.setItem('imp_q', String(q)); }catch(e){}; document.querySelectorAll('#imp-q button').forEach(b => b.classList.toggle('active', Number(b.dataset.q) === q)); impMostrarPresentado(q, impAnioSel()); return; }
   impBloquesTrimestre(true);
   _impQ = q; try{ localStorage.setItem('imp_q', String(q)); }catch(e){}
-  const anio = new Date().getFullYear(), $ = id => document.getElementById(id);
+  const anio = impAnioSel(), $ = id => document.getElementById(id);
   document.querySelectorAll('#imp-q button').forEach(b => b.classList.toggle('active', Number(b.dataset.q) === q));
   const D = impDatos(q, anio), c130 = impCalc130(q, anio, D), r303 = impRes303(D);
   const hoy = new Date(), ini = new Date(anio, (q-1)*3, 1), fin = new Date(anio, q*3, 0), plazo = impPlazo(q, anio);
@@ -26517,7 +26549,7 @@ async function impCargarPagos(){
   if(!sb) return;
   try{
     const {data} = await sb.from('sistema').select('id,tipo,data').eq('tipo', 'pago_modelo_130');
-    const anio = new Date().getFullYear(); _impPagos = {};
+    const anio = impAnioSel(); _impPagos = {};
     (data || []).filter(r => r.tipo === 'pago_modelo_130' && r.data && Number(r.data.anio) === anio).forEach(r => { _impPagos[Number(r.data.trimestre)] = Number(r.data.importe); });
     // lo ya presentado manda: el resultado de un modelo 130 presentado es lo pagado de ese trimestre
     const {data: decl} = await sb.from('sistema').select('id,tipo,data').eq('tipo', 'declaracion_presentada');
@@ -26531,7 +26563,7 @@ async function impCargarPagos(){
 async function impCargarBanco(){
   if(!sb) return false;
   try{
-    const anio = new Date().getFullYear(), desde = anio + '-01-01', hasta = anio + '-12-31';
+    const anio = impAnioSel(), desde = anio + '-01-01', hasta = anio + '-12-31';
     const r1 = await sb.from('movimientos_banco').select('id,fecha,importe,estado,comercio,concepto,categoria,incluir_impuestos,origen').gte('fecha', desde).lte('fecha', hasta).order('fecha', {ascending: true}).limit(5000);
     const r2 = await sb.from('recibos_banco').select('id,fecha,importe,estado,contraparte,concepto,sentido').eq('estado', 'falta_factura').gte('fecha', desde).lte('fecha', hasta).order('fecha', {ascending: true}).limit(5000);
     if(r1.error || r2.error){ _impBanco.error = !_impBanco.cargado; return false; }
@@ -26654,7 +26686,7 @@ function impPintarPendientes(q, anio, D){
 async function impGuardarPago(k){
   const inp = document.getElementById('imp-pago-' + k);
   if(!inp || inp.value === '' || isNaN(Number(inp.value)) || Number(inp.value) < 0){ mostrarToast('Escribe el importe pagado (0 si no hubo pago).', 'err'); return; }
-  const anio = new Date().getFullYear(), importe = Math.round(Number(inp.value) * 100) / 100;
+  const anio = impAnioSel(), importe = Math.round(Number(inp.value) * 100) / 100;
   if(!sb) return;
   try{
     const {data: previos} = await sb.from('sistema').select('id,tipo,data').eq('tipo', 'pago_modelo_130');
