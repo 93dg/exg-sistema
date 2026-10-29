@@ -194,6 +194,10 @@ table{border-collapse:collapse;width:100%;}
 .app.sidebar-collapsed .nav .grp-label::after{content:'···';font-size:12px;}
 .app.sidebar-collapsed .sidebar-foot{display:none;}
 
+/* V12.66: cabeceras de grupo en Documentos, iguales que en Control */
+.docm-cab{padding:10px 14px 6px;font-weight:700;font-size:13.5px;background:var(--bg-soft,#f3f1ec);}
+.docm-cab-tr td{background:var(--bg-soft,#f3f1ec);font-weight:700;padding:8px 10px;}
+
 /* V12.64 (reporte e862c44c, Daniel: «¿por qué es todo tan grande?»): Impuestos más compacto */
 #imp-anio-chips{display:none;} .pleg #imp-anio-chips{display:flex;}
 #view-impuestos .imp-q button{padding:7px 4px;font-size:13px;border-radius:9px;}
@@ -2398,7 +2402,8 @@ a.ie-hist-p{color:var(--orange);border-color:var(--orange-soft,#f3d6c5);}
 .ent-card{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer;}
 .ent-c{flex:1;min-width:0;}
 .ent-t{display:flex;gap:8px;align-items:center;font-size:14px;font-weight:600;}
-.ent-t span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ent-t span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}   /* V12.66: min-width 0 para que el texto largo se corte con … y no se salga de la pantalla */
+.ent-c{min-width:0;}
 .ent-m{margin-top:5px;font-size:12px;color:var(--ink-soft);display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
 .ent-m .pill{font-size:10.5px;padding:2px 8px;}
 .ent-l{color:var(--green);}
@@ -5076,11 +5081,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.65" defer></script>
-<script src="costes/norm.js?v=V12.65" defer></script>
-<script src="ajustes/calc.js?v=V12.65" defer></script>
+<script src="rentabilidad/rent.js?v=V12.66" defer></script>
+<script src="costes/norm.js?v=V12.66" defer></script>
+<script src="ajustes/calc.js?v=V12.66" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.65</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.66</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5232,7 +5237,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.65</div>
+        <div class="sub" id="version-badge">V12.66</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -30709,9 +30714,9 @@ function renderControlDocs(){
   const ORDEN_FASE = {presupuesto:0, albaran:1, proforma:2, factura:3};
   const porExp = new Map();
   filtrados.forEach(d=>{ if(!d.expediente_id) return; const p = porExp.get(d.expediente_id); if(!p || (ORDEN_FASE[d.type]||0) > (ORDEN_FASE[p.type]||0)) porExp.set(d.expediente_id, d); });
-  const unicos = filtrados.filter(d=> !d.expediente_id || porExp.get(d.expediente_id) === d);
+  const unicos = filtrados.filter(d=> (!d.expediente_id || porExp.get(d.expediente_id) === d) && !d.documento_siguiente_id);   // V12.66: lo que ya pasó a otro documento no es un pendiente
   // dos bloques claros: pendiente de FACTURAR (albarán/proforma/factura sin emitir) y pendiente de COBRAR (proforma/factura emitida sin cobrar del todo)
-  const bloqueDe = d=>{ if(d.type==='presupuesto') return 'presupuesto'; const est = controlDocsEstadoDe(d); if(CC_ESTADOS_CERRADOS.has(est)) return 'cerrado'; return (['entregado','por_cobrar_otra','parcial_otra','parcial'].includes(est) || (d.type!=='albaran' && ['pendiente_cobrar','parcial'].includes(est))) ? 'cobrar' : 'facturar'; };
+  const bloqueDe = d=>{ if(d.type==='presupuesto') return 'presupuesto'; if(d.documento_siguiente_id) return 'cerrado';   /* V12.66: ya pasó a otro documento (p. ej. proforma de 2020 ya facturada): no está pendiente */ const est = controlDocsEstadoDe(d); if(CC_ESTADOS_CERRADOS.has(est)) return 'cerrado'; return (['entregado','por_cobrar_otra','parcial_otra','parcial'].includes(est) || (d.type!=='albaran' && ['pendiente_cobrar','parcial'].includes(est))) ? 'cobrar' : 'facturar'; };
   const CC_BLOQUE_COLOR = {facturar: '#2B5C7A', cobrar: '#8A6100'};   // V11.26 (Daniel): cada grupo con el color de su estado (Por entregar, Por cobrar)
   const BLOQUES = [['facturar','Por entregar'],['cobrar','Por cobrar'],['presupuesto','Presupuestos'],['cerrado','Cerrados']];
   const sumaImp = l => l.reduce((s,d)=> s + (Number(d.base != null ? d.base : (d.total||d.importe))||0) * (['parcial','parcial_otra'].includes(d.estado_cobro) && Number(d.total||d.importe) ? Math.max(0, 1 - (Number(d.cobrado_importe||0) + (d.estado_cobro==='parcial_otra' ? enOtraSuma(d) : 0))/Number(d.total||d.importe)) : 1), 0);   // V8.74: totales SIN IVA
@@ -31619,13 +31624,40 @@ function docmMenuCliente(ancla){
     if(!buscar) return; buscar.value = v === '__todos' ? '' : v; docmBuscar(); ancla.classList.toggle('doc-cli-on', v !== '__todos');
   });
 }
+
+// V12.66: grupos de Documentos, los mismos que «Documentos pendientes» de Control
+function docmGrupos(){ return [['facturar', 'Por entregar'], ['cobrar', 'Por cobrar'], ['presupuesto', 'Presupuestos'], ['otros', 'Proyectos y expedientes'], ['cerrado', 'Cerrados']]; }
+function docmGrupoDe(f, ids){
+  if(f.kind !== 'doc') return 'otros';
+  const d = f.d; if(d.type === 'presupuesto') return 'presupuesto';
+  if(d.documento_siguiente_id) return 'cerrado';   // ya pasó a otro documento: el dinero se cuenta en ese
+  const est = controlDocsEstadoDe(d);
+  if(CC_ESTADOS_CERRADOS.has(est) || ['nula', 'rectificativa', 'anulado', 'rechazado'].includes(est)) return 'cerrado';
+  return (['entregado', 'por_cobrar_otra', 'parcial_otra', 'parcial'].includes(est) || (d.type !== 'albaran' && ['pendiente_cobrar', 'parcial'].includes(est))) ? 'cobrar' : 'facturar';
+}
+function docmBaseSinIva(f){
+  if(f.kind !== 'doc') return 0; const d = f.d, tot = Number(d.total || d.importe) || 0, base = Number(d.base != null ? d.base : tot) || 0;
+  if(['parcial', 'parcial_otra'].includes(d.estado_cobro) && tot) return base * Math.max(0, 1 - (Number(d.cobrado_importe || 0) + (d.estado_cobro === 'parcial_otra' ? enOtraSuma(d) : 0)) / tot);
+  return base;
+}
+function docmCabHtml(k, t){
+  const col = {facturar: '#2B5C7A', cobrar: '#8A6100'}[k] || 'var(--ink)', tit = (docmGrupos().find(g => g[0] === k) || [k, k])[1];
+  const imp = (k === 'facturar' || k === 'cobrar' || k === 'presupuesto') && t ? ' · ' + Math.round(t.imp).toLocaleString('es-ES') + ' € sin IVA' : '';
+  return `<span style="color:${col};">${tit} · ${t ? t.n : 0}${imp}</span>`;
+}
 function docmSync(){
   if(!docmActiva()) return;
   window.__docmEnSync = true;
   try{
     const filas = docmFilas();
     docmPintarFiltros(filas);
-    const vis = filas.filter(f => docmPasa(f)).sort(docmCmp);
+    let vis = filas.filter(f => docmPasa(f)).sort(docmCmp);
+    // V12.66 (Daniel 29/10: «en Documentos, apartados como en Centro de control, con las cantidades, por entregar y por cobrar»):
+    // mismos grupos, orden, colores y totales sin IVA que Control; dentro de cada grupo se respeta el orden elegido
+    const ids = new Set(vis.map(f => String(f.id))), GRP = docmGrupos();
+    vis.forEach(f => { f._grp = docmGrupoDe(f, ids); });
+    vis = GRP.flatMap(([k]) => vis.filter(f => f._grp === k));
+    const totG = {}; GRP.forEach(([k]) => { const l = vis.filter(f => f._grp === k); totG[k] = {n: l.length, imp: l.reduce((t, f) => t + docmBaseSinIva(f), 0)}; });
     const nombres = [...docmTiposActivos()].map(t => DOCM_NOMBRE[t]);
     const desc = document.getElementById('docm-desc'); if(desc) desc.textContent = _docm.tipos.size ? nombres.join(' + ') : 'Todos los documentos';
     const aviso = document.getElementById('docm-aviso'), pend = _historico.pendientes.size;
@@ -31637,8 +31669,10 @@ function docmSync(){
     lista.querySelector(':scope > .mostrar-mas-movil')?.remove();
     lista.querySelectorAll(':scope > [data-docm-clon]').forEach(c => c.remove());   // las tarjetas de proyectos y expedientes son copias: se rehacen en cada pasada
     Array.from(lista.children).forEach(c => { const id = String(c.dataset.docId || ''); if(!id || quedan.has(id)) return; const f = filaDe.get(id); if(!f || f.tr._mkCard) c.remove(); else c.style.display = 'none'; });   // las que ya no tocan salen de esta lista
-    let pos = 0;
+    let pos = 0, grpAnt = null;
+    lista.querySelectorAll(':scope > [data-docm-cab]').forEach(c => c.remove());
     mostrar.forEach(f => {
+      if(f._grp !== grpAnt){ grpAnt = f._grp; const h = document.createElement('div'); h.dataset.docmCab = f._grp; h.className = 'docm-cab'; h.innerHTML = docmCabHtml(f._grp, totG[f._grp]); lista.insertBefore(h, lista.children[pos] || null); pos++; }
       let card = null;
       if(f.kind !== 'doc'){ if(f.orig){ card = f.orig.cloneNode(true); card.dataset.docmClon = '1'; card.insertAdjacentHTML('afterbegin', docmFilaCompacta(f, card)); card.querySelectorAll('[data-url]').forEach(el => { el.onclick = ev => { ev.stopPropagation(); abrirVisorDesdeUrl(el.dataset.url); }; }); } }
       else { card = document.getElementById('mcard-' + f.id); if(!card && f.tr._mkCard) card = f.tr._mkCard(); }
@@ -31650,9 +31684,11 @@ function docmSync(){
     }
     if(!vis.length && !lista.querySelector('.docm-vacio')){ const v = document.createElement('div'); v.className = 'docm-vacio sub-t'; v.style.cssText = 'padding:18px 14px;'; v.textContent = 'No hay documentos con estos filtros.'; lista.appendChild(v); }
     if(vis.length) lista.querySelector('.docm-vacio')?.remove();
+    let grpT = null;
     if(tb) tb.innerHTML = mostrar.map(f => {
+      const cab = f._grp !== grpT ? (grpT = f._grp, `<tr class="docm-cab-tr"><td colspan="7">${docmCabHtml(f._grp, totG[f._grp])}</td></tr>`) : '';
       const d = f.d, esDoc = f.kind === 'doc', imp = esDoc ? f.imp.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €' : '—';
-      return `<tr ${esDoc ? `onclick="openDocumentViewer('${f.id}')" style="cursor:pointer;"` : ''}><td class="mono">${f.fecha ? formatFechaCorta(f.fecha) : '—'}</td><td><span class="fc-tipo-tag tp-${f.tipo}">${DOCM_NOMBRE[f.tipo] || f.tipo}</span></td><td class="mono">${svgEsc(f.num || '—')}</td><td>${svgEsc(f.cli || '—')}</td><td>${svgEsc(f.job || '—')}</td><td class="num mono">${imp}</td><td ${esDoc ? 'onclick="event.stopPropagation();"' : ''}>${esDoc ? estadoDocumentoSelect(f.tipo, f.id, d.estado_cobro, 'dm-') : svgEsc(f.estadoTxt || '—')}</td></tr>`;
+      return cab + `<tr ${esDoc ? `onclick="openDocumentViewer('${f.id}')" style="cursor:pointer;"` : ''}><td class="mono">${f.fecha ? formatFechaCorta(f.fecha) : '—'}</td><td><span class="fc-tipo-tag tp-${f.tipo}">${DOCM_NOMBRE[f.tipo] || f.tipo}</span></td><td class="mono">${svgEsc(f.num || '—')}</td><td>${svgEsc(f.cli || '—')}</td><td>${svgEsc(f.job || '—')}</td><td class="num mono">${imp}</td><td ${esDoc ? 'onclick="event.stopPropagation();"' : ''}>${esDoc ? estadoDocumentoSelect(f.tipo, f.id, d.estado_cobro, 'dm-') : svgEsc(f.estadoTxt || '—')}</td></tr>`;
     }).join('');
   }catch(e){ console.error('Documentos', e); }
   window.__docmEnSync = false;
