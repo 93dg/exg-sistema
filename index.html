@@ -194,6 +194,14 @@ table{border-collapse:collapse;width:100%;}
 .app.sidebar-collapsed .nav .grp-label::after{content:'···';font-size:12px;}
 .app.sidebar-collapsed .sidebar-foot{display:none;}
 
+.doc-info{display:flex !important;}
+.doc-info .doc-info-acc{order:0;} .doc-info .hist-aviso{order:1 !important;flex:1 1 auto;text-align:left !important;} .doc-info .doc-rev{order:2;margin-left:0 !important;}
+/* V12.67: contador de lista discreto y total a la derecha (todas las listas) */
+.cnt-l{display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;}
+.cnt-n{font-size:12px;color:var(--ink-soft);font-weight:500;white-space:nowrap;}
+.cnt-t{font-size:13.5px;font-weight:800;color:var(--ink);white-space:nowrap;}
+.hist-aviso{flex:1 1 auto !important;min-width:0;margin:0 !important;}
+
 /* V12.66: cabeceras de grupo en Documentos, iguales que en Control */
 .docm-cab{padding:10px 14px 6px;font-weight:700;font-size:13.5px;background:var(--bg-soft,#f3f1ec);}
 .docm-cab-tr td{background:var(--bg-soft,#f3f1ec);font-weight:700;padding:8px 10px;}
@@ -5081,11 +5089,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.66" defer></script>
-<script src="costes/norm.js?v=V12.66" defer></script>
-<script src="ajustes/calc.js?v=V12.66" defer></script>
+<script src="rentabilidad/rent.js?v=V12.67" defer></script>
+<script src="costes/norm.js?v=V12.67" defer></script>
+<script src="ajustes/calc.js?v=V12.67" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.66</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.67</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5237,7 +5245,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.66</div>
+        <div class="sub" id="version-badge">V12.67</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -11912,7 +11920,7 @@ function pintarTotalListaGastos(docs, tipo){
   const el = document.getElementById('gpro-lista-total');
   if(!el) return;
   const eur = n => Number(n || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
-  let h = `<div><b>${docs.length}</b> ${docs.length === 1 ? 'gasto' : 'gastos'}</div>`;
+  let h = contadorLista(docs.length, null, docs.reduce((t, d) => t + Number(d.importe || d.total || 0), 0), '');   // V12.67: contador discreto y total pagado a la derecha
   if(tipo === 'efectivo' && docs.length){   // en efectivo importa quién lo pagó
     const por = new Map(); docs.forEach(d => { const k = d.cuenta_origen || 'Sin indicar quién'; por.set(k, (por.get(k) || 0) + Number(d.importe || d.total || 0)); });
     if(por.size > 1) h += [...por.entries()].map(([k, v]) => `<div class="gm-total-fila gm-sub"><span>${escHtml(k)}</span><b>${escHtml(eur(v))}</b></div>`).join('');
@@ -12675,6 +12683,14 @@ function histAnioPorDefecto(){   // Facturas, Albaranes y Presupuestos arrancan 
   });
 }
 function histCuentaPorTipo(){ const n = {}; _historico.pendientes.forEach(d => { n[d.tipo] = (n[d.tipo] || 0) + 1; }); return n; }
+
+// V12.67 (Daniel 29/10: «la palabra documento ahí sobra; pon un contador más discreto, 14 de 24, y a la derecha, en la misma línea, el total en dinero»; «eso ponlo en todo sitio»):
+// un solo contador para todas las listas: «N de M» pequeño a la izquierda y, si la lista lleva dinero, el total a la derecha
+function contadorLista(n, total, importe, etiqueta, extra){
+  const f = x => Number(x || 0).toLocaleString('es-ES');
+  return `<div class="cnt-l"><span class="cnt-n">${f(n)}${total != null && total !== n ? ' de ' + f(total) : ''}${extra || ''}</span>${importe != null ? `<span class="cnt-t">${Math.round(importe).toLocaleString('es-ES')} €${etiqueta == null ? ' sin IVA' : etiqueta}</span>` : ''}</div>`;
+}
+function baseSinIvaDoc(d){ const tot = Number(d.total != null ? d.total : d.importe) || 0; return Number(d.base != null ? d.base : tot) || 0; }
 function renderAvisoHistorico(){   // una línea con el número de documentos que se ven; si se están cargando los antiguos, lo dice
   const total = _historico.pendientes.size;
   const NOM = {facturas: ['factura', 'facturas', 'econ-facturas-tbody'], albaranes: ['albarán', 'albaranes', 'albaranes-tbody-standalone'], presupuestos: ['presupuesto', 'presupuestos', 'presupuestos-tbody-standalone']};
@@ -12687,7 +12703,8 @@ function renderAvisoHistorico(){   // una línea con el número de documentos qu
     let visibles = 0, construidas = 0; Array.from(tbody.rows).forEach(tr => { if(vista === 'presupuestos' && tr.dataset.tipo !== presModo) return; construidas++; if(tr.style.display !== 'none') visibles++; });
     const pend = _historico.pendientes.size ? Array.from(_historico.pendientes.values()).filter(d => d.tipo === (vista === 'presupuestos' ? presModo : tipo)).length : 0;
     const fmt = n => n.toLocaleString('es-ES');
-    el.innerHTML = '<b style="color:var(--ink);">' + fmt(visibles) + '</b> ' + (visibles === 1 ? uno : varios) + (!_historico.enCurso && visibles < construidas + pend ? ' de ' + fmt(construidas + pend) : '') + (_historico.enCurso ? ' · cargando ' + (_historico.etiqueta || 'los anteriores') + '… <b class="hist-prog">0 %</b>' : '');
+    let suma = 0; Array.from(tbody.rows).forEach(tr => { if(vista === 'presupuestos' && tr.dataset.tipo !== presModo) return; if(tr.style.display === 'none') return; const d = documentosRealesById[docIdDeFila(tr)]; if(d) suma += baseSinIvaDoc(d); });
+    el.innerHTML = contadorLista(visibles, !_historico.enCurso ? construidas + pend : null, suma, null, _historico.enCurso ? ' · cargando ' + (_historico.etiqueta || 'los anteriores') + '… <b class="hist-prog">0 %</b>' : '');
   });
 }
 // V8.77: sin argumentos construye todo el histórico («Todos los años»); con una lista de años (['2023']) solo construye las filas de esos años, y cada año una sola vez
@@ -15954,7 +15971,7 @@ function renderDocsEmpresa(){
     barra.querySelector('.emp-f-fila').innerHTML = `<div class="emp-f-cab"><button type="button" class="tb-ftit tb-plegado ${_empCat !== 'todas' ? 'con' : ''} ${_empPleg ? '' : 'abierto'}" onclick="empresaPlegar()">Tipo: ${escHtml(_empCat === 'todas' ? 'Todos' : _empCat)}</button><span class="emp-f-n"></span><button type="button" class="emp-f-lupa" title="Buscar" aria-label="Buscar" onclick="empresaLupa(true)">${ICO_LUPA_PLEG}</button></div>${_empPleg ? '' : `<div class="emp-f-chips">${chips}</div>`}`;
   }
   const visibles = EMPRESA_DOCS.filter(d => (_empCat === 'todas' || (d.categoria || 'Sin tipo').trim() === _empCat) && (!_empBusq || norm([d.nombre, d.categoria, d.info_clave].join(' ')).includes(norm(_empBusq))));
-  { const n = barra && barra.querySelector('.emp-f-n'); if(n) n.innerHTML = `<b>${visibles.length}</b> ${visibles.length === 1 ? 'documento' : 'documentos'}${visibles.length !== EMPRESA_DOCS.length ? ' de ' + EMPRESA_DOCS.length : ''}`; }
+  { const n = barra && barra.querySelector('.emp-f-n'); if(n) n.innerHTML = contadorLista(visibles.length, EMPRESA_DOCS.length, null); }
   // V11.36 (Daniel: «de lo peor que he visto en diseño»): igual que Control: apartados por tipo con su color, título y número; cada documento es una tarjeta de una línea con su nombre y, si caduca, la fecha en una pastilla; al tocarla se abre ahí mismo
   const fmtF = f => new Date(f + 'T00:00:00').toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: '2-digit'});
   const lineasInfo = t => String(t || '').replace(/\\n/g, '\n').split('\n').map(x => x.trim()).filter(Boolean).map(x => { const m = x.match(/^([^:]{2,28}):\s*(.+)$/); return m ? `<div class="emp-kv"><span>${escHtml(m[1])}</span><b>${escHtml(m[2])}</b></div>` : `<div class="emp-txt">${escHtml(x)}</div>`; }).join('');
@@ -31661,7 +31678,7 @@ function docmSync(){
     const nombres = [...docmTiposActivos()].map(t => DOCM_NOMBRE[t]);
     const desc = document.getElementById('docm-desc'); if(desc) desc.textContent = _docm.tipos.size ? nombres.join(' + ') : 'Todos los documentos';
     const aviso = document.getElementById('docm-aviso'), pend = _historico.pendientes.size;
-    if(aviso) aviso.innerHTML = '<b style="color:var(--ink);">' + vis.length.toLocaleString('es-ES') + '</b> ' + (vis.length === 1 ? 'documento' : 'documentos') + (vis.length < filas.length ? ' de ' + filas.length.toLocaleString('es-ES') : '') + (_historico.enCurso ? ' · cargando los antiguos…' : '');
+    if(aviso) aviso.innerHTML = contadorLista(vis.length, filas.length, vis.filter(f => f._grp !== 'presupuesto' && f._grp !== 'otros').reduce((t, f) => t + docmBaseSinIva(f), 0), null, _historico.enCurso ? ' · cargando los antiguos…' : '');
     const lista = document.getElementById('docm-lista-movil'), tb = document.getElementById('docm-tbody');
     const sig = [_docm.q, [..._docm.anios], [..._docm.trims], [..._docm.estados], _docm.orden, [..._docm.tipos]].join('|');
     if(lista.dataset.sig !== sig){ lista.dataset.sig = sig; _docm.limite = 40; }
