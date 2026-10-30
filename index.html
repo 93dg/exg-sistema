@@ -5089,11 +5089,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.68" defer></script>
-<script src="costes/norm.js?v=V12.68" defer></script>
-<script src="ajustes/calc.js?v=V12.68" defer></script>
+<script src="rentabilidad/rent.js?v=V12.69" defer></script>
+<script src="costes/norm.js?v=V12.69" defer></script>
+<script src="ajustes/calc.js?v=V12.69" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.68</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.69</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5245,7 +5245,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.68</div>
+        <div class="sub" id="version-badge">V12.69</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -11774,8 +11774,8 @@ function renderGastosProControl(){
   $('gpro-ctl-aviso').textContent = 'Incluye Oficial y En B, con IVA. Toca una fila para ver el detalle.' + (sinLineas ? ` ${sinLineas} gasto(s) no tienen líneas: cuentan con su categoría y como "Sin detalle".` : '');
 }
 // ===== V11.75 (Daniel 14/10/2026): proveedores de combustible con lo que les escribimos y lo que contestaron (sistema tipo=proveedor_combustible), para poder comparar o cambiar en el futuro =====
-let _combProv = null, _combProvAb = null, _combRef = null;
-async function combProvCargar(){ try{ const {data} = await sb.from('sistema').select('id,tipo,data').in('tipo', ['proveedor_combustible', 'combustible_referencia']); _combProv = (data || []).filter(r => r.tipo === 'proveedor_combustible').map(r => ({id: r.id, ...(r.data || {})})); const ref = (data || []).find(r => r.tipo === 'combustible_referencia'); _combRef = ref ? ref.data : null; }catch(e){ _combProv = []; } combProvPintar(); }
+let _combProv = null, _combProvAb = null, _combRef = null, _combDia = null;
+async function combProvCargar(){ try{ const {data} = await sb.from('sistema').select('id,tipo,data').in('tipo', ['proveedor_combustible', 'combustible_referencia', 'precio_surtidor']); const pd = (data || []).find(r => r.tipo === 'precio_surtidor'); _combDia = pd && pd.data && pd.data.precios ? Object.entries(pd.data.precios).map(([f, p]) => ({mes: f, dia: f, precio: Number(p)})).sort((a, b) => a.dia.localeCompare(b.dia)) : null; _combProv = (data || []).filter(r => r.tipo === 'proveedor_combustible').map(r => ({id: r.id, ...(r.data || {})})); const ref = (data || []).find(r => r.tipo === 'combustible_referencia'); _combRef = ref ? ref.data : null; }catch(e){ _combProv = []; } combProvPintar(); }
 // V12.42 (Daniel 22/10/2026): todas las ofertas se comparan con la misma referencia. El día de referencia se conoce el precio de García-Camacho y el del surtidor del pueblo
 // (su factura de ese mes); esa diferencia en % se aplica al último precio del surtidor para estimar cuánto costaría hoy Camacho y comparar cada oferta con los dos.
 function combSurtidorMes(){
@@ -11787,11 +11787,14 @@ function combSurtidorMes(){
       const m = meses.get(f) || {l: 0, imp: 0}; m.l += l; m.imp += l * pr; meses.set(f, m); }); });
   return Array.from(meses.entries()).map(([mes, m]) => ({mes, precio: m.imp / m.l})).sort((a, b) => a.mes.localeCompare(b.mes));
 }
-function combSurtidorEn(lista, fecha){ const ym = String(fecha || '').slice(0, 7); const prev = lista.filter(x => x.mes <= ym); return prev.length ? prev[prev.length - 1] : (lista.length ? lista[lista.length - 1] : null); }
+// V12.69 (Daniel 30/10/2026): la comparativa se hace con el precio del surtidor del MISMO DÍA de cada oferta (tabla precio_surtidor); la media del mes solo si no hay precio de ese día.
+function combSurtidorEn(lista, fecha){ const f = String(fecha || '').slice(0, 10); if(_combDia && _combDia.length && f){ const prevD = _combDia.filter(x => x.dia <= f); if(prevD.length) return prevD[prevD.length - 1]; }
+  return combSurtidorMesEn(lista, fecha); }
+function combSurtidorMesEn(lista, fecha){ const ym = String(fecha || '').slice(0, 7); const prev = lista.filter(x => x.mes <= ym); return prev.length ? prev[prev.length - 1] : (lista.length ? lista[lista.length - 1] : null); }
 function combComparar(){
   const lista = combSurtidorMes(); if(!_combRef || !lista.length) return null;
   const sRef = combSurtidorEn(lista, _combRef.fecha); if(!sRef) return null;
-  const dif = Number(_combRef.precio) / sRef.precio - 1, ult = lista[lista.length - 1];
+  const dif = Number(_combRef.precio) / sRef.precio - 1, ult = (_combDia && _combDia.length) ? _combDia[_combDia.length - 1] : lista[lista.length - 1];
   return {lista, sRef, dif, ult, camHoy: ult.precio * (1 + dif),
     oferta: o => { const s = combSurtidorEn(lista, o.fecha), cam = s.precio * (1 + dif); return {vsCam: Number(o.precio) / cam - 1, vsSur: Number(o.precio) / s.precio - 1, cam, s}; }};
 }
@@ -11811,8 +11814,8 @@ function combProvPintar(){
   if(cmp){
     cab = `<div class="gp-pers-l" style="padding:6px 0 8px;">`
       + `<div class="gp-pers-f" style="border-top:0;"><span>Referencia ${escHtml(fF(_combRef.fecha))}<small>${escHtml(_combRef.proveedor || 'García-Camacho')}, ${String(Math.round(Number(_combRef.litros || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, '.')} l con IVA y transporte</small></span><b>${pr(_combRef.precio)}</b></div>`
-      + `<div class="gp-pers-f"><span>Surtidor del pueblo en ${escHtml(mesTxt(cmp.sRef.mes))}<small>Camacho salió ${pc(cmp.dif)} respecto al surtidor</small></span><b>${pr(cmp.sRef.precio)}</b></div>`
-      + (cmp.ult.mes === cmp.sRef.mes ? '' : `<div class="gp-pers-f"><span>Surtidor, último mes (${escHtml(mesTxt(cmp.ult.mes))})<small>Camacho estimado con la misma diferencia: ${pr(cmp.camHoy)}</small></span><b>${pr(cmp.ult.precio)}</b></div>`) + `</div>`;
+      + `<div class="gp-pers-f"><span>Surtidor del pueblo ${cmp.sRef.dia ? 'el ' + escHtml(fF(cmp.sRef.dia)) : 'en ' + escHtml(mesTxt(cmp.sRef.mes))}<small>Camacho salió ${pc(cmp.dif)} respecto al surtidor</small></span><b>${pr(cmp.sRef.precio)}</b></div>`
+      + (cmp.ult.mes === cmp.sRef.mes ? '' : `<div class="gp-pers-f"><span>Surtidor, ${cmp.ult.dia ? 'último precio (' + escHtml(fF(cmp.ult.dia)) + ')' : 'último mes (' + escHtml(mesTxt(cmp.ult.mes)) + ')'}<small>Camacho estimado con la misma diferencia: ${pr(cmp.camHoy)}</small></span><b>${pr(cmp.ult.precio)}</b></div>`) + `</div>`;
   }else if(_combRef && !gastosProDocs().length && !el.dataset.reint){ el.dataset.reint = '1'; setTimeout(() => { delete el.dataset.reint; combProvPintar(); }, 3000);
   }
   el.innerHTML = cab + (lista.length ? lista.map(p => { const h = p.historial || [], ult = h.slice(-1)[0], ab = _combProvAb === p.id, est = estado(p), o = p.oferta;
@@ -14986,7 +14989,7 @@ function recRender(){
   const cont = document.getElementById('alertas-list-bd'); if(!cont) return;
   // V12.12 (Daniel 18/10: «¿por qué cobros y pagos están en Tareas si ya hay Documentos pendientes y Deudas pendientes?»): los avisos de cobro salen en Documentos pendientes y los de pago en Deudas pendientes
   const recAparte = r => r.tipo !== 'alerta_itv' && ['cobros', 'pagos'].includes(recTema(r)), aparte = _recItems.filter(recAparte);
-  // V12.68 (reporte f6fea074, Daniel: «ITV Hyundai no me hagas 2 si es uno solo»): una tarea de ITV de un vehículo que ya tiene su aviso de ITV no sale aparte
+  // V12.69 (reporte f6fea074, Daniel: «ITV Hyundai no me hagas 2 si es uno solo»): una tarea de ITV de un vehículo que ya tiene su aviso de ITV no sale aparte
   const nITV = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\b(cita|pasar|itv|de|la|del)\b/g, ' ').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
   const avisosITV = _recItems.filter(r => r.tipo === 'alerta_itv').map(r => nITV((r.data || {}).titulo)).concat((window._recItvNombres || []).map(nITV));
   const tITV = r => (r.data || {}).titulo_corto || (r.data || {}).titulo || '', dupITV = r => r.tipo !== 'alerta_itv' && /\bITV\b/i.test(tITV(r)) && (() => { const v = nITV(tITV(r)); return v.length >= 3 && avisosITV.some(a => a === v || a.includes(v)); })();
