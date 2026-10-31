@@ -5109,11 +5109,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.94" defer></script>
-<script src="costes/norm.js?v=V12.94" defer></script>
-<script src="ajustes/calc.js?v=V12.94" defer></script>
+<script src="rentabilidad/rent.js?v=V12.95" defer></script>
+<script src="costes/norm.js?v=V12.95" defer></script>
+<script src="ajustes/calc.js?v=V12.95" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.94</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.95</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5265,7 +5265,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.94</div>
+        <div class="sub" id="version-badge">V12.95</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -10300,6 +10300,7 @@ const slIrpf = b => Math.max(0, slEscala(Math.max(0, b), SL_T.estatal) + slEscal
 let _slSalario = null, _slSoc = null;
 async function slPintar(){
   const el = document.getElementById('sl-app'); if(!el) return;
+  if(typeof _docsListos !== 'undefined' && !_docsListos){ el.innerHTML = '<div class="dir-cargando">Cargando…</div>'; return; }   // V12.95 (reporte 35d190a0): sin las facturas cargadas salía todo a 0; ahora espera y se pinta con los datos
   const hoy = new Date(), desde = new Date(hoy); desde.setFullYear(desde.getFullYear() - 1); const dIso = desde.toISOString().slice(0, 10), hIso = hoy.toISOString().slice(0, 10);
   const en12 = d => { const f = String(d.dateRaw || d.fecha_devengo || '').slice(0, 10); return f > dIso && f <= hIso; };
   let F = [], G = []; try{ F = impFacturasValidas().filter(en12); G = impGastosOficiales().filter(d => !impMotivoExclusion(d)).filter(en12); }catch(e){}
@@ -10328,13 +10329,13 @@ async function slPintar(){
     <div class="sl-f sl-cab"><span></span><b>Autónomo</b><b>SL</b></div>
     ${fila('Ingresos', e0(ing), e0(ing), '', 'Últimos 12 meses · ' + F.length + ' facturas, sin IVA')}
     ${fila('Gastos de la empresa', '−' + e0(gas), '−' + e0(gasSL))}
-    ${fila('Sueldo bruto de Rafa y Manolo', `<span style="color:var(--ink-soft);font-weight:600;">${e0(sal)}</span><small style="display:block;font-size:10.5px;font-weight:700;color:var(--red);">no deducible</small>`, `−${e0(sal)}<small style="display:block;font-size:10.5px;font-weight:700;color:var(--green);">deducible</small>`, '', e0(sal / 12) + ' brutos al mes')}
+    ${fila('Sueldo bruto de Rafa y Manolo', `<span style="color:var(--ink-soft);font-weight:600;">${e0(sal)}</span><small style="display:block;font-size:10.5px;font-weight:700;color:var(--red);">no deducible</small>`, `−${e0(sal)}<small style="display:block;font-size:10.5px;font-weight:700;color:var(--green);">deducible</small>`, '', e0(sal / 12) + ' brutos · ' + e0(salNeto / 12) + ' netos al mes')}
     ${fila('Beneficio que paga impuesto', e0(rend), e0(benSL), 'sl-neg')}
     ${fila('Impuestos', '−' + e0(irpfA), '−' + e0(isSL + irpfSal + impDiv))}
     ${fila('Limpio para la familia', e0(netoA), e0(netoSLreparte), 'sl-tot')}
     <div class="sl-f sl-tot" style="display:flex;justify-content:space-between;gap:10px;"><span>Trae más cuenta</span><b style="color:var(--green);text-align:right;flex:1;">${dif > 0 ? 'SL' : 'Autónomo'} · ${e0(Math.abs(dif))} más al año</b></div>
-    <div class="sl-aj"><span>Sueldo bruto al año<small>Convenio: ${e0(2 * SL_T.salarioMaquinista)} · retiradas: ${e0(retiradas)}</small></span><input type="text" inputmode="numeric" id="sl-sal" value="${sal}"> €</div>
-    <div class="sl-aj"><span>Sueldo que más deja en la SL<small>Con ${e0(mejorS)} brutos al año</small></span><b>${e0(mejorN)}</b></div>
+    <div class="sl-aj"><span>Sueldo bruto al mes<small>Neto: ${e0(salNeto / 12)} al mes · convenio: ${e0(2 * SL_T.salarioMaquinista / 12)} brutos</small></span><input type="text" inputmode="numeric" id="sl-sal" value="${Math.round(sal / 12)}"> €</div>
+    <div class="sl-aj"><span>Sueldo que más deja en la SL<small>${e0(mejorS / 12)} brutos · ${e0((mejorS - slIrpf(Math.max(0, mejorS - SL_T.otrosGastosTrabajo))) / 12)} netos al mes</small></span><b>${e0(mejorN)}</b></div>
   </div>
   <div class="sl-c"><h3>Lo que no son números</h3>
     <details class="sl-v"><summary>El dinero ya no es vuestro, es de la empresa</summary><div>Como autónomo, lo que entra en la cuenta es de Rafa: lo que saca para casa o un gasto personal no hay que explicarlo, simplemente no se declara como gasto. En una SL el dinero es de la sociedad: todo lo que sale hacia vosotros tiene que ser salario, dividendo o préstamo, y un gasto personal pagado con dinero de la empresa no se puede deducir y Hacienda puede tratarlo como sueldo encubierto. Por eso en la SL todo tiene que estar justificado.</div></details>
@@ -10344,7 +10345,7 @@ async function slPintar(){
     <details class="sl-v"><summary>Lo que cuesta cambiar</summary><div>Constituirla (notaría, registro, unos pocos cientos de euros; el capital mínimo es 1 €), nuevo NIF y numeración de facturas, pasar las máquinas y vehículos a la sociedad (seguros, ITV, contratos) y avisar a clientes y proveedores. La cuota de autónomo societario es más alta: mínimo ${e0(SL_T.cuotaSocietarioMes)} al mes.</div></details>
     <details class="sl-v"><summary>Ventajas de la SL además de los impuestos</summary><div>Más imagen ante clientes grandes y administraciones, más facilidad para pedir financiación, y el beneficio que se deja en la empresa paga menos impuesto (19 %) que en el IRPF de Rafa (hasta el 45 %), lo que permite ahorrar para comprar maquinaria.</div></details>
   </div>`;
-  const inp = document.getElementById('sl-sal'); if(inp) inp.onchange = () => { _slSalario = Number(String(inp.value).replace(/\./g, '').replace(',', '.')) || 0; slPintar(); };
+  const inp = document.getElementById('sl-sal'); if(inp) inp.onchange = () => { _slSalario = 12 * (Number(String(inp.value).replace(/\./g, '').replace(',', '.')) || 0); slPintar(); };   // V12.95 (reporte 1e552947): se escribe el bruto al mes
 }
 if(!document.getElementById('sl-css')){ const st = document.createElement('style'); st.id = 'sl-css'; st.textContent = `
 .sl-c{background:var(--paper,#fff);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin:0 0 10px;}
@@ -26123,7 +26124,7 @@ async function tbSyncDoc(docId){
   }
   if(document.getElementById('tb-lista')) tbRender();
 }
-document.addEventListener('exg-docs-listos', () => { if(document.getElementById('tb-lista')) tbRender(); });   // V12.80 (Daniel 31/10): también en Pendientes, para que los contadores de las pestañas (Activo, Historial) salgan bien al recargar   // V11.85 (reporte f308b882): también Activos   // V11.77: si Trámites se pintó antes de cargar los documentos
+document.addEventListener('exg-docs-listos', () => { if(document.getElementById('tb-lista')) tbRender(); if(document.getElementById('sl-app')) slPintar(); });   // V12.80 (Daniel 31/10): también en Pendientes, para que los contadores de las pestañas (Activo, Historial) salgan bien al recargar   // V11.85 (reporte f308b882): también Activos   // V11.77: si Trámites se pintó antes de cargar los documentos
 // V11.89 (Daniel 14/10): un trabajo en Activos es su albarán en «Trabajo activo»: al darle ✓ en Pendientes se crea ya, con el cliente y la obra puestos; «Ir al albarán» lo abre para editarlo
 async function tbEmpezar(j){
   const antes = tbFoto(j), nom = escHtml(j.cliente || j.trabajo || 'Trabajo');
