@@ -4198,7 +4198,7 @@ svg.ic{width:1.25em;height:1.25em;flex:0 0 auto;display:inline-block;vertical-al
 #tb-panel > .tb-cont button{padding:5px 4px;font-size:12px;border-radius:10px;border-width:1px;gap:4px;}
 #tb-panel > .tb-cont button b{font-size:13.5px;}
 .tb-grp-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.tb-grp-tot{background:var(--paper);border:1px solid var(--line);color:var(--ink);}
+.tb-cnt{margin:2px 6px 8px;}
 #tb-lista .tb-grp-cab .doc-vista-btn{width:22px !important;height:22px !important;min-height:0 !important;padding:0 !important;margin:-4px 0 !important;}   /* V12.74: la cabecera con el botón mide lo mismo que las demás */
 .tb-cont button{flex:1;min-width:0;padding:10px 4px;border-radius:12px;border:1.5px solid var(--b);background:var(--t);color:var(--k);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:5px;}
 .tb-cont button b{font-size:17px;font-weight:700;}
@@ -5102,11 +5102,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.83" defer></script>
-<script src="costes/norm.js?v=V12.83" defer></script>
-<script src="ajustes/calc.js?v=V12.83" defer></script>
+<script src="rentabilidad/rent.js?v=V12.84" defer></script>
+<script src="costes/norm.js?v=V12.84" defer></script>
+<script src="ajustes/calc.js?v=V12.84" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.83</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.84</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5258,7 +5258,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.83</div>
+        <div class="sub" id="version-badge">V12.84</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -12701,7 +12701,7 @@ function histCuentaPorTipo(){ const n = {}; _historico.pendientes.forEach(d => {
 // un solo contador para todas las listas: «N de M» pequeño a la izquierda y, si la lista lleva dinero, el total a la derecha
 function contadorLista(n, total, importe, etiqueta, extra){
   const f = x => Number(x || 0).toLocaleString('es-ES');
-  return `<div class="cnt-l"><span class="cnt-n">${f(n)}${total != null && total !== n ? ' de ' + f(total) : ''}${extra || ''}</span>${importe != null ? `<span class="cnt-t">${Math.round(importe).toLocaleString('es-ES')} €${etiqueta == null ? ' sin IVA' : etiqueta}</span>` : ''}</div>`;
+  return `<div class="cnt-l"><span class="cnt-n">${f(n)}${total != null && total !== n ? ' de ' + f(total) : ''}${extra || ''}</span>${importe != null ? `<span class="cnt-t">${String(Math.round(importe)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')} €${etiqueta == null ? ' sin IVA' : etiqueta}</span>` : ''}</div>`;
 }
 function baseSinIvaDoc(d){ const tot = Number(d.total != null ? d.total : d.importe) || 0; return Number(d.base != null ? d.base : tot) || 0; }
 function renderAvisoHistorico(){   // una línea con el número de documentos que se ven; si se están cargando los antiguos, lo dice
@@ -25868,7 +25868,8 @@ function tbAgruparEstado(lista, pintar){
   }).join('');
   // V12.79 (reporte f17a04d9): arriba, el total que suma los apartados; el botón de vista va en esta línea
   const totAll = lista.reduce((s2, j) => s2 + tbImporteSinIva(j), 0);
-  return `<div class="tb-grp-cab tb-grp-tot"><span>Total ${lista.length} · ${eur0(totAll)} sin IVA</span></div>` + cuerpo;
+  // V12.84 (reporte f2958eb4): el total, con el MISMO contador que Documentos (contadorLista): el número pequeño a la izquierda y el dinero a la derecha
+  return `<div class="tb-cnt">${contadorLista(lista.length, window._tbTotalTab != null ? window._tbTotalTab : null, totAll)}</div>` + cuerpo;
 }
 // V12.82 (Daniel 31/10: «la lupa siempre a la izquierda y en la misma línea: en la de los filtros si los hay»): la lupa de Trabajos se coloca en la fila de filtros
 // (Pendientes: Dificultad, Tiempo…; Activo: Activo / Trámite); sin filtros (Historial), en la línea de las pestañas. Mientras se busca no se rehace esa fila.
@@ -25900,6 +25901,7 @@ function tbRender(){
   { const b = tbLupa(); if(b) b.style.display = ''; document.getElementById('tb-panel')?.classList.remove('tb-cargando'); }
   if(_tbVista === 'tramites'){ _tbVista = 'enmarcha'; if(!_tbEnc.tramite){ _tbEnc.tramite = true; tbGuardarEnc(); } }   // los enlaces «Ver en Trámite» abren la pestaña Activo con Trámite marcado
   const pen = tbPendientes(), mar = tbEnMarcha(), tra = tbTramites(), his = tbHistorial();
+  window._tbTotalTab = _tbVista === 'historial' ? his.length : mar.length + tra.length;
   document.getElementById('tb-n-act').textContent = pen.length; document.getElementById('tb-n-mar').textContent = mar.length + tra.length; document.getElementById('tb-n-his').textContent = his.length;
   document.querySelectorAll('#tb-seg button').forEach(b => b.classList.toggle('active', b.dataset.v === _tbVista));
   // V12.73 (reporte b9603277): en Activo, Trámite e Historial no hay filtros de dificultad, tiempo, flota y lugar ni texto de ayuda: solo en Pendientes. Allí solo vale el buscador.
