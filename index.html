@@ -5093,11 +5093,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.74" defer></script>
-<script src="costes/norm.js?v=V12.74" defer></script>
-<script src="ajustes/calc.js?v=V12.74" defer></script>
+<script src="rentabilidad/rent.js?v=V12.75" defer></script>
+<script src="costes/norm.js?v=V12.75" defer></script>
+<script src="ajustes/calc.js?v=V12.75" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.74</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.75</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5249,7 +5249,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.74</div>
+        <div class="sub" id="version-badge">V12.75</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -25864,7 +25864,7 @@ function tbRender(){
   if(!soloPen){ const f2 = document.getElementById('tb-filtros2'); if(f2){ f2.style.display = 'none'; } window._tbVistaSuelta = ''; }
   const baseCont = filtrados, cuenta = p => baseCont.filter(j => tbPrioridades(j).includes(p)).length;   // un trabajo con dos prioridades cuenta en las dos
   const cont = document.getElementById('tb-cont');
-  cont.style.display = _tbVista === 'historial' ? 'none' : '';
+  cont.style.display = soloPen ? '' : 'none';   // V12.75 (Daniel 31/10): Alta/Media/Baja solo en Pendientes
   cont.innerHTML = ['Alta', 'Media', 'Baja'].map(p => `<button type="button" data-f="${p}" class="cc cc-${TB_CLASE_PRIO[p]} ${_tbFiltro === p ? 'active' : ''}" title="Ver solo prioridad ${p}"><span>${p}</span> <b>${cuenta(p)}</b></button>`).join('');
   const ayuda = document.getElementById('tb-ayuda');
   ayuda.style.display = _tbVista === 'historial' ? 'none' : '';
@@ -25876,7 +25876,7 @@ function tbRender(){
     if(!esHis && (_tbVista === 'tramites' || _tbVista === 'enmarcha')){ const d = tbDocDe(j);   // V11.79: también en Activos (albarán en «Trabajo activo»)
  if(d){ const h = tbDocCartaHtml(j, d); if(h) return h; } } return tbCartaHtml(j, esHis); };
   if(_tbVista === 'historial'){ tbRenderComputo(filtrados); lista.innerHTML = filtrados.length ? tbAgruparEstado(filtrados, j => carta(j, true)) : '<div class="empty" style="padding:24px;">' + (his.length ? 'Ningún trabajo cumple los filtros.' : 'Aún no hay trabajos cobrados.') + '</div>'; return; }
-  const ver = _tbFiltro === 'todos' ? filtrados : filtrados.filter(j => tbPrioridades(j).includes(_tbFiltro));
+  const ver = _tbFiltro === 'todos' || !soloPen ? filtrados : filtrados.filter(j => tbPrioridades(j).includes(_tbFiltro));
   tbRenderComputo(ver);
   lista.innerHTML = ver.length ? (_tbVista === 'activos' ? ver.map(j => carta(j, false)).join('') : tbAgruparEstado(ver, j => carta(j, false))) : (tbHayFiltros() || _tbFiltro !== 'todos' ? '<div class="empty" style="padding:24px;">Ningún trabajo cumple los filtros.</div>' : _tbVista === 'tramites' ? '<div class="empty" style="padding:24px;">No hay trámites pendientes.</div>' : _tbVista === 'enmarcha' ? '<div class="empty" style="padding:24px;">No hay ningún trabajo en marcha ahora.</div>' : '<div class="empty" style="padding:24px;">No hay trabajos pendientes. Pulsa + Trabajo para añadir uno.</div>');
 }
@@ -26198,7 +26198,7 @@ async function tbGuardarOrden(id){
 (function tbActivarArrastre(){
   const lista = document.getElementById('tb-lista'); if(!lista) return;
   let d = null;
-  const puedeArrastrar = () => _tbVista !== 'historial' && _tbFiltro === 'todos' && !tbHayFiltros();
+  const puedeArrastrar = () => _tbVista !== 'historial' && (_tbVista === 'activos' ? _tbFiltro === 'todos' && !tbHayFiltros() : !_tbBusca);   // V12.75: fuera de Pendientes no hay filtros, solo el buscador
   const cancelar = () => { document.removeEventListener('touchmove', tmActivo); if(!d) return; clearTimeout(d.timer); if(d.activo){ d.clone.remove(); d.card.classList.remove('levantada'); document.body.classList.remove('tb-arrastrando'); } d = null; };
   const posicionar = () => {
     if(!d || !d.activo) return;
