@@ -5102,11 +5102,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.85" defer></script>
-<script src="costes/norm.js?v=V12.85" defer></script>
-<script src="ajustes/calc.js?v=V12.85" defer></script>
+<script src="rentabilidad/rent.js?v=V12.86" defer></script>
+<script src="costes/norm.js?v=V12.86" defer></script>
+<script src="ajustes/calc.js?v=V12.86" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.85</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.86</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5258,7 +5258,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.85</div>
+        <div class="sub" id="version-badge">V12.86</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -25507,7 +25507,11 @@ const TB_EST_PENDIENTES = ['Pendiente'], TB_EST_ENMARCHA = ['Empezado', 'Activo'
 let _tbEnc = {activo: true, tramite: true};
 const TB_FILTRO_ENC = 'tb-filtro-encurso';
 async function tbGuardarEnc(){ if(!sb) return; const {error} = await sb.from('filtros_persistentes').upsert({container_id: TB_FILTRO_ENC, valor: JSON.stringify(Object.keys(_tbEnc).filter(k => _tbEnc[k])), actualizado_at: new Date().toISOString()}); if(error) console.error('No se pudo guardar el filtro Activo/Trámite', error); }
-let _tbJobs = [], _tbCargado = false, _tbFiltro = 'todos', _tbVista = 'activos', _tbEditando = null, _tbIgnorarClic = 0;
+// V12.86 (Daniel: «no recuerda la pestaña en la que me quedé»): la pestaña de Trabajos se recuerda (en el servidor y, para que salga al instante, también en este móvil)
+const TB_FILTRO_VISTA = 'tb-vista', TB_VISTAS = ['activos', 'enmarcha', 'historial'];
+function tbVistaInicial(){ try{ const v = localStorage.getItem(TB_FILTRO_VISTA); if(TB_VISTAS.includes(v)) return v; }catch(e){} return 'activos'; }
+async function tbGuardarVista(){ try{ localStorage.setItem(TB_FILTRO_VISTA, _tbVista); }catch(e){} if(!sb) return; const {error} = await sb.from('filtros_persistentes').upsert({container_id: TB_FILTRO_VISTA, valor: JSON.stringify(_tbVista), actualizado_at: new Date().toISOString()}); if(error) console.error('No se pudo guardar la pestaña de Trabajos', error); }
+let _tbJobs = [], _tbCargado = false, _tbFiltro = 'todos', _tbVista = tbVistaInicial(), _tbEditando = null, _tbIgnorarClic = 0;
 // ---- filtros de lugar, máquina y tiempo + cómputo de tiempo y dinero ----
 // En cada grupo se eligen varios valores (vale cualquiera) y entre grupos tienen que cumplirse todos. Se recuerdan en el servidor (filtros_persistentes), como los demás filtros de la web.
 const TB_FILTRO_ID = {lugar: 'tb-filtro-lugar', maquina: 'tb-filtro-maquina', tiempo: 'tb-filtro-tiempo', dificultad: 'tb-filtro-dificultad'}, TB_FILTRO_PLEGADOS = 'tb-filtros-plegados', TB_SIN_LUGAR = 'SIN LUGAR', TB_SIN_DUR = 'SIN DURACIÓN', TB_SIN_DIF = 'SIN DIFICULTAD';
@@ -25591,8 +25595,8 @@ async function tbCargarExtras(){   // tarifas (precio por hora de cada máquina)
     _tbTarifas = t;
   }catch(e){ console.error(e); }
   try{
-    const {data} = await sb.from('filtros_persistentes').select('container_id,valor').in('container_id', [...Object.values(TB_FILTRO_ID), TB_FILTRO_PLEGADOS, TB_FILTRO_ENC]);
-    (data || []).forEach(r => { if(r.container_id === TB_FILTRO_ENC){ try{ const l = JSON.parse(r.valor); if(Array.isArray(l)) _tbEnc = {activo: l.includes('activo'), tramite: l.includes('tramite')}; }catch(_){} return; } if(r.container_id === TB_FILTRO_PLEGADOS){ try{ const l = JSON.parse(r.valor); if(Array.isArray(l)) _tbPleg = l.filter(x => TB_GRUPOS.includes(x)); }catch(_){} return; } const g = Object.keys(TB_FILTRO_ID).find(k => TB_FILTRO_ID[k] === r.container_id); if(!g) return; try{ const l = JSON.parse(r.valor); if(Array.isArray(l)) _tbFil[g] = l.filter(x => typeof x === 'string'); }catch(_){} });
+    const {data} = await sb.from('filtros_persistentes').select('container_id,valor').in('container_id', [...Object.values(TB_FILTRO_ID), TB_FILTRO_PLEGADOS, TB_FILTRO_ENC, TB_FILTRO_VISTA]);
+    (data || []).forEach(r => { if(r.container_id === TB_FILTRO_VISTA){ try{ const v = JSON.parse(r.valor); if(TB_VISTAS.includes(v) && !window._tbVistaTocada && v !== _tbVista){ _tbVista = v; if(document.getElementById('tb-lista')) tbRender(); try{ localStorage.setItem(TB_FILTRO_VISTA, v); }catch(_){} } }catch(_){} return; } if(r.container_id === TB_FILTRO_ENC){ try{ const l = JSON.parse(r.valor); if(Array.isArray(l)) _tbEnc = {activo: l.includes('activo'), tramite: l.includes('tramite')}; }catch(_){} return; } if(r.container_id === TB_FILTRO_PLEGADOS){ try{ const l = JSON.parse(r.valor); if(Array.isArray(l)) _tbPleg = l.filter(x => TB_GRUPOS.includes(x)); }catch(_){} return; } const g = Object.keys(TB_FILTRO_ID).find(k => TB_FILTRO_ID[k] === r.container_id); if(!g) return; try{ const l = JSON.parse(r.valor); if(Array.isArray(l)) _tbFil[g] = l.filter(x => typeof x === 'string'); }catch(_){} });
   }catch(e){ console.error(e); }
 }
 // ---- máquinas fusionadas (vale cualquiera) en el formulario ----
@@ -26301,7 +26305,7 @@ async function tbGuardarOrden(id){
     tbAbrirEditor(card.dataset.id);
   });
 })();
-document.querySelectorAll('#tb-seg button').forEach(b => b.addEventListener('click', () => { _tbVista = b.dataset.v; tbRender(); window.scrollTo(0, 0); }));
+document.querySelectorAll('#tb-seg button').forEach(b => b.addEventListener('click', () => { _tbVista = b.dataset.v; window._tbVistaTocada = true; tbGuardarVista(); tbRender(); window.scrollTo(0, 0); }));
 document.getElementById('tb-cont')?.addEventListener('click', ev => { const b = ev.target.closest('button[data-f]'); if(!b) return; _tbFiltro = _tbFiltro === b.dataset.f ? 'todos' : b.dataset.f; tbRender(); });   // tocar otra vez quita el filtro
 document.getElementById('tb-fondo')?.addEventListener('click', ev => { if(ev.target.id === 'tb-fondo') tbIntentarCerrar(); });
 document.getElementById('tb-filtros2')?.addEventListener('click', tbClicFiltro);
