@@ -5095,11 +5095,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.77" defer></script>
-<script src="costes/norm.js?v=V12.77" defer></script>
-<script src="ajustes/calc.js?v=V12.77" defer></script>
+<script src="rentabilidad/rent.js?v=V12.78" defer></script>
+<script src="costes/norm.js?v=V12.78" defer></script>
+<script src="ajustes/calc.js?v=V12.78" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.77</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.78</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5251,7 +5251,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.77</div>
+        <div class="sub" id="version-badge">V12.78</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -6822,7 +6822,6 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
 
     <!-- ================= TRABAJOS (prueba): cola de trabajos para móvil ================= -->
     <div class="view" id="view-trabajos">
-      <div class="tb-comp" id="tb-comp" style="display:none;"></div>
       <div class="panel tb-panel" id="tb-panel">   <!-- V11.88: la lista de Trabajos va dentro de su tarjeta blanca, como Documentos y Control (guía: nunca suelta sobre el gris) -->
       <div class="tb-barra" id="tb-barra">
         <div class="tb-seg tb-seg4" id="tb-seg"><button type="button" data-v="activos" class="active">Pendientes <b id="tb-n-act">0</b></button><button type="button" data-v="enmarcha">Activo <b id="tb-n-mar">0</b></button><button type="button" data-v="tramites">Trámite <b id="tb-n-tra">0</b></button><button type="button" data-v="historial" aria-label="Historial" title="Historial"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-4px;"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg> <b id="tb-n-his">0</b></button></div>
@@ -6832,6 +6831,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
       <div class="tb-cont" id="tb-cont"></div>   <!-- V12.76 (Daniel 31/10): Alta/Media/Baja solo en Pendientes, pequeño, entre las pestañas y los filtros; sin botón «+ Trabajo» (se crea con el + de abajo) -->
       <div class="tb-filtros2" id="tb-filtros2" style="display:none;"></div>
       <div class="tb-ayuda" id="tb-ayuda">Mantén pulsado un trabajo y arrástralo para cambiarlo de sitio.</div>
+      <div class="tb-comp" id="tb-comp" style="display:none;"></div>   <!-- V12.78 (reportes 0387d74a y 53f209d0): el total estimado va fijo en Pendientes, entre el texto de ayuda y la lista -->
       <div id="tb-lista"></div>
       </div>
       <div class="tb-fondo" id="tb-fondo" style="display:none;"><div class="tb-hoja" id="tb-hoja"></div></div>
@@ -25678,16 +25678,17 @@ function tbSuma(lista, m){   // m: una sola máquina (desglose). Sin m: todo lo 
 }
 function tbRenderComputo(lista){   // encima de Alta/Media/Baja: solo sale con algún filtro puesto
   const el = document.getElementById('tb-comp'); if(!el) return;
-  if(!tbHayFiltros() || _tbVista !== 'activos'){ el.style.display = 'none'; el.innerHTML = ''; return; }
+  if(_tbVista !== 'activos'){ el.style.display = 'none'; el.innerHTML = ''; return; }   // V12.78: en Pendientes sale siempre, con filtros o sin ellos
   const conEur = !!(_tbTarifas && Object.keys(_tbTarifas).length), t = tbSuma(lista), trab = n => n === 1 ? '1 trabajo' : n + ' trabajos';
   const fila = (nom, s) => `<div class="tb-comp-f"><span>${escHtml(nom)}</span><span>${trab(s.n)} · ${tbFmtH(s.h)}${conEur ? ' · ' + tbEur(s.e) : ''}</span></div>`;
   const nombre = (g, v) => g === 'maquina' ? TB_MAQ_NOM[v] : v;
   const parte = {lugar: (v) => tbSuma(lista.filter(j => tbValorFiltro('lugar', j)[0] === v)), maquina: (v) => tbSuma(lista, v), tiempo: (v) => tbSuma(lista.filter(j => tbTramoTiempo(j) === v)), dificultad: (v) => tbSuma(lista.filter(j => tbValorFiltro('dificultad', j).includes(v)))};
   const tit = {lugar: 'Por lugar', maquina: 'Por flota', tiempo: 'Por tiempo', dificultad: 'Por dificultad'};
   const soloFlota = _tbFil.maquina.length ? tbOrdenValores('maquina', _tbFil.maquina).map(v => TB_MAQ_NOM[v]).join(' + ') : '';
-  const grupos = TB_GRUPOS.filter(g => _tbFil[g].length > 1).map(g => `<div class="tb-comp-g"><b>${tit[g]}</b>${tbOrdenValores(g, _tbFil[g]).map(v => fila(nombre(g, v), parte[g](v))).join('')}</div>`).join('');
+  const flotaTodas = !_tbFil.maquina.length ? TB_MAQ_ORDEN.filter(m => lista.some(j => tbMaquinas(j).includes(m))) : [];   // V12.78: sin filtro de flota, el desglose por máquina sale igualmente
+  const grupos = (flotaTodas.length > 1 ? `<div class="tb-comp-g"><b>Por flota</b>${flotaTodas.map(m => fila(TB_MAQ_NOM[m], tbSuma(lista, m))).join('')}</div>` : '') + TB_GRUPOS.filter(g => _tbFil[g].length > 1).map(g => `<div class="tb-comp-g"><b>${tit[g]}</b>${tbOrdenValores(g, _tbFil[g]).map(v => fila(nombre(g, v), parte[g](v))).join('')}</div>`).join('');
   el.style.display = '';
-  el.innerHTML = `<div class="tb-comp-t">${trab(t.n)} · ${tbFmtH(t.h)}${conEur ? ' · ' + tbEur(t.e) : ''}${conEur && soloFlota ? ` <span class="tb-comp-solo">solo ${escHtml(soloFlota)}</span>` : ''}</div>${grupos}<div class="tb-comp-nota">${conEur ? (soloFlota ? `Importe aproximado de lo que generaría solo ${soloFlota}: horas de cada trabajo × su precio por hora (Tarifas), sin contar el resto de máquinas de esos trabajos ni materiales.` : 'Importe aproximado: horas de cada trabajo × precio por hora de sus máquinas (Tarifas); no incluye materiales.') : 'No se pudieron leer las tarifas: sin importe.'}${lista.some(j => tbAlternativas(j).length) ? ' Con máquinas alternativas cuenta la media de sus tarifas.' : ''}${t.sin ? ` ${t.sin} sin duración no ${t.sin === 1 ? 'cuenta' : 'cuentan'}.` : ''}</div>`;
+  el.innerHTML = `<div class="tb-comp-g" style="margin-top:0;border-top:0;padding-top:0;"><b>Total estimado</b></div><div class="tb-comp-t">${trab(t.n)} · ${tbFmtH(t.h)}${conEur ? ' · ' + tbEur(t.e) : ''}${conEur && soloFlota ? ` <span class="tb-comp-solo">solo ${escHtml(soloFlota)}</span>` : ''}</div>${grupos}<div class="tb-comp-nota">${conEur ? (soloFlota ? `Importe aproximado de lo que generaría solo ${soloFlota}: horas de cada trabajo × su precio por hora (Tarifas), sin contar el resto de máquinas de esos trabajos ni materiales.` : 'Importe aproximado: horas de cada trabajo × precio por hora de sus máquinas (Tarifas); no incluye materiales.') : 'No se pudieron leer las tarifas: sin importe.'}${lista.some(j => tbAlternativas(j).length) ? ' Con máquinas alternativas cuenta la media de sus tarifas.' : ''}${t.sin ? ` ${t.sin} sin duración no ${t.sin === 1 ? 'cuenta' : 'cuentan'}.` : ''}</div>`;
 }
 
 function tbPrioridades(j){ const l = (Array.isArray(j.prioridades) && j.prioridades.length ? j.prioridades : [j.prioridad || 'Media']).filter(x => TB_PRIO.includes(x)).slice(0, 2); return l.length ? l : ['Media']; }
