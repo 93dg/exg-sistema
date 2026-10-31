@@ -86,7 +86,7 @@ async def main():
         return res
 VISTAS_TODAS=['control','trabajos','planificacion',"trabestad:teSub('costes')",'economia','documentos','albaranes','proformas','facturas','presupuestos','gastospro','impuestos','clientes','flota','direccion','empresa','personal','archivos','entradas','gastosrec','proyectos','tarifas','calcempleado','ayuntamiento','correo','reportes']   # V11.34: todas las pantallas (Empresa no se revisaba y por eso volvían las minúsculas)
 VISTAS=[v for v in VISTAS_TODAS if not os.environ.get('SOLO') or v==os.environ.get('SOLO')]
-DESC={'minuscula':'Texto que empieza en minúscula (todo texto empieza con mayúscula)','partido':'Texto corto partido en dos líneas','desborda':'Texto que se sale de la pantalla','circulo':'Botón de solo icono con círculo o borde alrededor','marcado':'Algo marcado con fondo oscuro (solo borde naranja)','lupa':'Lupa que no está en un extremo de su línea','correo_mayus':'Correo o enlace que sale con la primera letra en mayúscula (ponle class no-cap)'}
+DESC={'largo':'Texto largo (más de 70 letras): etiquetas y una línea por cosa','minuscula':'Texto que empieza en minúscula (todo texto empieza con mayúscula)','partido':'Texto corto partido en dos líneas','desborda':'Texto que se sale de la pantalla','circulo':'Botón de solo icono con círculo o borde alrededor','marcado':'Algo marcado con fondo oscuro (solo borde naranja)','lupa':'Lupa que no está en un extremo de su línea','correo_mayus':'Correo o enlace que sale con la primera letra en mayúscula (ponle class no-cap)'}
 BASE=os.path.join(os.path.dirname(os.path.abspath(__file__)),'auditoria_baseline.json')
 res=asyncio.run(main())
 c={}
