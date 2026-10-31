@@ -5095,11 +5095,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V12.76" defer></script>
-<script src="costes/norm.js?v=V12.76" defer></script>
-<script src="ajustes/calc.js?v=V12.76" defer></script>
+<script src="rentabilidad/rent.js?v=V12.77" defer></script>
+<script src="costes/norm.js?v=V12.77" defer></script>
+<script src="ajustes/calc.js?v=V12.77" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.76</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V12.77</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5251,7 +5251,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V12.76</div>
+        <div class="sub" id="version-badge">V12.77</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -25845,12 +25845,12 @@ function tbAgruparEstado(lista, pintar){
   const grupos = new Map();
   lista.forEach(j => { const k = tbGrupoEstado(j); if(!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(j); });
   const pos = k => { const i = TB_GRP_ORDEN.indexOf(k); return i < 0 ? 999 : i; };
-  const eur0 = n => Math.round(n).toLocaleString('es-ES') + ' €';
+  const eur0 = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €';   // con punto de miles también en 4 cifras (5.597 €)
   // V12.73: sin fila de filtros, el botón de vista plegada (el mismo de Documentos) va al final de la cabecera del primer grupo
   const bVista = `<button type="button" class="cli-icon-btn doc-vista-btn${window._docCompacto ? ' doc-cli-on' : ''}" title="Vista plegada o desplegada" aria-label="Vista plegada o desplegada" onclick="event.stopPropagation();docsVistaPlegada()">${ICO_VISTA_PLEGADA}</button>`;
   return [...grupos.entries()].sort((a, b) => pos(a[0]) - pos(b[0])).map(([k, l], i) => {
     const d = l.map(tbDocDe).find(Boolean), suma = l.reduce((s, j) => s + tbImporteSinIva(j), 0);
-    return `<div class="tb-grp-cab" style="color:${tbGrupoColor(k)};"><span>${escHtml(tbGrupoNombre(k, d))} · ${l.length} · ${eur0(suma)} sin IVA</span>${i === 0 ? bVista : ''}</div>` + l.map(pintar).join('');
+    return `<div class="tb-grp-cab" style="color:${tbGrupoColor(k)};"><span>${l.length} ${escHtml(tbGrupoNombre(k, d))} · ${eur0(suma)} sin IVA</span>${i === 0 ? bVista : ''}</div>` + l.map(pintar).join('');
   }).join('');
 }
 function tbRender(){
@@ -25874,8 +25874,8 @@ function tbRender(){
   ayuda.style.display = _tbVista === 'historial' ? 'none' : ''; if(window._tbVistaSuelta){ ayuda.innerHTML = `<span>${ayuda.innerHTML}</span>` + window._tbVistaSuelta; ayuda.style.display = 'flex'; ayuda.style.alignItems = 'center'; ayuda.style.gap = '8px'; ayuda.style.justifyContent = 'space-between'; } else { ayuda.style.display = _tbVista === 'historial' ? 'none' : ''; }
   if(!soloPen) ayuda.style.display = 'none';
   const carta = (j, esHis) => { if(j.virtual){ const d = tbDocDe(j); return d ? (tbDocCartaHtml(j, d) || '') : ''; }
-    if(!esHis && (_tbVista === 'tramites' || _tbVista === 'enmarcha') && (j.docs || []).length && !tbDocDe(j) && !_docsListos) return '<div class="tb-cargando" style="padding:12px 6px;font-size:13px;color:var(--ink-soft);">Cargando…</div>';   // V11.89 (Daniel): al cargar no sale primero la tarjeta del trabajo y luego la del albarán
-    if(!esHis && (_tbVista === 'tramites' || _tbVista === 'enmarcha')){ const d = tbDocDe(j);   // V11.79: también en Activos (albarán en «Trabajo activo»)
+    if(_tbVista !== 'activos' && j.estado !== 'Cancelado' && (j.docs || []).length && !tbDocDe(j) && !_docsListos) return '<div class="tb-cargando" style="padding:12px 6px;font-size:13px;color:var(--ink-soft);">Cargando…</div>';   // V11.89 (Daniel): al cargar no sale primero la tarjeta del trabajo y luego la del albarán
+    if(_tbVista !== 'activos' && j.estado !== 'Cancelado'){ const d = tbDocDe(j);   // V12.77 (reporte 1de74899): también en Historial, un trabajo cobrado sale como su albarán o factura, no como tarjeta de trabajo   // V11.79: también en Activos (albarán en «Trabajo activo»)
  if(d){ const h = tbDocCartaHtml(j, d); if(h) return h; } } return tbCartaHtml(j, esHis); };
   if(_tbVista === 'historial'){ tbRenderComputo(filtrados); lista.innerHTML = filtrados.length ? tbAgruparEstado(filtrados, j => carta(j, true)) : '<div class="empty" style="padding:24px;">' + (his.length ? 'Ningún trabajo cumple los filtros.' : 'Aún no hay trabajos cobrados.') + '</div>'; return; }
   const ver = _tbFiltro === 'todos' || !soloPen ? filtrados : filtrados.filter(j => tbPrioridades(j).includes(_tbFiltro));
@@ -30794,7 +30794,7 @@ function renderControlDocs(){
   const BLOQUES = [['facturar','Por entregar'],['cobrar','Por cobrar'],['presupuesto','Presupuestos'],['cerrado','Cerrados']];
   const sumaImp = l => l.reduce((s,d)=> s + (Number(d.base != null ? d.base : (d.total||d.importe))||0) * (['parcial','parcial_otra'].includes(d.estado_cobro) && Number(d.total||d.importe) ? Math.max(0, 1 - (Number(d.cobrado_importe||0) + (d.estado_cobro==='parcial_otra' ? enOtraSuma(d) : 0))/Number(d.total||d.importe)) : 1), 0);   // V8.74: totales SIN IVA
   const fmtEur = n => n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
-  const fmtEur0 = n => Math.round(n).toLocaleString('es-ES') + ' €';   // V10.97 (Daniel 12/10/2026): los totales de los resúmenes, sin céntimos
+  const fmtEur0 = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €';   // V12.77: punto de miles también en 4 cifras   // V10.97 (Daniel 12/10/2026): los totales de los resúmenes, sin céntimos
   document.getElementById('control-docs-count').textContent = unicos.length;
   // V8.72 (Daniel): en el cabecero, pendiente de facturar + pendiente de cobrar + total de ambos (los presupuestos no cuentan: no son dinero pendiente)
   const sumF = sumaImp(unicos.filter(d=>bloqueDe(d)==='facturar')), sumC = sumaImp(unicos.filter(d=>bloqueDe(d)==='cobrar'));
@@ -30809,7 +30809,7 @@ function renderControlDocs(){
       <td onclick="event.stopPropagation();">${calidadColumnaHtml(d)}</td>
       <td onclick="event.stopPropagation();">${controlDocsEstadoPill(d,'t')}</td>
     </tr>`;
-  tbody.innerHTML = visibles.length ? gruposVis.map(([k,t,l])=>`<tr><td colspan="7" style="background:var(--bg-soft,#f3f1ec);font-weight:700;padding:8px 10px;">${t} · ${l.length} · ${fmtEur0(sumaImp(l))} sin IVA</td></tr>` + l.map(filaDoc).join('')).join('') : '<tr><td colspan="7" class="empty">Sin documentos con estos filtros</td></tr>';
+  tbody.innerHTML = visibles.length ? gruposVis.map(([k,t,l])=>`<tr><td colspan="7" style="background:var(--bg-soft,#f3f1ec);font-weight:700;padding:8px 10px;">${l.length} ${t} · ${fmtEur0(sumaImp(l))} sin IVA</td></tr>` + l.map(filaDoc).join('')).join('') : '<tr><td colspan="7" class="empty">Sin documentos con estos filtros</td></tr>';
   const wrap = document.getElementById('control-docs-cargar-mas-wrap');
   if(wrap) wrap.style.display = unicos.length > controlDocsLimite ? '' : 'none';
 
@@ -30819,7 +30819,7 @@ function renderControlDocs(){
     if(!visibles.length){
       listaMovil.innerHTML = '<div style="padding:16px;color:var(--ink-soft);text-align:center;">Sin documentos con estos filtros</div>';
     } else {
-      const cabMovil = (k,t,l)=>`<div style="padding:10px 14px 6px;font-weight:700;font-size:13.5px;background:var(--bg-soft,#f3f1ec);color:${CC_BLOQUE_COLOR[k]||'var(--ink)'};">${t} · ${l.length} · ${fmtEur0(sumaImp(l))} sin IVA</div>`;
+      const cabMovil = (k,t,l)=>`<div style="padding:10px 14px 6px;font-weight:700;font-size:13.5px;background:var(--bg-soft,#f3f1ec);color:${CC_BLOQUE_COLOR[k]||'var(--ink)'};">${l.length} ${t} · ${fmtEur0(sumaImp(l))} sin IVA</div>`;   // V12.77 (reporte fd5d01ac): primero el número y luego el importe
       listaMovil.innerHTML = gruposVis.map(([k,t,l])=> cabMovil(k,t,l) + l.map(d => {
         const fecha = formatFechaCorta(d.dateRaw);
         const cal = calidadCorta(d);
@@ -31717,8 +31717,8 @@ function docmBaseSinIva(f){
 }
 function docmCabHtml(k, t){
   const col = {facturar: '#2B5C7A', cobrar: '#8A6100'}[k] || 'var(--ink)', tit = (docmGrupos().find(g => g[0] === k) || [k, k])[1];
-  const imp = (k === 'facturar' || k === 'cobrar' || k === 'presupuesto') && t ? ' · ' + Math.round(t.imp).toLocaleString('es-ES') + ' € sin IVA' : '';
-  return `<span style="color:${col};">${tit} · ${t ? t.n : 0}${imp}</span>`;
+  const imp = (k === 'facturar' || k === 'cobrar' || k === 'presupuesto') && t ? ' · ' + String(Math.round(t.imp)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' € sin IVA' : '';
+  return `<span style="color:${col};">${t ? t.n : 0} ${tit}${imp}</span>`;   // V12.77 (reporte fd5d01ac): primero el número y luego el importe, con punto de miles
 }
 function docmSync(){
   if(!docmActiva()) return;
