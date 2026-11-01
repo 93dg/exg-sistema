@@ -1893,6 +1893,11 @@ button.e2-fila{cursor:pointer;}
 .nota-larga,.two-col-note,.inv-nota,.fl-nota,.sl-nota,.rt-ldx,.te-concl{display:none !important;}   /* V12.99 (Daniel: «no quiero textos largos en toda la app»): sin notas ni explicaciones */
 .txt2{display:-webkit-box !important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden !important;}
 .txt2.txt2-ab{display:block !important;-webkit-line-clamp:unset;overflow:visible !important;}
+.ab-m{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:4px;font-size:11px;font-weight:800;line-height:1;border:1px solid var(--ink-soft);background:#fff;color:var(--ink);flex:0 0 auto;}   /* V13.03 (Daniel 01/11): A = se cobra en A (blanca), B = se cobra en B (roja) */
+.ab-m.ab-b{background:var(--red);border-color:var(--red);color:#fff;}
+.cc-fc-imp.ab-con{display:flex !important;flex-direction:column;align-items:flex-end;gap:3px;}
+.ab-tog{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:5px 10px 5px 6px;border:1px solid var(--line);border-radius:99px;background:var(--paper);color:var(--ink);margin-left:auto;white-space:nowrap;}
+.tb-ab{display:flex;justify-content:flex-end;align-items:center;gap:6px;font-weight:800;}
 .dir-pest{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-bottom:10px;}   /* V12.96 (reporte f8101005): cuadrícula fija, 3 arriba y 2 abajo del mismo ancho; nada suelto en una fila */
 .dir-pest button{all:unset;box-sizing:border-box;cursor:pointer;white-space:nowrap;text-align:center;padding:9px 12px;border-radius:99px;font-weight:800;font-size:13px;background:var(--paper);border:1px solid var(--line);color:var(--ink);}
 .dir-pest button.act{background:var(--orange);border-color:var(--orange);color:#fff;}
@@ -5115,11 +5120,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.02" defer></script>
-<script src="costes/norm.js?v=V13.02" defer></script>
-<script src="ajustes/calc.js?v=V13.02" defer></script>
+<script src="rentabilidad/rent.js?v=V13.03" defer></script>
+<script src="costes/norm.js?v=V13.03" defer></script>
+<script src="ajustes/calc.js?v=V13.03" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.02</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.03</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5271,7 +5276,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.02</div>
+        <div class="sub" id="version-badge">V13.03</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -25911,7 +25916,9 @@ function tbAgruparEstado(lista, pintar){
   const totAll = lista.reduce((s2, j) => s2 + tbImporteSinIva(j), 0);
   // V12.84 (reporte f2958eb4): el total, con el MISMO contador que Documentos (contadorLista): el número pequeño a la izquierda y el dinero a la derecha
   // V12.85 (Daniel: «el mismo formato que abajo pero a la derecha»): la línea del total es como las cabeceras de los grupos («N Estado · X € sin IVA»), alineada a la derecha
-  return `<div class="tb-grp-cab tb-cnt-tot"><span>${lista.length} Total · ${eur0(totAll)} sin IVA</span></div>` + cuerpo;
+  // V13.03 (Daniel 01/11): debajo del total, cuánto se cobra en A y cuánto en B
+  const totB = lista.reduce((s2, j) => s2 + (abEsB(tbDocDe(j)) ? tbImporteSinIva(j) : 0), 0);
+  return `<div class="tb-grp-cab tb-cnt-tot"><span>${lista.length} Total · ${eur0(totAll)} sin IVA</span></div><div class="tb-grp-cab tb-cnt-tot tb-ab"><span class="ab-m">A</span>${eur0(totAll - totB)}<span style="width:6px"></span><span class="ab-m ab-b">B</span>${eur0(totB)}</div>` + cuerpo;
 }
 // V12.82 (Daniel 31/10: «la lupa siempre a la izquierda y en la misma línea: en la de los filtros si los hay»): la lupa de Trabajos se coloca en la fila de filtros
 // (Pendientes: Dificultad, Tiempo…; Activo: Activo / Trámite); sin filtros (Historial), en la línea de las pestañas. Mientras se busca no se rehace esa fila.
@@ -33132,6 +33139,37 @@ if('serviceWorker' in navigator){
   document.addEventListener('click', ev => { const e = ev.target.closest && ev.target.closest('.txt2'); if(!e || e.closest('button,a,[onclick],label,summary,[role=button],[data-dir-ir]')) return; e.classList.toggle('txt2-ab'); }, true);
   programar();
 })();
+</script>
+<script>
+/* V13.03 (Daniel 01/11): cada documento lleva encima del precio si se cobra en A (blanca) o en B (roja); al desplegar la tarjeta, un botón lo cambia.
+   Se guarda en «contabilidad» del documento (oficial = A, en_b = B). Las facturas siempre son A. */
+function abEsB(d){ return !!d && d.contabilidad === 'en_b'; }
+function abMarca(d){ const b = abEsB(d); return `<span class="ab-m${b ? ' ab-b' : ''}" title="${b ? 'Se cobra en B' : 'Se cobra en A'}">${b ? 'B' : 'A'}</span>`; }
+const AB_TIPOS = ['factura', 'albaran', 'proforma', 'presupuesto'];
+function abDecorar(raiz){
+  (raiz.matches && raiz.matches('.factura-card-movil') ? [raiz] : [...raiz.querySelectorAll('.factura-card-movil[data-doc-id]')]).forEach(card => {
+    if(card.classList.contains('fc-gasto')) return;
+    const d = (typeof documentosRealesById !== 'undefined') && documentosRealesById[card.dataset.docId]; if(!d || !AB_TIPOS.includes(d.type)) return;
+    const imp = card.querySelector('.cc-fc-imp');
+    if(imp){ const m = imp.querySelector(':scope > .ab-m'); if(!m){ imp.insertAdjacentHTML('afterbegin', abMarca(d)); imp.classList.add('ab-con'); } else if(m.classList.contains('ab-b') !== abEsB(d)) m.outerHTML = abMarca(d); }
+    const w = card.querySelector('.fc-estado-wrap');
+    if(w && d.type !== 'factura'){ const t = w.querySelector('.ab-tog'), html = `<button type="button" class="ab-tog" data-ab="${d.id}">${abMarca(d)}${abEsB(d) ? 'Cobro en B' : 'Cobro en A'}</button>`; if(!t) w.insertAdjacentHTML('beforeend', html); else if(t.querySelector('.ab-m').classList.contains('ab-b') !== abEsB(d)) t.outerHTML = html; }
+  });
+}
+new MutationObserver(ms => { ms.forEach(m => m.addedNodes.forEach(n => { if(n.nodeType === 1 && (n.matches('.factura-card-movil') || n.querySelector('.factura-card-movil'))) abDecorar(n); })); }).observe(document.body, {childList: true, subtree: true});
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest && ev.target.closest('.ab-tog'); if(!b) return;
+  ev.stopPropagation(); ev.preventDefault();
+  const id = b.dataset.ab, d = documentosRealesById[id]; if(!d || !sb) return;
+  const nuevo = abEsB(d) ? 'oficial' : 'en_b';
+  const {error} = await sb.from('documentos_economicos').update({contabilidad: nuevo}).eq('id', id);
+  if(error){ mostrarToast('No se pudo cambiar: ' + errText(error), 'err'); return; }
+  d.contabilidad = nuevo;
+  document.querySelectorAll(`.factura-card-movil[data-doc-id="${id}"]`).forEach(abDecorar);
+  try{ if(document.getElementById('tb-lista')) tbRender(); }catch(e){}
+  mostrarToast(nuevo === 'en_b' ? 'Se cobra en B' : 'Se cobra en A', 'ok');
+}, true);
+document.addEventListener('exg-docs-listos', () => abDecorar(document.body));
 </script>
 </body>
 </html>
