@@ -5124,11 +5124,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.06" defer></script>
-<script src="costes/norm.js?v=V13.06" defer></script>
-<script src="ajustes/calc.js?v=V13.06" defer></script>
+<script src="rentabilidad/rent.js?v=V13.07" defer></script>
+<script src="costes/norm.js?v=V13.07" defer></script>
+<script src="ajustes/calc.js?v=V13.07" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.06</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.07</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5280,7 +5280,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.06</div>
+        <div class="sub" id="version-badge">V13.07</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -31251,6 +31251,14 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   const cerrarMenus = () => document.querySelectorAll(`.estado-cobro-dd[data-doc-id="${id}"]`).forEach(dd => dd.classList.remove('open'));
   const enPausa = valor === 'en_pausa'; if(enPausa) valor = 'trabajo_activo';   // V12.87: «En pausa» = albarán en Trabajo activo + su trabajo en pausa
   const payload = {estado_cobro: valor};
+  let _cobroFecha = null; const estadoAntes = docAct?.estado_cobro || '';
+  // V13.07 (Daniel 01/11, A19): con algo ya cobrado, pasar a un estado que no lo cuenta se avisa antes (antes se hacía sin preguntar y se veía el importe entero)
+  if(yaCobrado > 0 && !['parcial', 'cobrado', 'cobrado_otra', 'parcial_otra', 'cobrado_efectivo', 'pendiente_cobrar'].includes(valor)){
+    cerrarMenus();
+    const nomN = (ESTADOS_DOCUMENTO.find(o => o[0] === valor) || [, valor])[1];
+    const ok = await confirmarAccion((docAct?.numero || 'Este documento') + ' tiene ' + eur(yaCobrado) + ' cobrados. ¿Pasarlo a «' + nomN + '»?');
+    if(!ok){ renderControlDocs(); return; }
+  }
   // COBRADO = cobrado entero, en TODOS los tipos de documento (no solo facturas)
   if(valor==='cobrado_otra' || valor==='parcial_otra'){
     cerrarMenus();
@@ -31262,11 +31270,12 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   } else if(valor==='parcial'){
     // Cobro parcial: hay que decir cuánto se ha cobrado. Sin importe la base de datos lo devuelve a Por cobrar.
     cerrarMenus();
-    const r = await pedirCampos('Cobrado parcial · ' + (docAct?.client || 'documento'), [{id: 'importe', label: '¿Cuánto te ha pagado en total? (el documento es de ' + eur(totalDoc) + ')', tipo: 'number', valor: yaCobrado > 0 ? yaCobrado : '', placeholder: 'Importe en euros', requerido: true}]);
+    const hoyIso = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+    const r = await pedirCampos('Cobrado parcial · ' + (docAct?.client || 'documento'), [{id: 'importe', label: 'Cobrado en total (de ' + eur(totalDoc) + ')', tipo: 'number', valor: yaCobrado > 0 ? yaCobrado : '', placeholder: 'Importe en euros', requerido: true}, {id: 'fecha', label: 'Fecha del cobro', tipo: 'date', valor: hoyIso, requerido: true}]);   // V13.07 (Daniel 01/11): cada cobro parcial con su fecha
     if(!r){ renderControlDocs(); return; }
     const n = Math.round(Number(String(r.importe).replace(',', '.')) * 100) / 100;
     if(!(n > 0)){ mostrarToast('Escribe lo que te ha pagado, más de 0 €.', 'err'); renderControlDocs(); return; }
-    payload.cobrado_importe = n;
+    payload.cobrado_importe = n; _cobroFecha = r.fecha || hoyIso;
   } else if(valor==='pendiente_cobrar' && yaCobrado > 0 && docAct && ['parcial','cobrado'].includes(docAct.estado_cobro)){
     // Con algo cobrado la base de datos no deja Por cobrar: hay que poner lo cobrado a 0
     cerrarMenus();
@@ -31279,6 +31288,9 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   // lo que vale es lo que dejó la base de datos (calcula el estado según lo cobrado), no lo que se pidió
   if(guardado){ payload.estado_cobro = guardado.estado_cobro; if(guardado.cobrado_importe != null) payload.cobrado_importe = Number(guardado.cobrado_importe); }
   const pedido = valor; valor = payload.estado_cobro;
+  try{ const nuevoCob = payload.cobrado_importe != null ? Number(payload.cobrado_importe) : yaCobrado, dlt = Math.round((nuevoCob - yaCobrado) * 100) / 100;
+    if(dlt > 0) cobroRegistrar(docAct, dlt, _cobroFecha);
+    docEstadoLog(docAct, estadoAntes, valor, yaCobrado, nuevoCob); }catch(e){ console.error(e); }
   if(documentosRealesById[id]){ Object.assign(documentosRealesById[id], payload); }
   try{ await tbSyncDoc(id); }catch(e){ console.error(e); }   // V11.77: el trabajo enlazado sigue el estado de su documento
   if(valor === 'trabajo_activo'){ try{ await tbPausaDeDoc(id, enPausa); }catch(e){ console.error('En pausa', e); } }
@@ -31612,7 +31624,7 @@ function totalBlockHtml(doc){
   }
   const cob = Number(doc.cobrado_importe || 0);
   const cobroHtml = (doc.estado_cobro === 'parcial' && cob > 0 && cob < total)
-    ? `<div class="fc-total-mini"><span class="fc-total-label">Cobrado</span><span class="fc-total-sub n-pos">${cob.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</span></div><div class="fc-total-mini"><span class="fc-total-label">Falta</span><span class="fc-total-sub n-neg">${(total - cob).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</span></div>` : '';
+    ? `<div class="fc-total-mini"><span class="fc-total-label">Cobrado</span><span class="fc-total-sub n-pos">${cob.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €${cobroUltimaFecha(doc.id)}</span></div><div class="fc-total-mini"><span class="fc-total-label">Falta</span><span class="fc-total-sub n-neg">${(total - cob).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</span></div>` : '';
   return `${ivaHtml}${subtotalHtml}<div class="fc-total-mini"><span class="fc-total-label">Total</span><span class="fc-total-valor">${totalLabel}</span></div>${cobroHtml}`;
 }
 function ivaLineHtml(doc){
@@ -33174,6 +33186,23 @@ document.addEventListener('click', async ev => {
   mostrarToast(nuevo === 'en_b' ? 'Se cobra en B' : 'Se cobra en A', 'ok');
 }, true);
 document.addEventListener('exg-docs-listos', () => abDecorar(document.body));
+</script>
+<script>
+/* V13.07 (Daniel 01/11): cada cobro queda apuntado con su fecha, y cada cambio de estado de un documento queda registrado (sistema: cobro_doc y doc_estado_log) */
+let _cobrosDoc = {};
+async function cobrosCargar(){ try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'cobro_doc'); const M = {}; (data || []).forEach(x => { const d = x.data || {}; if(!d.doc_id) return; (M[d.doc_id] = M[d.doc_id] || []).push(d); }); Object.values(M).forEach(l => l.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))); _cobrosDoc = M; }catch(e){} }
+function cobroUltimaFecha(id){ const l = _cobrosDoc[id]; if(!l || !l.length) return ''; const f = String(l[l.length - 1].fecha || ''); return f ? ' · ' + f.slice(8, 10) + '/' + f.slice(5, 7) : ''; }
+async function cobroRegistrar(doc, importe, fecha){
+  if(!doc || !sb) return; const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+  const d = {doc_id: doc.id, numero: doc.numero || doc.num || '', tipo_doc: doc.type || doc.tipo || '', cliente: doc.client || '', fecha: fecha || hoy, importe: Number(importe), at: new Date().toISOString()};
+  (_cobrosDoc[doc.id] = _cobrosDoc[doc.id] || []).push(d);
+  try{ await sb.from('sistema').insert({tipo: 'cobro_doc', data: d}); }catch(e){ console.error('cobro', e); }
+}
+async function docEstadoLog(doc, antes, despues, cobAntes, cobDespues){
+  if(!doc || !sb || (antes === despues && Number(cobAntes) === Number(cobDespues))) return;
+  try{ await sb.from('sistema').insert({tipo: 'doc_estado_log', data: {doc_id: doc.id, numero: doc.numero || doc.num || '', antes, despues, cobrado_antes: Number(cobAntes || 0), cobrado_despues: Number(cobDespues || 0), at: new Date().toISOString()}}); }catch(e){ console.error('log', e); }
+}
+document.addEventListener('exg-docs-listos', () => { cobrosCargar(); });
 </script>
 </body>
 </html>
