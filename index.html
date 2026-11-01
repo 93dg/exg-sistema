@@ -5124,11 +5124,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.07" defer></script>
-<script src="costes/norm.js?v=V13.07" defer></script>
-<script src="ajustes/calc.js?v=V13.07" defer></script>
+<script src="rentabilidad/rent.js?v=V13.08" defer></script>
+<script src="costes/norm.js?v=V13.08" defer></script>
+<script src="ajustes/calc.js?v=V13.08" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.07</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.08</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5280,7 +5280,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.07</div>
+        <div class="sub" id="version-badge">V13.08</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -8966,7 +8966,7 @@ function ceEscenarios(){
 }
 function ceRender(){
   const app = document.getElementById('ce-app'); if(!app) return;
-  const ss = ceSS(CE.contrato, CE.at), netoAnual = CE.neto * CE.pagas, r = ceDesdeNeto(netoAnual, ss);
+  const ss = ceSS(CE.contrato, CE.at), ceJor = (Number(CE.jornada) || 100) / 100, netoAnual = CE.neto * CE.pagas * ceJor, r = ceDesdeNeto(netoAnual, ss);   // V13.08 (reporte 347406b5): la nómina elegida es la de jornada completa; con jornada parcial se cobra su parte y todo (B, alta, diferencia) baja en proporción
   const costeEmp = r.bruto + r.ssE + r.conv, enB = netoAnual;
   // Mínimo legal: el mayor entre el SMI (× jornada) y la tabla del convenio para el puesto, si la tenemos. Sin tabla, no se inventa: queda pendiente.
   const tablaConv = (CE_CONVENIO_TABLAS[CE.convenio] || {})[CE.puesto] || 0, convConocido = CE.convenio === 'ninguno' || tablaConv > 0;
@@ -8994,7 +8994,7 @@ function ceRender(){
   app.innerHTML = `
   <div class="panel ce-panel">
     <div class="ce-campos">
-      <label class="ce-c"><span>Nómina neta al mes</span><div class="pillsel" id="ce-neto" data-menu="1"></div></label>
+      <label class="ce-c"><span>${(Number(CE.jornada) || 100) < 100 ? 'Neto/mes a jornada completa' : 'Nómina neta al mes'}</span><div class="pillsel" id="ce-neto" data-menu="1"></div></label>
       <label class="ce-c"><span>Pagas al año</span><div class="pillsel" id="ce-pagas" data-menu="1"></div></label>
       <label class="ce-c"><span>Contrato</span><div class="pillsel" id="ce-contrato" data-menu="1"></div></label>
       <label class="ce-c"><span>Jornada</span><div class="pillsel" id="ce-jornada" data-menu="1"></div></label>
@@ -9002,7 +9002,7 @@ function ceRender(){
         <b>${bajoSMI ? 'Por debajo del mínimo' : convConocido ? 'Por encima del mínimo' : 'Mínimo por confirmar'}</b>
         <span>Mínimo: <b>${ceEur(smi / CE.pagas)}</b> brutos · <b>${ceEur(minNetoMes)}</b> netos/mes</span>
         ${(Number(CE.jornada) || 100) < 100 ? (() => { const pj = (Number(CE.jornada) || 100) / 100, hs = 40 * pj, hd = hs / 5, fmtH = h => { const m = Math.round(h * 60); return Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : ''); };   /* V8.14 (reporte de Daniel): cuántas horas son al día */
-          return `<span>Jornada ${Math.round(pj * 100)} %: <b>${fmtH(hd)} al día</b></span>`; })() : ''}
+          return `<span>Jornada ${Math.round(pj * 100)} %: <b>${fmtH(hd)} al día</b> · <b>${ceEur(CE.neto * pj)}</b> netos/mes</span>`; })() : ''}
         <span>${tablaConv ? 'Convenio ' + (CE_PUESTOS[CE.puesto] || [''])[0] + ' · ' + CE_NIVEL[CE.puesto] : 'SMI 2026'}</span>
       </div>
     </div>
@@ -9023,7 +9023,7 @@ function ceRender(){
       <label class="ce-c"><span>Familia (para su IRPF)</span><div class="pillsel" id="ce-familia" data-menu="1"></div></label>
       <label class="ce-c"><span>Hijos</span><div class="pillsel" id="ce-hijos" data-menu="1"></div></label>
       <label class="ce-c ce-ancho"><span>Accidentes de trabajo (%) · ${CE.atManual ? 'puesto a mano' : 'según el puesto'}</span><input type="number" inputmode="decimal" id="ce-at" value="${CE.at}" step="0.05"></label>
-      <label class="ce-c ce-ancho"><span>Retención IRPF del trabajador (%) · vacío = estimada</span><input type="number" inputmode="decimal" id="ce-ret" value="${CE.retencion}" placeholder="${(ceDesdeNeto(CE.neto * CE.pagas, ceSS(CE.contrato, CE.at)).irpf / ceDesdeNeto(CE.neto * CE.pagas, ceSS(CE.contrato, CE.at)).bruto * 100).toFixed(1)} (estimada)" step="0.5"></label>
+      <label class="ce-c ce-ancho"><span>Retención IRPF del trabajador (%) · vacío = estimada</span><input type="number" inputmode="decimal" id="ce-ret" value="${CE.retencion}" placeholder="${(ceDesdeNeto(CE.neto * CE.pagas * ((Number(CE.jornada) || 100) / 100), ceSS(CE.contrato, CE.at)).irpf / ceDesdeNeto(CE.neto * CE.pagas, ceSS(CE.contrato, CE.at)).bruto * 100).toFixed(1)} (estimada)" step="0.5"></label>
       <label class="ce-c ce-ancho"><span>Margen de beneficio (%) · 39 % en la renta de 2025</span><input type="number" inputmode="decimal" id="ce-margen" value="${CE.margen}" step="1"></label>
       <label class="ce-c ce-ancho"><span>Otro beneficio para probar (opcional)</span><input type="number" inputmode="decimal" id="ce-benef" value="${CE.beneficioReal || ''}" placeholder="opcional" step="500"></label>
     </div>`)}
@@ -9050,7 +9050,7 @@ function ceRender(){
   app.querySelectorAll('details.ce-pleg').forEach(d => d.addEventListener('toggle', () => cePlegGuardar(d.dataset.pleg, d.open)));
   document.getElementById('ce-pagas').value = String(CE.pagas);
   const ceSel = (id, ops, k, despues) => { if(!document.getElementById(id)) return; pillsSelIniciar(id, ops, v => { CE[k] = v; if(despues) despues(v); ceGuardar(); ceRender(); }); document.getElementById(id).value = CE[k]; };
-  { const ops = []; for(let n = 600; n <= 3000; n += 100) ops.push([String(n), n.toLocaleString('es-ES') + ' €' + (n < minNetoMes - 0.5 ? ' · bajo el mínimo' : '')]);
+  { const ops = []; for(let n = 600; n <= 3000; n += 100) ops.push([String(n), n.toLocaleString('es-ES') + ' €' + (n * ((Number(CE.jornada) || 100) / 100) < minNetoMes - 0.5 ? ' · bajo el mínimo' : '')]);
     if(!ops.some(o => o[0] === String(CE.neto))) ops.unshift([String(CE.neto), CE.neto.toLocaleString('es-ES') + ' €']);
     pillsSelIniciar('ce-neto', ops, v => { CE.neto = Number(v); ceGuardar(); ceRender(); }); document.getElementById('ce-neto').value = String(CE.neto); }
   ceSel('ce-contrato', [['indefinido', 'Indefinido'], ['temporal', 'Temporal']], 'contrato');
