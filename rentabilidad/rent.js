@@ -959,6 +959,7 @@ R.htmlPrecios = (T, enObra) => {
     + (enObra ? '' : '<div class="rt-ch" style="flex-wrap:nowrap;margin-top:10px;"><span>Ganar <b id="rt-pct-p">' + Math.min(100, Math.max(1, num(T.margen) || 1)) + ' %</b> neto</span><input type="range" min="1" max="100" step="1" value="' + Math.min(100, Math.max(1, num(T.margen) || 1)) + '" style="flex:1;accent-color:var(--orange);" oninput="document.getElementById(\'rt-pct-p\').textContent=this.value+\' %\'" onchange="RENT.setMargen(this.value)"></div>'));
 };
 // ---------- ¿Cómo de rentable es? (V11.62, Daniel 14/10/2026): margen neto, si el objetivo es razonable y rentabilidad sobre lo invertido, con referencias para comparar con otros negocios ----------
+R.REF_RENT = {letras: 2.7, empresas: 6.7, construccionROE: 3.1};   // Letras del Tesoro 12 meses (subastas 2026) · rentabilidad del activo de las empresas españolas (Banco de España, 2024) · rentabilidad de los fondos propios en construcción (BBVA Research, 2023). V13.26: se había borrado sin querer en V13.19 y Ren. obras dejó de funcionar
 R.htmlComparar = function(r, P){
   if(!r || r.vacio || !(r.ejecutado > 0)) return '';
   const m = num(R.param.margen), mg = r.neto / r.ejecutado * 100, dT = Object.keys(r.hDia || {}).length, jA = num(R.param.jornadas) || 250;
