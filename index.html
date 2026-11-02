@@ -927,6 +927,7 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 .fl-overlay{position:fixed;inset:0;z-index:9100;background:var(--concrete);display:none;flex-direction:column;}
 .fl-overlay.abierto{display:flex;}
 /* V13.28 (reporte 521227ee, Daniel: «no quiero páginas que ocupan toda la pantalla; que se despliegue ahí mismo y se pliegue tocando arriba»): la ficha de una máquina o de una persona se abre debajo de su tarjeta */
+.fl-oculta-ficha{display:none !important;}
 .fl-overlay.fl-inline{position:static;inset:auto;z-index:auto;background:var(--concrete);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:-2px 0 12px;grid-column:1/-1;}
 .fl-overlay.fl-inline .fl-cab{padding-top:10px;cursor:pointer;}
 .fl-overlay.fl-inline .fl-cab-top > .fl-ib[title="Cerrar"]{display:none;}
@@ -5166,11 +5167,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.35" defer></script>
-<script src="costes/norm.js?v=V13.35" defer></script>
-<script src="ajustes/calc.js?v=V13.35" defer></script>
+<script src="rentabilidad/rent.js?v=V13.36" defer></script>
+<script src="costes/norm.js?v=V13.36" defer></script>
+<script src="ajustes/calc.js?v=V13.36" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.35</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.36</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5322,7 +5323,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.35</div>
+        <div class="sub" id="version-badge">V13.36</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -20179,7 +20180,7 @@ function fcLineasHtml(d){
   const filas = cs.map((x, i) => { const q = x.cantidad != null && x.cantidad !== '' ? num(x.cantidad) + (x.unidad ? ' ' + x.unidad : '') : '', pu = precioLinea(x) != null ? eur(precioLinea(x)) : '';
     const sub = [q && pu ? q + ' × ' + pu : (q || pu), corta(x.fecha), x.maquina || ''].filter(Boolean).join(' · ');
     return '<div class="fc-l' + (i >= MAX ? ' fc-l-oc' : '') + '"><div class="fc-l-t"><span>' + e(x.descripcion || x.desc || x.concepto) + '</span><b>' + (x.importe != null && x.importe !== '' ? e(eur(x.importe)) : '') + '</b></div>' + (sub ? '<div class="fc-l-s">' + e(sub) + '</div>' : '') + '</div>'; }).join('');
-  const mas = cs.length > MAX ? '<div class="fc-l-btns"><button type="button" class="fc-l-mas" onclick="event.stopPropagation();fcLineasMas(this, 6)">Mostrar 6 más</button><button type="button" class="fc-l-mas" onclick="event.stopPropagation();fcLineasMas(this, 0)">Mostrar todas (' + cs.length + ')</button></div>' : '';
+  const mas = cs.length > MAX ? '<div class="fc-l-btns"><button type="button" class="fc-l-mas" onclick="event.stopPropagation();fcLineasMas(this, 6)">Mostrar más</button><button type="button" class="fc-l-mas" onclick="event.stopPropagation();fcLineasMas(this, 0)">Mostrar todas (' + cs.length + ')</button></div>' : '';
   return '<div class="fc-lineas">' + filas + mas + '</div>';
 }
 function fcLineasMas(btn, n){ const box = btn.closest('.fc-lineas'); if(!box) return; const oc = [...box.querySelectorAll(':scope > .fc-l.fc-l-oc')]; (n ? oc.slice(0, n) : oc).forEach(x => x.classList.remove('fc-l-oc')); if(!box.querySelector(':scope > .fc-l.fc-l-oc')) btn.closest('.fc-l-btns')?.remove(); }
@@ -20322,7 +20323,11 @@ let _ultToque = null; document.addEventListener('click', ev => { _ultToque = ev.
 function fichaEnLinea(ov){
   const o = _ultToque && _ultToque.closest ? _ultToque.closest('.fl-card, .per-tarj, .per-card, .fl-ven') : null;
   if(!o || o.closest('.fl-overlay') || !o.offsetParent){ ov.classList.remove('fl-inline'); if(ov.parentElement !== document.body) document.body.appendChild(ov); return false; }
-  ov.classList.add('fl-inline'); if(o.nextElementSibling !== ov) o.after(ov); ov._origen = o; return true;
+  ov.classList.add('fl-inline'); if(o.nextElementSibling !== ov) o.after(ov);
+  // V13.36 (reporte aed5a0c3, Daniel: «un despliegue es todo en la misma tarjeta, no separado, y no repitas»): la ficha ocupa el sitio de su tarjeta, que se oculta mientras está abierta
+  if(ov._origen && ov._origen !== o) ov._origen.classList.remove('fl-oculta-ficha'); ov._origen = o; o.classList.add('fl-oculta-ficha');
+  if(!ov._obsPleg){ ov._obsPleg = new MutationObserver(() => { if(!ov.classList.contains('abierto') || !ov.classList.contains('fl-inline')){ if(ov._origen) ov._origen.classList.remove('fl-oculta-ficha'); } }); ov._obsPleg.observe(ov, {attributes: true, attributeFilter: ['class']}); }
+  return true;
 }
 document.addEventListener('click', ev => {   // en línea, tocar la parte de arriba de la ficha la pliega
   const cab = ev.target.closest && ev.target.closest('.fl-overlay.fl-inline .fl-cab-top'); if(!cab || ev.target.closest('button:not(.fl-cab-top), a, input, select, textarea')) return;
@@ -20422,7 +20427,7 @@ async function flRecuperarDoc(id, path){
 }
 function renderFichaMaquina(){
   const ov = document.getElementById('fl-overlay'), m = flBuscar(_flFichaId); if(!ov || !m) return;
-  if(ov.classList.contains('fl-inline') && !ov.isConnected){ const t = document.querySelector('.fl-card[data-flota-id="' + _flFichaId + '"]'); if(t && t.offsetParent){ t.after(ov); ov._origen = t; } else { ov.classList.remove('fl-inline', 'abierto'); document.body.appendChild(ov); _flFichaId = null; return; } }   // V13.28: si la lista se ha vuelto a pintar, la ficha vuelve debajo de su tarjeta
+  if(ov.classList.contains('fl-inline') && !ov.isConnected){ const t = document.querySelector('.fl-card[data-flota-id="' + _flFichaId + '"]'); if(t && t.offsetParent){ t.after(ov); ov._origen = t; t.classList.add('fl-oculta-ficha'); } else { ov.classList.remove('fl-inline', 'abierto'); document.body.appendChild(ov); _flFichaId = null; return; } }   // V13.28: si la lista se ha vuelto a pintar, la ficha vuelve debajo de su tarjeta
   if(_flTab === 'itv') _flTab = 'tecnica'; if(_flTab === 'docs') _flTab = 'notas';
   if(!_flAsis && !_flAsisCargando){ _flAsisCargando = true; flAsisCargar().then(() => { _flAsisCargando = false; if(_flFichaId) renderFichaMaquina(); }); }
   const R = flParsear(m.fichaTecnica, m.name), nd = (m.documentos || []).filter(d => !d.retirado).length;
