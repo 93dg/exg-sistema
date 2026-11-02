@@ -5138,11 +5138,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.10" defer></script>
-<script src="costes/norm.js?v=V13.10" defer></script>
-<script src="ajustes/calc.js?v=V13.10" defer></script>
+<script src="rentabilidad/rent.js?v=V13.11" defer></script>
+<script src="costes/norm.js?v=V13.11" defer></script>
+<script src="ajustes/calc.js?v=V13.11" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.10</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.11</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5294,7 +5294,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.10</div>
+        <div class="sub" id="version-badge">V13.11</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -14833,7 +14833,9 @@ async function cargarAlertasYRecordatorios(){
   _recItv = null;
   try{
     const {data: fl} = await sb.from('flota').select('id,nombre,matricula,itv_vence,estado').not('itv_vence','is',null);
-    const avI = avisosItvFlota(fl, new Date()); window._recItvNombres = avI.map(x => x.v.nombre); _recItv = avI.map(htmlAvisoItv).join('');
+    // V13.11 (Daniel 02/11: «la ITV del Hyundai todavía aparece vencida y no aparece que vamos esta semana»): si el vehículo ya tiene su tarea de ITV pendiente (por matrícula en el título o en sus claves), manda la tarea con su fecha y el aviso «vencida» no sale
+    const mat = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''), pendTxt = _recItems.filter(r => r.tipo !== 'alerta_itv').map(r => mat(((r.data || {}).titulo || '') + JSON.stringify((r.data || {}).claves || [])));
+    const avI = avisosItvFlota(fl, new Date()).filter(a => { const m = mat(a.v.matricula); return !(m.length >= 5 && pendTxt.some(t => t.includes(m))); }); window._recItvNombres = avI.map(x => x.v.nombre); _recItv = avI.map(htmlAvisoItv).join('');
   }catch(e){}
   recRender();
   recMontarFiltro();
@@ -14841,12 +14843,13 @@ async function cargarAlertasYRecordatorios(){
 // RECORDATORIOS POR PLAZO (Daniel 02/10/2026): solo se ven los que tocan en la semana, el mes o el año elegido; los vencidos y los que no tienen fecha salen siempre
 let _recItems = [], _recItv = null, _recCargado = false;
 // V12.23 (Daniel 20/10: las averías en Tareas, en Flota → Averías y en la ficha): las averías y mantenimientos abiertos salen también en Tareas, con la misma tarjeta
+// V13.11 (Daniel 02/11: nada en Tareas sin fecha ni vencido): la avería sale con su fecha de revisión (flota_incidencias.revisar); sin fecha sale «Sin fecha» en rojo y la revisión de tareas la saca
 function recAveriasHtml(){   // V12.39 (reporte f409de12): en Tareas solo las averías que urgen (máquina parada o prioridad alta/media), plegadas en una línea como las demás tareas; el detalle, al abrirla
   const hoy = Date.now();
   return (typeof _flInc !== 'undefined' ? _flInc : []).filter(i => i.estado !== 'resuelta' && (i.tipo === 'averia' || i.tipo === 'mantenimiento') && (i.sigue_trabajando === false || ['alta', 'media'].includes(i.prioridad)))
     .sort((a, b) => ((b.sigue_trabajando === false) - (a.sigue_trabajando === false)) || String(a.fecha || '').localeCompare(String(b.fecha || '')))
     .map(i => { const dias = i.fecha ? Math.max(0, Math.floor((hoy - new Date(i.fecha + 'T00:00:00')) / 864e5)) : null, parada = i.sigue_trabajando === false;
-      return `<details class="alert-det rec-card t-flota"><summary class="alert-sum"><div class="t"><span class="rec-tit">${flE((i.flota?.nombre || '') + ': ' + String(i.descripcion || '').split(/[.\n]/)[0])}</span><span class="rec-fila"><span class="rec-est" style="--e:${parada ? 'var(--red)' : '#B7791F'}">${parada ? 'Parada' : (FL_INC_TIPO[i.tipo] || 'Avería') + ' · prioridad ' + flE(i.prioridad || '')}</span>${dias != null ? `<div class="rec-pil ${parada || dias > 14 ? 'roja' : dias > 3 ? 'ambar' : ''}">Desde hace ${dias} día${dias === 1 ? '' : 's'}</div>` : ''}</span></div></summary><div class="alert-det-b">${flIncCard(i)}</div></details>`; }).join('');
+      return `<details class="alert-det rec-card t-flota"><summary class="alert-sum"><div class="t"><span class="rec-tit">${flE((i.flota?.nombre || '') + ': ' + String(i.descripcion || '').split(/[.\n]/)[0])}</span><span class="rec-fila"><span class="rec-est" style="--e:${parada ? 'var(--red)' : '#B7791F'}">${parada ? 'Parada' : (FL_INC_TIPO[i.tipo] || 'Avería') + ' · prioridad ' + flE(i.prioridad || '')}</span>${i.revisar ? (() => { const r = Math.round((new Date(i.revisar + 'T00:00:00') - new Date(new Date().toDateString())) / 864e5), [y, m, d] = i.revisar.split('-'); return `<div class="rec-pil ${r < 0 || r <= 1 ? 'roja' : r <= 3 ? 'ambar' : ''}">${r < 0 ? 'Vencida hace ' + recTiempo(-r) : r === 0 ? 'Revisar hoy' : r === 1 ? 'Revisar mañana' : 'Revisar en ' + r + ' días'} · ${d}/${m}</div>`; })() : `<div class="rec-pil roja">Sin fecha</div>`}</span></div></summary><div class="alert-det-b">${flIncCard(i)}</div></details>`; }).join('');
 }
 
 // V8.57 (reporte de Daniel: «los filtros no están actualizados como estaba la web»): Documentos pendientes usa las mismas píldoras que el resto. Sin ninguna elegida = todos. Antes los desplegables del móvil no filtraban nada: renderControlDocs solo leía los de escritorio
