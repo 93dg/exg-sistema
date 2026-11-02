@@ -1903,6 +1903,13 @@ button.e2-fila{cursor:pointer;}
 .fc-total-mini:has(> .ab-tog) > .fc-total-valor{grid-column:2;grid-row:2;}   /* zona de toque cómoda; se ve solo la letra */   /* V13.05 (Daniel): la letra del botón, del mismo tamaño que la de los totales */
 .tb-ab{display:flex;justify-content:flex-end;align-items:center;gap:6px;font-weight:800;}
 /* V13.09 (Daniel 02/11: «la tarea tiene que tener todo lo que está asociado a ella y lo que está pendiente»): en cada tarea, lo que falta y lo ya hecho con su documento */
+.rec-nueva{font-size:11px;font-weight:800;color:var(--orange);border:1.5px solid var(--orange);border-radius:99px;padding:2px 8px;white-space:nowrap;}
+.rec-prueba{display:flex;flex-direction:column;gap:4px;margin:0 0 8px;padding:8px;border:2px solid var(--orange);border-radius:12px;}
+.rec-prueba > b{font-size:11px;font-weight:800;color:var(--orange);text-transform:uppercase;letter-spacing:.3px;}
+.rec-prueba .rp-f{display:flex;align-items:center;gap:8px;font-size:13px;}
+.rec-prueba .rp-f a, .rec-prueba .rp-f span.rp-t{flex:1;min-width:0;color:var(--ink);text-decoration:none;}
+.rec-prueba .rp-f i{font-style:normal;font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-right:6px;}
+.rec-prueba .rp-f button{all:unset;cursor:pointer;font-size:12px;font-weight:700;padding:4px 9px;border-radius:99px;border:1px solid var(--line);background:var(--paper);white-space:nowrap;}
 .rec-falta{display:flex;gap:8px;align-items:baseline;padding:8px 10px;margin:0 0 8px;border-radius:10px;background:#fbf2df;font-size:13px;}
 .rec-falta b{flex:0 0 auto;font-size:11px;font-weight:800;color:#8A6100;text-transform:uppercase;letter-spacing:.3px;}
 .rec-vinc{display:flex;flex-direction:column;gap:4px;margin:0 0 8px;}
@@ -5131,11 +5138,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.09" defer></script>
-<script src="costes/norm.js?v=V13.09" defer></script>
-<script src="ajustes/calc.js?v=V13.09" defer></script>
+<script src="rentabilidad/rent.js?v=V13.10" defer></script>
+<script src="costes/norm.js?v=V13.10" defer></script>
+<script src="ajustes/calc.js?v=V13.10" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.09</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.10</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5287,7 +5294,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.09</div>
+        <div class="sub" id="version-badge">V13.10</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -14830,6 +14837,7 @@ async function cargarAlertasYRecordatorios(){
   }catch(e){}
   recRender();
   recMontarFiltro();
+  try{ recPruebasCargar(); }catch(e){ console.error(e); }
 }
 // RECORDATORIOS POR PLAZO (Daniel 02/10/2026): solo se ven los que tocan en la semana, el mes o el año elegido; los vencidos y los que no tienen fecha salen siempre
 let _recItems = [], _recItv = null, _recCargado = false;
@@ -15084,11 +15092,12 @@ function recRender(){
     const est = E ? `<span class="rec-est" style="--e:${E[1]}" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">${E[0]}${d.con && !String(d.con).includes('@') && !recRepite(corto, d.con) ? ` <em>· ${escHtml(d.con)}</em>` : ''}</span>` : `<span class="rec-est sin" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">Poner estado</span>`;
     return `<details class="alert-det rec-card t-${tema}">
       <summary class="alert-sum">
-        <div class="t"><span class="rec-tit">${escHtml(corto)}</span><span class="rec-fila">${est}${pild}</span></div>
+        <div class="t"><span class="rec-tit">${escHtml(corto)}</span><span class="rec-fila">${est}${pild}${(window._recPruebas || {})[r.id] ? `<span class="rec-nueva">Prueba nueva</span>` : ''}</span></div>
       </summary>
       <div class="alert-det-b">
         ${largo ? `<div class="rec-largo">${escHtml(recSinGritos(largo))}</div>` : ''}
         <div class="rec-fte">Fuente · ${escHtml(d.fuente || (r.tipo === 'alerta_cobro_pendiente' ? 'documentos pendientes de cobro' : r.tipo === 'alerta_itv' ? 'ficha del vehículo' : d.origen === 'recordatorio' ? 'recordatorio' : 'chat con Claude'))}${d.archivo_url ? ' <a href="' + escHtml(d.archivo_url) + '" class="fte-lnk" onclick="event.stopPropagation()">Archivo</a>' : ''}</div>
+        ${recPruebasHtml(r)}
         ${d.falta ? `<div class="rec-falta"><b>Falta</b><span>${escHtml(d.falta)}</span></div>` : ''}
         ${Array.isArray(d.vinculos) && d.vinculos.some(x => x && x.etiqueta) ? `<div class="rec-vinc"><b>Hecho y asociado</b>${d.vinculos.filter(x => x && x.etiqueta).map(x => x.url ? `<a href="${escHtml(x.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${x.fecha ? `<i>${escHtml(String(x.fecha).slice(8, 10) + '/' + String(x.fecha).slice(5, 7))}</i>` : ''}${escHtml(x.etiqueta)}</a>` : `<span>${x.fecha ? `<i>${escHtml(String(x.fecha).slice(8, 10) + '/' + String(x.fecha).slice(5, 7))}</i>` : ''}${escHtml(x.etiqueta)}</span>`).join('')}</div>` : ''}
         ${desc ? recDetalleHtml(desc) : ''}
@@ -33212,6 +33221,75 @@ async function docEstadoLog(doc, antes, despues, cobAntes, cobDespues){
   try{ await sb.from('sistema').insert({tipo: 'doc_estado_log', data: {doc_id: doc.id, numero: doc.numero || doc.num || '', antes, despues, cobrado_antes: Number(cobAntes || 0), cobrado_despues: Number(cobDespues || 0), at: new Date().toISOString()}}); }catch(e){ console.error('log', e); }
 }
 document.addEventListener('exg-docs-listos', () => { cobrosCargar(); });
+</script>
+<script>
+/* V13.10 (Daniel 02/11, caso nave 7): la web busca SOLA, cada vez que carga las tareas, pruebas nuevas de cada tarea abierta en los documentos de empresa,
+   los correos que llegan, lo subido por Subir y el banco. Lo que encaja sale en la tarea como «Prueba nueva» para decir si es suya (se añade a Hecho y asociado) o no. */
+window._recPruebas = {};
+const REC_STOP = new Set('factura facturas recibo recibos cobro cobros pagar pagado pedir pedido esperar revisar comprobar confirmar sobre desde hasta para respuesta tarea tareas falta queda quedan antes despues después nuevo nueva cuando donde correo correos llamar mandar enviar enviado enviada hacer importe plazo fecha semana dinero cuenta cuentas total solicitud presentada presentar estado daniel rafael rafa manolo empresa web'.split(' '));
+const recNorm = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function recTokens(d){
+  const base = [d.titulo, d.titulo_corto, d.con, d.falta].filter(Boolean).join(' '), todo = base + ' ' + String(d.descripcion || '').slice(0, 600);
+  const fuertes = new Set();
+  (todo.match(/\b\d{4}\s?[A-Z]{3}\b/g) || []).forEach(x => fuertes.add(recNorm(x.replace(/\s/g, ''))));   // matrículas
+  (todo.match(/\b\d{3}\/[A-Z]{2}\/[A-Z]\/\d{4}\/\d+\b/g) || []).forEach(x => fuertes.add(recNorm(x)));   // registros del Ayuntamiento
+  (todo.match(/\b(?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{5,}\b/g) || []).forEach(x => fuertes.add(recNorm(x)));   // números de póliza, pedido, expediente
+  (todo.match(/\b\d{1,3}(?:\.\d{3})*,\d{2}\b/g) || []).forEach(x => fuertes.add(x));   // importes
+  const debiles = new Set(recNorm(base).split(/[^a-z0-9ñ]+/).filter(w => w.length >= 5 && !REC_STOP.has(w) && !/^\d+$/.test(w)));
+  return {fuertes, debiles};
+}
+function recDesde(r){
+  const d = r.data || {}; let f = String(r.created_at || '').slice(0, 10);
+  (Array.isArray(d.vinculos) ? d.vinculos : []).forEach(v => { if(v && v.fecha && v.fecha > f) f = v.fecha; });
+  if(d.estado_desde && d.estado_desde > f) f = d.estado_desde;
+  return f;
+}
+async function recPruebasCargar(){
+  if(!sb) return;
+  const hace = new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10);
+  const [de, ce, en, mb] = await Promise.all([
+    sb.from('documentos_empresa').select('id, nombre, info_clave, created_at, archivos').gte('created_at', hace),
+    sb.from('correo_entrante').select('message_id, de, asunto, extracto, fecha, estado').gte('fecha', hace).neq('estado', 'ignorado'),
+    sb.from('documentos').select('id, created_at, nota, linked_label, file_url').gte('created_at', hace),
+    sb.from('movimientos_banco').select('id, fecha, concepto, importe, nota').gte('fecha', hace)]);
+  const eur = n => Math.abs(Number(n || 0)).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const fuentes = [].concat(
+    (de.data || []).map(x => ({k: 'de:' + x.id, f: String(x.created_at).slice(0, 10), t: x.nombre + ' ' + (x.info_clave || ''), et: x.nombre, url: (Array.isArray(x.archivos) && x.archivos[0] && x.archivos[0].url) || null, tipo: 'Documento'})),
+    (ce.data || []).filter(x => !/ruralvia|aliexpress|amazon\.es/i.test(x.de || '')).map(x => ({k: 'ce:' + x.message_id, f: String(x.fecha).slice(0, 10), t: (x.de || '') + ' ' + (x.asunto || '') + ' ' + (x.extracto || ''), et: (String(x.de || '').replace(/<.*>/, '').replace(/"/g, '').trim()) + ': ' + (x.asunto || ''), url: 'https://mail.google.com/mail/u/0/#all/' + x.message_id, tipo: 'Correo'})),
+    (en.data || []).filter(x => x.nota || x.linked_label).map(x => ({k: 'en:' + x.id, f: String(x.created_at).slice(0, 10), t: (x.nota || '') + ' ' + (x.linked_label || ''), et: x.nota || x.linked_label, url: x.file_url || null, tipo: 'Subir'})),
+    (mb.data || []).map(x => ({k: 'mb:' + x.id, f: String(x.fecha).slice(0, 10), t: (x.concepto || '') + ' ' + eur(x.importe) + ' ' + (x.nota || ''), et: (x.concepto || '').replace(/\(aviso del banco\)/, '').trim() + ' · ' + (Number(x.importe) < 0 ? '−' : '') + eur(x.importe) + ' €', url: null, tipo: 'Banco'})));
+  const P = {};
+  _recItems.filter(r => r.tipo === 'recordatorio').forEach(r => {
+    const d = r.data || {}, {fuertes, debiles} = recTokens(d), desde = recDesde(r), ign = new Set(d.pruebas_no || []), ya = new Set((Array.isArray(d.vinculos) ? d.vinculos : []).flatMap(v => v ? [v.k, v.url] : []).filter(Boolean));
+    const l = fuentes.filter(x => x.f >= desde && !ign.has(x.k) && !ya.has(x.k) && !(x.url && ya.has(x.url))).filter(x => {
+      const t = recNorm(x.t), tNum = String(x.t);
+      if([...fuertes].some(w => w.length >= 5 && (t.includes(w) || tNum.includes(w)))) return true;
+      let n = 0; for(const w of debiles){ if(t.includes(w)) n++; if(n >= 2) return true; } return false; });
+    if(l.length) P[r.id] = l.slice(0, 5);
+  });
+  window._recPruebas = P; recRender();
+}
+function recPruebasHtml(r){
+  const l = (window._recPruebas || {})[r.id]; if(!l || !l.length) return '';
+  const f = x => String(x.f).slice(8, 10) + '/' + String(x.f).slice(5, 7);
+  return `<div class="rec-prueba"><b>Prueba nueva · ¿es de esta tarea?</b>${l.map((x, i) => `<div class="rp-f">${x.url ? `<a href="${escHtml(x.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><i>${f(x)} · ${x.tipo}</i>${escHtml(x.et)}</a>` : `<span class="rp-t"><i>${f(x)} · ${x.tipo}</i>${escHtml(x.et)}</span>`}<button type="button" onclick="event.stopPropagation();recPruebaSi('${r.id}', ${i})">Sí</button><button type="button" onclick="event.stopPropagation();recPruebaNo('${r.id}', ${i})">No</button></div>`).join('')}</div>`;
+}
+async function recPruebaGuardar(id, cambio){
+  const r = _recItems.find(x => x.id === id); if(!r) return; r.data = {...(r.data || {}), ...cambio(r.data || {})};
+  const {error} = await sb.from('sistema').update({data: r.data}).eq('id', id); if(error){ mostrarToast('No se pudo guardar: ' + errText(error), 'err'); return; }
+}
+async function recPruebaSi(id, i){
+  const x = ((window._recPruebas || {})[id] || [])[i]; if(!x) return;
+  await recPruebaGuardar(id, d => ({vinculos: (Array.isArray(d.vinculos) ? d.vinculos : []).concat([{k: x.k, fecha: x.f, etiqueta: x.tipo + ' · ' + x.et, url: x.url || undefined}])}));
+  window._recPruebas[id] = window._recPruebas[id].filter((_, j) => j !== i); if(!window._recPruebas[id].length) delete window._recPruebas[id];
+  recRender(); mostrarToast('Añadido a la tarea', 'ok');
+}
+async function recPruebaNo(id, i){
+  const x = ((window._recPruebas || {})[id] || [])[i]; if(!x) return;
+  await recPruebaGuardar(id, d => ({pruebas_no: (d.pruebas_no || []).concat([x.k])}));
+  window._recPruebas[id] = window._recPruebas[id].filter((_, j) => j !== i); if(!window._recPruebas[id].length) delete window._recPruebas[id];
+  recRender();
+}
 </script>
 </body>
 </html>
