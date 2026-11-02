@@ -930,7 +930,7 @@ R.preciosDe = function(r){
   const nv = R.niveles4(r), tm = r.ejecutado / r.H;
   return {filas, obra: r.job.trabajo, horas: r.H, tarifaMedia: tm, minMedio: R.objetivo(r.directo + r.indirecto, r.socios.valor, t, 0) / r.H, objMedio: nv.n4 / r.H, impuesto: R.param.impuesto, margen: R.param.margen};
 };
-R.tablaPrecios = function(P){ const ref = R.referencia(P); if(!ref || !P.costes) return null; return R.preciosDe(R.calcular(ref.job, P, R.asignar(P))); };
+R.tablaPrecios = function(P){ const ref = R.referencia(P); if(!ref || !P.costes) return null; const T = R.preciosDe(R.calcular(ref.job, P, R.asignar(P))); if(T){ try{ T.horasAnio = R.empresaVentana(P, new Date().toISOString().slice(0, 10)).horasClase || null; }catch(e){ T.horasAnio = null; } } return T; };   // V13.19: con las horas reales de cada máquina en los últimos 12 meses (albaranes), para el neto al mes y al año
 // V12.43 (Daniel 23/10/2026): cuenta de un viaje en el editor del albarán: horas internas de cada máquina ÷ número de viajes, a los precios por hora de «¿Estamos en precio?»
 R.cuentaViaje = async function(hi, viajes, precio){
   const P = await R.cargar(false), T = R.tablaPrecios(P); if(!T) return null;
@@ -942,18 +942,23 @@ R.cuentaViaje = async function(hi, viajes, precio){
 };
 R.htmlPrecios = (T, enObra) => {
   const caja = h => enObra ? '<div class="rt-c">' + h + '</div>' : '<div class="panel" style="padding:12px;margin-top:12px;">' + h + '</div>';
-  if(!T) return caja('<div style="font-size:12.5px;color:var(--ink-soft);">¿Estamos en precio? Aún no hay una obra con horas completas para calcularlo.</div>');
-  const f = T.filas, okO = f.filter(x => x.tarifa >= x.obj).length, okM = f.filter(x => x.tarifa >= x.min).length, r2 = v => eur(v, 2) + '/h';
+  if(!T) return caja('<div style="font-size:12.5px;color:var(--ink-soft);">Rentabilidad por máquina: aún no hay una obra con horas completas para calcularlo.</div>');
+  const f = T.filas, r2 = v => eur(v, 2) + '/h';
   const sr = (a, b2, c) => '<div class="rt-sim-r"><span>' + a + '</span><b' + (c ? ' style="color:' + c + ';"' : '') + '>' + b2 + '</b></div>';
   // V11.30 (reporte 00aea0c7): una línea por máquina, sin tabla; V11.62: se toca y despliega ahí mismo su cuenta; la diferencia es con el precio objetivo, en verde o rojo por su signo
-  const rows = f.map(x => { const dO = x.tarifa - x.obj, dM = x.tarifa - x.min, est = dO >= 0 ? 'En precio' : dM >= 0 ? 'Cubre costes' : 'No cubre costes';   // V12.90 (reporte dd11f631, «¿qué objetivo?»): se dice cuál: el precio para ganar el % limpio del marcador
-    return '<details class="rt-nd"><summary><div class="rt-sim-r"><span style="flex:1;min-width:0;font-weight:700;">' + esc(x.nombre) + '<small style="display:block;color:var(--ink-soft);font-size:10.5px;font-weight:400;">' + est + ' · para ganar el ' + T.margen + ' %: ' + r2(x.obj) + '</small></span><span style="text-align:right;white-space:nowrap;"><b>' + r2(x.tarifa) + '</b><small style="display:block;font-size:10.5px;font-weight:700;color:' + col(dO) + ';">' + (dO >= 0 ? '+' : '') + eur(dO, 2) + '</small></span></div></summary><div class="rt-bd">'
-      + sr('Tarifa', r2(x.tarifa)) + sr('Coste completo', r2(x.coste), RJ) + sr('Mínimo (coste + impuestos)', r2(x.min), RJ) + sr('Precio para ganar el ' + T.margen + ' % limpio', r2(x.obj)) + sr('Diferencia con el mínimo', (dM >= 0 ? '+' : '') + eur(dM, 2), col(dM)) + sr('Diferencia con el objetivo', (dO >= 0 ? '+' : '') + eur(dO, 2), col(dO)) + sr('Horas en la obra', h1(x.horas) + ' h') + '</div></details>'; }).join('');
-  return caja('<div style="font-weight:800;font-size:14px;">¿Estamos en precio?</div><div style="font-size:12px;color:var(--ink-soft);margin:2px 0 8px;">' + okO + ' de ' + f.length + ' máquinas llega' + (okO === 1 ? '' : 'n') + ' a ganar el ' + T.margen + ' % limpio y ' + okM + ' cubre' + (okM === 1 ? '' : 'n') + ' su coste. La tarifa media es de <span style="white-space:nowrap;">' + r2(T.tarifaMedia) + '</span>, el mínimo es <span style="white-space:nowrap;">' + r2(T.minMedio) + '</span> y para ganar el ' + T.margen + ' % <span style="white-space:nowrap;">' + r2(T.objMedio) + '.</span></div><div>' + rows + '</div>'
-    + (enObra ? '' : '<div class="rt-ch" style="flex-wrap:nowrap;margin-top:10px;"><span>Ganar <b id="rt-pct-p">' + Math.min(100, Math.max(1, num(T.margen) || 1)) + ' %</b> limpio</span><input type="range" min="1" max="100" step="1" value="' + Math.min(100, Math.max(1, num(T.margen) || 1)) + '" style="flex:1;accent-color:var(--orange);" oninput="document.getElementById(\'rt-pct-p\').textContent=this.value+\' %\'" onchange="RENT.setMargen(this.value)"></div>'));   // V12.91 (Daniel: «no quiero notas, quiero ahí ajustar el objetivo»): sin la nota; en Economía se ajusta aquí el % (el mismo dato que el marcador de Ren. obras)
+  // V13.19 (reporte 757f6d16, Daniel 02/11: «¿Estamos en precio? suena coloquial; no sé lo que representa al mes neto ni al año»): se llama Rentabilidad por máquina;
+  // cada máquina, su tarifa y lo que deja limpio (tarifa − mínimo, ya con impuestos) al mes y al año con las horas reales de los últimos 12 meses; al final, el total
+  const HA = T.horasAnio || null, hA = x => HA ? num(HA[x.clase]) : 0, netoA = x => (x.tarifa - x.min) * hA(x);
+  const rows = f.map(x => { const dO = x.tarifa - x.obj, dM = x.tarifa - x.min, na = netoA(x);
+    const sub = HA ? (hA(x) > 0 ? 'Neto ' + eur(na / 12) + '/mes · ' + eur(na) + '/año' : 'Sin horas en los últimos 12 meses') : 'Neto ' + (dM >= 0 ? '+' : '') + eur(dM, 2) + ' por hora';
+    return '<details class="rt-nd"><summary><div class="rt-sim-r"><span style="flex:1;min-width:0;font-weight:700;">' + esc(x.nombre) + '<small style="display:block;font-size:10.5px;font-weight:700;color:' + col(HA ? na : dM) + ';">' + sub + '</small></span><span style="text-align:right;white-space:nowrap;"><b>' + r2(x.tarifa) + '</b></span></div></summary><div class="rt-bd">'
+      + sr('Tarifa', r2(x.tarifa)) + sr('Coste completo', r2(x.coste), RJ) + sr('Mínimo (coste + impuestos)', r2(x.min), RJ) + sr('Neto por hora', (dM >= 0 ? '+' : '') + eur(dM, 2), col(dM)) + (HA ? sr('Horas en 12 meses', h1(hA(x)) + ' h') + sr('Neto al mes', eur(na / 12), col(na)) + sr('Neto al año', eur(na), col(na)) : '') + sr('Precio para ganar el ' + T.margen + ' % limpio', r2(x.obj)) + sr('Diferencia con ese precio', (dO >= 0 ? '+' : '') + eur(dO, 2), col(dO)) + '</div></details>'; }).join('');
+  const tot = HA ? sum(f, netoA) : null;
+  return caja('<div style="font-weight:800;font-size:14px;margin-bottom:6px;">Rentabilidad por máquina</div><div>' + rows + '</div>'
+    + (HA ? '<div class="rt-sim-r" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px;"><span style="font-weight:800;">Total<small style="display:block;font-size:10.5px;font-weight:700;color:' + col(tot) + ';">Neto ' + eur(tot / 12) + '/mes</small></span><b style="color:' + col(tot) + ';">' + eur(tot) + '/año</b></div>' : '')
+    + (enObra ? '' : '<div class="rt-ch" style="flex-wrap:nowrap;margin-top:10px;"><span>Ganar <b id="rt-pct-p">' + Math.min(100, Math.max(1, num(T.margen) || 1)) + ' %</b> limpio</span><input type="range" min="1" max="100" step="1" value="' + Math.min(100, Math.max(1, num(T.margen) || 1)) + '" style="flex:1;accent-color:var(--orange);" oninput="document.getElementById(\'rt-pct-p\').textContent=this.value+\' %\'" onchange="RENT.setMargen(this.value)"></div>'));
 };
 // ---------- ¿Cómo de rentable es? (V11.62, Daniel 14/10/2026): margen neto, si el objetivo es razonable y rentabilidad sobre lo invertido, con referencias para comparar con otros negocios ----------
-R.REF_RENT = {letras: 2.7, empresas: 6.7, construccionROE: 3.1};   // Letras del Tesoro 12 meses (subastas 2026) · rentabilidad del activo de las empresas españolas (Banco de España, 2024) · rentabilidad de los fondos propios en construcción (BBVA Research, 2023)
 R.htmlComparar = function(r, P){
   if(!r || r.vacio || !(r.ejecutado > 0)) return '';
   const m = num(R.param.margen), mg = r.neto / r.ejecutado * 100, dT = Object.keys(r.hDia || {}).length, jA = num(R.param.jornadas) || 250;
