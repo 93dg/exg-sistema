@@ -1915,7 +1915,7 @@ button.e2-fila{cursor:pointer;}
 .rec-vinc{display:flex;flex-direction:column;gap:4px;margin:0 0 8px;}
 .rec-vinc > b{font-size:11px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.3px;}
 .rec-vinc > a, .rec-vinc > span{display:flex;gap:8px;align-items:baseline;font-size:13px;color:var(--ink);text-decoration:none;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--paper);}
-.rec-vinc > a{color:var(--ink);} .rec-vinc i{font-style:normal;font-size:11.5px;font-weight:700;color:var(--ink-soft);flex:0 0 auto;}
+.rec-vinc > a{color:var(--ink);} .rec-vinc > .rv-auto{border:2px solid var(--orange);} .rec-vinc i{font-style:normal;font-size:11.5px;font-weight:700;color:var(--ink-soft);flex:0 0 auto;}
 .dir-pest{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-bottom:10px;}   /* V12.96 (reporte f8101005): cuadrícula fija, 3 arriba y 2 abajo del mismo ancho; nada suelto en una fila */
 .dir-pest button{all:unset;box-sizing:border-box;cursor:pointer;white-space:nowrap;text-align:center;padding:9px 12px;border-radius:99px;font-weight:800;font-size:13px;background:var(--paper);border:1px solid var(--line);color:var(--ink);}
 .dir-pest button.act{background:var(--orange);border-color:var(--orange);color:#fff;}
@@ -14837,7 +14837,6 @@ async function cargarAlertasYRecordatorios(){
   }catch(e){}
   recRender();
   recMontarFiltro();
-  try{ recPruebasCargar(); }catch(e){ console.error(e); }
 }
 // RECORDATORIOS POR PLAZO (Daniel 02/10/2026): solo se ven los que tocan en la semana, el mes o el año elegido; los vencidos y los que no tienen fecha salen siempre
 let _recItems = [], _recItv = null, _recCargado = false;
@@ -15092,14 +15091,13 @@ function recRender(){
     const est = E ? `<span class="rec-est" style="--e:${E[1]}" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">${E[0]}${d.con && !String(d.con).includes('@') && !recRepite(corto, d.con) ? ` <em>· ${escHtml(d.con)}</em>` : ''}</span>` : `<span class="rec-est sin" onclick="event.preventDefault();event.stopPropagation();recCambiarEstado('${r.id}')">Poner estado</span>`;
     return `<details class="alert-det rec-card t-${tema}">
       <summary class="alert-sum">
-        <div class="t"><span class="rec-tit">${escHtml(corto)}</span><span class="rec-fila">${est}${pild}${(window._recPruebas || {})[r.id] ? `<span class="rec-nueva">Prueba nueva</span>` : ''}</span></div>
+        <div class="t"><span class="rec-tit">${escHtml(corto)}</span><span class="rec-fila">${est}${pild}${d.prueba_nueva ? `<span class="rec-nueva">Novedad</span>` : ''}</span></div>
       </summary>
       <div class="alert-det-b">
         ${largo ? `<div class="rec-largo">${escHtml(recSinGritos(largo))}</div>` : ''}
         <div class="rec-fte">Fuente · ${escHtml(d.fuente || (r.tipo === 'alerta_cobro_pendiente' ? 'documentos pendientes de cobro' : r.tipo === 'alerta_itv' ? 'ficha del vehículo' : d.origen === 'recordatorio' ? 'recordatorio' : 'chat con Claude'))}${d.archivo_url ? ' <a href="' + escHtml(d.archivo_url) + '" class="fte-lnk" onclick="event.stopPropagation()">Archivo</a>' : ''}</div>
-        ${recPruebasHtml(r)}
         ${d.falta ? `<div class="rec-falta"><b>Falta</b><span>${escHtml(d.falta)}</span></div>` : ''}
-        ${Array.isArray(d.vinculos) && d.vinculos.some(x => x && x.etiqueta) ? `<div class="rec-vinc"><b>Hecho y asociado</b>${d.vinculos.filter(x => x && x.etiqueta).map(x => x.url ? `<a href="${escHtml(x.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${x.fecha ? `<i>${escHtml(String(x.fecha).slice(8, 10) + '/' + String(x.fecha).slice(5, 7))}</i>` : ''}${escHtml(x.etiqueta)}</a>` : `<span>${x.fecha ? `<i>${escHtml(String(x.fecha).slice(8, 10) + '/' + String(x.fecha).slice(5, 7))}</i>` : ''}${escHtml(x.etiqueta)}</span>`).join('')}</div>` : ''}
+        ${Array.isArray(d.vinculos) && d.vinculos.some(x => x && x.etiqueta) ? `<div class="rec-vinc"><b>Hecho y asociado</b>${d.vinculos.filter(x => x && x.etiqueta).map(x => x.url ? `<a class="${x.auto ? 'rv-auto' : ''}" href="${escHtml(x.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${x.fecha ? `<i>${escHtml(String(x.fecha).slice(8, 10) + '/' + String(x.fecha).slice(5, 7))}</i>` : ''}${escHtml(x.etiqueta)}</a>` : `<span class="${x.auto ? 'rv-auto' : ''}">${x.fecha ? `<i>${escHtml(String(x.fecha).slice(8, 10) + '/' + String(x.fecha).slice(5, 7))}</i>` : ''}${escHtml(x.etiqueta)}</span>`).join('')}</div>` : ''}
         ${desc ? recDetalleHtml(desc) : ''}
         ${d.en_bandeja ? '<div class="s" style="margin-top:6px;color:var(--orange);font-weight:700;">En la bandeja' + (d.orden_bandeja ? ': ' + escHtml(d.orden_bandeja) : '') + '</div>' : ''}
         <div class="rec-acc">${d.ver ? (Array.isArray(d.ver) ? d.ver : [d.ver]).map((v, i) => `<button type="button" class="rec-b rec-b-pri" onclick="recVer('${r.id}', ${i})">${escHtml(v.etiqueta || 'Ver')}</button>`).join('') : ''}<button type="button" class="rec-b ${d.ver ? '' : 'rec-b-pri'}" onclick="recABandeja('${r.id}')">A la bandeja</button><button type="button" class="rec-b" onclick="recPosponer('${r.id}')">Posponer</button><button type="button" class="rec-b" onclick="marcarRecordatorioResuelto('${r.id}')">Hecho</button></div>
