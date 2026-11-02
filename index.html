@@ -5166,11 +5166,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.34" defer></script>
-<script src="costes/norm.js?v=V13.34" defer></script>
-<script src="ajustes/calc.js?v=V13.34" defer></script>
+<script src="rentabilidad/rent.js?v=V13.35" defer></script>
+<script src="costes/norm.js?v=V13.35" defer></script>
+<script src="ajustes/calc.js?v=V13.35" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.34</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.35</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5322,7 +5322,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.34</div>
+        <div class="sub" id="version-badge">V13.35</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -31102,11 +31102,15 @@ function econEnlazadosAFactura(docs){
 function factorSubtotal(d){ if(d.base != null && d.total) return Number(d.base) / Number(d.total); const p = d.iva_pct != null ? d.iva_pct : d.ivaPct; return 1 / (1 + (p != null ? Number(p) : 21) / 100); }
 function econImporteSinFactura(d, enlazados){
   if(d.type !== 'proforma' && d.type !== 'albaran') return 0;
-  if(d.deleted_at || d.documento_siguiente_id || (enlazados && enlazados.has(d.id))) return 0;
+  // V13.35 (Daniel 02/11: «¿y cuenta como ingreso en B?»): lo pagado en B de un albarán es ingreso en B aunque luego se facture el resto (la factura solo lleva lo demás)
+  const enB = (typeof _cobrosDoc !== 'undefined' && _cobrosDoc[d.id] || []).filter(x => x.en_b).reduce((a, x) => a + (Number(x.importe) || 0), 0);
+  if(d.deleted_at) return 0;
+  if(d.documento_siguiente_id || (enlazados && enlazados.has(d.id))) return enB * factorSubtotal(d);
   if(esAdministracion(d.client)) return 0;
   const f = factorSubtotal(d);
   if(d.estado_cobro === 'cobrado') return Number(d.total || 0) * f;
   if(d.estado_cobro === 'parcial') return Math.min(Number(d.total || 0), Number(d.cobrado_importe || 0)) * f;
+  if(!['nula', 'cancelado', 'anulado', 'rectificativa', 'cobrado_otra', 'parcial_otra'].includes(d.estado_cobro) && Number(d.cobrado_importe || 0) > 0) return Math.min(Number(d.total || 0), Number(d.cobrado_importe)) * f;   // pagado a cuenta de un trabajo en marcha o en pausa
   return 0;
 }
 const esAdministracion = nombre => /(AYUNTAMIENTO|AYTO\.|DIPUTACI|JUNTA DE ANDALUC|CONSEJER|MINISTERIO|MANCOMUNIDAD|CONFEDERACI)/i.test(String(nombre || ''));
