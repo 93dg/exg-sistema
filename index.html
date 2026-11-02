@@ -1915,6 +1915,8 @@ button.e2-fila{cursor:pointer;}
 .ab-m.ab-b{background:var(--red);border-color:var(--red);color:#fff;}
 .cc-fc-imp.ab-con{display:flex !important;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px;}
 .cc-fc-imp.ab-con:has(> .cc-fc-pag){display:grid !important;grid-template-columns:auto auto;justify-content:end;align-items:center;column-gap:6px;row-gap:1px;}
+.fc-tot-col{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+.fc-pag-r{display:flex;justify-content:flex-end;align-items:baseline;gap:12px;font-size:14px;white-space:nowrap;} .fc-pag-r b{font-weight:800;} .fc-pag-r.n-neg{color:var(--red);} .fc-pag-pend{font-size:17px;}
 .cc-fc-pag{grid-column:1 / -1;display:block;text-align:right;font-size:11px;font-weight:700;color:var(--red);white-space:nowrap;line-height:1.2;}   /* V13.33: lo pagado, debajo de lo que falta */   /* V13.06 (Daniel): la letra a la izquierda del precio */
 .ab-tog{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;padding:6px;margin:-6px 0;}
 .fc-total-mini:has(> .ab-tog){display:grid !important;grid-template-columns:auto auto;column-gap:4px;align-items:center;justify-content:end;}
@@ -5105,6 +5107,7 @@ span.tp-albaran, span.tp-factura, span.tp-proforma, span.tp-presupuesto, span.tp
 .fc-l-t{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:13px;font-weight:600;line-height:1.3;} .fc-l-t b{white-space:nowrap;font-weight:800;}
 .fc-l-s{font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
 .fc-sin{margin-top:6px;padding-top:8px;border-top:1px dashed var(--line);font-size:12.5px;color:var(--ink-soft);}
+.fc-l.fc-l-oc{display:none !important;} .fc-l-btns{display:flex;gap:18px;align-self:flex-start;}
 .fc-l-mas{align-self:flex-start;background:none;border:none;padding:4px 0;color:var(--orange);font-weight:800;font-size:13px;}
 /* V8.67 (reporte de Daniel: «al reportar sale bien y como lo veo yo no»): el desplegable de estado se cortaba al llegar al borde de la tarjeta porque las tarjetas recortan lo que se sale de ellas; la captura no lo hacía y por eso salía completo. La tarjeta con el menú abierto no recorta */
 .factura-card-movil.fc-menu-abierto, .factura-card-movil:has(.estado-cobro-dd.open){content-visibility:visible !important;contain:none !important;overflow:visible !important;position:relative;z-index:40;}
@@ -5163,11 +5166,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.33" defer></script>
-<script src="costes/norm.js?v=V13.33" defer></script>
-<script src="ajustes/calc.js?v=V13.33" defer></script>
+<script src="rentabilidad/rent.js?v=V13.34" defer></script>
+<script src="costes/norm.js?v=V13.34" defer></script>
+<script src="ajustes/calc.js?v=V13.34" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.33</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.34</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5319,7 +5322,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.33</div>
+        <div class="sub" id="version-badge">V13.34</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -20172,13 +20175,14 @@ function fcLineasHtml(d){
   if(!cs.length) return '<div class="fc-sin">Sin líneas</div>';
   const e = x => escHtml(String(x == null ? '' : x)), eur = x => Number(x || 0).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €', num = x => Number(x).toLocaleString('es-ES', {maximumFractionDigits: 2});
   const corta = f => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(f || '')); return m ? m[3] + '/' + m[2] : ''; };
-  const MAX = 25;
-  const filas = cs.slice(0, MAX).map(x => { const q = x.cantidad != null && x.cantidad !== '' ? num(x.cantidad) + (x.unidad ? ' ' + x.unidad : '') : '', pu = precioLinea(x) != null ? eur(precioLinea(x)) : '';
+  const MAX = 6;   // V13.34 (Daniel 02/11): se ven 6 líneas; «Mostrar 6 más» va de 6 en 6 y «Mostrar todas» las despliega todas, ahí mismo (nunca abre el editor)
+  const filas = cs.map((x, i) => { const q = x.cantidad != null && x.cantidad !== '' ? num(x.cantidad) + (x.unidad ? ' ' + x.unidad : '') : '', pu = precioLinea(x) != null ? eur(precioLinea(x)) : '';
     const sub = [q && pu ? q + ' × ' + pu : (q || pu), corta(x.fecha), x.maquina || ''].filter(Boolean).join(' · ');
-    return '<div class="fc-l"><div class="fc-l-t"><span>' + e(x.descripcion || x.desc || x.concepto) + '</span><b>' + (x.importe != null && x.importe !== '' ? e(eur(x.importe)) : '') + '</b></div>' + (sub ? '<div class="fc-l-s">' + e(sub) + '</div>' : '') + '</div>'; }).join('');
-  const mas = cs.length > MAX ? '<button type="button" class="fc-l-mas" onclick="event.stopPropagation();openDocumentViewer(\'' + d.id + '\')">Ver las ' + cs.length + ' líneas</button>' : '';
+    return '<div class="fc-l' + (i >= MAX ? ' fc-l-oc' : '') + '"><div class="fc-l-t"><span>' + e(x.descripcion || x.desc || x.concepto) + '</span><b>' + (x.importe != null && x.importe !== '' ? e(eur(x.importe)) : '') + '</b></div>' + (sub ? '<div class="fc-l-s">' + e(sub) + '</div>' : '') + '</div>'; }).join('');
+  const mas = cs.length > MAX ? '<div class="fc-l-btns"><button type="button" class="fc-l-mas" onclick="event.stopPropagation();fcLineasMas(this, 6)">Mostrar 6 más</button><button type="button" class="fc-l-mas" onclick="event.stopPropagation();fcLineasMas(this, 0)">Mostrar todas (' + cs.length + ')</button></div>' : '';
   return '<div class="fc-lineas">' + filas + mas + '</div>';
 }
+function fcLineasMas(btn, n){ const box = btn.closest('.fc-lineas'); if(!box) return; const oc = [...box.querySelectorAll(':scope > .fc-l.fc-l-oc')]; (n ? oc.slice(0, n) : oc).forEach(x => x.classList.remove('fc-l-oc')); if(!box.querySelector(':scope > .fc-l.fc-l-oc')) btn.closest('.fc-l-btns')?.remove(); }
 function fcAlternar(card){
   const abrir = !card.classList.contains('fc-abierta'); card.classList.toggle('fc-abierta', abrir);
   if(!abrir) return;
@@ -31739,7 +31743,12 @@ function totalBlockHtml(doc){
   const cob = Number(doc.cobrado_importe || 0);
   const cobroHtml = (doc.estado_cobro === 'parcial' && cob > 0 && cob < total)
     ? `<div class="fc-total-mini"><span class="fc-total-label">Cobrado</span><span class="fc-total-sub n-pos">${cob.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €${cobroUltimaFecha(doc.id)}</span></div><div class="fc-total-mini"><span class="fc-total-label">Falta</span><span class="fc-total-sub n-neg">${(total - cob).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</span></div>` : '';
-  return `${ivaHtml}${subtotalHtml}<div class="fc-total-mini"><span class="fc-total-label">Total</span><span class="fc-total-valor">${totalLabel}</span></div>${cobroHtml}`;
+  // V13.34 (Daniel 02/11: «desplegado no sale»): en un trabajo en marcha o en pausa con algo pagado, debajo del total lo pagado en rojo (restado) y lo que queda, como en el PDF
+  let pagHtml = '';
+  try{ const pa = docPagadoAntes(doc); if(pa > 0){ const b = pagosDoc(doc.id).enB > 0;
+    pagHtml = `<div class="fc-pag-r n-neg"><span>Pagado${b ? ' en B' : ''}${cobroUltimaFecha(doc.id)}</span><b>${formatMoneda(-pa)}</b></div><div class="fc-pag-r fc-pag-pend"><span>Pendiente</span><b>${formatMoneda(Math.max(0, total - pa))}</b></div>`; } }catch(e){}
+  const totHtml = `<div class="fc-total-mini"><span class="fc-total-label">Total</span><span class="fc-total-valor">${totalLabel}</span></div>`;
+  return pagHtml ? `${ivaHtml}${subtotalHtml}<div class="fc-tot-col">${totHtml}${pagHtml}</div>` : `${ivaHtml}${subtotalHtml}${totHtml}${cobroHtml}`;
 }
 function ivaLineHtml(doc){
   const pct = (DOC_TYPES[doc.type] && DOC_TYPES[doc.type].hasIva===false) ? null : doc.iva_pct;
