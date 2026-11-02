@@ -142,7 +142,7 @@ if(!document.getElementById('nm2-css')){ const st = document.createElement('styl
 .nm2-r>span{min-width:0;}.nm2-r>span small{display:block;font-size:11px;color:var(--ink-soft);}
 .nm2-r>b{white-space:nowrap;text-align:right;flex-shrink:0;font-weight:800;}.nm2-r>b small{display:block;font-size:11px;font-weight:700;color:var(--ink-soft);}
 .nm2-l[open]>summary>.nm2-r{border-left:2px solid var(--orange);padding-left:8px;}
-.nm2-d{padding:0 0 6px 10px;}.nm2-d .nm2-r{font-size:12px;padding:5px 0;}
+.nm2-d{padding:0 0 6px 10px;}.nm2-desg{border-bottom:1px solid var(--line);margin-bottom:4px;padding-bottom:4px;}.nm2-d .nm2-r{font-size:12px;padding:5px 0;}
 .nm2-g>summary{list-style:none;cursor:pointer}.nm2-g>summary::-webkit-details-marker{display:none}.nm2-g>summary .nm2-r{font-weight:800;}
 .nm2-g[open]>summary .nm2-r{border-left:2px solid var(--orange);padding-left:8px;}.nm2-g>.nm2-gb{padding-left:10px;}
 .nm2-tot .nm2-r{font-weight:800;font-size:13.5px;}
@@ -162,13 +162,15 @@ C.vista = function(D){
   // Gastos por categoría (ya está en Resumen) y Contratos (ya está en Recurrentes) no salen.
   const enResumen = C.modo === 'resumen', partes = {};
   // 1. Lo que cuesta la empresa
+  // V13.29 (reporte cb6e0fbf): cada línea se abre con los tipos de gasto que la forman
+  const desg = g => { const cs = D.porCat.filter(x => x.grupo === g && x.base); return cs.length ? '<div class="nm2-desg">' + cs.map(x => fila(esc(x.cat), f2(x.base), x.n + ' documentos')).join('') + '</div>' : ''; };
   const t = D.total, hpE = D.hMaq ? t.economico / D.hMaq : null;
   h += card2('Coste de la empresa (12 meses)',
-    [['Máquinas y vehículos', D.porGrupo.flota || 0], ['Personal y autónomos', D.porGrupo.personal || 0], ['Estructura', D.porGrupo.estructura || 0], ['Directo de obra', D.porGrupo.obra || 0]].map(([n, v]) => lin(n, f2(v), eqv(C.conv(v)))).join('')
+    [['Máquinas y vehículos', D.porGrupo.flota || 0], ['Personal y autónomos', D.porGrupo.personal || 0], ['Estructura', D.porGrupo.estructura || 0], ['Directo de obra', D.porGrupo.obra || 0]].map(([n, v], i) => lin(n, f2(v), desg(['flota', 'personal', 'estructura', 'obra'][i]) + eqv(C.conv(v)))).join('')
     + '<div class="nm2-tot">' + lin('Coste de explotación', f2(t.registrado), eqv(C.conv(t.registrado))) + '</div>'
     + lin('Amortización', D.amortTot ? f2(t.provision) : '<span class="nm2-falta">Falta precio</span>', D.amortTot ? eqv(C.conv(t.provision)) : '', D.amort.filter(a => a.anual != null).length + ' de ' + D.amort.length + ' máquinas con precio')
     + '<div class="nm2-tot">' + lin('Coste total', f2(t.economico), eqv(C.conv(t.economico)) + fila('Por hora de máquina', f2(hpE), h1(D.hMaq) + ' h productivas')) + '</div>'
-    + fila('Fuera: retiradas y gastos de socios', f2(D.porGrupo.socios || 0)) + fila('Fuera: Hacienda y compra de vehículos', f2(D.porGrupo.fuera || 0)) + (D.porGrupo.sin ? fila('Sin clasificar', f2(D.porGrupo.sin)) : ''));
+    + lin('Fuera: retiradas y gastos de socios', f2(D.porGrupo.socios || 0), desg('socios')) + lin('Fuera: Hacienda y compra de vehículos', f2(D.porGrupo.fuera || 0), desg('fuera')) + (D.porGrupo.sin ? lin('Sin clasificar', f2(D.porGrupo.sin), desg('sin')) : ''));
   // 2. Por máquina
   h += card2('Coste por máquina', D.clases.map(k => {
     const cuerpo = (k.clase !== 'desplazamiento' ? fila('Horas productivas', '<input type="text" inputmode="decimal" placeholder="' + h1(k.hReal) + '" value="' + (k.manual ? k.h : '') + '" onchange="COSTES.setHP(\'' + k.clase + '\',this.value)">', 'Reales: ' + h1(k.hReal) + ' h (vacío = reales)') : '')
