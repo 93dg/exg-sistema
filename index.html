@@ -5161,11 +5161,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.30" defer></script>
-<script src="costes/norm.js?v=V13.30" defer></script>
-<script src="ajustes/calc.js?v=V13.30" defer></script>
+<script src="rentabilidad/rent.js?v=V13.31" defer></script>
+<script src="costes/norm.js?v=V13.31" defer></script>
+<script src="ajustes/calc.js?v=V13.31" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.30</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.31</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5317,7 +5317,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.30</div>
+        <div class="sub" id="version-badge">V13.31</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -15473,7 +15473,8 @@ document.addEventListener('pointerdown', () => mayusCampo(document.activeElement
 // decimal española, cantidades siempre con coma en vez de punto. useGrouping:true forzado
 // explícitamente porque no todos los navegadores/motores lo aplican igual por defecto.
 function formatMoneda(n){
-  return (Number(n)||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:true}) + ' €';
+  // V13.31: punto de miles también en las cantidades de 4 cifras (el formato español del navegador no lo pone en 4.000)
+  const v = Number(n) || 0, [e, d] = Math.abs(v).toFixed(2).split('.'); return (v < 0 && Math.abs(v) >= 0.005 ? '-' : '') + e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + d + ' €';
 }
 // V12.10 (Daniel): en el PDF y al imprimir, la unidad va junto al número en la columna Cant., separada y en minúscula: 6 h, 12 m³, 2 días (sin unidad o «ud», solo el número)
 function formatCantidadUnidad(n, u){
@@ -25113,7 +25114,7 @@ function generarPDFDocumento(accion, modoForzado, portadaForzada){
   const conPortada = portadaForzada !== undefined ? !!portadaForzada : (accion !== 'blob' && !!document.getElementById('ni-portada')?.checked);
   // V9.70 (Daniel): casillas «Mostrar» (logo, datos empresa, fecha, Nº, cliente); el PDF al gestor ('blob') lo lleva todo. Albarán sin guardar: por defecto solo el Nº.
   const _wrapOpc = document.getElementById('ni-estado-modo-wrap');
-  const _opc = (id) => { if(accion === 'blob') return true; const k = id.replace('ni-pdf-',''); if(_wrapOpc && _wrapOpc.style.display !== 'none' && window.PDF_OPC) return window.PDF_OPC[k] !== false; return k === 'num' || k === 'obra' || document.getElementById('ni-doctype').value !== 'albaran'; };
+  const _opc = (id) => { if(accion === 'blob') return true; const k = id.replace('ni-pdf-',''); if(_wrapOpc && _wrapOpc.style.display !== 'none' && window.PDF_OPC) return window.PDF_OPC[k] !== false; return !['logo', 'datos'].includes(k) || document.getElementById('ni-doctype').value !== 'albaran'; };   // V13.31 (Daniel 02/11): el albarán sale sin logo ni datos de la empresa, con fecha, Nº, cliente y obra
   const verLogo = _opc('ni-pdf-logo'), verDatos = _opc('ni-pdf-datos'), verFecha = _opc('ni-pdf-fecha'), verNum = _opc('ni-pdf-num'), verObra = _opc('ni-pdf-obra'), verCli = _opc('ni-pdf-cli');
   const cfg = modoPdf==='simplificado' ? {...DOC_TYPES[type], hasPrecios:false} : DOC_TYPES[type];
   const client = MAY(document.getElementById('ni-client').value || '—');
@@ -25319,7 +25320,18 @@ function generarPDFDocumento(accion, modoForzado, portadaForzada){
       // va debajo del TOTAL, en su misma columna — está relacionado con el IVA, no con la
       // forma de pago, así que no puede compartir columna con el IBAN/concepto (se confundía
       // visualmente con el concepto de la transferencia)
-      if(tratamientoIvaPdf==='isp'){
+      // V13.31 (Daniel 02/11): en el albarán, lo pagado se resta del total en rojo, con su fecha, y debajo lo que queda
+      if(type === 'albaran' && editingDocId){
+        const pg = pagosDoc(editingDocId);
+        if(pg.total > 0){
+          doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(163, 45, 45);
+          pg.lista.forEach(p => { doc.text(p.fecha ? 'Pagado el ' + formatFechaCorta(p.fecha) + ':' : 'Pagado:', 150, yDer, {align:'right'}); doc.text(formatMoneda(-p.importe), 195, yDer, {align:'right'}); yDer += 5.5; });
+          doc.setTextColor(0, 0, 0); doc.setFont('helvetica','bold'); doc.setFontSize(11);
+          doc.text('PENDIENTE:', 150, yDer, {align:'right'}); doc.text(formatMoneda(Math.max(0, total - pg.total)), 195, yDer, {align:'right'}); yDer += 7;
+          doc.setFont('helvetica','normal'); doc.setFontSize(9);
+        }
+      }
+      if(tratamientoIvaPdf==='isp' && type !== 'albaran'){   // V13.31: la nota del sujeto pasivo solo va en facturas
         doc.setFont('helvetica','italic'); doc.setFontSize(7.5);
         const notaIsp = doc.splitTextToSize('Inversión del sujeto pasivo. Art. 84.Uno.2º.f) de la Ley 37/1992 del IVA.', 75);
         notaIsp.forEach((linea, i) => doc.text(linea, 120, yDer + i*3.6));
@@ -30375,6 +30387,7 @@ function convertirDocumento(){
   if(!origen) return;
   const siguienteTipo = origen.type==='albaran' ? 'factura' : 'albaran';
   convirtiendoDesde = {origenId: origen.id, origenTipo: origen.type};
+  { const pg = pagosDoc(origen.id); if(origen.type === 'albaran' && pg.enB > 0) setTimeout(() => mostrarToast('Este albarán tiene ' + formatMoneda(pg.enB) + ' pagados en B: la factura será por el total menos esa cantidad.', 'ok'), 400); }
   const items = origen.items.map(i=>({...i}));
   closeNewInvoiceModal();
   editingDocId = null;
@@ -30653,6 +30666,9 @@ async function submitNewInvoice(ev, isDraft){
   const job = document.getElementById('ni-job').value || '—';
   const dateRaw = document.getElementById('ni-date').value;
   const {base, iva, total} = recalcTotals();
+  // V13.31 (Daniel 02/11, nave de Rafael Sánchez): lo pagado en B de un albarán no puede volver a entrar en su factura
+  if(type === 'factura' && convirtiendoDesde && !convirtiendoDesde.parcial){ const o = documentosRealesById[convirtiendoDesde.origenId], pg = pagosDoc(convirtiendoDesde.origenId);
+    if(o && pg.enB > 0){ const max = Math.round((Number(o.base != null ? o.base : o.total) - pg.enB) * 100) / 100; if(base > max + 0.01){ mostrarToast('El albarán tiene ' + formatMoneda(pg.enB) + ' pagados en B. La factura no puede pasar de ' + formatMoneda(max) + ' sin IVA: quita líneas por ' + formatMoneda(base - max) + ' antes de guardarla.', 'err'); return false; } } }
   const d = new Date(dateRaw);
   const dateLabel = isNaN(d) ? (dateRaw||'sin fecha') : formatFechaLabel(d);
   const amountLabel = total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
@@ -31474,7 +31490,7 @@ function actualizarControlesEditor(doc){
   { const pc = document.getElementById('ni-portada'); if(pc) pc.checked = false; }
   if(wrap.dataset.docOpc !== String(doc.id)){   // V9.70: «Mostrar» en el PDF: albarán = solo Nº; resto = todo
     wrap.dataset.docOpc = String(doc.id); const alb = (doc.tipo || doc.type) === 'albaran';
-    window.PDF_OPC = {logo:!alb, datos:!alb, fecha:!alb, num:true, cli:!alb, obra:true};
+    window.PDF_OPC = {logo:!alb, datos:!alb, fecha:true, num:true, cli:true, obra:true};
   }
   // V9.20: la portada se elige cada vez que se imprime
   { if(typeof _selLineasModo !== 'undefined' && _selLineasModo) selLineasToggleModo(); const b = document.getElementById('ie-sel-btn'); if(b) b.style.display = (doc.tipo || doc.type) === 'albaran' ? '' : 'none'; }
@@ -33287,6 +33303,8 @@ document.addEventListener('exg-docs-listos', () => abDecorar(document.body));
 let _cobrosDoc = {};
 async function cobrosCargar(){ try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'cobro_doc'); const M = {}; (data || []).forEach(x => { const d = x.data || {}; if(!d.doc_id) return; (M[d.doc_id] = M[d.doc_id] || []).push(d); }); Object.values(M).forEach(l => l.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))); _cobrosDoc = M; }catch(e){} }
 function cobroUltimaFecha(id){ const l = _cobrosDoc[id]; if(!l || !l.length) return ''; const f = String(l[l.length - 1].fecha || ''); return f ? ' · ' + f.slice(8, 10) + '/' + f.slice(5, 7) : ''; }
+// V13.31: lo pagado de un documento, cada pago con su fecha (lo que no tenga registro con fecha sale como un pago sin fecha)
+function pagosDoc(id){ const d = documentosRealesById[id] || {}, l = (_cobrosDoc[id] || []).filter(x => Number(x.importe) > 0).map(x => ({fecha: x.fecha, importe: Number(x.importe), enB: !!x.en_b})); const reg = l.reduce((a, x) => a + x.importe, 0), cob = Number(d.cobrado_importe != null ? d.cobrado_importe : d.cobrado) || 0; if(cob - reg > 0.005) l.unshift({fecha: '', importe: Math.round((cob - reg) * 100) / 100, enB: false}); return {lista: l, total: Math.max(cob, reg), enB: l.filter(x => x.enB).reduce((a, x) => a + x.importe, 0)}; }
 async function cobroRegistrar(doc, importe, fecha){
   if(!doc || !sb) return; const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
   const d = {doc_id: doc.id, numero: doc.numero || doc.num || '', tipo_doc: doc.type || doc.tipo || '', cliente: doc.client || '', fecha: fecha || hoy, importe: Number(importe), at: new Date().toISOString()};
