@@ -2088,6 +2088,7 @@ button.e2-fila{cursor:pointer;}
 
 /* V7.72 estadísticas de trabajos */
 .te-panel{padding:14px;margin-bottom:12px;}
+.te-graf-tb{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
 .te-kpis{display:flex;flex-direction:column}
 .te-kpis > div{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line);min-width:0}
 .te-kpis > div:first-child{border-top:0}
@@ -5138,11 +5139,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.14" defer></script>
-<script src="costes/norm.js?v=V13.14" defer></script>
-<script src="ajustes/calc.js?v=V13.14" defer></script>
+<script src="rentabilidad/rent.js?v=V13.15" defer></script>
+<script src="costes/norm.js?v=V13.15" defer></script>
+<script src="ajustes/calc.js?v=V13.15" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.14</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.15</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5294,7 +5295,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.14</div>
+        <div class="sub" id="version-badge">V13.15</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -9172,38 +9173,29 @@ function teConclusion(partes, t){
   return `<div class="te-concl">${f.join(' ')}</div>`;
 }
 function teSub(k){ TE.sub = k === 'costes' ? 'costes' : 'graficos'; teGuardar(); teRender(); }   // V9.05: Estadísticas con subpestañas Gráficos y Costes
-function teRender(){
-  const app = document.getElementById('te-app'); if(!app) return;
+// V13.15 (reporte 872c9713, Daniel 02/11: «este gráfico lo quiero debajo del último trabajo pendiente y esta sección la quitas de aquí; solo quiero el gráfico»):
+// el queso de los pendientes va en Trabajos › Pendientes, debajo de la última tarjeta; Ren. obras se queda solo con Rentabilidad (sin pestañas ni resumen)
+function teGraficoHtml(){
   const lista = typeof tbPendientes === 'function' ? tbPendientes() : [], t = lista.length ? tbSuma(lista) : {n: 0, h: 0, e: 0, sin: 0};
-  const conEur = !!(_tbTarifas && Object.keys(_tbTarifas).length);
+  if(!lista.length) return '';
   const grupos = teGrupos(lista), val = s => TE.medida === 'h' ? s.h : TE.medida === 'e' ? s.e : s.n;
   const partes = grupos.map(([k, s], i) => ({k, s, v: val(s), c: TE.por === 'prioridad' ? (TB_COLOR_PRIO[k] || TE_COLORES[i % 12]) : TE_COLORES[i % 12]}));
   const fmtV = v => TE.medida === 'h' ? tbFmtH(v) : TE.medida === 'e' ? tbEur(v) : String(v);
-  const dias = t.h / 8, meses = t.h / 160;
-  const sub = TE.sub === 'costes' ? 'costes' : 'graficos';
-  app.innerHTML = `
-  <div class="docs-tabs" id="te-subtabs" style="margin:0 0 10px;"><button type="button" class="docs-tab ${sub === 'graficos' ? 'active' : ''}" onclick="teSub('graficos')">Gráficos</button><button type="button" class="docs-tab ${sub === 'costes' ? 'active' : ''}" onclick="teSub('costes')">Rentabilidad</button></div>
-  <div id="te-sec-graf" style="display:${sub === 'graficos' ? 'block' : 'none'};">
-  <div class="panel te-panel">
-    <div class="te-kpis">
-      <div><span>Trabajos pendientes</span><b>${t.n}</b><i>${t.sin ? t.sin + ' sin tiempo puesto' : 'todos con tiempo'}</i></div>
-      <div><span>Tiempo pendiente</span><b>${meses > 1 ? tbN(meses) + ' meses' : Math.round(dias) + ' días'}</b><i>${meses > 1 ? Math.round(dias) + ' días · ' : ''}${Math.round(t.h)} h</i></div>
-      <div class="te-din"><span>Dinero pendiente</span><b>${conEur ? tbEur(t.e) : '—'}</b><i>${conEur ? 'según las tarifas' : 'faltan las tarifas'}</i></div>
-    </div>
-  </div>
-  <div class="panel te-panel">
-    <div class="te-sel"><div class="pillsel" id="te-por" data-menu="1"></div><div class="pillsel" id="te-medida" data-menu="1"></div></div>
-    ${partes.length ? `<div class="te-queso">${teQueso(partes.map(p => ({...p, det: [TE.medida !== 'n' ? p.s.n + (p.s.n === 1 ? ' trabajo' : ' trab.') : '', TE.medida !== 'h' ? tbFmtT(p.s.h) : ''].filter(Boolean).join(' · ')})), fmtV, [fmtV(partes.reduce((s, p) => s + p.v, 0)), t.n + ' trabajos'])}</div>`
-    : '<div class="ce-nota">No hay trabajos pendientes.</div>'}
-    ${teConclusion(partes, t)}
-  </div>
-  </div>
-  <div id="te-costes" style="display:${sub === 'costes' ? 'block' : 'none'};"></div>`;
-  tbRenderCostes();
-  pillsSelIniciar('te-por', [['prioridad', 'Por prioridad'], ['flota', 'Por flota'], ['lugar', 'Por lugar'], ['tiempo', 'Por tiempo'], ['dificultad', 'Por dificultad']], v => { TE.por = v; teGuardar(); teRender(); });
+  return `<div class="te-sel"><div class="pillsel" id="te-por" data-menu="1"></div><div class="pillsel" id="te-medida" data-menu="1"></div></div>
+    ${partes.length ? `<div class="te-queso">${teQueso(partes.map(p => ({...p, det: [TE.medida !== 'n' ? p.s.n + (p.s.n === 1 ? ' trabajo' : ' trab.') : '', TE.medida !== 'h' ? tbFmtT(p.s.h) : ''].filter(Boolean).join(' · ')})), fmtV, [fmtV(partes.reduce((s, p) => s + p.v, 0)), t.n + ' trabajos'])}</div>` : ''}`;
+}
+function teGraficoPintar(){
+  const el = document.getElementById('te-graf-tb'); if(!el) return;
+  const h = teGraficoHtml(); el.innerHTML = h; el.style.display = h ? '' : 'none'; if(!h) return;
+  pillsSelIniciar('te-por', [['prioridad', 'Por prioridad'], ['flota', 'Por flota'], ['lugar', 'Por lugar'], ['tiempo', 'Por tiempo'], ['dificultad', 'Por dificultad']], v => { TE.por = v; teGuardar(); teGraficoPintar(); });
   document.getElementById('te-por').value = TE.por;
-  pillsSelIniciar('te-medida', [['n', 'Nº de trabajos'], ['h', 'Horas'], ['e', 'Dinero']], v => { TE.medida = v; teGuardar(); teRender(); });
+  pillsSelIniciar('te-medida', [['n', 'Nº de trabajos'], ['h', 'Horas'], ['e', 'Dinero']], v => { TE.medida = v; teGuardar(); teGraficoPintar(); });
   document.getElementById('te-medida').value = TE.medida;
+}
+function teRender(){
+  const app = document.getElementById('te-app'); if(!app) return;
+  app.innerHTML = `<div id="te-costes"></div>`;
+  tbRenderCostes();
 }
 document.addEventListener('click', e => { if(e.target.closest && e.target.closest('[data-view="trabestad"]')) setTimeout(teCargar, 50); }, true);
 
@@ -26014,7 +26006,7 @@ function tbRender(){
   if(_tbVista === 'historial'){ tbRenderComputo(filtrados); lista.innerHTML = filtrados.length ? tbAgruparEstado(filtrados, j => carta(j, true)) : '<div class="empty" style="padding:24px;">' + (his.length ? 'Ningún trabajo cumple los filtros.' : 'Aún no hay trabajos cobrados.') + '</div>'; return; }
   const ver = _tbFiltro === 'todos' || !soloPen ? filtrados : filtrados.filter(j => tbPrioridades(j).includes(_tbFiltro));
   tbRenderComputo(ver);
-  lista.innerHTML = ver.length ? (_tbVista === 'activos' ? ver.map(j => carta(j, false)).join('') : tbAgruparEstado(ver, j => carta(j, false))) : (tbHayFiltros() || _tbFiltro !== 'todos' ? '<div class="empty" style="padding:24px;">Ningún trabajo cumple los filtros.</div>' : _tbVista === 'tramites' ? '<div class="empty" style="padding:24px;">No hay trámites pendientes.</div>' : _tbVista === 'enmarcha' ? '<div class="empty" style="padding:24px;">' + (!_tbEnc.activo && !_tbEnc.tramite ? 'Marca Activo o Trámite.' : 'No hay ningún trabajo en marcha ahora.') + '</div>' : '<div class="empty" style="padding:24px;">No hay trabajos pendientes. Pulsa + Trabajo para añadir uno.</div>');
+  lista.innerHTML = (ver.length ? (_tbVista === 'activos' ? ver.map(j => carta(j, false)).join('') + '<div class="te-graf-tb" id="te-graf-tb"></div>' : tbAgruparEstado(ver, j => carta(j, false))) : (tbHayFiltros() || _tbFiltro !== 'todos' ? '<div class="empty" style="padding:24px;">Ningún trabajo cumple los filtros.</div>' : _tbVista === 'tramites' ? '<div class="empty" style="padding:24px;">No hay trámites pendientes.</div>' : _tbVista === 'enmarcha' ? '<div class="empty" style="padding:24px;">' + (!_tbEnc.activo && !_tbEnc.tramite ? 'Marca Activo o Trámite.' : 'No hay ningún trabajo en marcha ahora.') + '</div>' : '<div class="empty" style="padding:24px;">No hay trabajos pendientes. Pulsa + Trabajo para añadir uno.</div>')); if(_tbVista === 'activos') try{ teGraficoPintar(); }catch(e){};
 }
 // ---- editor (hoja desde abajo) ----
 // Todo el texto de esta sección va en mayúsculas, como el resto de la web (regla global al escribir, y tbDatos lo fuerza al guardar).
