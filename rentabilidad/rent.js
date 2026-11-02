@@ -32,9 +32,9 @@ R.NOMBRE_CLASE = {mixta: 'Mixta (retro)', camion: 'Camión', giratoria: 'Girator
 // V12.43 (Daniel 23/10/2026): una línea de viajes/portes puede llevar las horas internas de cada máquina (horas_internas = {niveladora: 7, mixta: 5, ...}).
 // No se cobran: sirven para repartir el coste por máquina y calcular a cuánto hay que poner el viaje para no perder dinero.
 R.lineas = d => (Array.isArray(d.conceptos) ? d.conceptos : []).flatMap(c => { const f = dia(c.fecha) || dia(d.fecha_devengo), hi = c.horas_internas && typeof c.horas_internas === 'object' ? Object.entries(c.horas_internas).filter(([, v]) => num(v) > 0) : [];
-    if(hi.length){ const ht = sum(hi, x => num(x[1])), v = c.unidad === 'h' ? 0 : num(c.cantidad); return hi.map(([k, h], i) => ({f, h: num(h), imp: num(c.importe) * num(h) / ht, clase: R.NOMBRE_CLASE[k] ? k : R.claseLinea(k), desc: c.descripcion || '', v: i === 0 ? v : 0, impV: i === 0 && v > 0 ? num(c.importe) : 0, vg: v > 0})); }
+    if(hi.length){ const ht = sum(hi, x => num(x[1])), v = c.unidad === 'h' ? 0 : num(c.cantidad); return hi.map(([k, h], i) => ({f, h: num(h), imp: num(c.importe) * num(h) / ht, clase: R.NOMBRE_CLASE[k] ? k : R.claseLinea(k), maq: c.maquina || '', desc: c.descripcion || '', v: i === 0 ? v : 0, impV: i === 0 && v > 0 ? num(c.importe) : 0, vg: v > 0})); }
     return [{f, h: num(c.horas != null ? c.horas : (c.unidad === 'h' ? c.cantidad : 0)) || (/cuba\s+de\s+agua/i.test(c.descripcion || '') ? 1 : 0),   // V10.52 (Daniel): una cuba de agua cuenta como 1 h
-    imp: num(c.importe), clase: R.claseLinea(c.descripcion), desc: c.descripcion || '', v: 0, impV: 0}]; }).filter(l => l.f);
+    imp: num(c.importe), clase: R.claseLinea(c.descripcion), maq: c.maquina || '', desc: c.descripcion || '', v: 0, impV: 0}]; }).filter(l => l.f);
 
 // ---------- carga ----------
 async function pag(q, cols, fn){ const out = []; let o = 0; while(true){ let b = sb.from(q).select(cols); if(fn) b = fn(b); const {data, error} = await b.order(q === 'polizas_seguro' ? 'flota_id' : 'id', {ascending: true}).range(o, o + 999); if(error){ console.error('RENT carga ' + q, error); R.errores.push(q + ': ' + (error.message || error)); break; } out.push(...(data || [])); if(!data || data.length < 1000) break; o += 1000; } const vistos = new Set(); return out.filter(r => { if(r.id == null) return true; if(vistos.has(r.id)) return false; vistos.add(r.id); return true; }); }
@@ -114,12 +114,12 @@ R.empresaVentana = function(P, hasta){
   const k = hasta; P._ev = P._ev || {}; if(P._ev[k]) return P._ev[k];
   const W0 = addDays(hasta, -364);
   const indep = R.efectivos(P).lista;
-  const horasDia = {}, horasClase = {}, dias = new Set(); let ingresos = 0, horas = 0, ingConHoras = 0, cobrado = 0;
+  const horasDia = {}, horasClase = {}, horasMixta = {}, dias = new Set(); let ingresos = 0, horas = 0, ingConHoras = 0, cobrado = 0;
   indep.forEach(d => { const ls = R.lineas(d).filter(l => l.f >= W0 && l.f <= hasta); if(!ls.length) return; const fl = R.factorLineas(d); ingresos += sum(ls, l => l.imp) * fl; ingConHoras += sum(ls.filter(l => l.h > 0), l => l.imp) * fl; { const imp = num(d.importe); if(imp) cobrado += Math.min(1, num(d.cobrado_importe) / imp) * sum(ls, l => l.imp) * fl; }
-    ls.forEach(l => { horasDia[l.f] = (horasDia[l.f] || 0) + l.h; horasClase[l.clase] = (horasClase[l.clase] || 0) + l.h; horas += l.h; if(l.h > 0 || l.imp > 0) dias.add(l.f); }); });
+    ls.forEach(l => { horasDia[l.f] = (horasDia[l.f] || 0) + l.h; horasClase[l.clase] = (horasClase[l.clase] || 0) + l.h; if(l.clase === 'mixta'){ const mk = /rafa/i.test(l.maq) ? 'Mixta (Rafa)' : /manolo/i.test(l.maq) ? 'Mixta (Manolo)' : ''; horasMixta[mk] = (horasMixta[mk] || 0) + l.h; } horas += l.h; if(l.h > 0 || l.imp > 0) dias.add(l.f); }); });
   const gW = (P.gastos || []).filter(g => g.fecha_devengo >= W0 && g.fecha_devengo <= hasta && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada'));
   const comb = sum(gW.filter(g => /combust/i.test(g.categoria || '')), R.baseGasto);
-  return P._ev[k] = {W0, hasta, horasDia, horasClase, horas, dias: dias.size, ingresos, cobrado, ingConHoras, gW, comb};
+  return P._ev[k] = {W0, hasta, horasDia, horasClase, horasMixta, horas, dias: dias.size, ingresos, cobrado, ingConHoras, gW, comb};
 };
 
 // ---------- obra de referencia: precio actual por hora y mezcla de horas por máquina ----------
@@ -930,7 +930,10 @@ R.preciosDe = function(r){
   const nv = R.niveles4(r), tm = r.ejecutado / r.H;
   return {filas, obra: r.job.trabajo, horas: r.H, tarifaMedia: tm, minMedio: R.objetivo(r.directo + r.indirecto, r.socios.valor, t, 0) / r.H, objMedio: nv.n4 / r.H, impuesto: R.param.impuesto, margen: R.param.margen};
 };
-R.tablaPrecios = function(P){ const ref = R.referencia(P); if(!ref || !P.costes) return null; const T = R.preciosDe(R.calcular(ref.job, P, R.asignar(P))); if(T){ try{ T.horasAnio = R.empresaVentana(P, new Date().toISOString().slice(0, 10)).horasClase || null; }catch(e){ T.horasAnio = null; } } return T; };   // V13.19: con las horas reales de cada máquina en los últimos 12 meses (albaranes), para el neto al mes y al año
+R.tablaPrecios = function(P){ const ref = R.referencia(P); if(!ref || !P.costes) return null; const T = R.preciosDe(R.calcular(ref.job, P, R.asignar(P))); if(T){ try{ const ev = R.empresaVentana(P, new Date().toISOString().slice(0, 10)); T.horasAnio = ev.horasClase || null; T.horasMixta = ev.horasMixta || {};
+    // V13.30: el gasto propio de cada mixta en los últimos 12 meses (gastos apuntados a ese vehículo)
+    T.gastoMixta = {}; (P.flota || []).filter(f => /^mixta\s*\((rafa|manolo)\)/i.test(f.nombre || '')).forEach(f => { const nm = /rafa/i.test(f.nombre) ? 'Mixta (Rafa)' : 'Mixta (Manolo)'; T.gastoMixta[nm] = sum((ev.gW || []).filter(g => g.vehiculo_id === f.id), R.baseGasto); });
+  }catch(e){ T.horasAnio = null; } } return T; };   // V13.19: con las horas reales de cada máquina en los últimos 12 meses (albaranes), para el neto al mes y al año
 // V12.43 (Daniel 23/10/2026): cuenta de un viaje en el editor del albarán: horas internas de cada máquina ÷ número de viajes, a los precios por hora de «¿Estamos en precio?»
 R.cuentaViaje = async function(hi, viajes, precio){
   const P = await R.cargar(false), T = R.tablaPrecios(P); if(!T) return null;
@@ -948,14 +951,22 @@ R.htmlPrecios = (T, enObra) => {
   // V11.30 (reporte 00aea0c7): una línea por máquina, sin tabla; V11.62: se toca y despliega ahí mismo su cuenta; la diferencia es con el precio objetivo, en verde o rojo por su signo
   // V13.19 (reporte 757f6d16, Daniel 02/11: «¿Estamos en precio? suena coloquial; no sé lo que representa al mes neto ni al año»): se llama Rentabilidad por máquina;
   // cada máquina, su tarifa y lo que deja limpio (tarifa − mínimo, ya con impuestos) al mes y al año con las horas reales de los últimos 12 meses; al final, el total
-  const HA = T.horasAnio || null, hA = x => HA ? num(HA[x.clase]) : 0, netoA = x => (x.tarifa - x.min) * hA(x);
-  const rows = f.map(x => { const dO = x.tarifa - x.obj, dM = x.tarifa - x.min, na = netoA(x);
-    const sub = HA ? (hA(x) > 0 ? 'Neto ' + eur(na / 12) + '/mes · ' + eur(na) + '/año' : 'Sin horas en los últimos 12 meses') : 'Neto ' + (dM >= 0 ? '+' : '') + eur(dM, 2) + ' por hora';
-    return '<details class="rt-nd"><summary><div class="rt-sim-r"><span style="flex:1;min-width:0;font-weight:700;">' + esc(x.nombre) + '<small style="display:block;font-size:10.5px;font-weight:700;color:' + col(HA ? na : dM) + ';">' + sub + '</small></span><span style="text-align:right;white-space:nowrap;"><b>' + r2(x.tarifa) + '</b></span></div></summary><div class="rt-bd">'
-      + sr('Tarifa', r2(x.tarifa)) + sr('Coste completo', r2(x.coste), RJ) + sr('Mínimo (coste + impuestos)', r2(x.min), RJ) + sr('Neto por hora', (dM >= 0 ? '+' : '') + eur(dM, 2), col(dM)) + (HA ? sr('Horas en 12 meses', h1(hA(x)) + ' h') + sr('Neto al mes', eur(na / 12), col(na)) + sr('Neto al año', eur(na), col(na)) : '') + sr('Precio para ganar el ' + T.margen + ' % neto', r2(x.obj)) + sr('Diferencia con ese precio', (dO >= 0 ? '+' : '') + eur(dO, 2), col(dO)) + '</div></details>'; }).join('');
-  const tot = HA ? sum(f, netoA) : null;
+  const HA = T.horasAnio || null, hA = x => HA ? (x.hM != null ? x.hM : num(HA[x.clase])) : 0, netoA = x => (x.tarifa - x.min) * hA(x);
+  // V13.30 (reporte ffd9cf21, Daniel 02/11: «son dos mixtas, no una»): la mixta sale por cada máquina con sus horas (las del albarán que dicen cuál fue) y su gasto propio;
+  // las horas de antes, sin máquina apuntada, van aparte hasta que estén separadas
+  const HMx = T.horasMixta || {}, GMx = T.gastoMixta || {};
+  const F = HA ? f.flatMap(x => x.clase !== 'mixta' ? [x] : [...['Mixta (Rafa)', 'Mixta (Manolo)'].map(n => ({...x, nombre: n, hM: num(HMx[n]), gasto: GMx[n] != null ? GMx[n] : null})), ...(num(HMx['']) > 0 ? [{...x, nombre: 'Mixtas, horas sin separar', hM: num(HMx['']), sinSep: true}] : [])]) : f;
+  const rows = F.map(x => { const dO = x.tarifa - x.obj, dM = x.tarifa - x.min, na = netoA(x);
+    const sub = HA ? (hA(x) > 0 ? 'Neto ' + eur(na / 12) + '/mes · ' + eur(na) + '/año' : x.hM != null ? 'Sin horas apuntadas a esta mixta' : 'Sin horas en los últimos 12 meses') : 'Neto ' + (dM >= 0 ? '+' : '') + eur(dM, 2) + ' por hora';
+    return '<details class="rt-nd"><summary><div class="rt-sim-r"><span style="flex:1;min-width:0;font-weight:700;">' + esc(x.nombre) + '<small style="display:block;font-size:10.5px;font-weight:700;color:' + (HA && !(hA(x) > 0) ? 'var(--ink-soft)' : col(HA ? na : dM)) + ';">' + sub + '</small></span><span style="text-align:right;white-space:nowrap;"><b>' + r2(x.tarifa) + '</b></span></div></summary><div class="rt-bd">'
+      + sr('Tarifa', r2(x.tarifa)) + sr('Coste completo', r2(x.coste), RJ) + sr('Mínimo (coste + impuestos)', r2(x.min), RJ) + sr('Neto por hora', (dM >= 0 ? '+' : '') + eur(dM, 2), col(dM)) + (x.gasto != null ? sr('Gasto propio en 12 meses', eur(x.gasto), RJ) : '') + (HA ? sr('Horas en 12 meses', h1(hA(x)) + ' h') + sr('Neto al mes', eur(na / 12), col(na)) + sr('Neto al año', eur(na), col(na)) : '') + sr('Precio para ganar el ' + T.margen + ' % neto', r2(x.obj)) + sr('Diferencia con ese precio', (dO >= 0 ? '+' : '') + eur(dO, 2), col(dO)) + '</div></details>'; }).join('');
+  const tot = HA ? sum(F, netoA) : null;
+  // V13.30: la conclusión, en dos líneas
+  const cand = HA ? F.filter(x => !x.sinSep && hA(x) > 0) : [], mejor = cand.slice().sort((a, b) => netoA(b) - netoA(a))[0], pierden = cand.filter(x => netoA(x) < 0);
+  const concl = !cand.length ? '' : '<div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px;">' + (mejor && netoA(mejor) > 0 ? sr('La que más deja', esc(mejor.nombre) + ' · ' + eur(netoA(mejor)) + '/año', col(1)) : '')
+    + sr('Pierde dinero', pierden.length ? pierden.map(x => esc(x.nombre) + ' · ' + eur(netoA(x)) + '/año').join('<br>') : 'Ninguna', pierden.length ? col(-1) : null) + '</div>';
   return caja((enObra ? '<div style="font-weight:800;font-size:14px;margin-bottom:6px;">Rentabilidad por máquina</div>' : '<div class="panel-head" style="padding:0;margin:0 0 6px;border:0;background:none;display:flex;align-items:center;min-height:30px;"><h3 style="margin:0;font-size:14px;">Rentabilidad por máquina</h3></div>') + '<div>' + rows + '</div>'
-    + (HA ? '<div class="rt-sim-r" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px;"><span style="font-weight:800;">Total<small style="display:block;font-size:10.5px;font-weight:700;color:' + col(tot) + ';">Neto ' + eur(tot / 12) + '/mes</small></span><b style="color:' + col(tot) + ';">' + eur(tot) + '/año</b></div>' : '')
+    + (HA ? '<div class="rt-sim-r" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px;"><span style="font-weight:800;">Total<small style="display:block;font-size:10.5px;font-weight:700;color:' + col(tot) + ';">Neto ' + eur(tot / 12) + '/mes</small></span><b style="color:' + col(tot) + ';">' + eur(tot) + '/año</b></div>' : '') + concl
     + (enObra ? '' : '<div class="rt-ch" style="flex-wrap:nowrap;margin-top:10px;"><span>Ganar <b id="rt-pct-p">' + Math.min(100, Math.max(1, num(T.margen) || 1)) + ' %</b> neto</span><input type="range" min="1" max="100" step="1" value="' + Math.min(100, Math.max(1, num(T.margen) || 1)) + '" style="flex:1;accent-color:var(--orange);" oninput="document.getElementById(\'rt-pct-p\').textContent=this.value+\' %\'" onchange="RENT.setMargen(this.value)"></div>'));
 };
 // ---------- ¿Cómo de rentable es? (V11.62, Daniel 14/10/2026): margen neto, si el objetivo es razonable y rentabilidad sobre lo invertido, con referencias para comparar con otros negocios ----------
