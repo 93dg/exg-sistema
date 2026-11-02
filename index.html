@@ -5147,11 +5147,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.21" defer></script>
-<script src="costes/norm.js?v=V13.21" defer></script>
-<script src="ajustes/calc.js?v=V13.21" defer></script>
+<script src="rentabilidad/rent.js?v=V13.22" defer></script>
+<script src="costes/norm.js?v=V13.22" defer></script>
+<script src="ajustes/calc.js?v=V13.22" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.21</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.22</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5303,7 +5303,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.21</div>
+        <div class="sub" id="version-badge">V13.22</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -14097,6 +14097,12 @@ const grHoy = () => { const h = new Date(); h.setHours(0, 0, 0, 0); return h; };
 const grDias = f => f ? Math.round((new Date(f + 'T00:00:00') - grHoy()) / 86400000) : null;
 const grFechaTxt = f => f ? new Date(f + 'T00:00:00').toLocaleDateString('es-ES', {day: '2-digit', month: 'short', year: 'numeric'}) : '—';
 const grVigente = c => c.estado !== 'cancelado';
+// V13.22 (reporte fd6f2e05, Daniel 02/11: «no aparece el nuevo seguro que entra ni el que está ahora»): cuando un seguro se cambia por otro que empieza más adelante,
+// el viejo sigue en vigor hasta ese día y sale en la lista con «Hasta dd/mm»; el nuevo sale con «Desde dd/mm». El total al año sigue contando solo el que queda
+const grHoyIso = () => new Date().toISOString().slice(0, 10);
+const grSucesor = c => c.estado === 'cancelado' && c.flota_id ? GR.contratos.find(s => s.id !== c.id && s.flota_id === c.flota_id && s.categoria === c.categoria && s.estado !== 'cancelado' && s.fecha_inicio && s.fecha_inicio > grHoyIso()) : null;
+const grEnVigor = c => c.estado !== 'cancelado' || !!grSucesor(c);
+const grFechaCorta = f => f ? f.slice(8, 10) + '/' + f.slice(5, 7) : '';
 function grChipDias(d, c){ if(d == null) return ''; const fin = !!(c && c.renovacion_automatica === false), e = d < 0 ? 'mal' : d <= 60 ? 'aviso' : 'ok'; return `<span class="fl-chip ${fin ? (d < 0 ? 'nd' : 'aviso') : e}">${fin ? (d < 0 ? 'terminó hace ' + (-d) + ' d' : d === 0 ? 'termina hoy' : 'termina en ' + d + ' d · no se renueva') : d < 0 ? 'renovó hace ' + (-d) + ' d' : d === 0 ? 'renueva hoy' : 'renueva en ' + d + ' d'}</span>`; }
 function grMatriculaVis(m){ const s = String(m || '').replace(/\s*\(parcial\)/i, '').trim(); return s.replace(/X/g, '•'); }   // el banco tapa caracteres: se enseña un punto donde falta, nunca una X inventada
 function grVariacion(c){   // cuánto ha cambiado el último importe respecto al anterior (solo si el contrato está confirmado y el cambio es creíble como subida de precio)
@@ -14226,7 +14232,7 @@ let _grPleg = ['tipo', 'estado'];   // los filtros empiezan plegados (la lista a
 try{ const g = JSON.parse(localStorage.getItem('gr_pleg') || 'null'); if(Array.isArray(g)) _grPleg = g; }catch(e){}
 function grFiltroToggle(g){ _grPleg = _grPleg.includes(g) ? _grPleg.filter(x => x !== g) : _grPleg.concat([g]); try{ localStorage.setItem('gr_pleg', JSON.stringify(_grPleg)); }catch(e){} grRender(); }
 function grContratosHtml(){
-  const base = GR.contratos.filter(c => GR.fEst === 'todos' ? true : GR.fEst === 'vigentes' ? grVigente(c) : c.estado === GR.fEst);
+  const base = GR.contratos.filter(c => GR.fEst === 'todos' ? true : GR.fEst === 'vigentes' ? grEnVigor(c) : c.estado === GR.fEst);
   const cuentaCat = k => base.filter(c => k === 'todas' || c.categoria === k).length;
   const lista = base.filter(c => GR.fCat === 'todas' || c.categoria === GR.fCat).sort((a, b) => grAnual(b) - grAnual(a));
   const chCat = (k, l) => `<button type="button" class="tb-fchip ${GR.fCat === k ? 'active' : ''}" onclick="GR.fCat='${k}';grRender()">${l} <b>${cuentaCat(k)}</b></button>`;
@@ -14239,7 +14245,7 @@ function grContratosHtml(){
   h += FILT.filter(([k]) => !_grPleg.includes(k)).map(([k, tit, val, con, chips]) => `<div class="tb-frow" style="margin-bottom:8px;"><button type="button" class="tb-ftit" onclick="grFiltroToggle('${k}')" title="Plegar ${tit}">${tit}</button><div>${chips}</div></div>`).join('');
   h += lista.map(c => {
     const v = grVariacion(c), d = grDias(c.fecha_renovacion), m = grMejorAlt(c);
-    const chips = `${c.importe != null ? `<span class="fl-chip">${grEur(c.importe)} ${GR_PER_TXT[c.periodicidad] || ''}</span>` : '<span class="fl-chip nd">Sin importe</span>'}${grChipDias(d, c)}${v ? `<span class="fl-chip ${v.pct > 0 ? 'mal' : 'ok'}">${grPct(v.pct)}</span>` : ''}${c.estado === 'por_confirmar' ? '<span class="fl-chip aviso">Por confirmar</span>' : c.estado === 'en_revision' ? '<span class="fl-chip aviso">En revisión</span>' : c.estado === 'cancelado' ? '<span class="fl-chip nd">Cancelado</span>' : ''}${m ? `<span class="fl-chip ok">Ahorro posible ${grEur0(m.s.anual)}</span>` : ''}`;
+    const chips = `${c.importe != null ? `<span class="fl-chip">${grEur(c.importe)} ${GR_PER_TXT[c.periodicidad] || ''}</span>` : '<span class="fl-chip nd">Sin importe</span>'}${grSucesor(c) ? `<span class="fl-chip aviso">Hasta ${grFechaCorta(grSucesor(c).fecha_inicio)}</span>` : grChipDias(d, c)}${c.estado !== 'cancelado' && c.fecha_inicio && c.fecha_inicio > grHoyIso() ? `<span class="fl-chip ok">Desde ${grFechaCorta(c.fecha_inicio)}</span>` : ''}${v ? `<span class="fl-chip ${v.pct > 0 ? 'mal' : 'ok'}">${grPct(v.pct)}</span>` : ''}${c.estado === 'por_confirmar' ? '<span class="fl-chip aviso">Por confirmar</span>' : c.estado === 'en_revision' ? '<span class="fl-chip aviso">En revisión</span>' : c.estado === 'cancelado' && !grSucesor(c) ? '<span class="fl-chip nd">Cancelado</span>' : ''}${m ? `<span class="fl-chip ok">Ahorro posible ${grEur0(m.s.anual)}</span>` : ''}`;
     if(c.categoria === 'seguros'){
       const f = c.flota_id ? GR.flota.find(x => x.id === c.flota_id) : null;
       const titulo = f ? (f.modelo || f.nombre) : (/sin identificar|probablemente/i.test(c.afecta_a || '') ? 'Vehículo sin identificar' : c.nombre);
