@@ -5138,11 +5138,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.11" defer></script>
-<script src="costes/norm.js?v=V13.11" defer></script>
-<script src="ajustes/calc.js?v=V13.11" defer></script>
+<script src="rentabilidad/rent.js?v=V13.12" defer></script>
+<script src="costes/norm.js?v=V13.12" defer></script>
+<script src="ajustes/calc.js?v=V13.12" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.11</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.12</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5294,7 +5294,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.11</div>
+        <div class="sub" id="version-badge">V13.12</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -14732,6 +14732,8 @@ function avisosItvFlota(filasFlota, hoy){
     .sort((a,b) => a.dias - b.dias);
 }
 // V12.06: misma cuenta atrás real que el resto de recordatorios; si lleva mucho vencida, en años y meses
+// V13.12 (Daniel 02/11): en Tareas todas las fechas se escriben igual, sin «Quedan» ni «Revisar en»
+function recCuando(dias, f){ return (dias > 1 ? 'En ' + dias + ' días' : dias === 1 ? 'Mañana' : dias === 0 ? 'Hoy' : 'Vencida hace ' + recTiempo(-dias)) + (f ? ' · ' + f : ''); }
 function recTiempo(n){ if(n < 60) return n + (n === 1 ? ' día' : ' días'); const me = Math.floor(n / 30.44); if(me < 24) return me + ' meses'; const a = Math.floor(me / 12), r = me % 12; return a + ' años' + (r ? ' y ' + r + (r === 1 ? ' mes' : ' meses') : ''); }
 function htmlAvisoItv(a){
   const v = a.v, d = a.dias;
@@ -14741,7 +14743,7 @@ function htmlAvisoItv(a){
   const ico = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:15px;height:15px;vertical-align:-2px;margin-right:2px;"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><circle cx="8" cy="17" r="1.6"/><circle cx="16" cy="17" r="1.6"/></svg>';
   // V8.50 (Daniel: «dentro de cada grupo, unas tarjetas gordas y otras finas»): el aviso de ITV con la misma tarjeta que los demás recordatorios
   return `<details class="alert-det rec-card t-itv">
-      <summary class="alert-sum"><div class="rec-ico">${ico}</div><div class="t">ITV ${escHtml(v.nombre)}</div><div class="rec-pil ${d < 0 || d <= 3 ? 'roja' : d <= 14 ? 'ambar' : ''}">${d > 1 ? 'Quedan ' + d + ' días' : d === 1 ? 'Mañana' : d === 0 ? 'Hoy' : 'Vencida hace ' + recTiempo(-d)} · ${dd}/${m}/${String(y).slice(2)}</div></summary>
+      <summary class="alert-sum"><div class="rec-ico">${ico}</div><div class="t">ITV ${escHtml(v.nombre)}</div><div class="rec-pil ${d < 0 || d <= 3 ? 'roja' : d <= 14 ? 'ambar' : ''}">${recCuando(d, dd + '/' + m + '/' + String(y).slice(2))}</div></summary>
       <div class="alert-det-b"><div class="s" style="font-weight:600;color:var(--ink);">ITV ${escHtml(v.nombre)}${v.matricula ? ' (' + escHtml(v.matricula) + ')' : ''} — ${cuando}</div><div class="rec-fte">Fuente · ficha del vehículo (Flota)</div><div class="s" style="margin-top:6px;">Válida hasta ${dd}/${m}/${y}. Aviso automático: desaparece al actualizar la fecha de ITV en la ficha del vehículo.</div></div>
     </details>`;
 }
@@ -14849,7 +14851,7 @@ function recAveriasHtml(){   // V12.39 (reporte f409de12): en Tareas solo las av
   return (typeof _flInc !== 'undefined' ? _flInc : []).filter(i => i.estado !== 'resuelta' && (i.tipo === 'averia' || i.tipo === 'mantenimiento') && (i.sigue_trabajando === false || ['alta', 'media'].includes(i.prioridad)))
     .sort((a, b) => ((b.sigue_trabajando === false) - (a.sigue_trabajando === false)) || String(a.fecha || '').localeCompare(String(b.fecha || '')))
     .map(i => { const dias = i.fecha ? Math.max(0, Math.floor((hoy - new Date(i.fecha + 'T00:00:00')) / 864e5)) : null, parada = i.sigue_trabajando === false;
-      return `<details class="alert-det rec-card t-flota"><summary class="alert-sum"><div class="t"><span class="rec-tit">${flE((i.flota?.nombre || '') + ': ' + String(i.descripcion || '').split(/[.\n]/)[0])}</span><span class="rec-fila"><span class="rec-est" style="--e:${parada ? 'var(--red)' : '#B7791F'}">${parada ? 'Parada' : (FL_INC_TIPO[i.tipo] || 'Avería') + ' · prioridad ' + flE(i.prioridad || '')}</span>${i.revisar ? (() => { const r = Math.round((new Date(i.revisar + 'T00:00:00') - new Date(new Date().toDateString())) / 864e5), [y, m, d] = i.revisar.split('-'); return `<div class="rec-pil ${r < 0 || r <= 1 ? 'roja' : r <= 3 ? 'ambar' : ''}">${r < 0 ? 'Vencida hace ' + recTiempo(-r) : r === 0 ? 'Revisar hoy' : r === 1 ? 'Revisar mañana' : 'Revisar en ' + r + ' días'} · ${d}/${m}</div>`; })() : `<div class="rec-pil roja">Sin fecha</div>`}</span></div></summary><div class="alert-det-b">${flIncCard(i)}</div></details>`; }).join('');
+      return `<details class="alert-det rec-card t-flota"><summary class="alert-sum"><div class="t"><span class="rec-tit">${flE((i.flota?.nombre || '') + ': ' + String(i.descripcion || '').split(/[.\n]/)[0])}</span><span class="rec-fila"><span class="rec-est" style="--e:${parada ? 'var(--red)' : '#B7791F'}">${parada ? 'Parada' : (FL_INC_TIPO[i.tipo] || 'Avería') + ' · prioridad ' + flE(i.prioridad || '')}</span>${i.revisar ? (() => { const r = Math.round((new Date(i.revisar + 'T00:00:00') - new Date(new Date().toDateString())) / 864e5), [y, m, d] = i.revisar.split('-'); return `<div class="rec-pil ${r < 0 || r <= 1 ? 'roja' : r <= 3 ? 'ambar' : ''}">${recCuando(r, d + '/' + m)}</div>`; })() : `<div class="rec-pil roja">Sin fecha</div>`}</span></div></summary><div class="alert-det-b">${flIncCard(i)}</div></details>`; }).join('');
 }
 
 // V8.57 (reporte de Daniel: «los filtros no están actualizados como estaba la web»): Documentos pendientes usa las mismas píldoras que el resto. Sin ninguna elegida = todos. Antes los desplegables del móvil no filtraban nada: renderControlDocs solo leía los de escritorio
@@ -15087,7 +15089,7 @@ function recRender(){
     // V12.04 (Daniel: «quiero cuentas atrás reales»): cuenta atrás hasta la fecha límite real (vence), con la fecha al lado; sin fecha real no se inventa
     // V12.11 (Daniel: «¿por qué estas tareas no tienen cuenta atrás?»): toda tarea lleva fecha; si no hay límite real, la de revisión («Revisar en X días»)
     const fCorta = v ? v.slice(8, 10) + '/' + v.slice(5, 7) : '';
-    const pild = v == null ? '' : `<div class="rec-pil ${dias < 0 || dias <= 3 ? 'roja' : dias <= 14 ? 'ambar' : ''}">${d.vence_tipo === 'seguimiento' ? (dias > 1 ? 'Revisar en ' + dias + ' días · ' + fCorta : dias === 1 ? 'Revisar mañana · ' + fCorta : dias === 0 ? 'Revisar hoy · ' + fCorta : 'Revisión pasada hace ' + recTiempo(-dias) + ' · ' + fCorta) : (dias > 1 ? 'Quedan ' + dias + ' días · ' + fCorta : dias === 1 ? 'Mañana · ' + fCorta : dias === 0 ? 'Hoy · ' + fCorta : 'Vencido hace ' + recTiempo(-dias) + ' · ' + fCorta)}</div>`;
+    const pild = v == null ? '' : `<div class="rec-pil ${dias < 0 || dias <= 3 ? 'roja' : dias <= 14 ? 'ambar' : ''}">${recCuando(dias, fCorta)}</div>`;
     // V8.51 (Daniel): estado, con quién o motivo, y cuánto lleva así
     // V12.04: el estado ya no muestra días desde que se puso (se confundía con una cuenta atrás); la cuenta atrás real está en la pastilla de fecha
     const E = REC_ESTADOS[d.estado_rec], desde = d.estado_desde ? Math.max(0, Math.round((new Date(hoy + 'T12:00:00') - new Date(d.estado_desde + 'T12:00:00')) / 86400000)) : null;
