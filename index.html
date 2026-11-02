@@ -1913,7 +1913,9 @@ button.e2-fila{cursor:pointer;}
 .txt2.txt2-ab{display:block !important;-webkit-line-clamp:unset;overflow:visible !important;}
 .ab-m{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:4px;font-size:11px;font-weight:800;line-height:1;border:1px solid var(--ink-soft);background:#fff;color:var(--ink);flex:0 0 auto;}   /* V13.03 (Daniel 01/11): A = se cobra en A (blanca), B = se cobra en B (roja) */
 .ab-m.ab-b{background:var(--red);border-color:var(--red);color:#fff;}
-.cc-fc-imp.ab-con{display:flex !important;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px;}   /* V13.06 (Daniel): la letra a la izquierda del precio */
+.cc-fc-imp.ab-con{display:flex !important;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px;}
+.cc-fc-imp.ab-con:has(> .cc-fc-pag){display:grid !important;grid-template-columns:auto auto;justify-content:end;align-items:center;column-gap:6px;row-gap:1px;}
+.cc-fc-pag{grid-column:1 / -1;display:block;text-align:right;font-size:11px;font-weight:700;color:var(--red);white-space:nowrap;line-height:1.2;}   /* V13.33: lo pagado, debajo de lo que falta */   /* V13.06 (Daniel): la letra a la izquierda del precio */
 .ab-tog{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;padding:6px;margin:-6px 0;}
 .fc-total-mini:has(> .ab-tog){display:grid !important;grid-template-columns:auto auto;column-gap:4px;align-items:center;justify-content:end;}
 .fc-total-mini > .ab-tog{grid-column:1;grid-row:2;}
@@ -5161,11 +5163,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.32" defer></script>
-<script src="costes/norm.js?v=V13.32" defer></script>
-<script src="ajustes/calc.js?v=V13.32" defer></script>
+<script src="rentabilidad/rent.js?v=V13.33" defer></script>
+<script src="costes/norm.js?v=V13.33" defer></script>
+<script src="ajustes/calc.js?v=V13.33" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.32</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.33</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5317,7 +5319,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.32</div>
+        <div class="sub" id="version-badge">V13.33</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -26008,6 +26010,7 @@ function tbImporteSinIva(j){
   const d = tbDocDe(j); if(!d) return 0;
   const tot = Number(d.total || d.importe) || 0, base = Number(d.base != null ? d.base : tot) || 0;
   if(['parcial', 'parcial_otra'].includes(d.estado_cobro) && tot) return base * Math.max(0, 1 - (Number(d.cobrado_importe || 0) + (d.estado_cobro === 'parcial_otra' && typeof enOtraSuma === 'function' ? enOtraSuma(d) : 0)) / tot);
+  { const pa = docPagadoAntes(d); if(pa && tot) return base * Math.max(0, 1 - pa / tot); }   // V13.33: lo ya pagado de un trabajo en marcha no cuenta como pendiente
   return base;
 }
 function tbAgruparEstado(lista, pintar){
@@ -31055,7 +31058,7 @@ function renderControlDocs(){
         const tipoNum = `Nº ${d.numero||'—'}`;   // V8.64: el tipo va arriba, entre el estado y el icono de imprimir
         const cliente = d.client && d.client !== '—' ? d.client : 'Sin cliente';
         return `<div class="factura-card-movil fc-tipo-${d.type}" data-doc-id="${d.id}" onclick="openDocumentViewer('${d.id}')">
-          <div class="cc-fila-compacta"><span class="cc-fc-te"><span class="cc-fc-est" onclick="event.stopPropagation();">${estadoHtml}</span><span class="cc-fc-l1"><span class="fc-tipo-tag tp-${d.type}">${TIPO_DOC_NOMBRE[d.type] || d.type}</span><span class="cc-fc-num">${svgEsc(d.numero||d.num||'—')}</span></span></span><span class="cc-fc-bloque"><span class="cc-fc-cli" data-cli="${escHtml(cliente)}">${svgEsc(cliente)}</span>${((d.obra_texto || d.job) && (d.obra_texto || d.job) !== '—') ? `<span class="cc-fc-obra">${svgEsc(d.obra_texto || d.job)}</span>` : ''}</span><span class="cc-fc-imp">${((['parcial','parcial_otra'].includes(d.estado_cobro) && Number(d.total||d.importe)) ? fmtEur(Math.max(0, Number(d.total||d.importe) - Number(d.cobrado_importe||0) - (d.estado_cobro==='parcial_otra' ? enOtraSuma(d) : 0))) : d.amountLabel)}</span></div>
+          <div class="cc-fila-compacta"><span class="cc-fc-te"><span class="cc-fc-est" onclick="event.stopPropagation();">${estadoHtml}</span><span class="cc-fc-l1"><span class="fc-tipo-tag tp-${d.type}">${TIPO_DOC_NOMBRE[d.type] || d.type}</span><span class="cc-fc-num">${svgEsc(d.numero||d.num||'—')}</span></span></span><span class="cc-fc-bloque"><span class="cc-fc-cli" data-cli="${escHtml(cliente)}">${svgEsc(cliente)}</span>${((d.obra_texto || d.job) && (d.obra_texto || d.job) !== '—') ? `<span class="cc-fc-obra">${svgEsc(d.obra_texto || d.job)}</span>` : ''}</span><span class="cc-fc-imp">${((['parcial','parcial_otra'].includes(d.estado_cobro) && Number(d.total||d.importe)) ? fmtEur(Math.max(0, Number(d.total||d.importe) - Number(d.cobrado_importe||0) - (d.estado_cobro==='parcial_otra' ? enOtraSuma(d) : 0))) : docPagadoAntes(d) ? fmtEur(Math.max(0, Number(d.total||d.importe) - docPagadoAntes(d))) : d.amountLabel)}${docPagadoHtml(d)}</span></div>
           <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${d.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
           <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${d.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
           <input type="checkbox" class="fc-check ctrl-sel-chk" data-id="${d.id}" onclick="event.stopPropagation();" onchange="actualizarSeleccionDoc('ctrl-sel-chk','ctrl-borrar-sel-btn','ctrl-sel-count')">
@@ -31755,8 +31758,8 @@ function ivaLineHtml(doc){
 // V10.76 (Daniel: «en Documentos las tarjetas y el botón de vista como en Documentos pendientes»): las listas de Facturas, Albaranes y Presupuestos/Proformas usan la misma tarjeta plegada (una línea por documento; tocarla la despliega) y el mismo botón de vista
 function filaCompactaDocHtml(doc, tipo, estadoHtml, cliente, obra){
   const t = tipo || doc.type || 'factura', imp = Number(doc.importe || doc.total || 0);
-  const falta = (['parcial','parcial_otra'].includes(doc.estado_cobro) && imp) ? Math.max(0, imp - Number(doc.cobrado_importe || 0) - (doc.estado_cobro === 'parcial_otra' && typeof enOtraSuma === 'function' ? enOtraSuma(doc) : 0)) : imp;
-  const lbl = falta.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  const falta = (['parcial','parcial_otra'].includes(doc.estado_cobro) && imp) ? Math.max(0, imp - Number(doc.cobrado_importe || 0) - (doc.estado_cobro === 'parcial_otra' && typeof enOtraSuma === 'function' ? enOtraSuma(doc) : 0)) : Math.max(0, imp - docPagadoAntes(doc));
+  const lbl = formatMoneda(falta) + docPagadoHtml(doc);
   const cli = cliente || 'Sin cliente', ob = obra && obra !== '—' ? `<span class="cc-fc-obra">${svgEsc(obra)}</span>` : '';
   return `<div class="cc-fila-compacta"><span class="cc-fc-te"><span class="cc-fc-est" onclick="event.stopPropagation();">${estadoHtml}</span><span class="cc-fc-l1"><span class="fc-tipo-tag tp-${t}">${TIPO_DOC_NOMBRE[t] || t}</span><span class="cc-fc-num">${svgEsc(doc.numero || doc.num || '—')}</span></span></span><span class="cc-fc-bloque"><span class="cc-fc-cli" data-cli="${escHtml(cli)}">${svgEsc(cli)}</span>${ob}</span><span class="cc-fc-imp">${lbl}</span></div>`;
 }
@@ -33303,6 +33306,11 @@ document.addEventListener('exg-docs-listos', () => abDecorar(document.body));
 let _cobrosDoc = {};
 async function cobrosCargar(){ try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'cobro_doc'); const M = {}; (data || []).forEach(x => { const d = x.data || {}; if(!d.doc_id) return; (M[d.doc_id] = M[d.doc_id] || []).push(d); }); Object.values(M).forEach(l => l.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))); _cobrosDoc = M; }catch(e){} }
 function cobroUltimaFecha(id){ const l = _cobrosDoc[id]; if(!l || !l.length) return ''; const f = String(l[l.length - 1].fecha || ''); return f ? ' · ' + f.slice(8, 10) + '/' + f.slice(5, 7) : ''; }
+// V13.33 (Daniel 02/11: «¿por qué aquí no sale lo cobrado en B y lo que falta actualizado?»): un albarán de un trabajo en marcha o en pausa con algo ya pagado
+// enseña lo que falta y, debajo, lo pagado (en B si fue en B). En los estados de cobro normales (parcial…) ya se hacía.
+function docPagadoAntes(d){ if(!d || ['parcial', 'parcial_otra', 'cobrado', 'cobrado_otra', 'cobrado_efectivo', 'nula', 'cancelado', 'anulado', 'rectificativa'].includes(d.estado_cobro)) return 0; return Number(d.cobrado_importe || 0) > 0 ? Number(d.cobrado_importe) : 0; }
+function docPagadoHtml(d){ const pa = docPagadoAntes(d); if(!pa) return ''; let b = false; try{ b = pagosDoc(d.id).enB > 0; }catch(e){} return '<small class="cc-fc-pag">Pagado' + (b ? ' en B' : '') + ' ' + String(Math.round(pa)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €</small>'; }
+function docPagadoDecorar(){ document.querySelectorAll('.factura-card-movil[data-doc-id] .cc-fc-pag').forEach(sm => { const d = documentosRealesById[sm.closest('[data-doc-id]').dataset.docId]; if(d){ const t = docPagadoHtml(d); if(t) sm.outerHTML = t; } }); }
 // V13.31: lo pagado de un documento, cada pago con su fecha (lo que no tenga registro con fecha sale como un pago sin fecha)
 function pagosDoc(id){ const d = documentosRealesById[id] || {}, l = (_cobrosDoc[id] || []).filter(x => Number(x.importe) > 0).map(x => ({fecha: x.fecha, importe: Number(x.importe), enB: !!x.en_b})); const reg = l.reduce((a, x) => a + x.importe, 0), cob = Number(d.cobrado_importe != null ? d.cobrado_importe : d.cobrado) || 0; if(cob - reg > 0.005) l.unshift({fecha: '', importe: Math.round((cob - reg) * 100) / 100, enB: false}); return {lista: l, total: Math.max(cob, reg), enB: l.filter(x => x.enB).reduce((a, x) => a + x.importe, 0)}; }
 async function cobroRegistrar(doc, importe, fecha){
@@ -33315,7 +33323,7 @@ async function docEstadoLog(doc, antes, despues, cobAntes, cobDespues){
   if(!doc || !sb || (antes === despues && Number(cobAntes) === Number(cobDespues))) return;
   try{ await sb.from('sistema').insert({tipo: 'doc_estado_log', data: {doc_id: doc.id, numero: doc.numero || doc.num || '', antes, despues, cobrado_antes: Number(cobAntes || 0), cobrado_despues: Number(cobDespues || 0), at: new Date().toISOString()}}); }catch(e){ console.error('log', e); }
 }
-document.addEventListener('exg-docs-listos', () => { cobrosCargar(); });
+document.addEventListener('exg-docs-listos', () => { cobrosCargar().then(docPagadoDecorar); });
 </script>
 <script>
 /* V13.10 (Daniel 02/11, caso nave 7): la web busca SOLA, cada vez que carga las tareas, pruebas nuevas de cada tarea abierta en los documentos de empresa,
