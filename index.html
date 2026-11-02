@@ -1902,6 +1902,13 @@ button.e2-fila{cursor:pointer;}
 .fc-total-mini:has(> .ab-tog) > .fc-total-label{grid-column:2;grid-row:1;text-align:right;}
 .fc-total-mini:has(> .ab-tog) > .fc-total-valor{grid-column:2;grid-row:2;}   /* zona de toque cómoda; se ve solo la letra */   /* V13.05 (Daniel): la letra del botón, del mismo tamaño que la de los totales */
 .tb-ab{display:flex;justify-content:flex-end;align-items:center;gap:6px;font-weight:800;}
+/* V13.09 (Daniel 02/11: «la tarea tiene que tener todo lo que está asociado a ella y lo que está pendiente»): en cada tarea, lo que falta y lo ya hecho con su documento */
+.rec-falta{display:flex;gap:8px;align-items:baseline;padding:8px 10px;margin:0 0 8px;border-radius:10px;background:#fbf2df;font-size:13px;}
+.rec-falta b{flex:0 0 auto;font-size:11px;font-weight:800;color:#8A6100;text-transform:uppercase;letter-spacing:.3px;}
+.rec-vinc{display:flex;flex-direction:column;gap:4px;margin:0 0 8px;}
+.rec-vinc > b{font-size:11px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.3px;}
+.rec-vinc > a, .rec-vinc > span{display:flex;gap:8px;align-items:baseline;font-size:13px;color:var(--ink);text-decoration:none;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--paper);}
+.rec-vinc > a{color:var(--ink);} .rec-vinc i{font-style:normal;font-size:11.5px;font-weight:700;color:var(--ink-soft);flex:0 0 auto;}
 .dir-pest{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-bottom:10px;}   /* V12.96 (reporte f8101005): cuadrícula fija, 3 arriba y 2 abajo del mismo ancho; nada suelto en una fila */
 .dir-pest button{all:unset;box-sizing:border-box;cursor:pointer;white-space:nowrap;text-align:center;padding:9px 12px;border-radius:99px;font-weight:800;font-size:13px;background:var(--paper);border:1px solid var(--line);color:var(--ink);}
 .dir-pest button.act{background:var(--orange);border-color:var(--orange);color:#fff;}
@@ -5124,11 +5131,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.08" defer></script>
-<script src="costes/norm.js?v=V13.08" defer></script>
-<script src="ajustes/calc.js?v=V13.08" defer></script>
+<script src="rentabilidad/rent.js?v=V13.09" defer></script>
+<script src="costes/norm.js?v=V13.09" defer></script>
+<script src="ajustes/calc.js?v=V13.09" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.08</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.09</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5280,7 +5287,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.08</div>
+        <div class="sub" id="version-badge">V13.09</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -15082,6 +15089,8 @@ function recRender(){
       <div class="alert-det-b">
         ${largo ? `<div class="rec-largo">${escHtml(recSinGritos(largo))}</div>` : ''}
         <div class="rec-fte">Fuente · ${escHtml(d.fuente || (r.tipo === 'alerta_cobro_pendiente' ? 'documentos pendientes de cobro' : r.tipo === 'alerta_itv' ? 'ficha del vehículo' : d.origen === 'recordatorio' ? 'recordatorio' : 'chat con Claude'))}${d.archivo_url ? ' <a href="' + escHtml(d.archivo_url) + '" class="fte-lnk" onclick="event.stopPropagation()">Archivo</a>' : ''}</div>
+        ${d.falta ? `<div class="rec-falta"><b>Falta</b><span>${escHtml(d.falta)}</span></div>` : ''}
+        ${Array.isArray(d.vinculos) && d.vinculos.some(x => x && x.etiqueta) ? `<div class="rec-vinc"><b>Hecho y asociado</b>${d.vinculos.filter(x => x && x.etiqueta).map(x => x.url ? `<a href="${escHtml(x.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${x.fecha ? `<i>${escHtml(String(x.fecha).slice(8, 10) + '/' + String(x.fecha).slice(5, 7))}</i>` : ''}${escHtml(x.etiqueta)}</a>` : `<span>${x.fecha ? `<i>${escHtml(String(x.fecha).slice(8, 10) + '/' + String(x.fecha).slice(5, 7))}</i>` : ''}${escHtml(x.etiqueta)}</span>`).join('')}</div>` : ''}
         ${desc ? recDetalleHtml(desc) : ''}
         ${d.en_bandeja ? '<div class="s" style="margin-top:6px;color:var(--orange);font-weight:700;">En la bandeja' + (d.orden_bandeja ? ': ' + escHtml(d.orden_bandeja) : '') + '</div>' : ''}
         <div class="rec-acc">${d.ver ? (Array.isArray(d.ver) ? d.ver : [d.ver]).map((v, i) => `<button type="button" class="rec-b rec-b-pri" onclick="recVer('${r.id}', ${i})">${escHtml(v.etiqueta || 'Ver')}</button>`).join('') : ''}<button type="button" class="rec-b ${d.ver ? '' : 'rec-b-pri'}" onclick="recABandeja('${r.id}')">A la bandeja</button><button type="button" class="rec-b" onclick="recPosponer('${r.id}')">Posponer</button><button type="button" class="rec-b" onclick="marcarRecordatorioResuelto('${r.id}')">Hecho</button></div>
