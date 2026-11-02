@@ -5161,11 +5161,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.31" defer></script>
-<script src="costes/norm.js?v=V13.31" defer></script>
-<script src="ajustes/calc.js?v=V13.31" defer></script>
+<script src="rentabilidad/rent.js?v=V13.32" defer></script>
+<script src="costes/norm.js?v=V13.32" defer></script>
+<script src="ajustes/calc.js?v=V13.32" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.31</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.32</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5317,7 +5317,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.31</div>
+        <div class="sub" id="version-badge">V13.32</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -25114,7 +25114,7 @@ function generarPDFDocumento(accion, modoForzado, portadaForzada){
   const conPortada = portadaForzada !== undefined ? !!portadaForzada : (accion !== 'blob' && !!document.getElementById('ni-portada')?.checked);
   // V9.70 (Daniel): casillas «Mostrar» (logo, datos empresa, fecha, Nº, cliente); el PDF al gestor ('blob') lo lleva todo. Albarán sin guardar: por defecto solo el Nº.
   const _wrapOpc = document.getElementById('ni-estado-modo-wrap');
-  const _opc = (id) => { if(accion === 'blob') return true; const k = id.replace('ni-pdf-',''); if(_wrapOpc && _wrapOpc.style.display !== 'none' && window.PDF_OPC) return window.PDF_OPC[k] !== false; return !['logo', 'datos'].includes(k) || document.getElementById('ni-doctype').value !== 'albaran'; };   // V13.31 (Daniel 02/11): el albarán sale sin logo ni datos de la empresa, con fecha, Nº, cliente y obra
+  const _opc = (id) => { if(accion === 'blob') return true; const k = id.replace('ni-pdf-',''); if(_wrapOpc && _wrapOpc.style.display !== 'none' && window.PDF_OPC) return window.PDF_OPC[k] !== false; return k === 'num' || k === 'obra' || document.getElementById('ni-doctype').value !== 'albaran'; };   // V13.32 (Daniel 02/11: «¿por qué pones cliente?»): el albarán sale solo con el Nº y la obra, como decidió en V9.70
   const verLogo = _opc('ni-pdf-logo'), verDatos = _opc('ni-pdf-datos'), verFecha = _opc('ni-pdf-fecha'), verNum = _opc('ni-pdf-num'), verObra = _opc('ni-pdf-obra'), verCli = _opc('ni-pdf-cli');
   const cfg = modoPdf==='simplificado' ? {...DOC_TYPES[type], hasPrecios:false} : DOC_TYPES[type];
   const client = MAY(document.getElementById('ni-client').value || '—');
@@ -25324,8 +25324,8 @@ function generarPDFDocumento(accion, modoForzado, portadaForzada){
       if(type === 'albaran' && editingDocId){
         const pg = pagosDoc(editingDocId);
         if(pg.total > 0){
-          doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(163, 45, 45);
-          pg.lista.forEach(p => { doc.text(p.fecha ? 'Pagado el ' + formatFechaCorta(p.fecha) + ':' : 'Pagado:', 150, yDer, {align:'right'}); doc.text(formatMoneda(-p.importe), 195, yDer, {align:'right'}); yDer += 5.5; });
+          doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(163, 45, 45);   // V13.32 (Daniel: «¿por qué tan pequeño lo pagado?»): mismo tamaño que el total
+          pg.lista.forEach(p => { doc.text(p.fecha ? 'Pagado el ' + formatFechaCorta(p.fecha) + ':' : 'Pagado:', 150, yDer, {align:'right'}); doc.text(formatMoneda(-p.importe), 195, yDer, {align:'right'}); yDer += 7; });
           doc.setTextColor(0, 0, 0); doc.setFont('helvetica','bold'); doc.setFontSize(11);
           doc.text('PENDIENTE:', 150, yDer, {align:'right'}); doc.text(formatMoneda(Math.max(0, total - pg.total)), 195, yDer, {align:'right'}); yDer += 7;
           doc.setFont('helvetica','normal'); doc.setFontSize(9);
@@ -31490,7 +31490,7 @@ function actualizarControlesEditor(doc){
   { const pc = document.getElementById('ni-portada'); if(pc) pc.checked = false; }
   if(wrap.dataset.docOpc !== String(doc.id)){   // V9.70: «Mostrar» en el PDF: albarán = solo Nº; resto = todo
     wrap.dataset.docOpc = String(doc.id); const alb = (doc.tipo || doc.type) === 'albaran';
-    window.PDF_OPC = {logo:!alb, datos:!alb, fecha:true, num:true, cli:true, obra:true};
+    window.PDF_OPC = {logo:!alb, datos:!alb, fecha:!alb, num:true, cli:!alb, obra:true};
   }
   // V9.20: la portada se elige cada vez que se imprime
   { if(typeof _selLineasModo !== 'undefined' && _selLineasModo) selLineasToggleModo(); const b = document.getElementById('ie-sel-btn'); if(b) b.style.display = (doc.tipo || doc.type) === 'albaran' ? '' : 'none'; }
