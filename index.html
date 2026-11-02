@@ -5138,11 +5138,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.13" defer></script>
-<script src="costes/norm.js?v=V13.13" defer></script>
-<script src="ajustes/calc.js?v=V13.13" defer></script>
+<script src="rentabilidad/rent.js?v=V13.14" defer></script>
+<script src="costes/norm.js?v=V13.14" defer></script>
+<script src="ajustes/calc.js?v=V13.14" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.13</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.14</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5294,7 +5294,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.13</div>
+        <div class="sub" id="version-badge">V13.14</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -7226,6 +7226,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
           <div class="seleccionar-todo-movil" id="empresa-sel-todo-m" onclick="toggleSeleccionarTodoEmpresaDocs()">Seleccionar todos</div>
           <div id="empresa-docs-cards"></div>
           </div>
+          <div class="panel emp-panel" id="empresa-enlaces" style="display:none;margin-top:12px;"></div>
         </div>
 
         <!-- ================= REPORTES ================= -->
@@ -15902,10 +15903,18 @@ const EMP_CAT_ESTILO = [
   [/plano|proyecto/i, '#5E5A8A', '<path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>'],
 ];
 function empCatEstilo(cat){ const e = EMP_CAT_ESTILO.find(x => x[0].test(cat || '')); return e ? [e[1], e[2]] : ['#6A6A6A', '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/>']; }
+function renderEnlacesEmpresa(l){
+  const el = document.getElementById('empresa-enlaces'); if(!el) return;
+  l = l.slice().sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es'));
+  el.innerHTML = l.length ? `<div class="rec-sec" style="--c:${empCatEstilo('Enlaces')[0]};cursor:default;"><span class="rec-sec-bar"></span><b>Enlaces</b><i>${l.length}</i></div><div class="emp-grupo" style="--c:${empCatEstilo('Enlaces')[0]};">${l.map(d => { const u = ((d.archivos || [])[0] || {}).url || d.archivo_url || ''; return `<div class="emp-card"><a class="emp-fila no-cap" href="${escHtml(u)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;"><span class="emp-nom">${escHtml(d.nombre)}</span></a></div>`; }).join('')}</div>` : '';
+  el.style.display = l.length ? '' : 'none';
+}
 async function cargarDocsEmpresa(){
   if(!sb) return;
   const {data} = await sb.from('documentos_empresa').select('*').order('categoria');
-  EMPRESA_DOCS = data || [];
+  // V13.14 (Daniel 02/11: «no lo quiero dentro de donde están los otros, lo quiero fuera»): los Enlaces van en su propio apartado, fuera de la lista de documentos
+  const esEnl = d => /^enlaces$/i.test((d.categoria || '').trim());
+  EMPRESA_DOCS = (data || []).filter(d => !esEnl(d)); renderEnlacesEmpresa((data || []).filter(esEnl));
   renderDocsEmpresa(); cargarEmpresaDatos();
 }
 function diasHastaCaducidad(fecha){
