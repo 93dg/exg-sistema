@@ -5170,11 +5170,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.42" defer></script>
-<script src="costes/norm.js?v=V13.42" defer></script>
-<script src="ajustes/calc.js?v=V13.42" defer></script>
+<script src="rentabilidad/rent.js?v=V13.43" defer></script>
+<script src="costes/norm.js?v=V13.43" defer></script>
+<script src="ajustes/calc.js?v=V13.43" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.42</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.43</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5326,7 +5326,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.42</div>
+        <div class="sub" id="version-badge">V13.43</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -10059,7 +10059,7 @@ async function econ2Cargar(){
   if(!_e2 && _e2Cargando) await _e2Cargando;   // V12.27: dos cargas a la vez sumaban dos veces las retiradas (Gastos 2026 salía 4.580 € de más)
   if(!_e2){ let _fin; _e2Cargando = new Promise(r => _fin = r); box.innerHTML = '<div class="dir-cargando">Cargando…</div>';
     const docs = []; let desde = 0;
-    while(true){ const {data, error} = await sb.from('documentos_economicos').select('id, tipo, numero, importe, iva_pct, cobrado_importe, cobrado_en, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id, categoria, relacion_actividad').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'proforma', 'albaran', 'gasto']).range(desde, desde + 999);
+    while(true){ const {data, error} = await sb.from('documentos_economicos').select('id, tipo, numero, importe, iva_pct, cobrado_importe, cobrado_en, estado_cobro, documento_siguiente_id, documento_anterior_id, origen_albaran_ids, fecha_devengo, entidad_id, categoria, concepto, relacion_actividad').is('deleted_at', null).eq('fase_estado', 'activo').in('tipo', ['factura', 'proforma', 'albaran', 'gasto']).range(desde, desde + 999);
       if(error || !data || !data.length) break; docs.push(...data); if(data.length < 1000) break; desde += 1000; }
     const {data: ents} = await sb.from('entidades').select('id, nombre'); const E = {}; (ents || []).forEach(x => { E[x.id] = x.nombre; });
     const enl = new Set(); docs.forEach(d => { if(d.tipo !== 'factura') return; if(d.documento_anterior_id) enl.add(d.documento_anterior_id); (d.origen_albaran_ids || []).forEach(x => enl.add(x)); });
@@ -10074,13 +10074,14 @@ async function econ2Cargar(){
         else if(d.tipo !== 'gasto' && !d.documento_siguiente_id && !enl.has(d.id) && falta){ if(admin) sinFact = falta; else if(['pendiente_cobrar', 'pendiente_enviar', 'parcial', 'borrador', 'entregado', 'por_cobrar_otra', 'parcial_otra'].includes(est)) pend = falta; }
       }
       const ajeno = d.tipo === 'gasto' && /^gasto personal\s*[–-]\s*alberto/i.test(d.categoria || '');   // V11.31 (Daniel: «tiene la instrucción de que no cuenta»): lo personal de Alberto no es de la empresa ni de los socios, no suma en ningún sitio
-      const gper = d.tipo === 'gasto' && !ajeno && d.relacion_actividad === 'no_relacionada' ? imp : 0;   // gasto personal de Rafa y Manolo (no relacionado con la actividad)
+      const gper = d.tipo === 'gasto' && !ajeno && gproPersona(d) ? imp : 0;   // V13.43: Gasto personal = lo mismo que la línea Personal de Gastos (lo que se le paga a cada persona y lo personal de Rafa y Manolo)
       return {id: d.id, tipo: d.tipo, numero: d.numero, fecha: f, cli: E[d.entidad_id] || (d.tipo === 'gasto' ? (d.categoria || 'Sin proveedor') : '—'), an, tr, legal, sinF, gasto: d.tipo === 'gasto' && !ajeno ? imp : 0, gper, ret: 0, pend, sinFact}; });
     try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').order('data->>ts', {ascending: false}).limit(12); E2.avisos = (data || []).map(r => r.data); }catch(e){ E2.avisos = []; }
-    try{ const rt = []; let d2 = 0;   // V9.13: retiradas en efectivo del cajero = la manera de cobrar de Rafa y Manolo; van aparte, no son gasto
-      while(true){ const {data, error} = await sb.from('movimientos_banco').select('id, fecha, importe, nota').eq('categoria', 'efectivo').lt('importe', 0).range(d2, d2 + 999); if(error || !data || !data.length) break; rt.push(...data); if(data.length < 1000) break; d2 += 1000; }
-      E2.ret = rt.filter(m => m.fecha && (!m.nota || /^EFECTIVO DE USO PERSONAL/i.test(m.nota))).map(m => ({id: m.id, fecha: m.fecha, an: Number(m.fecha.slice(0, 4)), tr: Math.floor((Number(m.fecha.slice(5, 7)) - 1) / 3) + 1, imp: -Number(m.importe), nota: m.nota || ''}));
-      E2.ret.forEach(m => E2.push({id: 'ret-' + m.id, tipo: 'retirada', numero: '', fecha: m.fecha, cli: 'Retiradas de socios', an: m.an, tr: m.tr, legal: 0, sinF: 0, gasto: m.imp, gper: m.imp, ret: m.imp, pend: 0, sinFact: 0})); }catch(e){ E2.ret = []; }   // V11.31 (reporte f6ce967d): las retiradas son como el sueldo de Rafa y Manolo: cuentan como gasto (Gastos, Resultado, barras por año y por trimestre)
+    try{   // V13.43 (reporte 839026ee): las retiradas y lo personal del banco, con la MISMA regla que la línea Personal de Gastos (gpBancoRegla) y sin contar dos veces lo ya apuntado
+      await gpBancoCargar(); if(typeof _docsListos !== 'undefined' && !_docsListos) await new Promise(r => { document.addEventListener('exg-docs-listos', r, {once: true}); setTimeout(r, 20000); });
+      const bl = gpBancoSinRepetir(_gpBanco || [], typeof gastosTodosDocs === 'function' ? gastosTodosDocs() : []);
+      E2.ret = bl.map(m => { const f = String(m.dateRaw).slice(0, 10); return {id: m.id, fecha: f, an: Number(f.slice(0, 4)), tr: Math.floor((Number(f.slice(5, 7)) - 1) / 3) + 1, imp: m.importe, nota: m.concepto || ''}; });
+      E2.ret.forEach(m => E2.push({id: 'ret-' + m.id, tipo: 'retirada', numero: '', fecha: m.fecha, cli: 'Retiradas de socios', an: m.an, tr: m.tr, legal: 0, sinF: 0, gasto: m.imp, gper: m.imp, ret: m.imp, pend: 0, sinFact: 0})); }catch(e){ E2.ret = []; }
     try{ E2.vivo = await dirVivo(); }catch(e){ E2.vivo = {}; }
     try{ const {data} = await sb.from('sistema').select('data').eq('tipo', 'alerta_banco').not('data->>saldo', 'is', null).order('data->>ts', {ascending: false}).limit(1); E2.alerta = data && data[0] ? data[0].data : null; }catch(e){}
     try{ if(!_valFlotaRaw) await valFlotaCargar(); }catch(e){}
@@ -10097,6 +10098,7 @@ function econ2Detalle(k, {sel, e}){   // V8.13: el detalle que se despliega al t
   const porCli = (rs, imp, max = 12) => { const m = {}; rs.forEach(r => { m[r.cli] = (m[r.cli] || 0) + imp(r); }); const o = Object.entries(m).filter(x => x[1] > 0.5).sort((a, b) => b[1] - a[1]), tot = o.reduce((a, x) => a + x[1], 0);
     const docsDe = c => rs.filter(r => r.cli === c && imp(r) > 0.005).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).map(r => r.tipo === 'retirada' ? `<div class="e2-fila"><div><b>${fch(r.fecha)}</b><span>Retirada en efectivo</span></div><strong>${e(imp(r))}</strong></div>` : `<button type="button" class="e2-fila" data-e2-doc="${r.id}"><div><b>${tipoTxt(r.tipo)}${r.numero ? ' nº ' + escHtml(String(r.numero)) : ''}</b><span>${fch(r.fecha)}</span></div><strong>${e(imp(r))}</strong></button>`).join('');   // sin repetir el nombre, que ya está en la línea de arriba
     return o.slice(0, max).map(([c, v]) => `<div class="e2-fila e2-cli${_e2cli === c ? ' abierto' : ''}" data-e2-cli="${escHtml(c)}" style="cursor:pointer;"><div><b>${escHtml(c)}</b><span>${Math.round(v / tot * 100)} %</span></div><strong>${e(v)}</strong></div>` + (_e2cli === c ? `<div class="e2-cli-docs" style="margin:0 0 6px 10px;border-left:2px solid var(--orange);padding-left:8px;">${docsDe(c)}</div>` : '')).join('') + (o.length > max ? `<div class="e2-mas">y ${o.length - max} más</div>` : ''); };
+  if(k === 'trab'){ const v = _e2.vivo || {}; return `<div class="e2-fila"><div><b>Trabajos</b></div><strong>${v.nTrab || 0}</strong></div><div class="e2-fila"><div><b>Trabajo para</b></div><strong>${v.meses != null ? tbN(v.meses) + (v.meses >= 1.05 ? ' meses' : ' mes') : '—'}</strong></div>`; }
   if(k === 'saldo') return (_e2.avisos || []).length ? (_e2.avisos || []).map(a => `<div class="e2-fila"><div><b>${escHtml(a.concepto || ({abono: 'Abono', cargo: 'Cargo', recibo: 'Recibo', prestamo: 'Préstamo', tarjeta: 'Tarjeta', reintegro: 'Cajero', otro: 'Aviso sin interpretar'})[a.tipo] || '')}</b><span>${fch(a.fecha)}${a.saldo != null ? ' · saldo ' + e(a.saldo) : ''}</span></div><strong class="${a.importe == null ? '' : a.importe >= 0 ? 'pos' : 'neg'}">${a.importe == null ? '—' : (a.importe >= 0 ? '+' : '') + e(a.importe)}</strong></div>`).join('') : '<div class="e2-mas">Aún no hay avisos del banco leídos.</div>';
   if(k === 'flota') return ((_valFlotaRaw && _valFlotaRaw.items) || []).filter(x => x.maquina).map(x => { const f = (typeof fleet !== 'undefined' ? fleet : []).find(m => m.id === x.flota_id); return `<div class="e2-fila"><div><b>${escHtml(f ? (f.modelo || f.name) : 'Máquina')}</b><span>${x.min && x.max ? 'entre ' + e(x.min) + ' y ' + e(x.max) : ''}</span></div><strong>≈ ${e(x.estimado)}</strong></div>`; }).join('');
   if(k === 'deuda') return (_e2Deuda || []).map(x => `<div class="e2-fila"><div><b>${escHtml(x.quien)}</b><span>${escHtml(x.que || '')}</span></div><strong>${x.imp == null ? '<em style="font-style:normal;color:#E8A33A;">Falta</em>' : (x.aprox ? '≈ ' : '') + e(x.imp)}</strong></div>`).join('') || '<div class="e2-mas">No hay deudas apuntadas.</div>';
@@ -10106,7 +10108,7 @@ function econ2Detalle(k, {sel, e}){   // V8.13: el detalle que se despliega al t
   if(k === 'gas') return '<div class="e2-sub">Por proveedor</div>' + porCli(sel, r => r.gasto);
   if(k === 'ret'){ const rs = (_e2.ret || []).filter(r => r.an === _e2anio && (_e2per === 'año' || r.tr === Number(_e2per[0]))).sort((a, b) => b.fecha.localeCompare(a.fecha));
     const gr = sel.reduce((a, r) => a + (r.ret || 0), 0), gp = sel.reduce((a, r) => a + (r.gper || 0), 0) - gr, fl = (t, v, b) => `<div class="e2-fila"><div><b>${t}</b></div><strong${b ? ' style="font-weight:900;"' : ''}>${e(v)}</strong></div>`;
-    return fl('Retiradas en efectivo', gr) + fl('Gastos personales', gp) + fl('Total', gr + gp, true) + '<div class="e2-sub">Retiradas</div>' + (rs.length ? rs.map(r => `<div class="e2-fila"><div><b>${fch(r.fecha)}</b><span>${escHtml(!r.nota || /PERSONAL/i.test(r.nota) ? 'Retirada de socios' : r.nota.slice(0, 80))}</span></div><strong>${e(r.imp)}</strong></div>`).join('') : '<div class="e2-mas">Sin retiradas en este periodo.</div>'); }   // V9.13
+    return fl('Del banco: retiradas y tarjeta personal', gr) + fl('Apuntado en gastos: nóminas, pagos en B y personales', gp) + fl('Total', gr + gp, true) + '<div class="e2-sub">Retiradas</div>' + (rs.length ? rs.map(r => `<div class="e2-fila"><div><b>${fch(r.fecha)}</b><span>${escHtml(!r.nota || /PERSONAL/i.test(r.nota) ? 'Retirada de socios' : r.nota.slice(0, 80))}</span></div><strong>${e(r.imp)}</strong></div>`).join('') : '<div class="e2-mas">Sin retiradas en este periodo.</div>'); }   // V9.13
   if(k === 'res'){ const imp = r => (_e2cf !== 'sin' ? r.legal : 0) + (_e2cf !== 'oficial' ? r.sinF : 0);
     return [1, 2, 3, 4].map(t => { const rs = _e2.filter(r => r.an === _e2anio && r.tr === t), i = rs.reduce((a, r) => a + imp(r), 0), g = rs.reduce((a, r) => a + r.gasto, 0); if(!i && !g) return '';
       return `<div class="e2-fila"><div><b>${t}T ${_e2anio}</b><span>ingresos ${e(i)} · gastos ${e(g)}</span></div><strong class="${i - g >= 0 ? 'pos' : 'neg'}">${i - g >= 0 ? '+' : '−'}${e(Math.abs(i - g))}</strong></div>`; }).join(''); }
@@ -10153,6 +10155,7 @@ function econ2Pintar(){
       ['saldo', 'Dinero en cuenta', saldo != null ? fmt(saldo, 2) + ' €' : '—', ''],
       ['flota', 'Valor de la flota', flota ? '≈ ' + e(flota) : '—', ''],
       ['cobrar', 'Por cobrar', e(v.cobrar || 0), 'v'],
+      ['trab', 'Trabajos pendientes', v.trabEur ? e(v.trabEur) : '—', ''],
       ['deuda', 'Deuda', _e2Deuda ? e(_e2Deuda.reduce((a, x) => a + (x.imp || 0), 0)) : '…', 'r'],
       ['ing', 'Ingresos ' + etq, e(I), 'v'],
       ['gas', 'Gastos ' + etq, e(G), 'r'],
@@ -10276,7 +10279,7 @@ function docsPendientes(){
   vivos.forEach(d => { if(!d.expediente_id) return; const p = porExp.get(d.expediente_id); if(!p || (ORD[d.type] || 0) > (ORD[p.type] || 0)) porExp.set(d.expediente_id, d); });
   const l = vivos.filter(d => (!d.expediente_id || porExp.get(d.expediente_id) === d) && !d.documento_siguiente_id);
   const base = d => (Number(d.base != null ? d.base : (d.total || d.importe)) || 0) * (['parcial', 'parcial_otra'].includes(d.estado_cobro) && Number(d.total || d.importe) ? Math.max(0, 1 - (Number(d.cobrado_importe || 0) + (d.estado_cobro === 'parcial_otra' ? enOtraSuma(d) : 0)) / Number(d.total || d.importe)) : 1);
-  return {n: l.length, eur: l.reduce((a, d) => a + base(d), 0)};
+  return {n: l.length, eur: l.reduce((a, d) => a + docPendSinIva(d), 0)};
 }
 async function dirVivo(){
   const v = {saldo: null, cobrar: 0, nCobrar: 0, facturar: 0, nFacturar: 0, facturarDias: 0, meses: null, nTrab: 0, sf: [], acuenta: [], parc: [], deudas: [], nRevisar: 0, rsanchez: 0, usoAlerta: false};   // V10.71: sf/acuenta/parc alimentan las tareas de «Qué hacer ahora» con fórmulas
@@ -10456,7 +10459,8 @@ function dirPintar(){
   <div class="dir-hero">
     <div><div class="dir-hola">Dirección</div><div class="dir-sub">${tareas.length - hechas ? (tareas.length - hechas) + ((tareas.length - hechas) === 1 ? ' tarea' : ' tareas') : 'Sin tareas'} · ${pend.length ? pend.length + (pend.length === 1 ? ' decisión' : ' decisiones') + ' por tomar' : 'todo decidido'}</div></div>
   </div>
-  <div class="dir-tiles">${tiles.map(x => `<button type="button" class="dir-tile s-${x.s}" data-dir-ir="${x.ir}"><span class="dir-t-ico">${dirIco(x.ico)}</span><span class="dir-t-t">${x.t}</span><b>${x.v}</b><i>${escHtml(x.p)}</i></button>`).join('')}</div>
+  <!-- V13.43 (reporte 331583c9, Daniel: «esto debería estar en Economía y no aquí»): banco, por cobrar y trabajos pendientes van en la tarjeta de Economía -->
+  <div class="dir-tiles" style="display:none;">${tiles.map(x => `<button type="button" class="dir-tile s-${x.s}" data-dir-ir="${x.ir}"><span class="dir-t-ico">${dirIco(x.ico)}</span><span class="dir-t-t">${x.t}</span><b>${x.v}</b><i>${escHtml(x.p)}</i></button>`).join('')}</div>
   <div class="dir-tit">Qué hacer ahora</div>
   <div class="dir-tareas">${tareas.map(t => `<div class="dir-tarea${t.hecha ? ' hecha' : ''}">
       ${t.auto ? '' : `<button type="button" class="dir-check" data-dir-tarea="${t.id}" aria-label="Marcar">${t.hecha ? '✓' : ''}</button>`}
@@ -12094,15 +12098,30 @@ function gproPersona(d){
   if(m){ if(/gasto personal/i.test(m[1]) && /alberto/i.test(m[2])) return null; if(/sin asignar/i.test(m[2])) return 'A medias'; const p = GP_PERSONAS.find(([r]) => r.test(m[2])); return p ? p[1] : null; }
   if(/^personal\b/i.test(c)){ const p = GP_PERSONAS.find(([r]) => r.test(t)); return p ? p[1] : 'A medias'; }
   if(/^(sueldos y salarios|n[oó]minas?)$/i.test(c)){ const p = GP_PERSONAS.find(([r]) => r.test(t)); return p ? p[1] : null; }   // V13.41: la nómina de Dani también es lo que se le paga
+  if(d.relacion_actividad === 'no_relacionada' && !/alberto/i.test(c)) return 'A medias';   // V13.43: gasto personal sin dueño (supermercado…), a medias, como en Economía
   return null;
 }
-let _gpPersAbierta = null, _gpBanco = null, _gpBancoCargando = false;
+let _gpPersAbierta = null, _gpBanco = null, _gpBancoCargando = null;
+// V13.43 (reporte 839026ee): una sola regla para lo personal que sale del banco, la misma en Gastos y en Economía.
+// Retirada de efectivo: cuenta si no tiene nota o es «EFECTIVO DE USO PERSONAL» (a medias entre Rafa y Manolo) o «Nómina de Rafa/Manolo» (entera de esa persona).
+// Las que tienen otra explicación (pago a Dani, el guarda, efectivo explicado) no son personales: ya están en su gasto. Tarjeta: solo lo marcado PERSONAL (a medias).
+function gpBancoRegla(m){
+  const n = String(m.nota || '').trim();
+  if(m.categoria === 'efectivo'){ if(!n || /^efectivo de uso personal/i.test(n)) return {persona: null}; const x = n.match(/^n[oó]mina de (rafa|rafael|manolo|manuel)\b/i); if(x) return {persona: /^ra/i.test(x[1]) ? 'Rafa' : 'Manolo'}; return null; }
+  if(m.categoria === 'tarjeta_otros' && /^PERSONAL/i.test(n)) return {persona: null};
+  return null;
+}
+// lo que ya está apuntado como gasto el mismo día (retiradas repartidas a mano, el solape de julio) no se cuenta otra vez desde el banco
+function gpBancoSinRepetir(banco, todosDocs){
+  const yaDia = new Set(), yaImp = new Set(); (todosDocs || []).forEach(d => { if(!/^gasto personal/i.test(d.categoria || '') || !(d.dateRaw || d.fecha_devengo)) return; const f = String(d.dateRaw || d.fecha_devengo).slice(0, 10); if(/cajero|retirada|reintegro|efectivo/i.test(d.concepto || '')) yaDia.add(f); yaImp.add(f + '|' + Math.round(Number(d.importe || d.total || 0) * 100)); });
+  return (banco || []).filter(d => { const f = String(d.dateRaw).slice(0, 10); return !(/^Retirada de efectivo$/.test(d.concepto) ? yaDia.has(f) : yaImp.has(f + '|' + Math.round(d.importe * 100))); });
+}
 async function gpBancoCargar(){   // retiradas y pagos personales del banco desde el 01/07/2026 (la misma regla que Ren. obras)
-  if(_gpBanco || _gpBancoCargando) return; _gpBancoCargando = true; const out = [];
+  if(_gpBanco) return; if(_gpBancoCargando) return _gpBancoCargando; let _finB; _gpBancoCargando = new Promise(r => _finB = r); const out = [];
   try{ let d2 = 0; while(true){ const {data, error} = await sb.from('movimientos_banco').select('id, fecha, importe, nota, categoria, concepto').lt('importe', 0).gte('fecha', '2026-07-01').in('categoria', ['efectivo', 'tarjeta_otros']).range(d2, d2 + 999); if(error || !data || !data.length) break;
-    data.forEach(m => { if(m.categoria === 'efectivo' ? !/^efectivo explicado/i.test(m.nota || '') : /^PERSONAL/i.test(m.nota || '')) out.push({id: 'banco:' + m.id, dateRaw: m.fecha, importe: -Number(m.importe), concepto: m.categoria === 'efectivo' ? 'Retirada de efectivo' : String(m.nota || '').replace(/^PERSONAL,?\s*(NO DEDUCIBLE:?)?\s*/i, '').replace(/\s*\(dicho por[^)]*\)?.*$/i, '') || m.concepto, banco: true}); });
+    data.forEach(m => { const r = gpBancoRegla(m); if(r) out.push({id: 'banco:' + m.id, dateRaw: m.fecha, importe: -Number(m.importe), persona: r.persona, concepto: m.categoria === 'efectivo' ? (r.persona ? 'Nómina de ' + r.persona + ' (retirada)' : 'Retirada de efectivo') : String(m.nota || '').replace(/^PERSONAL,?\s*(NO DEDUCIBLE:?)?\s*/i, '').replace(/\s*\(dicho por[^)]*\)?.*$/i, '') || m.concepto, banco: true}); });
     if(data.length < 1000) break; d2 += 1000; } }catch(e){ console.error('Gasto de personal: banco', e); }
-  _gpBanco = out; _gpBancoCargando = false; try{ const per = document.querySelector('#gpro-resumen .filters:first-child .chip-filter.active')?.dataset.per || 'trim'; renderGastoPersonal(per, new Date()); }catch(e){}
+  _gpBanco = out; _gpBancoCargando = null; _finB(); try{ const per = document.querySelector('#gpro-resumen .filters:first-child .chip-filter.active')?.dataset.per || 'trim'; renderGastoPersonal(per, new Date()); }catch(e){}
 }
 // ===== V11.68 (Daniel 14/10/2026): coste de personal de cada uno: pagado, días, horas, €/hora, al mes, bruto, neto y coste =====
 // Horas de cada día: las líneas con fecha de los documentos (Ren. obras). Dani: 100 € por día; si el pago no dice los días, son los días ANTERIORES al pago
@@ -12167,8 +12186,7 @@ function renderGastoPersonal(per, hoy){
   docs.forEach(d => { const p = gproPersona(d); if(!p) return; const v = Number(d.importe || d.total || 0);
     if(p === 'A medias'){ mete('Rafa', {d, v: v / 2, mitad: v}); mete('Manolo', {d, v: v / 2, mitad: v}); } else mete(p, {d, v}); });
   // lo que ya está apuntado como gasto el mismo día (retiradas repartidas a mano, el solape de julio) no se cuenta otra vez desde el banco
-  const yaDia = new Set(), yaImp = new Set(); (typeof gastosTodosDocs === 'function' ? gastosTodosDocs() : gastosProDocs()).forEach(d => { if(!/^gasto personal/i.test(d.categoria || '') || !d.dateRaw) return; const f = String(d.dateRaw).slice(0, 10); if(/cajero|retirada|reintegro|efectivo/i.test(d.concepto || '')) yaDia.add(f); yaImp.add(f + '|' + Math.round(Number(d.importe || d.total || 0) * 100)); });
-  banco.forEach(d => { const f = String(d.dateRaw).slice(0, 10); if(d.concepto === 'Retirada de efectivo' ? yaDia.has(f) : yaImp.has(f + '|' + Math.round(d.importe * 100))) return; mete('Rafa', {d, v: d.importe / 2, mitad: d.importe}); mete('Manolo', {d, v: d.importe / 2, mitad: d.importe}); });
+  gpBancoSinRepetir(banco, typeof gastosTodosDocs === 'function' ? gastosTodosDocs() : gastosProDocs()).forEach(d => { if(d.persona){ mete(d.persona, {d, v: d.importe}); return; } mete('Rafa', {d, v: d.importe / 2, mitad: d.importe}); mete('Manolo', {d, v: d.importe / 2, mitad: d.importe}); });
   const filas = Object.entries(g).map(([p, l]) => [p, l, l.reduce((s, x) => s + x.v, 0)]).sort((a, b) => b[2] - a[2]);
   const tot = filas.reduce((s, f) => s + f[2], 0); const t = document.getElementById('gpro-personal-total'); if(t) t.textContent = filas.length ? euro(tot) : '';
   { const nuevo = filas.length ? Math.round(tot * 100) / 100 : null; if(window._gpTot !== nuevo){ window._gpTot = nuevo; setTimeout(() => { try{ renderGastosProControl(); }catch(e){} }, 0); } }
@@ -14226,11 +14244,12 @@ function grRender(){
 // DIGITALIZACIÓN DE PROVEEDORES (Daniel 03/10/2026): cómo llega la factura de cada proveedor y qué falta para que llegue sola. Primero el correo; API solo si el correo no la trae
 const GR_DG_EST = {correo: ['Correo', 'ok'], api: ['API', 'ok'], parcial: ['Parcial', 'aviso'], manual: ['A mano', 'mal']};   // correo y API cuentan como automáticos (verde)
 const GR_DG_MET = {correo: 'Correo', api: 'API', banco: 'Banco', portal: 'Portal', ninguno: '—'};
-function grDigitalPintar(){ const el = document.getElementById('gpro-prov-digital'); if(el) el.innerHTML = GR.cargado ? grDigitalHtml() : ''; }
+function grDigitalPintar(){ const el = document.getElementById('gpro-prov-digital'); if(el){ el.innerHTML = GR.cargado ? grDigitalHtml() : ''; try{ pnlMontar(el); }catch(e){} } }
 function grDigitalHtml(){
   const l = GR.digital || []; if(!l.length) return '<div class="fl-vacio">Sin proveedores todavía.</div>';
   const n = k => l.filter(p => p.estado === k).length, fecha = f => f ? f.split('-').reverse().join('/').replace(/^(\d\d\/\d\d\/)\d\d(\d\d)$/, '$1$2') : '—';
-  let h = '<div class="fl-sec"><h4>Cómo llega la factura de cada proveedor</h4>' + `<div class="gr-dg-res"><span class="fl-chip ok">${n('correo')} por correo</span><span class="fl-chip ok">${n('api')} por API</span><span class="fl-chip aviso">${n('parcial')} parciales</span><span class="fl-chip mal">${n('manual')} a mano</span></div>` + l.map(p => { const e = GR_DG_EST[p.estado] || [p.estado, 'nd'];
+  // V13.43 (reporte 8bc69955, Daniel: «¿por qué no pones desplegable si es una regla de diseño?»): panel plegable como los demás, cerrado al entrar
+  let h = '<div class="panel" data-pnl-clave="pnl-gr-digital" data-pleg-def="1"><div class="panel-head"><h3>Cómo llega la factura de cada proveedor</h3></div><div class="panel-body">' + `<div class="gr-dg-res"><span class="fl-chip ok">${n('correo')} por correo</span><span class="fl-chip ok">${n('api')} por API</span><span class="fl-chip aviso">${n('parcial')} parciales</span><span class="fl-chip mal">${n('manual')} a mano</span></div>` + l.map(p => { const e = GR_DG_EST[p.estado] || [p.estado, 'nd'];
     return `<details class="alert-det"><summary class="alert-sum"><div class="t">${flE(p.proveedor)}</div><div class="estado-cobro-dd" id="gr-dg-dd-${p.id}" style="flex:none;" onclick="event.preventDefault();event.stopPropagation();"><span class="fl-chip ${e[1]}" style="cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();toggleEstadoCobroDropdown('gr-dg-dd-${p.id}',this)">${e[0]}</span><div class="estado-cobro-menu">${Object.entries(GR_DG_EST).map(([k, v]) => `<span class="fl-chip ${v[1]}" style="cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();grDgPoner('${p.id}','${k}')">${v[0]}</span>`).join('')}</div></div></summary>
       <div class="alert-det-b"><div class="gr-dg">
         <div><span>Gasto</span><b>${flE(p.tipo_gasto || '—')}</b></div>
@@ -14242,6 +14261,7 @@ function grDigitalHtml(){
       </div>
       ${p.incidencias ? `<div class="fl-aviso-lin" style="margin-top:8px;">${flE(p.incidencias)}</div>` : ''}
       <div class="rec-acc">${!['correo', 'api'].includes(p.estado) ? `<button type="button" class="rec-b rec-b-pri" onclick="grDgBandeja('${p.id}')">A la bandeja</button>` : ''}</div></div></details>`; /* V12.88 (reporte 3d2d33fc): sin botón «Cambiar estado»: se cambia tocando la pastilla */ }).join('') + '</div>';
+  h += '</div>';
   return h;
 }
 async function grDgBandeja(id){
@@ -26094,7 +26114,18 @@ function tbGrupoColor(k){
     c = blanco && !sinFondo ? bg : txt; }catch(e){}
   return _tbGrpColor[k] = c;
 }
+// V13.43 (reportes 839026ee y 4e27ffa6, Daniel: «todo desconectado»): una sola fórmula de lo que queda por cobrar de un documento, sin IVA, para Documentos, Trabajos, Economía y Dirección.
+// Antes el total de Documentos y Por cobrar no restaban lo ya pagado de un trabajo en marcha (los 4.000 € de Rafa en el A21) y el apartado de Trabajos sí.
+function docPendSinIva(d){
+  if(!d) return 0; const tot = Number(d.total != null ? d.total : d.importe) || 0, base = Number(d.base != null ? d.base : tot) || 0;
+  if(['parcial', 'parcial_otra'].includes(d.estado_cobro) && tot) return base * Math.max(0, 1 - (Number(d.cobrado_importe || 0) + (d.estado_cobro === 'parcial_otra' && typeof enOtraSuma === 'function' ? enOtraSuma(d) : 0)) / tot);
+  { const pa = docPagadoAntes(d); if(pa && tot) return base * Math.max(0, 1 - pa / tot); }
+  return base;
+}
 function tbImporteSinIva(j){
+  return docPendSinIva(tbDocDe(j));
+}
+function tbImporteSinIvaViejo(j){
   const d = tbDocDe(j); if(!d) return 0;
   const tot = Number(d.total || d.importe) || 0, base = Number(d.base != null ? d.base : tot) || 0;
   if(['parcial', 'parcial_otra'].includes(d.estado_cobro) && tot) return base * Math.max(0, 1 - (Number(d.cobrado_importe || 0) + (d.estado_cobro === 'parcial_otra' && typeof enOtraSuma === 'function' ? enOtraSuma(d) : 0)) / tot);
@@ -31107,7 +31138,7 @@ function renderControlDocs(){
   const bloqueDe = d=>{ if(d.type==='presupuesto') return 'presupuesto'; if(d.documento_siguiente_id) return 'cerrado';   /* V12.66: ya pasó a otro documento (p. ej. proforma de 2020 ya facturada): no está pendiente */ const est = controlDocsEstadoDe(d); if(CC_ESTADOS_CERRADOS.has(est)) return 'cerrado'; return (['entregado','por_cobrar_otra','parcial_otra','parcial'].includes(est) || (d.type!=='albaran' && ['pendiente_cobrar','parcial'].includes(est))) ? 'cobrar' : 'facturar'; };
   const CC_BLOQUE_COLOR = {facturar: '#2B5C7A', cobrar: '#8A6100'};   // V11.26 (Daniel): cada grupo con el color de su estado (Por entregar, Por cobrar)
   const BLOQUES = [['facturar','Por entregar'],['cobrar','Por cobrar'],['presupuesto','Presupuestos'],['cerrado','Cerrados']];
-  const sumaImp = l => l.reduce((s,d)=> s + (Number(d.base != null ? d.base : (d.total||d.importe))||0) * (['parcial','parcial_otra'].includes(d.estado_cobro) && Number(d.total||d.importe) ? Math.max(0, 1 - (Number(d.cobrado_importe||0) + (d.estado_cobro==='parcial_otra' ? enOtraSuma(d) : 0))/Number(d.total||d.importe)) : 1), 0);   // V8.74: totales SIN IVA
+  const sumaImp = l => l.reduce((s,d)=> s + docPendSinIva(d), 0);   // V13.43: la misma fórmula en todas partes   // V8.74: totales SIN IVA
   const fmtEur = n => n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
   const fmtEur0 = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €';   // V12.77: punto de miles también en 4 cifras   // V10.97 (Daniel 12/10/2026): los totales de los resúmenes, sin céntimos
   document.getElementById('control-docs-count').textContent = unicos.length;
@@ -32053,7 +32084,8 @@ function docmGrupoDe(f, ids){
   return (['entregado', 'por_cobrar_otra', 'parcial_otra', 'parcial'].includes(est) || (d.type !== 'albaran' && ['pendiente_cobrar', 'parcial'].includes(est))) ? 'cobrar' : 'facturar';
 }
 function docmBaseSinIva(f){
-  if(f.kind !== 'doc') return 0; const d = f.d, tot = Number(d.total || d.importe) || 0, base = Number(d.base != null ? d.base : tot) || 0;
+  if(f.kind !== 'doc') return 0; return docPendSinIva(f.d);
+  const d = f.d, tot = Number(d.total || d.importe) || 0, base = Number(d.base != null ? d.base : tot) || 0;
   if(['parcial', 'parcial_otra'].includes(d.estado_cobro) && tot) return base * Math.max(0, 1 - (Number(d.cobrado_importe || 0) + (d.estado_cobro === 'parcial_otra' ? enOtraSuma(d) : 0)) / tot);
   return base;
 }
