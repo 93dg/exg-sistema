@@ -28,7 +28,7 @@ C.grupoDe = cat => {
   if(/subcontrat|vertedero/i.test(t)) return 'obra';
   if(/combust|repuest|recambio|lubric|neum|taller|^seguros?$|impuestos y tasas/i.test(t)) return 'flota';
   if(/n[oó]mina|^personal|seguridad social/i.test(t)) return 'personal';
-  if(/alquiler|gestor|financ|comisi|pr[eé]stamo|tecnolog|software|suministro|ferreter|prevenci|electric|amazon|bazar|cooperativa|compras varias/i.test(t)) return 'estructura';
+  if(/vigilan|guarda|alquiler|gestor|financ|comisi|pr[eé]stamo|tecnolog|software|suministro|ferreter|prevenci|electric|amazon|bazar|cooperativa|compras varias/i.test(t)) return 'estructura';
   return 'sin';
 };
 const claseFlota = f => { const t = ((f && f.nombre) || '') + ' ' + ((f && f.clase) || ''); if(/todoterreno|turismo|coche|audi|hyundai|range|nissan/i.test(t)) return 'turismo'; if(/mixta/i.test(t)) return 'mixta'; if(/cami[oó]n|iveco|multilift/i.test(t)) return 'camion'; if(/giratoria/i.test(t)) return 'giratoria'; if(/niveladora/i.test(t)) return 'niveladora'; if(/rulo/i.test(t)) return 'rulo'; if(/cuba/i.test(t)) return 'cuba'; return 'turismo'; };
@@ -39,6 +39,13 @@ C.USOS = USOS;
 C.usoDe = f => { if(!f) return null; const m = C.cfg.usoVeh && C.cfg.usoVeh[f.id]; if(m) return m; if(claseFlota(f) !== 'turismo') return 'maquina'; const t = (f.nombre || '') + ' ' + (f.matricula || ''); if(/x-trail|matrix/i.test(t)) return 'empresa'; if(/audi/i.test(t)) return 'socio'; if(/galloper/i.test(t)) return 'averiado'; if(/evoque|range/i.test(t)) return 'alberto'; return 'empresa'; };
 const usoTexto = t => { t = String(t || ''); if(/retroexcavadora|liebherr|nissan|x-trail|mixta|iveco|cami[oó]n/i.test(t)) return null; if(/evoque|range rover/i.test(t)) return 'alberto'; if(/audi|galloper/i.test(t)) return 'socio'; if(/hyundai matrix/i.test(t)) return 'empresa'; return null; };
 
+// V13.42: el grupo de una línea de gasto con la misma regla que el cálculo (el uso del vehículo manda sobre la categoría); para Gastos por categoría en Resumen
+C.grupoLinea = (cat, doc) => {
+  let grupo = C.grupoDe(cat); if(grupo === 'fuera' || grupo === 'socios') return grupo;
+  const P = C.D && C.D.P, vid = doc && (doc.vehiculo_id || doc.vehiculoId), veh = vid && P ? (P.flota || []).find(f => f.id === vid) : null, uso = veh ? C.usoDe(veh) : usoTexto(doc && doc.concepto);
+  if(uso === 'socio') return 'socios'; if(uso === 'alberto') return 'ajeno'; if(uso === 'averiado') return 'fuera'; if(uso === 'empresa' && grupo !== 'personal') return 'flota';
+  return grupo;
+};
 // ---- conversiones automáticas a partir del importe ANUAL ----
 C.aplicarCfg = row => { if(row){ C.cfgId = row.id; C.cfg = {...JSON.parse(JSON.stringify(DEF)), ...(row.data || {})}; } };
 C.conv = anual => {
@@ -204,8 +211,9 @@ C.vista = function(D){
   if(enResumen){
     const ajustes = h.slice(hAntesAmort.length).replace(/<div class="nm2-c"><h3>([^<]*)<\/h3>/g, '<details class="nm2-g"><summary>' + fila('$1', '') + '</summary><div class="nm2-gb">').replace(/<\/div>(?=<details class="nm2-g">|$)/g, '</div></details>');
     // V13.41 (reporte d7148f94, Daniel: «¿por qué no están juntos los 3 si están conectados?»): una sola tarjeta; coste por máquina y ajustes, plegados dentro
-    const grp = (t2, inner) => '<details class="nm2-g"><summary>' + fila(t2, '') + '</summary><div class="nm2-gb">' + inner + '</div></details>';
-    return card2('Coste de la empresa (12 meses)', iCoste + grp('Coste por máquina', iMaq) + grp('Ajustes de costes', fila('Incluir gastos en B', '<input type="checkbox" ' + (c.incluirB ? 'checked' : '') + ' onchange="COSTES.toggleB(this.checked)">') + ajustes));
+    // V13.42 (reporte 0441df69, Daniel: «integrado en Gastos por categoría con el filtro de tiempo»): el coste de la empresa ya sale arriba, en Gastos por categoría; aquí, al final de esa tarjeta, solo lo plegado
+    const grp = (t2, inner, sub) => '<details class="nm2-g"><summary>' + fila(t2, '', sub) + '</summary><div class="nm2-gb">' + inner + '</div></details>';
+    return grp('Coste por máquina', iMaq, 'Últimos 12 meses') + grp('Ajustes de costes', fila('Incluir gastos en B', '<input type="checkbox" ' + (c.incluirB ? 'checked' : '') + ' onchange="COSTES.toggleB(this.checked)">') + ajustes);
   }
   return h;
 };
@@ -227,7 +235,7 @@ C.repinta = async () => { if(C.el) await C.pintar(C.el, false); };
 C.recargar = async () => { if(window.RENT) window.RENT.invalidar(); C.D = null; if(C.el) await C.pintar(C.el, true); };
 // V11.51 (reporte d80cd0e4: «¿por qué calcula costes cada vez que entro? Esto no debe pasar en ningún sitio»): se enseña al momento lo último calculado (guardado en este dispositivo)
 // y se pone al día por detrás sin avisos ni «Calculando…»; lo que se abrió sigue abierto
-const CACHE_K = 'costes_vista_v2';
+const CACHE_K = 'costes_vista_v3';
 C.pintar = async function(el, forzar){
   C.el = el;
   if(!C.D && !el.querySelector('.nm2-c')){ let html = ''; try{ html = localStorage.getItem(CACHE_K) || ''; }catch(e){} el.innerHTML = html || '<div class="nm2-c" style="font-size:13px;color:var(--ink-soft);">Cargando…</div>'; }
