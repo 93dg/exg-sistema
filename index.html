@@ -5170,11 +5170,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.40" defer></script>
-<script src="costes/norm.js?v=V13.40" defer></script>
-<script src="ajustes/calc.js?v=V13.40" defer></script>
+<script src="rentabilidad/rent.js?v=V13.41" defer></script>
+<script src="costes/norm.js?v=V13.41" defer></script>
+<script src="ajustes/calc.js?v=V13.41" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.40</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.41</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5326,7 +5326,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.40</div>
+        <div class="sub" id="version-badge">V13.41</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -6426,7 +6426,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
           <div class="kpi" style="display:none;"><div class="lbl">Sin detalle</div><div class="val orange" id="gpro-ctl-kpi-sindet">—</div></div>
         </div>
 
-        <div class="panel" id="gpro-personal-panel">
+        <div class="panel" id="gpro-personal-panel" style="display:none;">   <!-- V13.41 (reporte 11eb73cb, Daniel: «repetido, déjalo solo en la gráfica»): su contenido va dentro de la línea Personal de Gastos por categoría -->
           <div class="panel-head" style="display:flex;align-items:center;"><h3>Gasto de personal</h3><b id="gpro-personal-total" style="margin-left:auto;"></b></div>
           <div class="panel-body" id="gpro-personal"></div>
         </div>
@@ -6489,7 +6489,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
         </div>
       </div></div>
         <!-- V13.21 (reporte 3d9065e3, Daniel: «préstamo mételo en resumen»): el préstamo va dentro de Resumen, sin pestaña propia -->
-        <div id="gpro-prestamos" style="margin-top:12px;"><div id="prest-lista"></div></div>
+        <div id="gpro-prestamos-sitio"><div id="gpro-prestamos" style="margin-top:12px;"><div id="prest-lista"></div></div></div>   <!-- V13.41 (reporte 23ccb136): se mueve dentro de la línea Gastos financieros de Gastos por categoría -->
       </div>
 
       <!-- PROVEEDORES (V8.93: los proveedores viven en Gastos, no en Clientes) -->
@@ -11831,21 +11831,34 @@ function renderGastosProControl(){
   const per = vistaEl.querySelector('.filters:first-child .chip-filter.active')?.dataset.per || 'trim';
   const docs = filtrarDocsPeriodoComb(gastosProDocs(), per, new Date());
   const lineas = lineasControlGasto(docs);
-  const total = lineas.reduce((s, l) => s + l.imp, 0);
+  let total = lineas.reduce((s, l) => s + l.imp, 0);
   const sinDet = lineas.filter(l => l.sinDetalle).reduce((s, l) => s + l.imp, 0);
   const grupos = agruparControl(lineas, 'categoria'), gruposMaq = agruparControl(lineas, 'maquina');
+  // V13.41 (reporte 11eb73cb, Daniel 03/11): la línea Personal lleva el total de Gasto de personal (nómina, pagos en B y retiradas de Manolo y Rafa) y su detalle por persona dentro
+  let gpExtra = 0; { const gP = grupos.find(g => g.nombre === 'Personal'), tp = window._gpTot;
+    if(tp != null){ if(gP){ gpExtra = Math.max(0, tp - gP.imp); gP.imp = tp; } else { gpExtra = tp; grupos.push({nombre: 'Personal', imp: tp, subs: new Map()}); } grupos.sort((a, b) => b.imp - a.imp); } }
   const eur = n => { const [e, d] = Math.abs(Number(n || 0)).toFixed(2).split('.'); return (Number(n) < 0 ? '−' : '') + e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + d + ' €'; };   // V11.51: como Gasto de personal: sin letra de máquina de escribir, con punto de miles y sin partirse
   const pc = (v, t) => t ? Math.round(v / t * 100) : 0;
   $('gpro-ctl-lbl-mayor').textContent = 'Mayor partida';
   $('gpro-ctl-kpi-mayor').textContent = grupos.length ? grupos[0].nombre : '—';
   $('gpro-ctl-kpi-sindet').textContent = eur(sinDet);
-  const pintarGrupos = grupos => grupos.length ? grupos.map(g => {
-    const subs = Array.from(g.subs.entries()).sort((a, b) => b[1] - a[1]).map(([s, v]) =>
+  total += gpExtra;
+  { const K = window._gproKpi; if(K){ const e2 = eur; $('gpro-kpi-total').textContent = e2(K.total + gpExtra); $('gpro-kpi-enb').textContent = e2(K.enB + gpExtra); } }   // las retiradas no son oficiales
+  const ranuras = conRanuras => g => !conRanuras ? '' : g.nombre === 'Personal' ? '<div class="ctl-ranura" data-ranura="gpro-personal"></div>' : /^gastos financieros$/i.test(g.nombre) ? '<div class="ctl-ranura" data-ranura="gpro-prestamos"></div>' : '';
+  const pintarGrupos = (grupos, conRanuras) => grupos.length ? grupos.map(g => {
+    const subs = g.nombre === 'Personal' && conRanuras ? '' : Array.from(g.subs.entries()).sort((a, b) => b[1] - a[1]).map(([s, v]) =>
       `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0 0 14px;font-size:12.5px;color:var(--ink-soft);"><span>${escHtml(s)} <span style="font-size:11px;">${pc(v, g.imp)} %</span></span><span style="white-space:nowrap;flex-shrink:0;">${eur(v)}</span></div>`).join('');
-    const p = pc(g.imp, total);
-    return `<details class="ctl-det" style="border-bottom:1px solid var(--line);padding:9px 0;"><summary><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:600;">${escHtml(g.nombre)} <span style="color:var(--ink-soft);font-weight:400;font-size:11.5px;">${p} %</span></span><b style="white-space:nowrap;flex-shrink:0;font-weight:800;">${eur(g.imp)}</b></div><div style="height:5px;background:var(--concrete);border-radius:3px;margin-top:6px;"><div style="height:5px;width:${Math.max(2, p)}%;background:var(--orange);border-radius:3px;"></div></div></summary>${subs}</details>`;
+    const p = pc(g.imp, grupos.reduce((s2, x) => s2 + x.imp, 0));
+    return `<details class="ctl-det" data-g="${escHtml(g.nombre)}" style="border-bottom:1px solid var(--line);padding:9px 0;"><summary><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:600;">${escHtml(g.nombre)} <span style="color:var(--ink-soft);font-weight:400;font-size:11.5px;">${p} %</span></span><b style="white-space:nowrap;flex-shrink:0;font-weight:800;">${eur(g.imp)}</b></div><div style="height:5px;background:var(--concrete);border-radius:3px;margin-top:6px;"><div style="height:5px;width:${Math.max(2, p)}%;background:var(--orange);border-radius:3px;"></div></div></summary>${subs}${ranuras(conRanuras)(g)}</details>`;
   }).join('') : '<div class="empty" style="padding:16px;">Sin gastos en este periodo.</div>';
-  $('gpro-ctl-lista').innerHTML = pintarGrupos(grupos);
+  // lo que va dentro de las líneas (Gasto de personal y Préstamo) se saca antes de repintar y se vuelve a meter; las líneas abiertas siguen abiertas
+  const lst = $('gpro-ctl-lista'), abiertas = new Set(Array.from(lst.querySelectorAll('details.ctl-det[open]')).map(d => d.dataset.g));
+  let alm = document.getElementById('ctl-almacen'); if(!alm){ alm = document.createElement('div'); alm.id = 'ctl-almacen'; alm.style.display = 'none'; document.body.appendChild(alm); }
+  ['gpro-personal', 'gpro-prestamos'].forEach(id => { const x = $(id); if(x && lst.contains(x)) alm.appendChild(x); });
+  lst.innerHTML = pintarGrupos(grupos, true);
+  lst.querySelectorAll('details.ctl-det').forEach(d => { if(abiertas.has(d.dataset.g)) d.open = true; });
+  lst.querySelectorAll('.ctl-ranura').forEach(r => { const x = $(r.dataset.ranura); if(x){ x.style.marginTop = '8px'; r.appendChild(x); } });
+  { const x = $('gpro-prestamos'), sitio = $('gpro-prestamos-sitio'); if(x && sitio && alm.contains(x)) sitio.appendChild(x); }   // periodo sin gastos financieros: el préstamo sigue a la vista
   { const m = $('gpro-ctl-lista-maq'); if(m) m.innerHTML = pintarGrupos(gruposMaq); }
   const sinLineas = docs.filter(d => !(Array.isArray(d.conceptos) && d.conceptos.some(c => Number(c.importe) > 0))).length;
   $('gpro-ctl-aviso').textContent = 'Incluye Oficial y En B, con IVA. Toca una fila para ver el detalle.' + (sinLineas ? ` ${sinLineas} gasto(s) no tienen líneas: cuentan con su categoría y como "Sin detalle".` : '');
@@ -12056,6 +12069,7 @@ function gproPersona(d){
   const m = c.match(/^(n[oó]minas|gasto personal)\s*[–-]\s*(.+)$/i) || c.match(/^(n[oó]minas)\s*\((.+)\)$/i);
   if(m){ if(/gasto personal/i.test(m[1]) && /alberto/i.test(m[2])) return null; if(/sin asignar/i.test(m[2])) return 'A medias'; const p = GP_PERSONAS.find(([r]) => r.test(m[2])); return p ? p[1] : null; }
   if(/^personal\b/i.test(c)){ const p = GP_PERSONAS.find(([r]) => r.test(t)); return p ? p[1] : 'A medias'; }
+  if(/^(sueldos y salarios|n[oó]minas?)$/i.test(c)){ const p = GP_PERSONAS.find(([r]) => r.test(t)); return p ? p[1] : null; }   // V13.41: la nómina de Dani también es lo que se le paga
   return null;
 }
 let _gpPersAbierta = null, _gpBanco = null, _gpBancoCargando = false;
@@ -12077,7 +12091,7 @@ async function gpHorasCargar(){
 }
 function gpDiasPago(d, previo){   // días que paga un jornal de Dani y horas de cada uno
   const H = _gpHoras || {}, t = String(d.concepto || ''), f = String(d.dateRaw || '').slice(0, 10), imp = Number(d.importe || 0);
-  if(!f || /en especie/i.test(t)) return [];
+  if(!f || /en especie|^n[oó]mina/i.test(t)) return [];
   const hFija = (t.match(/de\s+(\d+(?:[.,]\d+)?)\s*horas/i) || [])[1], hDe = x => hFija ? Number(String(hFija).replace(',', '.')) : (H[x] || 0) / 2;
   const lista = t.match(/(\d{1,2}(?:\s*,\s*\d{1,2})*\s+y\s+\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if(lista){ const ds = lista[1].split(/\s*,\s*|\s+y\s+/).map(Number); return ds.map(n => { const x = lista[3] + '-' + String(lista[2]).padStart(2, '0') + '-' + String(n).padStart(2, '0'); return {f: x, h: hDe(x)}; }); }
@@ -12133,6 +12147,7 @@ function renderGastoPersonal(per, hoy){
   banco.forEach(d => { const f = String(d.dateRaw).slice(0, 10); if(d.concepto === 'Retirada de efectivo' ? yaDia.has(f) : yaImp.has(f + '|' + Math.round(d.importe * 100))) return; mete('Rafa', {d, v: d.importe / 2, mitad: d.importe}); mete('Manolo', {d, v: d.importe / 2, mitad: d.importe}); });
   const filas = Object.entries(g).map(([p, l]) => [p, l, l.reduce((s, x) => s + x.v, 0)]).sort((a, b) => b[2] - a[2]);
   const tot = filas.reduce((s, f) => s + f[2], 0); const t = document.getElementById('gpro-personal-total'); if(t) t.textContent = filas.length ? euro(tot) : '';
+  { const nuevo = filas.length ? Math.round(tot * 100) / 100 : null; if(window._gpTot !== nuevo){ window._gpTot = nuevo; setTimeout(() => { try{ renderGastosProControl(); }catch(e){} }, 0); } }
   const fF = d => d.dateRaw ? new Date(d.dateRaw).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: '2-digit'}) : '—';
   const limpio = c => { c = String(c || '').replace(/\[HIST[ÓO]RICO BANCO, SIN VERIFICAR\]\s*/i, '').replace(/^TJ-/i, '').replace(/\s+/g, ' ').trim();
     if(c && c === c.toUpperCase()) c = c.toLowerCase();   // solo lo que viene todo en mayúsculas del banco; lo escrito a mano se deja como está
@@ -12157,6 +12172,7 @@ function renderGastosProResumen(){
   document.getElementById('gpro-kpi-total').textContent = euro(total);
   document.getElementById('gpro-kpi-oficial').textContent = euro(oficial);
   document.getElementById('gpro-kpi-enb').textContent = euro(enB);
+  window._gproKpi = {total, enB};
   try{ renderGastosProControl(); }catch(e){ console.error(e); }
   try{ renderGastoPersonal(per, hoy); }catch(e){ console.error(e); }
 
@@ -14250,16 +14266,7 @@ function grResumenHtml(){
   if(venc.length) h += `<div class="fl-sec"><h4>Próximos vencimientos</h4>${venc.map(x => `<button type="button" class="gr-fila" onclick="grAbrir('${x.c.id}')"><div class="c"><b>${flE(x.c.nombre)}</b><span>${grFechaTxt(x.c.fecha_renovacion)} · ${grEur0(grAnual(x.c))} al año</span></div>${grChipDias(x.d, x.c)}</button>`).join('')}</div>`;
   if(subidas.length) h += `<div class="fl-sec"><h4>Han subido de precio</h4>${subidas.map(x => `<button type="button" class="gr-fila" onclick="grAbrir('${x.c.id}')"><div class="c"><b>${flE(x.c.nombre)}</b><span>${grEur(x.v.desde)} → ${grEur(x.v.hasta)} · ${grFechaTxt(x.v.fecha)}</span></div><div class="gr-anual"><b class="gr-sube">${grPct(x.v.pct)}</b><small>+${grEur0(x.v.anual)} al año</small></div></button>`).join('')}</div>`;
   if(conAhorro.length) h += `<div class="fl-sec"><h4>Dónde se puede ahorrar</h4>${conAhorro.map(x => `<button type="button" class="gr-fila" onclick="grAbrir('${x.c.id}');GR.fTab='alternativas';grRenderFicha()"><div class="c"><b>${flE(x.c.nombre)}</b><span>${flE(x.m.a.proveedor)} · ${grEur0(x.m.s.coste)} al año</span></div><div class="gr-anual"><b class="gr-baja">−${grEur0(x.m.s.anual)}</b><small>al año</small></div></button>`).join('')}</div>`;
-  if(porConfirmar.length || enRev.length || sinSeguro.length || dup.length){
-    h += `<div class="fl-sec"><h4>Para revisar</h4>`;
-    // V12.92 (reporte f8b620b5: «textos largos no quiero, etiquetas, listas, una línea»): una fila por cosa, con su etiqueta
-    const fRev = (nom, chip, cls, id) => `<button type="button" class="gr-fila gr-rev"${id ? ` onclick="grAbrir('${id}')"` : ''}><div class="c"><b>${flE(nom)}</b></div><span class="fl-chip ${cls}" style="flex:none;">${chip}</span></button>`;
-    porConfirmar.forEach(c => { h += fRev(c.nombre, 'Por confirmar', 'aviso', c.id); });
-    enRev.forEach(c => { h += fRev(c.nombre, 'En revisión', 'aviso', c.id); });
-    dup.forEach(([a, b]) => { h += fRev(a.nombre + ' y ' + b.nombre, 'Duplicado', 'mal', a.id); });
-    sinSeguro.forEach(f => { h += fRev(f.nombre, 'Sin seguro', 'mal', null); });
-    h += `</div>`;
-  }
+  // V13.41 (reporte 8772b55e, Daniel: «¿esta sección qué es?»): fuera «Para revisar»; lo por confirmar o en revisión lleva su etiqueta en su tarjeta, y los vehículos sin seguro salen dentro de Seguros
   return h;
 }
 let _grPleg = ['tipo', 'estado'];   // los filtros empiezan plegados (la lista arriba del todo); se recuerda lo que cada uno deja abierto
@@ -14292,11 +14299,15 @@ function grCatContratosHtml(k){   // V13.40 (reporte eb6a3d2e): al tocar un tipo
     const enVigor = l.filter(c => !futuro(c) && grEnVigor(c)).sort((a, b) => grAnual(b) - grAnual(a));
     const proximo = l.filter(c => c.estado !== 'cancelado' && futuro(c));
     const anterior = l.filter(c => c.estado === 'cancelado' && !enVigor.includes(c)).sort((a, b) => String(b.fecha_renovacion || b.fecha_inicio || '').localeCompare(String(a.fecha_renovacion || a.fecha_inicio || '')))[0];
-    if(!enVigor.length && !proximo.length) return;   // vehículo sin seguro actual ni próximo: no se enseña aquí (sale en «Para revisar»)
+    if(!enVigor.length && !proximo.length) return;   // vehículo sin seguro actual ni próximo: no se enseña aquí (sale abajo, «Sin seguro»)
     const peso = enVigor.concat(proximo).reduce((s2, c) => s2 + grAnual(c), 0);
     out.push({peso, html: enVigor.map(c => grCardHtml(c, 'En vigor')).join('') + proximo.map(c => grCardHtml(c, 'Próximo')).join('') + (anterior ? grCardHtml(anterior, 'Anterior') : '')});
   });
-  return out.sort((a, b) => b.peso - a.peso).map(x => `<div class="gr-veh">${x.html}</div>`).join('');
+  const vigS = segs.filter(grVigente), tiene = f => vigS.some(c => c.flota_id === f.id || (f.matricula && grNorm(c.afecta_a).includes(grNorm(f.matricula))));
+  const sinSeg = GR.flota.filter(f => !tiene(f)), dup = []; vigS.forEach((c, i) => { if(c.flota_id) vigS.slice(i + 1).forEach(o => { if(o.flota_id === c.flota_id) dup.push([c, o]); }); });
+  const fRev = (nom, chip, cls, id) => `<button type="button" class="gr-fila gr-rev"${id ? ` onclick="grAbrir('${id}')"` : ''}><div class="c"><b>${flE(nom)}</b></div><span class="fl-chip ${cls}" style="flex:none;">${chip}</span></button>`;
+  const extra = dup.map(([a, b]) => fRev(a.nombre + ' y ' + b.nombre, 'Duplicado', 'mal', a.id)).join('') + sinSeg.map(f => fRev(f.nombre, 'Sin seguro', 'mal', null)).join('');
+  return out.sort((a, b) => b.peso - a.peso).map(x => `<div class="gr-veh">${x.html}</div>`).join('') + (extra ? `<div class="fl-sec" style="margin-top:8px;">${extra}</div>` : '');
 }
 function grCardHtml(c, rol){
     const v = grVariacion(c), d = grDias(c.fecha_renovacion), m = grMejorAlt(c);

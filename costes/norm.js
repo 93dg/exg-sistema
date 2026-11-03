@@ -165,18 +165,20 @@ C.vista = function(D){
   // V13.29 (reporte cb6e0fbf): cada línea se abre con los tipos de gasto que la forman
   const desg = g => { const cs = D.porCat.filter(x => x.grupo === g && x.base); return cs.length ? '<div class="nm2-desg">' + cs.map(x => fila(esc(x.cat), f2(x.base), x.n + ' documentos')).join('') + '</div>' : ''; };
   const t = D.total, hpE = D.hMaq ? t.economico / D.hMaq : null;
-  h += card2('Coste de la empresa (12 meses)',
+  const iCoste = (
     [['Máquinas y vehículos', D.porGrupo.flota || 0], ['Personal y autónomos', D.porGrupo.personal || 0], ['Estructura', D.porGrupo.estructura || 0], ['Directo de obra', D.porGrupo.obra || 0]].map(([n, v], i) => lin(n, f2(v), desg(['flota', 'personal', 'estructura', 'obra'][i]) + eqv(C.conv(v)))).join('')
     + '<div class="nm2-tot">' + lin('Coste de explotación', f2(t.registrado), eqv(C.conv(t.registrado))) + '</div>'
     + lin('Amortización', D.amortTot ? f2(t.provision) : '<span class="nm2-falta">Falta precio</span>', D.amortTot ? eqv(C.conv(t.provision)) : '', D.amort.filter(a => a.anual != null).length + ' de ' + D.amort.length + ' máquinas con precio')
     + '<div class="nm2-tot">' + lin('Coste total', f2(t.economico), eqv(C.conv(t.economico)) + fila('Por hora de máquina', f2(hpE), h1(D.hMaq) + ' h productivas')) + '</div>'
     + lin('Fuera: retiradas y gastos de socios', f2(D.porGrupo.socios || 0), desg('socios')) + lin('Fuera: Hacienda y compra de vehículos', f2(D.porGrupo.fuera || 0), desg('fuera')) + (D.porGrupo.sin ? lin('Sin clasificar', f2(D.porGrupo.sin), desg('sin')) : ''));
+  h += card2('Coste de la empresa (12 meses)', iCoste);
   // 2. Por máquina
-  h += card2('Coste por máquina', D.clases.map(k => {
+  const iMaq = D.clases.map(k => {
     const cuerpo = (k.clase !== 'desplazamiento' ? fila('Horas productivas', '<input type="text" inputmode="decimal" placeholder="' + h1(k.hReal) + '" value="' + (k.manual ? k.h : '') + '" onchange="COSTES.setHP(\'' + k.clase + '\',this.value)">', 'Reales: ' + h1(k.hReal) + ' h (vacío = reales)') : '')
       + fila('Al año', f2(k.total)) + fila('Al mes', f2(k.mes)) + fila('Suyo directo', f2(k.directo)) + fila('Parte del resto de la flota', f2(k.parte)) + (k.maquinas.length ? fila('Máquinas', '', k.maquinas.map(m => esc(m.nombre)).join(', ')) : '');
     return lin(esc(k.nombre), k.horaProd != null ? f2(k.horaProd) + '/h' : f2(k.total), cuerpo, k.clase !== 'desplazamiento' ? h1(k.h) + ' h' : '', k.horaProd != null ? f2(k.total) + ' al año' : 'al año');
-  }).join(''));
+  }).join('');
+  h += card2('Coste por máquina', iMaq);
   const hBase = h;
   // 3. Gastos por categoría
   h += card2('Gastos por categoría (12 meses)', Object.keys(GRUPOS).filter(k => D.porGrupo[k]).map(k => {
@@ -201,7 +203,9 @@ C.vista = function(D){
   h += card2('Ajustes', fila('Días laborables al año', '<input type="text" inputmode="numeric" value="' + c.diasLab + '" onchange="COSTES.set(\'diasLab\',this.value)">') + fila('Horas de jornada al día', '<input type="text" inputmode="decimal" value="' + c.horasJornada + '" onchange="COSTES.set(\'horasJornada\',this.value)">', 'Hora de jornada = ' + h1(hJ) + ' h al año') + fila('Actividad en albaranes (12 m)', h1(D.horasEmpresa) + ' h', D.diasActividad + ' días'));
   if(enResumen){
     const ajustes = h.slice(hAntesAmort.length).replace(/<div class="nm2-c"><h3>([^<]*)<\/h3>/g, '<details class="nm2-g"><summary>' + fila('$1', '') + '</summary><div class="nm2-gb">').replace(/<\/div>(?=<details class="nm2-g">|$)/g, '</div></details>');
-    return hBase + card2('Ajustes de costes', fila('Incluir gastos en B', '<input type="checkbox" ' + (c.incluirB ? 'checked' : '') + ' onchange="COSTES.toggleB(this.checked)">') + ajustes);
+    // V13.41 (reporte d7148f94, Daniel: «¿por qué no están juntos los 3 si están conectados?»): una sola tarjeta; coste por máquina y ajustes, plegados dentro
+    const grp = (t2, inner) => '<details class="nm2-g"><summary>' + fila(t2, '') + '</summary><div class="nm2-gb">' + inner + '</div></details>';
+    return card2('Coste de la empresa (12 meses)', iCoste + grp('Coste por máquina', iMaq) + grp('Ajustes de costes', fila('Incluir gastos en B', '<input type="checkbox" ' + (c.incluirB ? 'checked' : '') + ' onchange="COSTES.toggleB(this.checked)">') + ajustes));
   }
   return h;
 };
