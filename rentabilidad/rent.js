@@ -139,7 +139,7 @@ R.referencia = function(P){
 const PAT_MAQ = {mixta: /mixta/i, camion: /cami[oó]n|iveco|multilift/i, giratoria: /giratoria/i, niveladora: /niveladora/i};
 R.maquinasDeClase = (P, clase) => (P.flota || []).filter(f => ['activo', 'averiada', 'averia'].includes(f.estado) && PAT_MAQ[clase] && (PAT_MAQ[clase].test(f.nombre || '') || PAT_MAQ[clase].test(f.clase || '')) && !/todoterreno|turismo|coche/i.test(f.clase || ''));
 const CAT_FIJO = /seguro|impuesto|tasa|itv|circulaci/i, CAT_MANT = /repuesto|recambio|taller|neum[aá]tico|lubricante/i;
-const GENERALES = [['Autónomos y Seguridad Social', /aut[oó]nomo|seguridad social/i], ['Alquiler de la nave', /alquiler de nave/i], ['Gestoría y asesoría', /gestor/i], ['Financiación y banco', /financiero|pr[eé]stamo|comisiones banco/i], ['Prevención de riesgos', /prevenci/i], ['Seguros generales e impuestos', /seguro|impuesto|tasa/i], ['Suministros, luz y programas', /electricidad|software|tecnolog|suministros|ferreter/i]];
+const GENERALES = [['Autónomos y Seguridad Social', /aut[oó]nomo|seguridad social/i], ['Alquiler de la nave', /alquiler de nave/i], ['Gestoría y asesoría', /gestor/i], ['Financiación y banco', /financiero|pr[eé]stamo|comisiones (del )?banco/i], ['Prevención de riesgos', /prevenci/i], ['Seguros generales e impuestos', /seguro|impuesto|tasa/i], ['Suministros, luz y programas', /electricidad|software|tecnolog|suministros|ferreter/i]];
 R.GENERALES = GENERALES;
 
 // ---------- cálculo de una obra ----------
