@@ -138,7 +138,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.35 · Sistema …</div>
+    <div class="ver" id="ver-subir">Subir S3.36 · Sistema …</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -210,6 +210,55 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   const SUPABASE_URL = "https://sshctqnpuolawtcujxkt.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzaGN0cW5wdW9sYXd0Y3VqeGt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NDMxNDQsImV4cCI6MjEwNDUxOTE0NH0.NgqSwwtdQjKot2kiCabmF6f_kvl-27QU1kWgfzYPFsQ";
   const BUCKET = "documentos-exg";
+  // S3.36 (seguridad, Daniel 04/11/2026): esta página ya no trabaja con la clave pública; entra con el mismo usuario que la web (dg, mg, rg).
+  // La sesión es propia de esta página (no comparte la de la web). Cada llamada a la base de datos va con el usuario.
+  const SES_KEY = "exg-subir-ses";
+  const sesLeer = () => { try{ const s = JSON.parse(localStorage.getItem(SES_KEY) || "null"); return s && s.access_token ? s : null; }catch(e){ return null; } };
+  const sesGuardar = s => { try{ localStorage.setItem(SES_KEY, JSON.stringify(s)); }catch(e){} };
+  const _fetchOrig = window.fetch.bind(window);
+  async function authPedir(cuerpo, tipo){
+    const r = await _fetchOrig(SUPABASE_URL + "/auth/v1/token?grant_type=" + tipo, { method:"POST", headers:{ "apikey":SUPABASE_ANON_KEY, "Content-Type":"application/json" }, body: JSON.stringify(cuerpo) });
+    const j = await r.json().catch(() => ({}));
+    if(!r.ok || !j.access_token) throw new Error(j.error_description || j.msg || "No se pudo entrar");
+    const s = { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Math.floor(Date.now() / 1000) + (j.expires_in || 3600) };
+    sesGuardar(s); return s;
+  }
+  let _refrescando = null;
+  async function tokObtener(){
+    let s = sesLeer(); if(!s) return null;
+    if((s.expires_at || 0) * 1000 - Date.now() < 120000){
+      if(!_refrescando) _refrescando = authPedir({ refresh_token: s.refresh_token }, "refresh_token").catch(() => { try{ localStorage.removeItem(SES_KEY); }catch(e){} return null; }).finally(() => { setTimeout(() => { _refrescando = null; }, 0); });
+      s = await _refrescando;
+    }
+    return s ? s.access_token : null;
+  }
+  function loginMostrar(msg){
+    let o = document.getElementById("login-subir");
+    if(!o){
+      o = document.createElement("div"); o.id = "login-subir";
+      o.style.cssText = "position:fixed;inset:0;z-index:9999;background:var(--bg,#f6f4ef);display:flex;align-items:center;justify-content:center;padding:16px;";
+      o.innerHTML = '<form style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:10px;font-family:inherit;"><b style="font-size:18px;">Entrar</b><span style="font-size:13px;color:#666;">Con el mismo usuario y contraseña que la web.</span><input name="u" autocomplete="username" placeholder="Usuario" style="padding:12px;border:1px solid #ccc;border-radius:10px;font-size:16px;"><input name="p" type="password" autocomplete="current-password" placeholder="Contraseña" style="padding:12px;border:1px solid #ccc;border-radius:10px;font-size:16px;"><span class="err" style="color:#b3261e;font-size:13px;display:none;"></span><button type="submit" style="padding:12px;border:0;border-radius:10px;background:#E8590C;color:#fff;font-size:16px;font-weight:700;">Entrar</button></form>';
+      document.body.appendChild(o);
+      o.querySelector("form").addEventListener("submit", async ev => {
+        ev.preventDefault(); const f = ev.target, err = f.querySelector(".err"); err.style.display = "none";
+        let u = f.u.value.trim().toLowerCase(); const email = u.includes("@") ? u : u + "@exg.local";
+        try{ await authPedir({ email, password: f.p.value }, "password"); o.remove(); location.reload(); }
+        catch(e){ err.textContent = e.message || "No se pudo entrar"; err.style.display = "block"; }
+      });
+    }
+    if(msg){ const err = o.querySelector(".err"); err.textContent = msg; err.style.display = "block"; }
+  }
+  // todas las llamadas a la base de datos, al almacenamiento y a las funciones salen con el usuario, no con la clave pública
+  window.fetch = async (u, o) => {
+    const url = typeof u === "string" ? u : (u && u.url) || "";
+    if(url.startsWith(SUPABASE_URL) && !url.includes("/auth/v1/") && o && o.headers && !(o.headers instanceof Headers) && "Authorization" in o.headers){
+      const habia = !!sesLeer(), t = await tokObtener();
+      if(!t){ loginMostrar(habia ? "Tu sesión ha caducado: vuelve a entrar." : ""); throw new Error("Hace falta entrar con tu usuario"); }
+      o = { ...o, headers: { ...o.headers, "Authorization": "Bearer " + t } };
+    }
+    return _fetchOrig(u, o);
+  };
+  if(!sesLeer()) loginMostrar();
   const LS_KEY = "exg_historial_mensajes";
   const LS_KEY_OLD = "exg_historial_subidas"; // formato antiguo, se migra al cargar
 
@@ -946,7 +995,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   window.abrirMenuAnadir = abrirMenuAnadir;
   // Versión del sistema desde BD (no hay que actualizarla a mano)
   fetch(SUPABASE_URL+"/rest/v1/arranque?clave=eq.web_version_actual&select=valor",{headers:{"Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY}})
-    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.35 · Sistema '+d[0].valor; }).catch(()=>{});
+    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.36 · Sistema '+d[0].valor; }).catch(()=>{});
   window.abrirEnlaceDesdeSubir = abrirEnlaceDesdeSubir;
   window.toggleMsgVerificado = toggleMsgVerificado;
   menuAnadir.addEventListener("click", (e) => { if (e.target === menuAnadir) menuAnadir.classList.remove("activo"); });

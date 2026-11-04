@@ -5170,11 +5170,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.44" defer></script>
-<script src="costes/norm.js?v=V13.44" defer></script>
-<script src="ajustes/calc.js?v=V13.44" defer></script>
+<script src="rentabilidad/rent.js?v=V13.45" defer></script>
+<script src="costes/norm.js?v=V13.45" defer></script>
+<script src="ajustes/calc.js?v=V13.45" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.44</div>
+<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.45</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5326,7 +5326,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.44</div>
+        <div class="sub" id="version-badge">V13.45</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -19785,6 +19785,8 @@ function visorPellizco(c){
   ['gesturestart', 'gesturechange'].forEach(ev => c.addEventListener(ev, e => e.preventDefault(), {passive: false}));   // Safari: que no amplíe la página entera
 }
 function visorAbrir(url, titulo, deLista){
+  // V13.45 (seguridad, Daniel 04/11): DNI, contratos, Hacienda y Banco están en el almacenamiento privado («privado:exg-privado/ruta»): se pide un enlace temporal y se abre igual
+  if(/^privado:/.test(String(url || ''))){ privadoUrl(url).then(u => { if(u) visorAbrir(u, titulo || decodeURIComponent(String(url).split('/').pop()), deLista); else mostrarToast('No se pudo abrir el archivo'); }); return; }
   if(!deLista) _visorLista = null;
   const v = visorCrear(); _visorUrl = url; _visorVer = url; _visorZoom = 1; _visorPdf = null;
   const nombre = (titulo || decodeURIComponent(String(url).split('?')[0].split('/').pop() || 'Documento')).replace(/\s+/g, ' ').trim();
@@ -22424,6 +22426,13 @@ async function navUsoCargar(){
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(navUsoCargar, 1500)); else setTimeout(navUsoCargar, 1500);
 // V11.56 (seguridad): los archivos delicados (certificados digitales) están en el almacenamiento privado. Su enlace es «privado:exg-privado/ruta»:
 // al tocarlo se pide un enlace temporal de 5 minutos y se abre igual que antes. Sin sesión no se pueden ver.
+const _privadoCache = new Map();
+async function privadoUrl(ref){   // enlace temporal (1 hora) de un archivo privado; se recuerda mientras dure
+  const m = String(ref || '').match(/^privado:([^/]+)\/(.+)$/); if(!m) return ref; const c = _privadoCache.get(ref); if(c && c.h > Date.now()) return c.u;
+  try{ const {data, error} = await sb.storage.from(m[1]).createSignedUrl(m[2], 3600); if(error || !data) return null; _privadoCache.set(ref, {u: data.signedUrl, h: Date.now() + 3300000}); return data.signedUrl; }catch(e){ return null; }
+}
+function privadoImgs(raiz){ (raiz.querySelectorAll ? raiz : document).querySelectorAll('img[src^="privado:"]').forEach(im => { const r = im.getAttribute('src'); im.removeAttribute('src'); privadoUrl(r).then(u => { if(u) im.src = u; }); }); }
+try{ new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if(n.nodeType !== 1) return; if(n.tagName === 'IMG' && /^privado:/.test(n.getAttribute('src') || '')) privadoImgs(n.parentNode || document); else if(n.querySelector && n.querySelector('img[src^="privado:"]')) privadoImgs(n); }))).observe(document.documentElement, {childList: true, subtree: true}); }catch(e){}
 async function abrirArchivoPrivado(ref){ const m = String(ref || '').match(/^privado:([^/]+)\/(.+)$/); if(!m) return; const ventana = window.open('', '_blank');
   try{ const {data, error} = await sb.storage.from(m[1]).createSignedUrl(m[2], 300, {download: /\.(p12|pfx)$/i.test(m[2])}); if(error || !data) throw error || new Error('sin enlace'); if(ventana) ventana.location = data.signedUrl; else location.href = data.signedUrl; }
   catch(e){ if(ventana) ventana.close(); mostrarToast('No se pudo abrir el archivo: ' + (e.message || e)); } }
