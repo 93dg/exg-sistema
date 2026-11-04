@@ -3456,6 +3456,10 @@ html.ai-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0px)
   .ai-tab{max-width:130px;flex:0 0 auto;min-width:90px;}
   .ai-tool-btn{width:46px;height:46px;font-size:18px;}
 }
+/* V13.47: aviso de versión nueva, arriba, debajo de la franja de la hora */
+#version-nueva{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);left:50%;transform:translateX(-50%);z-index:10000;display:flex;align-items:center;gap:12px;background:var(--paper);border:1.5px solid var(--orange);border-radius:12px;padding:8px 8px 8px 14px;box-shadow:0 6px 24px rgba(0,0,0,.15);font-size:14px;color:var(--ink);white-space:nowrap;}
+#version-nueva button{background:var(--orange);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;}
+#version-badge{cursor:pointer;}
 /* ===== REPORTAR: botón redondo justo encima del asistente ===== */
 html body #report-bug-btn{position:fixed !important;top:auto !important;left:auto !important;bottom:94px !important;right:31px !important;z-index:2147483000 !important;
   width:44px !important;height:44px !important;padding:0 !important;border-radius:50% !important;display:flex !important;align-items:center;justify-content:center;font-size:20px !important;
@@ -5173,11 +5177,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.46" defer></script>
-<script src="costes/norm.js?v=V13.46" defer></script>
-<script src="ajustes/calc.js?v=V13.46" defer></script>
+<script src="rentabilidad/rent.js?v=V13.47" defer></script>
+<script src="costes/norm.js?v=V13.47" defer></script>
+<script src="ajustes/calc.js?v=V13.47" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:8px;z-index:9999;font-size:7px;color:var(--ink-soft);opacity:0.45;pointer-events:none;font-family:monospace;">V13.46</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:0;padding:4px 8px 8px 14px;z-index:9999;font-size:8px;color:var(--ink-soft);opacity:0.6;cursor:pointer;font-family:monospace;">V13.47</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5329,7 +5333,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.46</div>
+        <div class="sub" id="version-badge">V13.47</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -13995,6 +13999,30 @@ function recargarDeVerdad(){
   const base = location.href.split('#')[0].split('?')[0];
   location.href = base + '?r=' + Date.now();
 }
+/* V13.47 (Daniel 04/11: «en la app de la pantalla de inicio no puedo darle a actualizar»): al volver a la app (o cada 5 min con ella abierta)
+   se mira qué versión está publicada; si es más nueva que la cargada, sale arriba «Hay versión nueva · Actualizar». Tocar el número de versión recarga siempre. */
+function versionNum(v){ const m = String(v || '').match(/V(\d+)\.(\d+)/); return m ? (+m[1]) * 1000 + (+m[2]) : 0; }
+let _versionUltimaMirada = 0;
+async function versionComprobar(){
+  if(document.visibilityState !== 'visible' || Date.now() - _versionUltimaMirada < 20000) return; _versionUltimaMirada = Date.now();
+  try{
+    const r = await fetch(location.pathname + '?vc=' + Date.now(), {cache: 'no-store'}); if(!r.ok) return;
+    const m = (await r.text()).match(/id="version-float"[^>]*>\s*(V\d+\.\d+)/); if(!m) return;
+    const actual = (document.getElementById('version-float') || {}).textContent || '';
+    if(versionNum(m[1]) > versionNum(actual)) versionAvisar(m[1]);
+  }catch(e){}
+}
+function versionAvisar(nueva){
+  let b = document.getElementById('version-nueva'); if(!b){ b = document.createElement('div'); b.id = 'version-nueva'; document.body.appendChild(b); }
+  b.innerHTML = '<span>Hay versión nueva</span><button type="button" onclick="recargarDeVerdad()">Actualizar</button>';
+  b.title = nueva;
+}
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') versionComprobar(); });
+window.addEventListener('focus', versionComprobar);
+window.addEventListener('pageshow', versionComprobar);
+setInterval(versionComprobar, 300000);
+setTimeout(versionComprobar, 15000);
+document.addEventListener('click', ev => { if(ev.target.closest && ev.target.closest('#version-float, #version-badge')) recargarDeVerdad(); });
 function mostrarToast(mensaje, tipo){
   const stack = document.getElementById('toast-stack');
   const el = document.createElement('div');
