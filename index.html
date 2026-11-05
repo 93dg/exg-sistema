@@ -1510,7 +1510,7 @@ html.c2-hoja #report-bug-btn, html.c2-hoja #asistente-ia-fab, html.c2-hoja #mob-
 .c3-dia i{font-style:normal;font-size:12px;font-weight:800;}
 .c3-dia span{display:block;color:#fff;font-size:10.5px;font-weight:800;border-radius:6px;padding:5px 4px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .c3-dia b{font-size:9.5px;color:var(--ink-soft);}
-.ie-items .ie-resumen-hi{flex:1 1 100%;order:2;font-size:11px;font-weight:700;color:var(--green);} .ie-items .ie-resumen-hi.pierde{color:var(--red);}
+.ie-items .ie-resumen-hi{flex:1 1 100%;order:2;font-size:11px;font-weight:700;color:var(--green);} .ie-items .ie-resumen-rep{flex:1 1 100%;order:2;font-size:11px;font-weight:700;color:var(--ink-soft);white-space:nowrap;} .ie-items .ie-resumen-hi.pierde{color:var(--red);}
 .c3-dia > *{flex-shrink:0;} .c3-dia{position:relative;} .c3-dia > b{position:absolute;right:5px;top:4px;color:var(--orange);font-size:11px;font-weight:800;}   /* V12.45 (Daniel): el +1 arriba a la derecha y en naranja */   /* V12.44: con «+1» el día tiene más cosas que alto; sin esto las barras de ese día se encogían y quedaban más arriba que las de los días de al lado */
 .c3-dia em{font-style:normal;font-size:9px;color:var(--ink-soft);}
 .c3-dia.libre{background:#eef6e6;border-color:#cfe5b8;}
@@ -5215,11 +5215,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.55" defer></script>
-<script src="costes/norm.js?v=V13.55" defer></script>
-<script src="ajustes/calc.js?v=V13.55" defer></script>
+<script src="rentabilidad/rent.js?v=V13.56" defer></script>
+<script src="costes/norm.js?v=V13.56" defer></script>
+<script src="ajustes/calc.js?v=V13.56" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.55</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.56</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5371,7 +5371,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.55</div>
+        <div class="sub" id="version-badge">V13.56</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -24792,13 +24792,14 @@ function duplicarLinea(id){
   recalcTotals();
   if(nueva){ actualizarResumenLinea(nueva.id); nueva.scrollIntoView({block:'nearest', behavior:'smooth'}); }
 }
-function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva, origenEntradaId, origenEntradaIds, horasInternas, operario){
+function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva, origenEntradaId, origenEntradaIds, horasInternas, operario, reparto){
   const id = 'item'+(itemSeq++);
   const tbody = document.getElementById('ie-items-body');
   const tr = document.createElement('tr');
   tr.id = id;
   if(machine) tr.dataset.maq = machine;   // V13.30: la máquina de la línea se conserva al guardar (antes se perdía)
   if(horasInternas && typeof horasInternas === 'object') tr.dataset.hi = JSON.stringify(horasInternas);   // V12.43: horas internas de los viajes (no se ven ni se cobran; las usa Rentabilidad)
+  if(Array.isArray(reparto) && reparto.length > 1) tr.dataset.rep = JSON.stringify(reparto);   // V13.56: reparto interno de horas entre personas (mismo trabajo, una sola línea para el cliente)
   if(esNueva) tr.classList.add('linea-nueva');
   const comboId = 'combo-'+id;
   tr.innerHTML = `
@@ -24807,7 +24808,7 @@ function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva, origen
       <div class="ie-linea-col ie-linea-col-lg"><div class="ie-field-label">FECHA</div><div class="fecha-caja ie-fecha-caja"><span class="fecha-texto ie-fecha-texto">${fecha ? formatFechaCorta(fecha) : '—'}</span><input type="date" class="ie-linea-fecha" value="${fecha ?? ''}" oninput="this.previousElementSibling.textContent=this.value?formatFechaCorta(this.value):'—'; actualizarResumenLinea('${id}')"></div></div>
       <div class="ie-linea-col ie-linea-col-sm"><div class="ie-field-label">CANTIDAD</div><input type="number" class="ie-qty search-box" style="width:100%;padding:4px;" value="${qty ?? 1}" min="0" step="0.01" oninput="recalcTotals(); if(document.getElementById('${id}').dataset.hi) ieHiCuenta('${id}')"></div>
       <div class="ie-linea-col ie-linea-col-sm"><div class="ie-field-label">UD</div><select class="search-box ie-unidad" style="width:100%;padding:4px;" onchange="ieOpVer(this.closest('tr'))">${UNIDADES.map(u=>`<option value="${u}" ${unidad===u?'selected':''}>${u}</option>`).join('')}</select></div>
-      <div class="ie-linea-col ie-linea-col-sm ie-op-col" style="display:none;"><div class="ie-field-label">QUIÉN</div><select class="search-box ie-op" style="width:100%;padding:4px;"><option value="">—</option>${IE_OPERARIOS.map(o => `<option value="${o}" ${operario === o ? 'selected' : ''}>${o}</option>`).join('')}</select></div>
+      <div class="ie-linea-col ie-linea-col-sm ie-op-col" style="display:none;"><div class="ie-field-label">QUIÉN</div><select class="search-box ie-op" style="width:100%;padding:4px;" onchange="const r=this.closest('tr'); delete r.dataset.rep; actualizarResumenLinea(r.id)"><option value="">—</option>${IE_OPERARIOS.map(o => `<option value="${o}" ${operario === o ? 'selected' : ''}>${o}</option>`).join('')}</select></div>
     </div></td>
     <td class="ie-fila-con"><div class="ie-field-label ie-con-lab">CONCEPTO<button type="button" class="ie-con-exp" aria-label="Ampliar el concepto" title="Ampliar" onclick="conceptoAmpliar(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button></div><div style="position:relative;"><textarea rows="1" class="ie-concept" name="concepto-${id}" autocomplete="new-password" placeholder="Ej. M³ de excavación en terreno de consistencia media"
         oninput="suggestFromConcept(this); renderConceptCombo(this,'${comboId}'); actualizarResumenLinea('${id}'); ajustarInputConcepto(this)" onfocus="renderConceptCombo(this,'${comboId}')" onblur="setTimeout(()=>{const c=document.getElementById('${comboId}'); if(c) c.style.display='none';},150); sugerirPrecioHistorico(this,'${id}')">${escHtml(concept ?? '')}</textarea>
@@ -24872,6 +24873,8 @@ async function ieHiCuenta(id){
 }
 // resumen de una línea (fecha · cantidad · concepto · precio · total), visible solo cuando la
 // línea está plegada en móvil — para poder identificarla sin tener que desplegarla
+// V13.56: «MG 4 h · DG 1,5 h» — quién hizo cuántas horas de una misma línea (solo se ve en la app, no en el PDF)
+function repartoTexto(rep){ return (rep || []).map(x => x.operario + ' ' + String(x.horas).replace('.', ',') + ' h').join(' · '); }
 function actualizarResumenLinea(id){
   const tr = document.getElementById(id);
   if(!tr) return;
@@ -24884,7 +24887,7 @@ function actualizarResumenLinea(id){
   const resumenTd = tr.querySelector('.ie-linea-resumen-td');
   if(resumenTd){
     const chk = (typeof _selLineasModo !== 'undefined' && _selLineasModo) ? `<input type="checkbox" class="ie-sel-chk" ${tr.dataset.sel ? 'checked' : ''} onclick="event.stopPropagation(); selLineaToggle('${id}', this.checked)">` : '';
-    resumenTd.innerHTML = `${chk}<span class="ie-resumen-fecha">${fecha ? formatFechaCorta(fecha) : '—'}</span><span class="ie-resumen-cant">${cantidad ?? ''}${unidad}</span><span class="ie-resumen-concepto">${concepto}</span><span class="ie-resumen-precio">${precio ? precio+'€' : ''}</span><span class="ie-resumen-total">${total}</span><span class="ie-resumen-chevron">▾</span>${tr.dataset.hires ? `<span class="ie-resumen-hi${tr.dataset.hipierde ? ' pierde' : ''}">${escHtml(tr.dataset.hires)}</span>` : ''}`;
+    resumenTd.innerHTML = `${chk}<span class="ie-resumen-fecha">${fecha ? formatFechaCorta(fecha) : '—'}</span><span class="ie-resumen-cant">${cantidad ?? ''}${unidad}</span><span class="ie-resumen-concepto">${concepto}</span><span class="ie-resumen-precio">${precio ? precio+'€' : ''}</span><span class="ie-resumen-total">${total}</span><span class="ie-resumen-chevron">▾</span>${tr.dataset.hires ? `<span class="ie-resumen-hi${tr.dataset.hipierde ? ' pierde' : ''}">${escHtml(tr.dataset.hires)}</span>` : ''}${tr.dataset.rep ? `<span class="ie-resumen-rep">${escHtml('Interno: ' + repartoTexto(JSON.parse(tr.dataset.rep)))}</span>` : ''}`;
   }
 }
 // tamaño del input de CONCEPTO desplegado, por longitud — misma técnica de clases CSS
@@ -30581,7 +30584,7 @@ const IE_QUIEN = [['RG', 'Rafa'], ['MG', 'Manolo'], ['DG', 'Dani']];
 // V13.55 (Daniel 05/11: «no Rafa, Manolo o Dani: RG, MG, DG; y un plegable, que no aparezcan las tres opciones»): el mismo «Quién» plegable en el editor del albarán y en Trabajos
 function quienPlegableHtml(fn, actual){ return `<div class="quien-pl"><button type="button" class="quien-b${actual ? ' con' : ''}" onclick="event.stopPropagation();this.parentElement.classList.toggle('abierto')">Quién${actual ? ' · ' + actual : ''}<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><span class="quien-ops">${IE_QUIEN.map(([c]) => `<button type="button" class="${actual === c ? 'on' : ''}" onclick="event.stopPropagation();this.closest('.quien-pl').classList.remove('abierto');${fn}('${c}')">${c}</button>`).join('')}</span></div>`; }
 // línea de horas: quién y, si es de mixta, cuál de las dos (la de esa persona)
-function quienEnConcepto(c, code){ if(!c || c.unidad !== 'h') return false; c.operario = code; const t = String(c.descripcion || ''), pr = Number(c.precio_unitario) || 0;
+function quienEnConcepto(c, code){ if(!c || c.unidad !== 'h') return false; c.operario = code; delete c.reparto; const t = String(c.descripcion || ''), pr = Number(c.precio_unitario) || 0;
   if(!/giratoria/i.test(t) && (/mixta|retro|martillo/i.test(t) || (!/cami[oó]n|niveladora|cuba/i.test(t) && pr === 45)) && (code === 'RG' || code === 'MG')) c.maquina = code === 'RG' ? 'Mixta (Rafa)' : 'Mixta (Manolo)'; return true; }
 function selLineasActualizarBarra(){
   const filas = [...document.querySelectorAll('#ie-items-body tr')], sel = filas.filter(tr => tr.dataset.sel);
@@ -30817,7 +30820,7 @@ function openDocumentViewer(id){
     if(!b.fecha) return -1;
     return b.fecha.localeCompare(a.fecha);
   });
-  itemsOrdenados.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, i.unidad||undefined, i.fecha, i.nuevo||false, i.origen_entrada_id||null, i.origen_entrada_ids||null, i.horas_internas||null, i.operario||null));
+  itemsOrdenados.forEach(i=>addItemRow(i.qty, i.concept, i.price, i.machine, i.unidad||undefined, i.fecha, i.nuevo||false, i.origen_entrada_id||null, i.origen_entrada_ids||null, i.horas_internas||null, i.operario||null, i.reparto||null));
   // Colapsar todas las líneas excepto las nuevas (naranjas) y hacer scroll a la primera naranja
   setTimeout(()=>{
     document.querySelectorAll('#ie-items-body tr').forEach(tr=>{
@@ -30954,6 +30957,7 @@ async function submitNewInvoice(ev, isDraft){
     price: Number(tr.querySelector('.ie-price').value)||0,
     horas_internas: (()=>{ try{ return tr.dataset.hi ? JSON.parse(tr.dataset.hi) : null; }catch(e){ return null; } })(),
     operario: tr.querySelector('.ie-unidad')?.value === 'h' ? (tr.querySelector('.ie-op')?.value || null) : null,
+    reparto: (()=>{ try{ return tr.dataset.rep ? JSON.parse(tr.dataset.rep) : null; }catch(e){ return null; } })(),
     machine: (() => { const m = tr.dataset.maq || ''; if(ieEsMixta(tr)) return IE_MIXTAS.some(x => x[0] === m) ? m : (/^mixta\s*\(/i.test(m) ? null : m || null); return IE_MIXTAS.some(x => x[0] === m) ? null : (m || null); })(),
   }));
   const payment = document.getElementById('ni-payment').value || (type!=='albaran' ? 'Transferencia' : '');
@@ -31050,6 +31054,7 @@ async function submitNewInvoice(ev, isDraft){
     descripcion: it.concept, cantidad: Number(it.qty)||1, unidad: it.unidad||'ud', precio_unitario: it.price,
     importe: (Number(it.qty)||1) * it.price, maquina: it.machine||null, fecha: it.fecha||null, ...(it.operario ? {operario: it.operario} : {}),
     ...(it.horas_internas ? {horas_internas: it.horas_internas} : {}),
+    ...(it.reparto ? {reparto: it.reparto} : {}),
   }));
   const conceptoResumen = items.map(i=>i.concept).filter(Boolean).join('; ').slice(0,500);
 
@@ -32592,7 +32597,7 @@ async function cargarDocumentosEconomicosReales(){
       if(fase !== 'filas' && documentosRealesById[doc.id]) return; // ya está (lo acabamos de guardar nosotros mismos)
       const entidad = clientes.find(c=>c.id===doc.entidad_id);
       const trabajo = jobs.find(j=>j.id===doc.trabajo_id);
-      const items = (doc.conceptos||[]).map(c=>({qty:c.cantidad, concept:c.descripcion, price:precioLinea(c), machine:c.maquina, fecha:c.fecha, unidad:c.unidad, nuevo:c.nuevo||false, origen_entrada_id:c.origen_entrada_id||null, origen_entrada_ids:c.origen_entrada_ids||null, horas_internas:c.horas_internas||null, operario:c.operario||null}));
+      const items = (doc.conceptos||[]).map(c=>({qty:c.cantidad, concept:c.descripcion, price:precioLinea(c), machine:c.maquina, fecha:c.fecha, unidad:c.unidad, nuevo:c.nuevo||false, origen_entrada_id:c.origen_entrada_id||null, origen_entrada_ids:c.origen_entrada_ids||null, horas_internas:c.horas_internas||null, operario:c.operario||null, reparto:c.reparto||null}));
       const dRaw = doc.fecha_devengo ? new Date(doc.fecha_devengo) : null;
       const dateLabel = formatFechaLabel(dRaw);
       const amountLabel = Number(doc.importe||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
