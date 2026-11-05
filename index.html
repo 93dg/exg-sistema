@@ -3456,6 +3456,9 @@ html.ai-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0px)
   .ai-tab{max-width:130px;flex:0 0 auto;min-width:90px;}
   .ai-tool-btn{width:46px;height:46px;font-size:18px;}
 }
+/* V13.51: en la tarjeta del préstamo los textos cortos no se parten */
+#prest-lista .pr-cuota, #prest-lista .imp-k .l, #prest-lista .pr-pag span{white-space:nowrap;}
+#prest-lista .pr-pag{flex-wrap:wrap;gap:2px 10px;}
 /* V13.47: aviso de versión nueva, arriba, debajo de la franja de la hora */
 #version-nueva{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);left:50%;transform:translateX(-50%);z-index:10000;display:flex;align-items:center;gap:12px;background:var(--paper);border:1.5px solid var(--orange);border-radius:12px;padding:8px 8px 8px 14px;box-shadow:0 6px 24px rgba(0,0,0,.15);font-size:14px;color:var(--ink);white-space:nowrap;}
 #version-nueva button{background:var(--orange);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;}
@@ -5177,11 +5180,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.50" defer></script>
-<script src="costes/norm.js?v=V13.50" defer></script>
-<script src="ajustes/calc.js?v=V13.50" defer></script>
+<script src="rentabilidad/rent.js?v=V13.51" defer></script>
+<script src="costes/norm.js?v=V13.51" defer></script>
+<script src="ajustes/calc.js?v=V13.51" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.50</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.51</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5333,7 +5336,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.50</div>
+        <div class="sub" id="version-badge">V13.51</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -11898,6 +11901,7 @@ function renderGastosProControl(){
   lst.querySelectorAll('details.ctl-det').forEach(d => { if(abiertas.has(d.dataset.g)) d.open = true; });
   lst.querySelectorAll('.ctl-ranura').forEach(r => { const x = $(r.dataset.ranura); if(x){ x.style.marginTop = '8px'; r.appendChild(x); } });
   { const x = $('gpro-prestamos'), sitio = $('gpro-prestamos-sitio'); if(x && sitio && alm.contains(x)) sitio.appendChild(x); }   // periodo sin gastos financieros: el préstamo sigue a la vista
+  try{ if(!_prestamosCargados || !(document.getElementById('prest-lista') || {}).innerHTML) renderPrestamos(); }catch(e){}   // V13.51: el préstamo se carga solo al pintar Gastos
   { const m = $('gpro-ctl-lista-maq'); if(m) m.innerHTML = pintarGrupos(gruposMaq); }
   const sinLineas = docs.filter(d => !(Array.isArray(d.conceptos) && d.conceptos.some(c => Number(c.importe) > 0))).length;
   $('gpro-ctl-aviso').textContent = 'Incluye Oficial y En B, con IVA. Toca una fila para ver el detalle.' + (sinLineas ? ` ${sinLineas} gasto(s) no tienen líneas: cuentan con su categoría y como "Sin detalle".` : '');
@@ -25728,6 +25732,7 @@ async function prRecibosDelBanco(){
 async function iniciarPrestamos(){ if(!_prestamosCargados) await cargarPrestamos(); renderPrestamos(); }
 function renderPrestamos(){
   const cont = document.getElementById('prest-lista'); if(!cont) return;
+  if(!_prestamosCargados){ cont.innerHTML = '<div class="empty" style="padding:20px;">Cargando el préstamo…</div>'; if(!window._prestCargando) window._prestCargando = cargarPrestamos().then(() => { window._prestCargando = null; renderPrestamos(); }); return; }   // V13.51 (reporte 115bc92c): al entrar en Gastos con Resumen ya abierto no se cargaba y salía vacío
   if(!_docsListos){ cont.innerHTML = '<div class="empty" style="padding:20px;">Cargando los documentos…</div>'; return; }
   if(!_prestamos.length){ cont.innerHTML = '<div class="empty" style="padding:20px;">No hay ningún préstamo registrado.</div>'; return; }
   const hoy = new Date(), hoyIso = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0') + '-' + String(hoy.getDate()).padStart(2,'0'), anio = hoy.getFullYear();
@@ -25745,7 +25750,7 @@ function renderPrestamos(){
       <div class="panel-body">
         <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:10px;">${escHtml(p.entidad || '')} · nº ${escHtml(p.num_acuerdo || '')} · ${Number(p.tipo_interes).toLocaleString('es-ES')} % ${escHtml((p.modalidad || '').toLowerCase())} · formalizado el ${prFechaCorta(p.fecha_formalizacion)} · vence el ${prFechaCorta(prVence(p))} · cuenta ${escHtml(p.cuenta_cargo || '')}</div>
         <div style="height:10px;background:var(--concrete);border-radius:5px;overflow:hidden;"><div style="height:10px;width:${Math.max(2, pct)}%;background:var(--green);"></div></div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin:4px 0 12px;"><span class="n-pos" style="font-weight:600;">Pagado ${PR_EUR(capPagado)} (${pct} %)</span><span>Concedido ${PR_EUR(p.capital)}</span></div>
+        <div class="pr-pag" style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin:4px 0 12px;"><span class="n-pos" style="font-weight:600;">Pagado ${PR_EUR(capPagado)} (${pct} %)</span><span>Concedido ${PR_EUR(p.capital)}</span></div>
         <div class="imp-grid">
           <div class="imp-k"><div class="l">Pendiente</div><div class="v n-neg">${PR_EUR(saldo)}</div></div>
           <div class="imp-k"><div class="l">Próximo recibo</div><div class="v">${prox ? PR_EUR(prox.cuota) : '—'}</div><div class="s">${prox ? prFechaCorta(prox.iso) : 'préstamo terminado'}</div></div>
