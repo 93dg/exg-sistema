@@ -480,6 +480,9 @@ body.overlay-open { overflow:hidden; position:fixed; width:100%; }
 .ie-portada-chk input{width:20px;height:20px;}
 .ie-estado-modo .ie-portada-chk{display:inline-flex !important;align-items:center;width:auto !important;flex:0 0 auto !important;white-space:nowrap;margin:0;}
 .ie-estado-modo .ie-portada-chk input{width:20px !important;min-width:20px;height:20px;flex:0 0 20px !important;margin:0;}
+.ie-sel-quien{display:flex;align-items:center;gap:6px;flex-wrap:wrap;} .ie-sel-quien>span{font-size:12px;color:var(--ink-soft);}
+.ie-sel-quien button{all:unset;cursor:pointer;padding:4px 12px;border-radius:99px;border:1px solid var(--line);background:var(--paper);font-size:13px;font-weight:600;}
+.ie-sel-quien button.on{border:2px solid var(--orange);padding:3px 11px;}
 #ie-sel-barra{display:none;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--concrete);}
 .ie-modo-sel #ie-sel-barra{display:flex !important;}
 #ie-sel-texto{flex:1 1 100%;font-size:14px;font-weight:600;}
@@ -5204,11 +5207,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.53" defer></script>
-<script src="costes/norm.js?v=V13.53" defer></script>
-<script src="ajustes/calc.js?v=V13.53" defer></script>
+<script src="rentabilidad/rent.js?v=V13.54" defer></script>
+<script src="costes/norm.js?v=V13.54" defer></script>
+<script src="ajustes/calc.js?v=V13.54" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.53</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.54</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5360,7 +5363,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.53</div>
+        <div class="sub" id="version-badge">V13.54</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -8400,8 +8403,9 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
         </div>
         <div id="ie-sel-barra" style="display:none;">
           <span id="ie-sel-texto"></span>
-          <button type="button" class="btn sm" onclick="selLineasTodas(true)">Todas</button>
-          <button type="button" class="btn sm" onclick="selLineasTodas(false)">Ninguna</button>
+          <button type="button" class="btn sm" id="ie-sel-todas" onclick="selLineasTodas(!selLineasTodasMarcadas())">Seleccionar todas</button>
+          <!-- V13.54 (Daniel 05/11: «hay albaranes que los ha hecho todo Rafa; es un coñazo línea por línea»): quién hizo las líneas marcadas, de una vez -->
+          <div class="ie-sel-quien" id="ie-sel-quien" style="display:none;"></div>
           <button type="button" class="btn primary sm" id="ie-sel-pasar" onclick="selLineasPasarAFactura()">Pasar a factura</button>
         </div>
         <div class="ie-totals" style="margin-bottom:10px;">
@@ -24790,7 +24794,7 @@ function addItemRow(qty, concept, price, machine, unidad, fecha, esNueva, origen
   if(esNueva) tr.classList.add('linea-nueva');
   const comboId = 'combo-'+id;
   tr.innerHTML = `
-    <td class="ie-linea-resumen-td" onclick="document.getElementById('${id}').classList.toggle('colapsada'); actualizarResumenLinea('${id}')"></td>
+    <td class="ie-linea-resumen-td" onclick="if(typeof _selLineasModo !== 'undefined' && _selLineasModo){ const r = document.getElementById('${id}'); selLineaToggle('${id}', !r.dataset.sel); actualizarResumenLinea('${id}'); return; } document.getElementById('${id}').classList.toggle('colapsada'); actualizarResumenLinea('${id}')"></td>
     <td class="ie-fila-fcu"><div class="ie-linea-row">
       <div class="ie-linea-col ie-linea-col-lg"><div class="ie-field-label">FECHA</div><div class="fecha-caja ie-fecha-caja"><span class="fecha-texto ie-fecha-texto">${fecha ? formatFechaCorta(fecha) : '—'}</span><input type="date" class="ie-linea-fecha" value="${fecha ?? ''}" oninput="this.previousElementSibling.textContent=this.value?formatFechaCorta(this.value):'—'; actualizarResumenLinea('${id}')"></div></div>
       <div class="ie-linea-col ie-linea-col-sm"><div class="ie-field-label">CANTIDAD</div><input type="number" class="ie-qty search-box" style="width:100%;padding:4px;" value="${qty ?? 1}" min="0" step="0.01" oninput="recalcTotals(); if(document.getElementById('${id}').dataset.hi) ieHiCuenta('${id}')"></div>
@@ -30532,13 +30536,27 @@ function selLineasTodas(v){
   document.querySelectorAll('#ie-items-body tr').forEach(tr => { if(v) tr.dataset.sel = '1'; else delete tr.dataset.sel; tr.classList.toggle('linea-sel', !!v); actualizarResumenLinea(tr.id); });
   selLineasActualizarBarra();
 }
+function selLineasTodasMarcadas(){ const f = [...document.querySelectorAll('#ie-items-body tr')]; return f.length > 0 && f.every(tr => tr.dataset.sel); }
+const IE_QUIEN = [['RG', 'Rafa'], ['MG', 'Manolo'], ['DG', 'Dani']];
 function selLineasActualizarBarra(){
   const filas = [...document.querySelectorAll('#ie-items-body tr')], sel = filas.filter(tr => tr.dataset.sel);
   const imp = tr => (Number(tr.querySelector('.ie-qty')?.value) || 0) * (Number(tr.querySelector('.ie-price')?.value) || 0);
   const suma = sel.reduce((s, tr) => s + imp(tr), 0);
   const t = document.getElementById('ie-sel-texto'), b = document.getElementById('ie-sel-pasar');
-  if(t) t.textContent = sel.length ? `${sel.length} de ${filas.length} líneas · ${formatMoneda(suma)}` : 'Marca las líneas que quieres pasar a factura';
+  if(t) t.textContent = sel.length ? `${sel.length} de ${filas.length} líneas · ${formatMoneda(suma)}` : 'Marca las líneas';
   if(b) b.disabled = !sel.length;
+  // V13.54: «Seleccionar todas» solo cuando ya hay una marcada (como en el resto de listas); con todas marcadas, «Quitar la selección»
+  const bt = document.getElementById('ie-sel-todas'); if(bt){ bt.style.display = sel.length ? '' : 'none'; bt.textContent = selLineasTodasMarcadas() ? 'Quitar la selección' : 'Seleccionar todas'; }
+  const q = document.getElementById('ie-sel-quien'); if(q){ const hs = sel.filter(tr => tr.querySelector('.ie-unidad')?.value === 'h'); q.style.display = hs.length ? '' : 'none';
+    const comun = hs.length && hs.every(tr => tr.querySelector('.ie-op')?.value === hs[0].querySelector('.ie-op')?.value) ? hs[0].querySelector('.ie-op')?.value : '';
+    q.innerHTML = '<span>Quién</span>' + IE_QUIEN.map(([c, n]) => `<button type="button" class="${comun === c ? 'on' : ''}" onclick="selLineasQuien('${c}')">${n}</button>`).join(''); }
+}
+function selLineasQuien(c){
+  const hs = [...document.querySelectorAll('#ie-items-body tr')].filter(tr => tr.dataset.sel && tr.querySelector('.ie-unidad')?.value === 'h');
+  hs.forEach(tr => { const op = tr.querySelector('.ie-op'); if(op) op.value = c;
+    if(ieEsMixta(tr) && (c === 'RG' || c === 'MG')){ const m = c === 'RG' ? 'Mixta (Rafa)' : 'Mixta (Manolo)'; tr.dataset.maq = m; const sm = tr.querySelector('.ie-maq'); if(sm) sm.value = m; } });
+  selLineasActualizarBarra();
+  mostrarToast((IE_QUIEN.find(x => x[0] === c) || [, c])[1] + ' en ' + hs.length + (hs.length === 1 ? ' línea' : ' líneas'), 'ok');
 }
 function selLineasReset(){ if(_selLineasModo){ _selLineasModo = false; document.querySelector('.invoice-editor')?.classList.remove('ie-modo-sel'); const b = document.getElementById('ie-sel-btn'); if(b){ b.classList.remove('ie-ico-on'); b.title = 'Seleccionar líneas'; b.style.display = 'none'; } } }
 // Abre una factura nueva con SOLO las líneas marcadas (de la más antigua a la más nueva). El albarán no se toca hasta que esa factura se guarda;
