@@ -990,7 +990,57 @@ R.htmlComparar = function(r, P){
     + tx('Es la cifra que se usa para comparar negocios: cuánto deja al año cada 100 € metidos en él. Lo invertido es el valor de venta de las máquinas de la obra, el de «Valor flota» en Economía: es el dinero que tenéis metido.' + (falta.length ? ' Falta el valor de ' + falta.map(f => esc(f.nombre)).join(', ') + ' en Valor flota.' : '')));
   return '<div class="rt-c"><h3>¿Cómo de rentable es?</h3>' + l1 + l2 + l3 + '</div>';
 };
-R.pintarPrecios = async function(el){ if(!el) return; try{ const P = await R.cargar(false); el.innerHTML = R.htmlPrecios(R.tablaPrecios(P)); }catch(e){ console.error(e); el.innerHTML = ''; } };
+// V13.52 (reporte da9d684b, Daniel 03/11: «sigo sin entender de dónde se compara qué gastos, ya van 4 veces»): Rentabilidad por máquina en Economía sale de la EMPRESA,
+// no de una obra: lo facturado por cada máquina en los albaranes de los últimos 12 meses frente a sus gastos reales de esos mismos 12 meses (los suyos, por categoría,
+// y su parte por horas del resto de la flota, coches de empresa, personal y estructura) más su amortización. Al tocar una máquina se ve cada gasto.
+R.htmlRentMaquinas = function(P){
+  const D = P && P.costes, C = window.COSTES; if(!D || !C) return '<div class="panel" style="padding:12px;margin-top:12px;"><div style="font-size:12.5px;color:var(--ink-soft);">Rentabilidad por máquina: sin datos.</div></div>';
+  const hoy = D.hoy, W0 = D.W0, t = num(R.param.impuesto) / 100, m = Math.min(100, Math.max(1, num(R.param.margen) || 1));
+  const ing = {}, hrs = {}, add = (o, k, v) => { o[k] = (o[k] || 0) + v; }, mk = l => l.clase !== 'mixta' ? l.clase : /rafa/i.test(l.maq) ? 'mixta|Mixta (Rafa)' : /manolo/i.test(l.maq) ? 'mixta|Mixta (Manolo)' : 'mixta|';
+  R.efectivos(P).lista.forEach(d => { const ls = R.lineas(d).filter(l => l.f >= W0 && l.f <= hoy); if(!ls.length) return; const fl = R.factorLineas(d); ls.forEach(l => { add(ing, mk(l), l.imp * fl); add(hrs, mk(l), l.h); }); });
+  const hMaq = D.hMaq || 0, pers = D.porGrupo.personal || 0, estr = D.porGrupo.estructura || 0, coches = (D.clases.find(k => k.clase === 'desplazamiento') || {}).total || 0;
+  const flota = P.flota || [], mixtaDe = n => flota.find(f => new RegExp('^mixta\\s*\\(' + n + '\\)', 'i').test(f.nombre || ''));
+  const VAR = /combust|repuest|recambio|lubric|neum|taller/i;
+  const filas = [];
+  D.clases.filter(k => k.clase !== 'desplazamiento' && k.h > 0).forEach(k => {
+    const partes = k.clase !== 'mixta' ? [{nombre: k.nombre, key: k.clase, h: k.h, propio: k.catC || D.catC[k.clase] || {}, veh: null}]
+      : ['Rafa', 'Manolo', ''].map(n => { const key = 'mixta|' + (n ? 'Mixta (' + n + ')' : ''), f = n ? mixtaDe(n) : null, vd = f && D.vehDir[f.id]; return {nombre: n ? 'Mixta (' + n + ')' : 'Mixtas, horas sin separar', key, h: num(hrs[key]), propio: vd ? vd.cat : {}, veh: f, sinSep: !n}; }).filter(x => x.h > 0 || Object.keys(x.propio).length);
+    const hClase = k.clase === 'mixta' ? sum(partes, x => x.h) || k.h : k.h;
+    partes.forEach(x => {
+      const peso = hMaq ? x.h / hMaq : 0, pesoC = hClase ? x.h / hClase : 0;
+      const propioTot = sum(Object.values(x.propio), v => v);
+      // en la mixta, lo de la clase que no es de ninguna de las dos (sin máquina apuntada) se reparte entre ellas por horas
+      const restoClase = k.clase === 'mixta' ? Math.max(0, num(k.directo) - sum(partes.filter(p => p.veh), p => sum(Object.values(p.propio), v => v))) * pesoC : 0;
+      const parteFlota = num(k.parte) * (k.clase === 'mixta' ? pesoC : 1), cCoches = coches * peso, cPers = pers * peso, cEstr = estr * peso;
+      const amort = sum(D.amort.filter(a => a.clase === k.clase && a.anual != null && (!x.veh || a.id === x.veh.id) && (x.veh || k.clase !== 'mixta')), a => a.anual) * (k.clase === 'mixta' && !x.veh ? 0 : 1);
+      const coste = propioTot + restoClase + parteFlota + cCoches + cPers + cEstr + amort, ingr = num(ing[x.key]), ben = ingr - coste, neto = ben > 0 ? ben * (1 - t) : ben;
+      filas.push({...x, ingr, coste, ben, neto, propioTot, restoClase, parteFlota, cCoches, cPers, cEstr, amort, sinAmort: !D.amort.some(a => a.clase === k.clase && a.anual != null), tarifa: x.h ? ingr / x.h : NaN, costeH: x.h ? coste / x.h : NaN});
+    });
+  });
+  const sr = (a, b2, c) => '<div class="rt-sim-r"><span>' + a + '</span><b' + (c ? ' style="color:' + c + ';"' : '') + '>' + b2 + '</b></div>', menos = v => v ? '−' + eur(v).replace('−', '') : eur(0);
+  const poolTot = sum(Object.values(D.catPool || {}), v => v);
+  const objH = x => isFinite(x.costeH) ? x.costeH * (1 - t) / Math.max(0.05, 1 - t - m / 100) : NaN;
+  const rows = filas.map(x => {
+    const cats = Object.entries(x.propio).sort((a, b) => b[1] - a[1]), sub = x.h > 0 ? 'Neto ' + eur(x.neto / 12) + '/mes · ' + eur(x.neto) + '/año' : 'Sin horas en 12 meses';
+    const cuerpo = sr('Horas en 12 meses', h1(x.h) + ' h') + sr('Facturado', eur(x.ingr))
+      + cats.map(([c, v]) => sr('− ' + esc(c), menos(v), RJ)).join('')
+      + (x.restoClase ? sr('− Gastos de mixta sin máquina apuntada (por horas)', menos(x.restoClase), RJ) : '')
+      + (x.parteFlota ? (poolTot > 0 ? Object.entries(D.catPool || {}).sort((a, b) => b[1] - a[1]).map(([c, v]) => v * x.parteFlota / poolTot >= 0.5 ? sr('− ' + esc(c) + ' sin máquina apuntada (por horas)', menos(v * x.parteFlota / poolTot), RJ) : '').join('') : sr('− Parte del resto de la flota (por horas)', menos(x.parteFlota), RJ)) : '')
+      + (x.cCoches ? sr('− Coches de empresa (por horas)', menos(x.cCoches), RJ) : '')
+      + sr('− Personal (por horas)', menos(x.cPers), RJ) + sr('− Estructura (por horas)', menos(x.cEstr), RJ)
+      + sr('− Amortización', x.amort ? menos(x.amort) : x.sinAmort ? 'falta precio de compra' : menos(0), x.amort ? RJ : null)
+      + sr('Beneficio antes de impuestos', eur(x.ben), col(x.ben)) + (x.ben > 0 ? sr('− Impuestos (' + num(R.param.impuesto) + ' %)', menos(x.ben * t), RJ) : '') + sr('Neto al año', eur(x.neto), col(x.neto))
+      + (x.h > 0 ? sr('Cobrado por hora', eur(x.tarifa, 2) + '/h') + sr('Coste por hora', eur(x.costeH, 2) + '/h', RJ) + sr('Precio para ganar el ' + m + ' % neto', eur(objH(x), 2) + '/h') : '');
+    return '<details class="rt-nd"><summary><div class="rt-sim-r"><span style="flex:1;min-width:0;font-weight:700;">' + esc(x.nombre) + '<small style="display:block;font-size:10.5px;font-weight:700;color:' + (x.h > 0 ? col(x.neto) : 'var(--ink-soft)') + ';">' + sub + '</small></span><span style="text-align:right;white-space:nowrap;"><b>' + (isFinite(x.tarifa) ? eur(x.tarifa, 2) + '/h' : '—') + '</b></span></div></summary><div class="rt-bd">' + cuerpo + '</div></details>';
+  }).join('');
+  const tot = sum(filas, x => x.neto), cand = filas.filter(x => !x.sinSep && x.h > 0), mejor = cand.slice().sort((a, b) => b.neto - a.neto)[0], pierden = cand.filter(x => x.neto < 0);
+  const concl = !cand.length ? '' : '<div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px;">' + (mejor && mejor.neto > 0 ? sr('La que más deja', esc(mejor.nombre) + ' · ' + eur(mejor.neto) + '/año', col(1)) : '') + sr('Pierde dinero', pierden.length ? pierden.map(x => esc(x.nombre) + ' · ' + eur(x.neto) + '/año').join('<br>') : 'Ninguna', pierden.length ? col(-1) : null) + '</div>';
+  return '<div class="panel" style="padding:12px;margin-top:12px;"><div class="panel-head" style="padding:0;margin:0 0 6px;border:0;background:none;display:flex;align-items:center;min-height:30px;"><h3 style="margin:0;font-size:14px;">Rentabilidad por máquina</h3></div>'
+    + '<div style="font-size:11.5px;color:var(--ink-soft);margin:-2px 0 6px;">Albaranes y gastos de los últimos 12 meses</div><div>' + rows + '</div>'
+    + '<div class="rt-sim-r" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px;"><span style="font-weight:800;">Total<small style="display:block;font-size:10.5px;font-weight:700;color:' + col(tot) + ';">Neto ' + eur(tot / 12) + '/mes</small></span><b style="color:' + col(tot) + ';">' + eur(tot) + '/año</b></div>' + concl
+    + '<div class="rt-ch" style="flex-wrap:nowrap;margin-top:10px;"><span>Ganar <b id="rt-pct-p">' + m + ' %</b> neto</span><input type="range" min="1" max="100" step="1" value="' + m + '" style="flex:1;accent-color:var(--orange);" oninput="document.getElementById(\'rt-pct-p\').textContent=this.value+\' %\'" onchange="RENT.setMargen(this.value)"></div></div>';
+};
+R.pintarPrecios = async function(el){ if(!el) return; try{ const P = await R.cargar(false); el.innerHTML = R.htmlRentMaquinas(P); }catch(e){ console.error(e); el.innerHTML = ''; } };
 R.recargar = async () => { R.invalidar(); if(R.el) await R.pintar(R.el, true); };
 R.param_ = async () => { const P = R.P; const data = {...R.param}; if(P.paramId) await guarda(sb.from('sistema').update({data}).eq('id', P.paramId), 'hipótesis'); else { const {data: d, error} = await sb.from('sistema').insert({tipo: 'rent_parametros', data}).select('id').single(); if(!error && d) P.paramId = d.id; } };
 R.setRef = async id => { R.param.refJob = id || null; await R.param_(); if(R.P) delete R.P._ref; R.repinta(); };

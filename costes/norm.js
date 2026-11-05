@@ -35,7 +35,7 @@ const claseFlota = f => { const t = ((f && f.nombre) || '') + ' ' + ((f && f.cla
 
 // ---- uso de cada vehículo: lo que Daniel ha dicho (Nissan X-Trail y Hyundai Matrix = coches de empresa; los dos Audi = personales de Rafa, aunque fiscalmente se deduzcan como mixtos; Galloper averiado; Evoque = Alberto) ----
 const USOS = {maquina: 'Máquina', empresa: 'Coche de empresa', socio: 'Personal de Rafa', alberto: 'De Alberto', averiado: 'Averiado, sin uso'};
-C.USOS = USOS;
+C.USOS = USOS; C.claseFlota = f => claseFlota(f);
 C.usoDe = f => { if(!f) return null; const m = C.cfg.usoVeh && C.cfg.usoVeh[f.id]; if(m) return m; if(claseFlota(f) !== 'turismo') return 'maquina'; const t = (f.nombre || '') + ' ' + (f.matricula || ''); if(/x-trail|matrix/i.test(t)) return 'empresa'; if(/audi/i.test(t)) return 'socio'; if(/galloper/i.test(t)) return 'averiado'; if(/evoque|range/i.test(t)) return 'alberto'; return 'empresa'; };
 const usoTexto = t => { t = String(t || ''); if(/retroexcavadora|liebherr|nissan|x-trail|mixta|iveco|cami[oó]n/i.test(t)) return null; if(/evoque|range rover/i.test(t)) return 'alberto'; if(/audi|galloper/i.test(t)) return 'socio'; if(/hyundai matrix/i.test(t)) return 'empresa'; return null; };
 
@@ -73,7 +73,7 @@ C.calcular = function(P, contratos){
   const gW = (P.gastos || []).filter(g => g.fecha_devengo >= W0 && g.fecha_devengo <= hoy && (g.relacion_actividad == null || g.relacion_actividad === 'relacionada') && (c.incluirB || g.contabilidad !== 'en_b'));
   const porCat = new Map(), porGrupo = {}, porClase = {}, varClase = {}; const add = (o, k, v) => { o[k] = (o[k] || 0) + v; };
   const fijoCatC = {}, fijoCatPool = {}; const addC = (k, cat, v) => { (fijoCatC[k] = fijoCatC[k] || {}); add(fijoCatC[k], cat, v); };   // V11.49: de qué se componen los costes fijos de cada clase (para el desglose en Ren. obras)
-  let nB = 0, baseB = 0;
+  let nB = 0, baseB = 0; const catC = {}, catPool = {}, vehDir = {};   // V13.52: de qué categorías se compone el gasto propio de cada clase y de cada máquina (para Rentabilidad por máquina)
   gW.forEach(g => {
     const base = R.baseGasto(g), cat = g.categoria || '(sin categoría)', esB = g.contabilidad === 'en_b', veh = g.vehiculo_id ? flotaById.get(g.vehiculo_id) : null;
     let grupo = C.grupoDe(cat), uso = veh ? C.usoDe(veh) : usoTexto(g.concepto), recl = false;
@@ -86,8 +86,8 @@ C.calcular = function(P, contratos){
     if(grupo === 'flota'){
       if(uso === 'empresa'){ add(porClase, 'desplazamiento', base); return; }
       const esVar = /combust|repuest|recambio|lubric|neum|taller/i.test(cat);
-      if(veh && uso === 'maquina'){ add(porClase, claseFlota(veh), base); if(esVar) add(varClase, claseFlota(veh), base); else addC(claseFlota(veh), cat, base); return; }
-      add(porClase, 'pool', base); if(esVar) add(varClase, 'pool', base); else add(fijoCatPool, cat, base);
+      if(veh && uso === 'maquina'){ { const kc = claseFlota(veh); (catC[kc] = catC[kc] || {}); add(catC[kc], cat, base); const vd = vehDir[veh.id] = vehDir[veh.id] || {total: 0, cat: {}}; vd.total += base; add(vd.cat, cat, base); } add(porClase, claseFlota(veh), base); if(esVar) add(varClase, claseFlota(veh), base); else addC(claseFlota(veh), cat, base); return; }
+      add(catPool, cat, base); add(porClase, 'pool', base); if(esVar) add(varClase, 'pool', base); else add(fijoCatPool, cat, base);
     }
   });
   // reparto del pool de flota por horas de utilización de cada clase
@@ -112,7 +112,7 @@ C.calcular = function(P, contratos){
   });
   const expl = ['flota', 'personal', 'estructura', 'obra'].reduce((s, k) => s + (porGrupo[k] || 0), 0);
   const hJ = c.diasLab * c.horasJornada;
-  return {P, hoy, W0, gastos: gW.length, nB, baseB, porCat: [...porCat.values()].sort((a, b) => b.base - a.base), porGrupo, clases, hMaq, horasEmpresa: ev.horas, diasActividad: ev.dias, amort, amortTot, ctr, expl, hJ, total: {registrado: expl, provision: amortTot, economico: expl + amortTot}};
+  return {P, hoy, W0, catC, catPool, vehDir, gastos: gW.length, nB, baseB, porCat: [...porCat.values()].sort((a, b) => b.base - a.base), porGrupo, clases, hMaq, horasEmpresa: ev.horas, diasActividad: ev.dias, amort, amortTot, ctr, expl, hJ, total: {registrado: expl, provision: amortTot, economico: expl + amortTot}};
 };
 
 // ---- API para Rentabilidad ----
