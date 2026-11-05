@@ -5204,11 +5204,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.52" defer></script>
-<script src="costes/norm.js?v=V13.52" defer></script>
-<script src="ajustes/calc.js?v=V13.52" defer></script>
+<script src="rentabilidad/rent.js?v=V13.53" defer></script>
+<script src="costes/norm.js?v=V13.53" defer></script>
+<script src="ajustes/calc.js?v=V13.53" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.52</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.53</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5360,7 +5360,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.52</div>
+        <div class="sub" id="version-badge">V13.53</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -16974,7 +16974,7 @@ async function rbCapturar(){
   try{
     for(const intento of [1, 2]){   // 1: se quitan los colores modernos de los estilos; 2: además se revisan los colores ya calculados de lo que se ve
       try{
-        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { subirCopia(doc); fijarCopia(doc); ponerImgs(doc); doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); rbCompactarStyle(doc); }})), 9000);
+        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { try{ doc.body.classList.remove('overlay-open'); }catch(e){} /* V13.53 (reporte 1fa59412: con una ficha abierta la foto salía toda gris): con la ficha abierta el cuerpo queda fijo y la copia salía vacía */ subirCopia(doc); fijarCopia(doc); ponerImgs(doc); doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); rbCompactarStyle(doc); }})), 9000);
         if(cap && cap.width > 0){ const fin = recortar(cap); return {cap: fin, error: '', diag: fin._diag}; }
       }catch(e){ ultimoError = String(e && e.message || e).slice(0, 160); console.warn('captura, intento ' + intento, e); }
     }
@@ -23816,7 +23816,7 @@ function openClientDrawer(name){
   document.getElementById('cpan-anios').style.display = aniosOrdenados.length ? '' : 'none';
 
   const cJobs = jobs.filter(j=>j.client===name);
-  document.getElementById('c-jobs-wrap').innerHTML = cJobs.map(j => `<div class="econ-line cli-lin" onclick="closeClientDrawer();openJobDrawer('${j.code}')"><span>${escHtml(j.code)} · ${j.scheduledDate ? formatFechaCorta(j.scheduledDate) : (j.date || '')}</span><span class="v">${/\d/.test(String(j.price || '')) ? j.price : ''}</span></div>`).join('');
+  document.getElementById('c-jobs-wrap').innerHTML = cJobs.map(j => cliTrabajoHtml(c, j)).join('');   // V13.53 (reportes c2a9f19c y 1fa59412): se despliega ahí mismo, con el nombre de la obra y sus fechas
   document.getElementById('cpan-jobs').style.display = cJobs.length ? '' : 'none';
 
   _cliDocsOrden = cDocs.slice().sort((a,b)=> new Date(b.dateRaw||0) - new Date(a.dateRaw||0));
@@ -31510,10 +31510,27 @@ document.addEventListener('click', ev => {
   const nombre = el.dataset.cli; if(!nombre || !clientes.some(x => x.name === nombre)) return;
   ev.stopPropagation(); ev.preventDefault(); openClientDrawer(nombre);
 }, true);
+// V13.53 (Daniel 05/11: «no sé por qué tiene ese nombre; con el nombre de la obra y la fecha desde que empezó hasta que se acabó, abreviado»; «se tenía que desplegar ahí mismo y debería aparecer el total de la obra»)
+function cliObraNorm(t){ return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+function cliTrabajoHtml(c, j){
+  const nObra = cliObraNorm(j.nombre), deObra = d => (j.id && d.trabajo_id === j.id) || (nObra && cliObraNorm(d.obra_texto || d.obra || '') === nObra);
+  const k = c ? clienteCuentaCalcular(c, deObra) : null, eur = _eurO;
+  const fechas = []; Object.values(documentosRealesById).filter(d => c && d.entidad_id === c.id && d.type !== 'gasto' && !d.deleted_at && deObra(d)).forEach(d => (Array.isArray(d.conceptos) ? d.conceptos : []).forEach(x => { if(x && /^\d{4}-\d\d-\d\d/.test(x.fecha || '')) fechas.push(x.fecha.slice(0, 10)); }));
+  fechas.sort();
+  const fc = iso => { const [y, m, d] = String(iso).slice(0, 10).split('-'); return d + '/' + m + '/' + y.slice(2); };
+  const ini = fechas[0] || j.scheduledDate || '', terminado = /termin|finaliz|complet|cerrad|hecho/i.test(j.state || '') || !!j.fechaFin, fin = j.fechaFin || (terminado ? fechas[fechas.length - 1] : '');
+  const rango = ini ? fc(ini) + (fin ? ' – ' + fc(fin) : ' – en curso') : 'sin fecha';
+  const nom = String(j.nombre || '').split(/\s+[–-]\s+/)[0].toLowerCase().replace(/^./, x => x.toUpperCase());
+  const l = (t, v, cl) => `<div class="econ-line"><span>${t}</span><span class="v${cl ? ' ' + cl : ''}">${v}</span></div>`;
+  const est = {encurso: 'En curso', pendiente: 'Pendiente', terminado: 'Terminado', pausado: 'En pausa'}[j.state] || j.state || '';
+  return `<details class="alert-det cli-trab"><summary class="alert-sum"><div class="t">${escHtml(nom || j.code)} · ${rango}</div></summary><div class="alert-det-b">`
+    + (j.zone && j.zone !== '—' ? l('Zona', escHtml(j.zone)) : '') + (est ? l('Estado', escHtml(est)) : '')
+    + (k ? l('Trabajado', eur(k.trabajado)) + l('Cobrado', eur(k.cobradoTodo)) + l('Pendiente de cobro', eur(k.pendienteTotal), 'pend') + l('Sin entregar', eur(k.sinEntregar)) : '') + `</div></details>`;
+}
 // ===== V9.01 · Cuenta con el cliente (ficha del cliente + PDF para enseñar) =====
 let _cuentaSoloPend = null;   // null = automático (la administración empieza en «solo lo pendiente»)
-function clienteCuentaCalcular(c){
-  const docs = Object.values(documentosRealesById).filter(d => d.entidad_id === c.id && d.type !== 'gasto' && !d.deleted_at && !['historico', 'revertido'].includes(d.fase_estado));
+function clienteCuentaCalcular(c, filtro){   // V13.53: filtro opcional (los documentos de una obra)
+  const docs = Object.values(documentosRealesById).filter(d => d.entidad_id === c.id && d.type !== 'gasto' && !d.deleted_at && !['historico', 'revertido'].includes(d.fase_estado) && (!filtro || filtro(d)));
   const facs = docs.filter(d => d.type === 'factura' && d.estado_cobro !== 'nula' && d.estado_cobro !== 'borrador' && d.estado !== 'anulado' && d.status !== 'Borrador');
   const enl = new Set(); facs.forEach(f => { if(f.documento_anterior_id) enl.add(f.documento_anterior_id); (f.origen_albaran_ids || []).forEach(x => enl.add(x)); });
   const tot = d => Number(d.total != null ? d.total : d.importe) || 0;
@@ -31527,7 +31544,9 @@ function clienteCuentaCalcular(c){
   const sum = (l, f) => _o2(l.reduce((s, x) => s + f(x), 0));
   const facturado = sum(facs, tot), cobrado = _o2(sum(facs, f => Number(f.cobrado_importe || 0)) + sum(cobradosSinFactura, tot));
   const pendFacturas = sum(facs, facFalta), pendEntregado = sum(entregados, falta);
-  return {facs, entregados, porEntregar, porRevisar, cobradosSinFactura, facFalta, falta, tot, facturado, cobrado, pendFacturas, pendEntregado, pendienteTotal: _o2(pendFacturas + pendEntregado), sinEntregar: sum(porEntregar, falta)};
+  // V13.53 (reporte 6a97044c, Daniel: «¿por qué no cuenta automáticamente los 4k cobrados?»): en la ficha, Cobrado suma también lo cobrado a cuenta de albaranes y proformas sin terminar
+  const aCuenta = sum(sueltos.filter(d => d.estado_cobro !== 'cobrado'), d => Number(d.cobrado_importe || 0)), trabajado = _o2(facturado + sum(sueltos, tot));
+  return {aCuenta, cobradoTodo: _o2(cobrado + aCuenta), trabajado, facs, entregados, porEntregar, porRevisar, cobradosSinFactura, facFalta, falta, tot, facturado, cobrado, pendFacturas, pendEntregado, pendienteTotal: _o2(pendFacturas + pendEntregado), sinEntregar: sum(porEntregar, falta)};
 }
 function clienteCuentaHtml(c, soloPend, pdf){
   const k = clienteCuentaCalcular(c), eur = _eurO;
@@ -31539,7 +31558,7 @@ function clienteCuentaHtml(c, soloPend, pdf){
     h += `<div class="sub" style="font-size:11px;color:var(--ink-soft);">Importes con IVA. Pendiente = facturas sin cobrar ${eur(k.pendFacturas)} + entregado sin factura ${eur(k.pendEntregado)}. Lo que ya va dentro de otra factura no se cuenta dos veces.</div>`;
   } else {   // V12.54: en la ficha, una línea por cifra (sin cajas grises ni párrafo de explicación)
     const l = (t, v, cl) => `<div class="econ-line"><span>${t}</span><span class="v${cl ? ' ' + cl : ''}">${eur(v)}</span></div>`;
-    h = '<div class="cu-lineas">' + l('Facturado', k.facturado) + l('Cobrado', k.cobrado) + l('Pendiente de cobro', k.pendienteTotal, 'pend') + l('Sin entregar', k.sinEntregar) + (Number(window._cliEnB) > 0.005 ? l('En B', window._cliEnB) : '') + '</div><!--CU-OPC-->';
+    h = '<div class="cu-lineas">' + l('Facturado', k.facturado) + l('Cobrado', k.cobradoTodo) + l('Pendiente de cobro', k.pendienteTotal, 'pend') + l('Sin entregar', k.sinEntregar) + (Number(window._cliEnB) > 0.005 ? l('En B', window._cliEnB) : '') + '</div><!--CU-OPC-->';
   }
   if(!pdf) return h;   // V12.54: en la ficha los documentos ya salen debajo con su tarjeta; las listas solo van en el PDF
   if(facFilas.length){
