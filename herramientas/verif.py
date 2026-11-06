@@ -14,7 +14,7 @@ tok=b64({"alg":"HS256","typ":"JWT"})+"."+b64({"sub":user["id"],"email":user["ema
 ses={"access_token":tok,"token_type":"bearer","expires_in":86400*30,"expires_at":exp,"refresh_token":"r","user":user}
 async def main():
     async with async_playwright() as p:
-        b=await p.chromium.launch(executable_path='/opt/pw-browsers/chromium-1194/chrome-linux/chrome')
+        b=await p.chromium.launch(**({'executable_path':'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'} if __import__('os').path.exists('/opt/pw-browsers/chromium-1194/chrome-linux/chrome') else {}))
         ctx=await b.new_context(viewport={'width':390,'height':844},device_scale_factor=2,has_touch=True,is_mobile=True)
         await ctx.add_init_script("localStorage.setItem('sb-sshctqnpuolawtcujxkt-auth-token',"+json.dumps(json.dumps(ses))+");")
         pg=await ctx.new_page();errs=[];pg.on('pageerror',lambda e:errs.append(str(e)[:200]))

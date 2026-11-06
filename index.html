@@ -5226,11 +5226,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.60" defer></script>
-<script src="costes/norm.js?v=V13.60" defer></script>
-<script src="ajustes/calc.js?v=V13.60" defer></script>
+<script src="rentabilidad/rent.js?v=V13.61" defer></script>
+<script src="costes/norm.js?v=V13.61" defer></script>
+<script src="ajustes/calc.js?v=V13.61" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.60</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.61</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5382,7 +5382,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.60</div>
+        <div class="sub" id="version-badge">V13.61</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -20356,9 +20356,18 @@ function fteDocumento(el, r){
   const pie = document.createElement('div'); pie.className = 'fte fte-doc';
   const izq = document.createElement('div'); izq.className = 'fte-izq'; izq.innerHTML = r ? fteIzq(/^\s*a mano\s*$/i.test(String(r.txt || '')) && !r.url ? '' : r.txt, r.url, r.lista) : ''; pie.appendChild(izq);
   const acc = document.createElement('div'); acc.className = 'fte-acc';
-  const lapiz = document.createElement('button'); lapiz.type = 'button'; lapiz.className = 'fc-mas-btn fc-lapiz-btn'; lapiz.title = 'Editar'; lapiz.setAttribute('aria-label', 'Editar'); lapiz.innerHTML = ICO_LAPIZ;
-  lapiz.onclick = ev => { ev.stopPropagation(); if(el.dataset.docId) openDocumentViewer(el.dataset.docId); };
-  acc.appendChild(lapiz);
+  // V13.61 (Daniel 06/11: «el botón del lápiz quítalo, esa página ya no sirve»): en presupuestos, albaranes, proformas y facturas todo se edita en la tarjeta;
+  // en su sitio, a la izquierda de la impresora, el botón del modo del PDF. Los demás documentos (gastos…) conservan el lápiz.
+  const dd = el.dataset.docId ? documentosRealesById[el.dataset.docId] : null;
+  if(dd && fcPuedeEditarDatos(dd)){
+    const modo = document.createElement('button'); modo.type = 'button'; modo.className = 'fc-mas-btn fc-modo-btn'; modo.title = 'Modo del PDF'; modo.setAttribute('aria-label', 'Modo del PDF'); modo.innerHTML = ICO_MODO_PDF;
+    modo.onclick = ev => { ev.stopPropagation(); fcModoMenu(modo, el.dataset.docId); };
+    acc.appendChild(modo);
+  } else {
+    const lapiz = document.createElement('button'); lapiz.type = 'button'; lapiz.className = 'fc-mas-btn fc-lapiz-btn'; lapiz.title = 'Editar'; lapiz.setAttribute('aria-label', 'Editar'); lapiz.innerHTML = ICO_LAPIZ;
+    lapiz.onclick = ev => { ev.stopPropagation(); if(el.dataset.docId) openDocumentViewer(el.dataset.docId); };
+    acc.appendChild(lapiz);
+  }
   const pdf = el.querySelector(':scope > .fc-pdf-btn'), mas = el.querySelector(':scope > .fc-mas-btn:not(.fc-pdf-btn)');
   if(pdf) acc.appendChild(pdf); if(mas){ mas.innerHTML = ICO_MAS; acc.appendChild(mas); }
   pie.appendChild(acc); el.appendChild(pie);
@@ -20536,15 +20545,15 @@ window.addEventListener('click', ev => {
     const fin = () => { if(!i.isConnected) return; const n = i.value.trim(); if(n && n !== v) fcGuardarCampos(d, {numero: n}, 'Número cambiado'); else meta.innerHTML = meta.dataset.html; };
     i.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); i.blur(); } }); i.addEventListener('blur', fin); }
 }, true);
-// la impresora de la tarjeta despliega el modo del PDF; «Completo con portada» es una opción más
+// V13.61 (Daniel 06/11: «la función de la impresora no me la toques»): la impresora imprime directo como siempre; el modo del PDF va en su propio botón, a su izquierda
 const FC_PDF_MODOS = [['completo', 'Completo'], ['portada', 'Completo con portada'], ['sin_fechas', 'Sin fechas en conceptos'], ['simplificado', 'Simplificado (1 línea)']];
-window.addEventListener('click', ev => {
-  const b = ev.target && ev.target.closest && ev.target.closest('.factura-card-movil .fc-pdf-btn'); if(!b) return; const card = b.closest('.factura-card-movil'), id = card && card.dataset.docId; if(!id) return;
-  ev.stopImmediatePropagation(); ev.preventDefault(); const d = documentosRealesById[id] || {}; b.value = d.modo_pdf || 'completo'; b.dataset.pdfOpc = '1';
-  psMenuAbrir(b, FC_PDF_MODOS, false, async v => { const modo = v === 'portada' ? 'completo' : v;
-    if((d.modo_pdf || 'completo') !== modo && exigirNivelDoc(id, 'editar')){ const {error} = await sb.from('documentos_economicos').update({modo_pdf: modo}).eq('id', id); if(!error) d.modo_pdf = modo; }
-    imprimirDocumento(id, undefined, v === 'portada'); });
-}, true);
+const ICO_MODO_PDF = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>';
+function fcModoValor(d){ return d.pdf_portada && (d.modo_pdf || 'completo') === 'completo' ? 'portada' : (d.modo_pdf || 'completo'); }
+function fcModoMenu(b, id){ const d = documentosRealesById[id]; if(!d) return; b.value = fcModoValor(d); b.dataset.pdfOpc = '1';
+  psMenuAbrir(b, FC_PDF_MODOS, false, async v => { if(v === fcModoValor(d) || !exigirNivelDoc(id, 'editar')) return;
+    const patch = {modo_pdf: v === 'portada' ? 'completo' : v, pdf_portada: v === 'portada'};
+    const {error} = await sb.from('documentos_economicos').update(patch).eq('id', id); if(error){ mostrarToast('No se pudo guardar: ' + errText(error), 'err'); return; }
+    Object.assign(d, patch); mostrarToast('PDF: ' + FC_PDF_MODOS.find(x => x[0] === v)[1], 'ok'); }); }
 function fcReabrir(){ document.querySelectorAll('.factura-card-movil[data-doc-id]').forEach(card => { if(_fcAbiertas.has(card.dataset.docId) && !card.classList.contains('fc-abierta')){ card.classList.add('cc-abierta'); fcAlternar(card); } }); }
 document.addEventListener('click', ev => { const t = ev.target; if(!t || !t.closest) return; const lin = t.closest('.fc-detalle .fc-l.fc-l-ed'); if(!lin || t.closest('.fc-le, button, a')) return; ev.stopPropagation(); fcLeAbrir(lin); }, true);
 document.addEventListener('change', ev => { const box = ev.target && ev.target.closest && ev.target.closest('.fc-le'); if(box) fcLeGuardar(box); });
@@ -32615,7 +32624,7 @@ async function imprimirDocumento(id, accion, portada){   // V11.90: accion 'ofic
   const ov = document.getElementById('newinvoice-overlay');
   const yaAbierto = ov && ov.classList.contains('active') && editingDocId === id;
   if(!yaAbierto && ov) ov.classList.add('imp-oculto');
-  const conPortada = portada !== undefined ? !!portada : yaAbierto && !!document.getElementById('ni-portada')?.checked;   // V9.20: reabrir el documento desmarcaba la casilla y la portada nunca salía al imprimir
+  const conPortada = portada !== undefined ? !!portada : yaAbierto ? !!document.getElementById('ni-portada')?.checked : !!documentosRealesById[id]?.pdf_portada;   // V13.61: «Completo con portada» se elige en el botón de modo de la tarjeta   // V9.20: reabrir el documento desmarcaba la casilla y la portada nunca salía al imprimir
   openDocumentViewer(id);
   await new Promise(r => setTimeout(r, 300));
   try{ if(await confirmarFacturaCompleta('Imprimirla')) await generarPDFDocumento(accion === 'oficina' ? 'oficina' : 'imprimir', undefined, conPortada); }
