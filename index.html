@@ -5226,11 +5226,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.61" defer></script>
-<script src="costes/norm.js?v=V13.61" defer></script>
-<script src="ajustes/calc.js?v=V13.61" defer></script>
+<script src="rentabilidad/rent.js?v=V13.62" defer></script>
+<script src="costes/norm.js?v=V13.62" defer></script>
+<script src="ajustes/calc.js?v=V13.62" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.61</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.62</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5382,7 +5382,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.61</div>
+        <div class="sub" id="version-badge">V13.62</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -27082,7 +27082,7 @@ function impOrigenGasto(d){   // de dónde sale un gasto, en una o dos palabras
 }
 function impPendIncluidos(q, anio, acumulado){   // pagos del banco sin factura que se han incluido a mano en el cálculo (estimado, con IVA 21 %)
   const ini = acumulado ? anio + '-01-01' : anio + '-' + String((q-1)*3 + 1).padStart(2, '0') + '-01', fd = new Date(anio, q*3, 0), fin = anio + '-' + String(fd.getMonth() + 1).padStart(2, '0') + '-' + String(fd.getDate()).padStart(2, '0');
-  const items = ((typeof _impBanco !== 'undefined' && _impBanco.movs) || []).filter(m => m.estado === 'falta_factura' && m.incluir_impuestos === true && Number(m.importe) < 0 && String(m.fecha).slice(0, 10) >= ini && String(m.fecha).slice(0, 10) <= fin);
+  const items = ((typeof _impBanco !== 'undefined' && _impBanco.movs) || []).filter(m => m.estado === 'falta_factura' && m.incluir_impuestos !== false && Number(m.importe) < 0 && String(m.fecha).slice(0, 10) >= ini && String(m.fecha).slice(0, 10) <= fin);
   const total = items.reduce((s, m) => s - Number(m.importe), 0), base = total / 1.21;
   return {items, total, base, iva: total - base};
 }
@@ -27333,7 +27333,7 @@ function impPendienteFactura(q, anio, D){
   const movsQ = (_impBanco.movs || []).filter(m => enQ(m.fecha));
   // si el trimestre tiene el extracto cargado se usa; si no, los recibos del banco que faltan factura
   const filas = movsQ.length
-    ? movsQ.filter(m => m.estado === 'falta_factura' && Number(m.importe) < 0).map(m => ({id: m.id, origen: m.origen, incl: m.incluir_impuestos === true, fecha: String(m.fecha).slice(0, 10), importe: -Number(m.importe), prov: m.categoria === 'combustible' ? 'Surtidores de Córdoba (gasoil)' : (m.comercio || m.concepto || 'Sin nombre'), det: m.categoria === 'combustible' ? '' : String(m.concepto || '')}))
+    ? movsQ.filter(m => m.estado === 'falta_factura' && Number(m.importe) < 0).map(m => ({id: m.id, origen: m.origen, incl: m.incluir_impuestos !== false,   /* V13.62 (reporte 52931049): un pago sin factura cuenta salvo que se marque que no (sospecha fuerte o sin justificante posible) */ fecha: String(m.fecha).slice(0, 10), importe: -Number(m.importe), prov: m.categoria === 'combustible' ? 'Surtidores de Córdoba (gasoil)' : (m.comercio || m.concepto || 'Sin nombre'), det: m.categoria === 'combustible' ? '' : String(m.concepto || '')}))
     : (_impBanco.recibos || []).filter(r => enQ(r.fecha) && r.sentido !== 'entrada').map(r => ({fecha: String(r.fecha).slice(0, 10), importe: Math.abs(Number(r.importe) || 0), prov: r.contraparte || r.concepto || 'Sin nombre', det: String(r.concepto || '')}));
   const grupos = lista => { const m = new Map(); lista.forEach(x => { const k = MAY(x.prov); if(!m.has(k)) m.set(k, {prov: k, items: [], total: 0}); const g = m.get(k); g.items.push(x); g.total += x.importe; }); return Array.from(m.values()).sort((a, b) => b.total - a.total); };
   const sinJust = ((D && D.gq) || []).filter(d => d.estado_justificante !== 'completo').map(d => ({fecha: String(d.dateRaw || '').slice(0, 10), importe: impTotalGasto(d), prov: d.client || 'Sin nombre', det: String(d.concepto || d.categoria || '')}));
@@ -27395,7 +27395,7 @@ function impPintarApartados(q, anio, D){
       html: (noInc.length || enB.length) ? ordena(noInc).map(d => impFilaGasto(d, d.categoria === 'Compra de vehículos' ? impPill('Inversión: compra de vehículo', 'no') : impPill('No es de la empresa', 'no'), d.categoria === 'Compra de vehículos' ? '' : impBtn('Sí es de la empresa', `impDudoso('${d.id}','empresa')`), `<div class="ct-g3">${d.categoria === 'Compra de vehículos' ? 'Es una inversión, no un gasto del trimestre.' : 'Marcado como no relacionado con la actividad.'}</div>`)).join('') + ordena(enB).map(d => impFilaGasto(d, impPill('En B: no se declara', 'b'), '', `<div class="ct-g3">Contabilidad en B: cuenta como control, no entra en los impuestos ni va al gestor.</div>`)).join('') : vacio('Ningún gasto sin incluir.')},
     {id: 'pinc', t: 'Sin factura incluidos', n: pendJust.length + incB.reduce((s, g) => s + g.items.length, 0), total: tot(pendJust) + suma(incB, g => g.total), nota: 'Cuentan, pero falta la factura o el justificante: se piden al cerrar el trimestre.',
       html: (pendJust.length || incB.length) ? ordena(pendJust).map(filaJust).join('') + incB.map(g => filaB(g, true)).join('') : vacio(banco ? 'Nada pendiente de factura entre lo que cuenta.' : 'Cargando el banco…')},
-    {id: 'pno', t: 'Sin factura no incluidos', n: noB.reduce((s, g) => s + g.items.length, 0), total: suma(noB, g => g.total), nota: 'Pagos del banco sin factura: no cuentan hasta que llegue. Puedes incluirlos ya (IVA 21 %, estimado).',
+    {id: 'pno', t: 'Sin factura no incluidos', n: noB.reduce((s, g) => s + g.items.length, 0), total: suma(noB, g => g.total), nota: 'Solo los pagos sin factura con fuerte sospecha de no ser de la empresa o sin justificante posible. Los demás cuentan.',
       html: noB.length ? noB.map(g => filaB(g, false)).join('') : vacio(banco ? (P.conExtracto ? 'Ningún pago del banco sin factura en este trimestre.' : 'No hay pagos del banco cargados en este trimestre.') : 'Cargando el banco…')}
   ];
   cont.innerHTML = S.filter(s => s.n > 0).map(s => `<details class="imp-det" data-ap="${s.id}" ${_impAbiertos.has(s.id) ? 'open' : ''}><summary><span>${escHtml(s.t)} (${s.n}${s.n ? ' · ' + impEur(s.total) : ''})</span></summary><div class="imp-det-body"><div class="imp-pend-nota">${escHtml(s.nota)}</div>${s.html}</div></details>`).join('');
