@@ -56,6 +56,8 @@ c=re.sub(r'(<div id=\"version-float\"[^>]*>)(V[\d.]+)(</div>)', r'\g<1>${VERSION
 with open('index.html','w',encoding='utf-8') as f: f.write(c)
 print('HTML actualizado a ${VERSION} (version-badge y version-float)')
 "
+# S3.37 (07/11/2026): la cabecera de Subir enseña la versión del sistema publicada (antes la leía de una fila que no se podía leer y se quedaba en «Sistema …»)
+sed -i -E "s#(id=\"ver-subir\">Subir S[0-9.]+ · Sistema )V[0-9.]+#\1${VERSION}#" subir.html
 # Commit y push — si algo falla aquí, 'set -e' corta el script y version_final NUNCA se marca
 git add -A
 # 06/10/2026: si la rama ya traía la versión puesta no hay nada que guardar; antes eso cortaba el script antes del push

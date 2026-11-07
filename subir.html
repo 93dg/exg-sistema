@@ -29,6 +29,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
+html{overflow-x:hidden;}
 body{font-family:'Inter',sans-serif;background:var(--concrete);color:var(--ink);min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;overflow-x:hidden;}
 svg{display:block;}
 
@@ -36,12 +37,18 @@ header{padding:calc(8px + env(safe-area-inset-top)) 16px 8px;display:flex;align-
 header .name{font-family:'Archivo',sans-serif;font-weight:800;font-size:14px;}
 header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--ink-soft);margin-top:1px;}
 
-#feed{flex:1;overflow-y:auto;padding:10px 16px;display:flex;flex-direction:column;gap:9px;}
-.msg{background:var(--paper);border:1.5px solid var(--line);border-radius:13px;padding:10px;position:relative;animation:aparecer .2s ease;}
+/* S3.37 (Daniel 07/11): el chat no se desplaza hacia los lados; solo la tira de miniaturas se desliza */
+#feed{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior-x:none;touch-action:pan-y;padding:10px 16px;display:flex;flex-direction:column;gap:9px;}
+.msg{min-width:0;max-width:100%;background:var(--paper);border:1.5px solid var(--line);border-radius:13px;padding:10px;position:relative;animation:aparecer .2s ease;}
 @keyframes aparecer{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
 .msg-fila{display:flex;gap:10px;align-items:flex-start;}
 .msg-thumb{width:46px;height:46px;border-radius:9px;flex:0 0 46px;object-fit:cover;background:var(--asphalt);display:flex;align-items:center;justify-content:center;color:#fff;font-size:19px;position:relative;cursor:pointer;}
-.msg-adjuntos{display:flex;gap:6px;flex:0 1 auto;overflow-x:auto;}
+.msg-adjuntos{display:flex;gap:6px;flex:0 1 auto;min-width:0;overflow-x:auto;touch-action:pan-x;scrollbar-width:none;}
+.msg-adjuntos::-webkit-scrollbar{display:none;}
+/* S3.37 (Daniel 07/11): con 3 o más archivos la tira de miniaturas ocupa todo el ancho y el estado va debajo, en una línea */
+.msg-fila.multi{flex-direction:column;align-items:stretch;gap:7px;}
+.msg-fila.multi .msg-adjuntos{max-width:100%;}
+.msg-meta > span{white-space:nowrap;}
 .msg-adjuntos .msg-thumb{flex:0 0 46px;}
 .msg-cuerpo{flex:1;min-width:0;padding-top:1px;}
 .msg-texto{font-size:13.5px;color:var(--ink);line-height:1.35;word-wrap:break-word;}
@@ -138,7 +145,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.36 · Sistema …</div>
+    <div class="ver" id="ver-subir">Subir S3.37 · Sistema V13.69</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -767,11 +774,11 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
           : `<div class="msg-thumb" ${click}>${icono}${badge}</div>`;
       }).join("");
       filaHtml = `
-        <div class="msg-fila">
+        <div class="msg-fila${m.attachments.length >= 3 ? " multi" : ""}">
           <div class="msg-adjuntos">${miniaturas}</div>
           <div class="msg-cuerpo">
             ${m.nota ? `<div class="msg-texto">"${esc(m.nota)}"</div>` : ""}
-            <div class="msg-meta"><span class="msg-pill cargando" id="pill-${m.msg_id}">…</span> ${etiquetaMensaje(m)} ${fechaCorta(m.created_at)}</div>
+            <div class="msg-meta"><span class="msg-pill cargando" id="pill-${m.msg_id}">…</span> ${etiquetaMensaje(m)} <span>${fechaCorta(m.created_at)}</span></div>
           </div>
         </div>`;
     } else {
@@ -779,7 +786,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
         <div class="msg-fila">
           <div class="msg-cuerpo">
             <div class="msg-texto">${esc(m.nota || "")}</div>
-            <div class="msg-meta"><span class="msg-pill cargando" id="pill-${m.msg_id}">…</span> ${etiquetaMensaje(m)} ${fechaCorta(m.created_at)}</div>
+            <div class="msg-meta"><span class="msg-pill cargando" id="pill-${m.msg_id}">…</span> ${etiquetaMensaje(m)} <span>${fechaCorta(m.created_at)}</span></div>
           </div>
         </div>`;
     }
@@ -926,6 +933,8 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
             caja.textContent = interp.estado_resolucion === "trabajo_no_encontrado" ? "No encuentro ese trabajo — edita para especificarlo" : "No sé a qué trabajo pertenece — nombra el cliente/obra";
           }
         }
+        // S3.37 (Daniel 07/11): sin nada que decir no queda una caja vacía que deja un hueco en blanco en la tarjeta
+        if (!caja.textContent.trim()) caja.remove();
       }
 
       // Plegar mensajes verificados
@@ -993,9 +1002,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   let loteObjetivoActual = null;
   function abrirMenuAnadir(msgId){ loteObjetivoActual = msgId; menuAnadir.classList.add("activo"); }
   window.abrirMenuAnadir = abrirMenuAnadir;
-  // Versión del sistema desde BD (no hay que actualizarla a mano)
-  fetch(SUPABASE_URL+"/rest/v1/arranque?clave=eq.web_version_actual&select=valor",{headers:{"Authorization":"Bearer "+SUPABASE_ANON_KEY,"apikey":SUPABASE_ANON_KEY}})
-    .then(r=>r.json()).then(d=>{ if(d&&d[0]) document.getElementById('ver-subir').textContent='Subir S3.36 · Sistema '+d[0].valor; }).catch(()=>{});
+  // S3.37: la versión del sistema la escribe deploy.sh en la cabecera (la fila arranque.web_version_actual no se podía leer y se quedaba en «Sistema …»)
   window.abrirEnlaceDesdeSubir = abrirEnlaceDesdeSubir;
   window.toggleMsgVerificado = toggleMsgVerificado;
   menuAnadir.addEventListener("click", (e) => { if (e.target === menuAnadir) menuAnadir.classList.remove("activo"); });
