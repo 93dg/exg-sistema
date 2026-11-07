@@ -38,12 +38,12 @@ header .name{font-family:'Archivo',sans-serif;font-weight:800;font-size:14px;}
 header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--ink-soft);margin-top:1px;}
 
 /* S3.37 (Daniel 07/11): el chat no se desplaza hacia los lados; solo la tira de miniaturas se desliza */
-#feed{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior-x:none;touch-action:pan-y;padding:10px 16px;display:flex;flex-direction:column;gap:9px;}
+#feed{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior-x:none;-webkit-overflow-scrolling:touch;padding:10px 16px;display:flex;flex-direction:column;gap:9px;}
 .msg{min-width:0;max-width:100%;background:var(--paper);border:1.5px solid var(--line);border-radius:13px;padding:10px;position:relative;animation:aparecer .2s ease;}
 @keyframes aparecer{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
 .msg-fila{display:flex;gap:10px;align-items:flex-start;}
 .msg-thumb{width:46px;height:46px;border-radius:9px;flex:0 0 46px;object-fit:cover;background:var(--asphalt);display:flex;align-items:center;justify-content:center;color:#fff;font-size:19px;position:relative;cursor:pointer;}
-.msg-adjuntos{display:flex;gap:6px;flex:0 1 auto;min-width:0;overflow-x:auto;touch-action:pan-x;scrollbar-width:none;}
+.msg-adjuntos{display:flex;gap:6px;flex:0 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;}
 .msg-adjuntos::-webkit-scrollbar{display:none;}
 /* S3.37 (Daniel 07/11): con 3 o más archivos la tira de miniaturas ocupa todo el ancho y el estado va debajo, en una línea */
 .msg-fila.multi{flex-direction:column;align-items:stretch;gap:7px;}
@@ -76,6 +76,8 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 .msg-pie{display:flex;align-items:center;justify-content:space-between;margin-top:8px;border-top:1px solid var(--line);padding-top:7px;}
 .btn-anadir{-webkit-appearance:none;appearance:none;border:1.3px dashed var(--line);background:none;border-radius:20px;padding:4px 11px 4px 8px;display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink-soft);}
 .btn-anadir svg{width:14px;height:14px;}
+/* S3.38 (Daniel 07/11): al abrir solo las 20 últimas entradas; las anteriores, con este botón */
+#mas-anteriores{align-self:center;padding:5px 13px;}
 
 #menu-anadir{position:fixed;inset:0;z-index:110;background:rgba(27,31,36,0.5);display:none;align-items:flex-end;justify-content:center;}
 #menu-anadir.activo{display:flex;}
@@ -145,7 +147,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
 <header>
   <div>
     <div class="name">EXG</div>
-    <div class="ver" id="ver-subir">Subir S3.37 · Sistema V13.69</div>
+    <div class="ver" id="ver-subir">Subir S3.38 · Sistema V13.70</div>
   </div>
 </header>
 <button onclick="location.reload(true)" title="Actualizar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:9999;background:none;border:none;padding:8px;cursor:pointer;color:var(--ink-soft);font-size:22px;line-height:1;">↻</button>
@@ -762,6 +764,12 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     if (otros > 0) partes.push(otros === 1 ? "1 archivo" : otros + " archivos");
     return `<span class="msg-etq">${partes.join(" · ")}</span>`;
   }
+  // S3.38 (Daniel 07/11: se quedaba pillado y cargando al hacer scroll): cada miniatura cargaba la foto original (1,4 MB de media, 354 MB en total);
+  // ahora se pide al almacenamiento una miniatura de 138 px (unos 3 KB). La foto original solo se carga al abrirla.
+  function miniatura(url){
+    const pub = "/storage/v1/object/public/";
+    return url.includes(pub) ? url.replace(pub, "/storage/v1/render/image/public/") + (url.includes("?") ? "&" : "?") + "width=138&height=138&resize=cover&quality=60" : url;
+  }
   function construirContenidoMensaje(m){
     let filaHtml = "";
     if (m.attachments && m.attachments.length > 0){
@@ -770,7 +778,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
         const badge = a.kind === "audio" ? `<span class="play-badge"><svg viewBox="0 0 24 24" fill="white"><path d="M6 4l14 8-14 8z"/></svg></span>` : "";
         const click = a.kind === "audio" ? `onclick="reproducirUrl('${a.file_url}','doc-${a.documento_id}')"` : `onclick="abrirDetalleAdjunto('${a.file_url}')"`;
         return (a.kind === "foto" && a.file_url && !/\.pdf($|\?)/i.test(a.file_url || ""))
-          ? `<img class="msg-thumb" src="${a.file_url}" alt="" ${click}>`
+          ? `<img class="msg-thumb" src="${miniatura(a.file_url)}" loading="lazy" decoding="async" alt="" ${click}>`
           : `<div class="msg-thumb" ${click}>${icono}${badge}</div>`;
       }).join("");
       filaHtml = `
@@ -873,7 +881,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   }
 
   // ---------- Pintar un mensaje (agrupado) ----------
-  function pintarMensaje(m, alPrincipio){
+  function pintarMensaje(m, alPrincipio, sinBajar){
     vacio.style.display = "none";
     const div = document.createElement("div");
     div.className = "msg";
@@ -881,7 +889,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     div.addEventListener("click", function(e){ if(e.target.closest("button,input,a,select")) return; toggleMsgVerificado(div); });
     div.innerHTML = construirContenidoMensaje(m);
     if (alPrincipio) feed.insertBefore(div, feed.firstChild); else feed.appendChild(div);
-    feed.scrollTop = feed.scrollHeight;
+    if (!sinBajar) feed.scrollTop = feed.scrollHeight;
     actualizarPill(m.msg_id);
   }
 
@@ -978,10 +986,32 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
     } catch(e){ return null; }
   }
   const firmaLista = l => l.map(m => m.msg_id + ":" + (m.attachments || []).length + ":" + (m.nota || "")).join("|");
+  // S3.38 (Daniel 07/11): al abrir se pintan solo las últimas 20 entradas; «Cargar 20 anteriores» trae las siguientes
+  const POR_TANDA = 20;
+  let visibles = POR_TANDA, listaFeed = [];
+  function ponerBotonMas(){
+    let b = document.getElementById("mas-anteriores");
+    const quedan = listaFeed.length - visibles;
+    if (quedan <= 0){ if (b) b.remove(); return; }
+    if (!b){ b = document.createElement("button"); b.type = "button"; b.id = "mas-anteriores"; b.className = "btn-anadir"; b.addEventListener("click", cargarAnteriores); }
+    b.textContent = "Cargar " + Math.min(POR_TANDA, quedan) + " anteriores";
+    feed.insertBefore(b, feed.querySelector(".msg"));
+  }
+  function cargarAnteriores(){
+    const alto = feed.scrollHeight, arriba = feed.scrollTop;
+    const tanda = listaFeed.slice(visibles, visibles + POR_TANDA);
+    visibles += tanda.length;
+    tanda.forEach(m => pintarMensaje(m, true, true));
+    ponerBotonMas();
+    feed.scrollTop = arriba + (feed.scrollHeight - alto);
+  }
   function repintarFeed(lista){
-    feed.querySelectorAll(".msg").forEach(e => e.remove());
+    listaFeed = lista;
+    feed.querySelectorAll(".msg, #mas-anteriores").forEach(e => e.remove());
     if (lista.length === 0){ vacio.style.display = "block"; return; }
-    lista.slice().reverse().forEach(m => pintarMensaje(m));
+    lista.slice(0, visibles).reverse().forEach(m => pintarMensaje(m, false, true));
+    ponerBotonMas();
+    feed.scrollTop = feed.scrollHeight;
   }
   async function sincronizarConLaBase(){
     if (subiendo) return;
@@ -993,7 +1023,7 @@ header .ver{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--in
   }
   function cargarFeedInicial(){
     const lista = leerHistorial();
-    if (lista.length === 0){ vacio.style.display = "block"; } else { lista.slice().reverse().forEach(m => pintarMensaje(m)); }
+    repintarFeed(lista);
     sincronizarConLaBase();
   }
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") sincronizarConLaBase(); });
