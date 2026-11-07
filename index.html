@@ -2628,6 +2628,7 @@ a.ie-hist-p{color:var(--orange);border-color:var(--orange-soft,#f3d6c5);}
   span[onclick]{font-size:16px !important;padding:6px;display:inline-block;}
   .row-actions .btn, .btn.sm{min-height:40px;}
 
+  html{height:100%;overflow:hidden;} body{height:100%;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:none;-webkit-overflow-scrolling:touch;}   /* V13.68: se desplaza el cuerpo, no la ventana (barra de abajo quieta en el iPhone) */
   #mobile-tabbar{
     display:flex; position:fixed; left:0; right:0; bottom:0; z-index:3100;
     background:var(--asphalt); border-top:1px solid var(--line-dark);
@@ -5208,6 +5209,24 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 </style>
 </head>
 <body>
+<script>
+/* V13.68 (reporte 5b0d9a1c, Daniel: «cuando hago scroll hacia abajo el menú inferior se mueve hacia arriba», en todas las pantallas):
+   en el móvil quien se desplaza es el cuerpo de la página (body), no la ventana. Así Safari del iPhone no cambia el tamaño de la pantalla
+   al bajar y la barra de abajo se queda quieta. Para que todo lo demás siga igual, scrollTo/scrollBy/scrollY/scrollingElement de la ventana
+   apuntan al cuerpo, y cada desplazamiento del cuerpo se avisa también a la ventana. */
+(function(){
+  var mq = window.matchMedia ? window.matchMedia('(max-width:768px)') : null, on = function(){ return !!(mq && mq.matches && document.body); };
+  var oTo = window.scrollTo.bind(window), oBy = window.scrollBy.bind(window);
+  window.scrollTo = function(a, b){ if(on()){ if(a && typeof a === 'object') return document.body.scrollTo(a); return document.body.scrollTo(a || 0, b || 0); } return typeof a === 'object' ? oTo(a) : oTo(a, b); };
+  window.scrollBy = function(a, b){ if(on()){ if(a && typeof a === 'object') return document.body.scrollBy(a); return document.body.scrollBy(a || 0, b || 0); } return typeof a === 'object' ? oBy(a) : oBy(a, b); };
+  function prop(n, eje){ var d = Object.getOwnPropertyDescriptor(window, n) || Object.getOwnPropertyDescriptor(Window.prototype, n);
+    try{ Object.defineProperty(window, n, {configurable: true, get: function(){ if(on()) return eje === 'y' ? document.body.scrollTop : document.body.scrollLeft; return d && d.get ? d.get.call(window) : (eje === 'y' ? document.documentElement.scrollTop : document.documentElement.scrollLeft); }}); }catch(e){} }
+  prop('scrollY', 'y'); prop('pageYOffset', 'y'); prop('scrollX', 'x'); prop('pageXOffset', 'x');
+  var dse = Object.getOwnPropertyDescriptor(Document.prototype, 'scrollingElement');
+  try{ Object.defineProperty(document, 'scrollingElement', {configurable: true, get: function(){ return on() ? document.body : (dse && dse.get ? dse.get.call(document) : document.documentElement); }}); }catch(e){}
+  document.addEventListener('DOMContentLoaded', function(){ document.body.addEventListener('scroll', function(){ if(on()) window.dispatchEvent(new Event('scroll')); }, {passive: true}); });
+})();
+</script>
 <div id="arranque-splash" style="position:fixed;inset:0;z-index:10000;background:#edece7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:-apple-system,system-ui,sans-serif;color:#1b1f24;">
   <div style="font-weight:800;font-size:30px;letter-spacing:.06em;">EXG</div>
   <div id="arranque-msg" style="font-size:14px;opacity:.7;">Cargando…</div>
@@ -5228,11 +5247,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.67" defer></script>
-<script src="costes/norm.js?v=V13.67" defer></script>
-<script src="ajustes/calc.js?v=V13.67" defer></script>
+<script src="rentabilidad/rent.js?v=V13.68" defer></script>
+<script src="costes/norm.js?v=V13.68" defer></script>
+<script src="ajustes/calc.js?v=V13.68" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.67</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.68</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5384,7 +5403,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.67</div>
+        <div class="sub" id="version-badge">V13.68</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -17001,7 +17020,7 @@ async function rbCapturar(){
   try{
     for(const intento of [1, 2]){   // 1: se quitan los colores modernos de los estilos; 2: además se revisan los colores ya calculados de lo que se ve
       try{
-        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { try{ doc.body.classList.remove('overlay-open'); }catch(e){} /* V13.53 (reporte 1fa59412: con una ficha abierta la foto salía toda gris): con la ficha abierta el cuerpo queda fijo y la copia salía vacía */ subirCopia(doc); fijarCopia(doc); ponerImgs(doc); doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); rbCompactarStyle(doc); }})), 9000);
+        const cap = await conTiempo(html2canvas(document.documentElement, opciones({onclone: doc => { try{ doc.body.classList.remove('overlay-open'); doc.documentElement.style.setProperty('overflow', 'visible', 'important'); doc.documentElement.style.setProperty('height', 'auto', 'important'); doc.body.style.setProperty('overflow', 'visible', 'important'); doc.body.style.setProperty('height', 'auto', 'important'); }catch(e){} /* V13.68: en el móvil el que se desplaza es el cuerpo; en la copia se deja todo a la vista */ /* V13.53 (reporte 1fa59412: con una ficha abierta la foto salía toda gris): con la ficha abierta el cuerpo queda fijo y la copia salía vacía */ subirCopia(doc); fijarCopia(doc); ponerImgs(doc); doc.querySelectorAll('[data-rbarriba]').forEach(el => { el.style.setProperty('visibility', 'hidden', 'important'); }); rbSanearEstilos(doc); ponerColores(doc); rbSanearComputados(doc); rbCompactarStyle(doc); }})), 9000);
         if(cap && cap.width > 0){ const fin = recortar(cap); return {cap: fin, error: '', diag: fin._diag}; }
       }catch(e){ ultimoError = String(e && e.message || e).slice(0, 160); console.warn('captura, intento ' + intento, e); }
     }
