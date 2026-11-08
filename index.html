@@ -5247,11 +5247,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.71" defer></script>
-<script src="costes/norm.js?v=V13.71" defer></script>
-<script src="ajustes/calc.js?v=V13.71" defer></script>
+<script src="rentabilidad/rent.js?v=V13.72" defer></script>
+<script src="costes/norm.js?v=V13.72" defer></script>
+<script src="ajustes/calc.js?v=V13.72" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.71</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.72</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5403,7 +5403,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.71</div>
+        <div class="sub" id="version-badge">V13.72</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -12745,7 +12745,7 @@ function renderAlbaranesKPIs(){
     const d = documentosRealesById[docId];
     const pct = d?.iva_pct;
     const esIsp = (d?.tratamiento_iva||'normal')==='isp';
-    const base = esIsp ? totalTr : (pct!=null && Number(pct)!==0 ? totalTr/(1+Number(pct)/100) : totalTr);
+    const base = (esIsp || (d && (d.type || d.tipo) === 'albaran')) ? totalTr : (pct!=null && Number(pct)!==0 ? totalTr/(1+Number(pct)/100) : totalTr);   // V13.72: un albarán no lleva IVA
     subtotal += base;
     cobrado += Number(d?.cobrado_importe||0);
   });
@@ -12824,7 +12824,7 @@ function renderPresupuestosKPIs(){
     const d = documentosRealesById[docId];
     const pct = d?.iva_pct;
     const esIsp = (d?.tratamiento_iva||'normal')==='isp';
-    const base = esIsp ? totalTr : (pct!=null && Number(pct)!==0 ? totalTr/(1+Number(pct)/100) : totalTr);
+    const base = (esIsp || (d && (d.type || d.tipo) === 'albaran')) ? totalTr : (pct!=null && Number(pct)!==0 ? totalTr/(1+Number(pct)/100) : totalTr);   // V13.72: un albarán no lleva IVA
     subtotal += base;
     // igual que en Albaranes: leer la píldora de estado real, no un índice de columna
     // fijo (el índice cambia si se añade/quita una columna, y llevaba tiempo apuntando
@@ -26438,7 +26438,7 @@ function tbGrupoColor(k){
 // V13.43 (reportes 839026ee y 4e27ffa6, Daniel: «todo desconectado»): una sola fórmula de lo que queda por cobrar de un documento, sin IVA, para Documentos, Trabajos, Economía y Dirección.
 // Antes el total de Documentos y Por cobrar no restaban lo ya pagado de un trabajo en marcha (los 4.000 € de Rafa en el A21) y el apartado de Trabajos sí.
 function docPendSinIva(d){
-  if(!d) return 0; const tot = Number(d.total != null ? d.total : d.importe) || 0, base = Number(d.base != null ? d.base : tot) || 0;
+  if(!d) return 0; const tot = Number(d.total != null ? d.total : d.importe) || 0, base = (d.type || d.tipo) === 'albaran' ? tot : (Number(d.base != null ? d.base : tot) || 0);   // V13.72: un albarán no lleva IVA
   if(['parcial', 'parcial_otra'].includes(d.estado_cobro) && tot) return base * Math.max(0, 1 - (Number(d.cobrado_importe || 0) + (d.estado_cobro === 'parcial_otra' && typeof enOtraSuma === 'function' ? enOtraSuma(d) : 0)) / tot);
   { const pa = docPagadoAntes(d); if(pa && tot) return base * Math.max(0, 1 - pa / tot); }
   return base;
@@ -32867,7 +32867,7 @@ async function cargarDocumentosEconomicosReales(){
       const amountLabel = Number(doc.importe||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
       const totalNum = Number(doc.importe||0);
       const tratIvaTmp = doc.tratamiento_iva || 'normal';
-      const baseNum = tratIvaTmp==='isp' ? totalNum : totalNum / (1 + (Number(doc.iva_pct!=null?doc.iva_pct:21))/100);
+      const baseNum = (tratIvaTmp==='isp' || doc.tipo==='albaran') ? totalNum : totalNum / (1 + (Number(doc.iva_pct!=null?doc.iva_pct:21))/100);   // V13.72 (Daniel 08/11: «¿cómo va a haber albaranes con IVA?»): el importe de un albarán es siempre sin IVA
       const ivaNum = totalNum - baseNum;
       const status = doc.estado==='borrador' ? 'Borrador' : doc.tipo==='factura' ? 'Pendiente' : doc.tipo==='albaran' ? 'Validado' : 'Enviado';
       // forma de pago / IBAN / titular / concepto: si el documento no los tiene guardados (p.ej.
