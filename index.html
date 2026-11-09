@@ -2628,7 +2628,6 @@ a.ie-hist-p{color:var(--orange);border-color:var(--orange-soft,#f3d6c5);}
   span[onclick]{font-size:16px !important;padding:6px;display:inline-block;}
   .row-actions .btn, .btn.sm{min-height:40px;}
 
-  html{height:100%;overflow:hidden;} body{height:100%;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:none;-webkit-overflow-scrolling:touch;}   /* V13.68: se desplaza el cuerpo, no la ventana (barra de abajo quieta en el iPhone) */
   #mobile-tabbar{
     display:flex; position:fixed; left:0; right:0; bottom:0; z-index:3100;
     background:var(--asphalt); border-top:1px solid var(--line-dark);
@@ -2636,11 +2635,6 @@ a.ie-hist-p{color:var(--orange);border-color:var(--orange-soft,#f3d6c5);}
     box-shadow:0 -2px 10px rgba(0,0,0,0.25);
   }
   /* iPhone (Safari reciente): la barra del navegador es translúcida y la página sigue por debajo de nuestra barra inferior; ese hueco se pinta del mismo color para que no se vean pasar las tarjetas. Donde no hay hueco, queda fuera de la pantalla y no se nota. */
-  /* V13.76 (Daniel 09/11): en la app de la pantalla de inicio el iPhone deja una franja abajo donde la página no puede dibujar (fallo de iOS, WebKit 301994).
-     La franja toma el color de la barra y la barra pierde su relleno de abajo (la rayita del iPhone ya cae en la franja): iconos y nombres quedan abajo del todo. */
-  @media (display-mode: standalone){ html{background:var(--asphalt);} }
-  html.ios-hueco #mobile-tabbar{padding-bottom:6px !important;}
-  html.ios-hueco #asistente-ia-fab, html.ios-hueco #busq-fab, html.ios-hueco body #report-bug-btn, html.ios-hueco #mob-menu-btn, html.ios-hueco #mob-menu-panel, html.ios-hueco #mobile-add-menu, html.ios-hueco #sel-flotante.on, html.ios-hueco .docs-selector-menu{margin-bottom:calc(-1 * env(safe-area-inset-bottom, 0px)) !important;}
   #mobile-tabbar::after{content:'';position:absolute;left:0;right:0;top:100%;height:260px;background:var(--asphalt);pointer-events:none;}
   .mobile-tab-btn{
     flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
@@ -5214,36 +5208,6 @@ html.visor-abierto body #report-bug-btn{bottom:calc(env(safe-area-inset-bottom,0
 </style>
 </head>
 <body>
-<script>
-/* V13.76: detecta la franja del iPhone en la app de inicio (la ventana mide menos que la pantalla) */
-(function(){
-  var r = document.documentElement;
-  function medir(){
-    var st = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches), h = 0;
-    if(st && window.innerWidth < 769){ var alto = window.innerWidth < window.innerHeight ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height); h = Math.round(alto - window.innerHeight); if(h < 20 || h > 100) h = 0; }
-    r.classList.toggle('ios-hueco', h > 0);
-  }
-  medir(); window.addEventListener('resize', medir); window.addEventListener('orientationchange', function(){ setTimeout(medir, 300); }); window.addEventListener('pageshow', medir);
-})();
-</script>
-<script>
-/* V13.68 (reporte 5b0d9a1c, Daniel: «cuando hago scroll hacia abajo el menú inferior se mueve hacia arriba», en todas las pantallas):
-   en el móvil quien se desplaza es el cuerpo de la página (body), no la ventana. Así Safari del iPhone no cambia el tamaño de la pantalla
-   al bajar y la barra de abajo se queda quieta. Para que todo lo demás siga igual, scrollTo/scrollBy/scrollY/scrollingElement de la ventana
-   apuntan al cuerpo, y cada desplazamiento del cuerpo se avisa también a la ventana. */
-(function(){
-  var mq = window.matchMedia ? window.matchMedia('(max-width:768px)') : null, on = function(){ return !!(mq && mq.matches && document.body); };
-  var oTo = window.scrollTo.bind(window), oBy = window.scrollBy.bind(window);
-  window.scrollTo = function(a, b){ if(on()){ if(a && typeof a === 'object') return document.body.scrollTo(a); return document.body.scrollTo(a || 0, b || 0); } return typeof a === 'object' ? oTo(a) : oTo(a, b); };
-  window.scrollBy = function(a, b){ if(on()){ if(a && typeof a === 'object') return document.body.scrollBy(a); return document.body.scrollBy(a || 0, b || 0); } return typeof a === 'object' ? oBy(a) : oBy(a, b); };
-  function prop(n, eje){ var d = Object.getOwnPropertyDescriptor(window, n) || Object.getOwnPropertyDescriptor(Window.prototype, n);
-    try{ Object.defineProperty(window, n, {configurable: true, get: function(){ if(on()) return eje === 'y' ? document.body.scrollTop : document.body.scrollLeft; return d && d.get ? d.get.call(window) : (eje === 'y' ? document.documentElement.scrollTop : document.documentElement.scrollLeft); }}); }catch(e){} }
-  prop('scrollY', 'y'); prop('pageYOffset', 'y'); prop('scrollX', 'x'); prop('pageXOffset', 'x');
-  var dse = Object.getOwnPropertyDescriptor(Document.prototype, 'scrollingElement');
-  try{ Object.defineProperty(document, 'scrollingElement', {configurable: true, get: function(){ return on() ? document.body : (dse && dse.get ? dse.get.call(document) : document.documentElement); }}); }catch(e){}
-  document.addEventListener('DOMContentLoaded', function(){ document.body.addEventListener('scroll', function(){ if(on()) window.dispatchEvent(new Event('scroll')); }, {passive: true}); });
-})();
-</script>
 <div id="arranque-splash" style="position:fixed;inset:0;z-index:10000;background:#edece7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:-apple-system,system-ui,sans-serif;color:#1b1f24;">
   <div style="font-weight:800;font-size:30px;letter-spacing:.06em;">EXG</div>
   <div id="arranque-msg" style="font-size:14px;opacity:.7;">Cargando…</div>
@@ -5264,11 +5228,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.76" defer></script>
-<script src="costes/norm.js?v=V13.76" defer></script>
-<script src="ajustes/calc.js?v=V13.76" defer></script>
+<script src="rentabilidad/rent.js?v=V13.77" defer></script>
+<script src="costes/norm.js?v=V13.77" defer></script>
+<script src="ajustes/calc.js?v=V13.77" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.76</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.77</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5420,7 +5384,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.76</div>
+        <div class="sub" id="version-badge">V13.77</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
