@@ -5228,11 +5228,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.80" defer></script>
-<script src="costes/norm.js?v=V13.80" defer></script>
-<script src="ajustes/calc.js?v=V13.80" defer></script>
+<script src="rentabilidad/rent.js?v=V13.81" defer></script>
+<script src="costes/norm.js?v=V13.81" defer></script>
+<script src="ajustes/calc.js?v=V13.81" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.80</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.81</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5384,7 +5384,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.80</div>
+        <div class="sub" id="version-badge">V13.81</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -6858,13 +6858,14 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
           <div class="imp-k imp-big" id="imp-k130"><div class="l">Modelo 130 · IRPF</div><div class="v" id="imp-130">—</div><div class="s" id="imp-130-s"></div></div>
         </div>
         <div class="imp-total" id="imp-total-box"><div class="l" id="imp-total-l">A pagar ahora (303 + 130)</div><div class="v" id="imp-total">—</div><div class="s" id="imp-total-s"></div><div class="s" id="imp-total-baja" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);display:none;"></div></div>
+        <!-- V13.81 (Daniel 10/11): el simulador justo debajo de «A pagar ahora», para ver lo real al tenerlo abierto -->
+        <details class="imp-det" id="imp-det-sim" ontoggle="if(this.open) impSimPintar()"><summary>Simulador del trimestre</summary><div class="imp-det-body" id="imp-sim"></div></details>
 
         <div class="panel" id="imp-estado-panel">
           <div class="panel-head"><h3 id="imp-estado-tit">Antes de cerrar</h3></div>
           <div class="panel-body" id="imp-estado"></div>
         </div>
 
-        <details class="imp-det" id="imp-det-sim" ontoggle="if(this.open) impSimPintar()"><summary>Simulador del trimestre</summary><div class="imp-det-body" id="imp-sim"></div></details>
         <button type="button" class="btn primary imp-gestor-btn" id="imp-gestor-btn" onclick="impAbrirGestor()">Preparar para el gestor</button>
 
         <details class="imp-det" id="imp-det-303"><summary>Cálculo 303</summary><div class="imp-det-body" id="imp-303-calc"></div></details>
@@ -27371,7 +27372,9 @@ async function impSimPintar(){
   const E = [['+ Fijos', esc(F.base, F.iva), impEur(F.tot)], ['+ Fijos + Estimación', esc(F.base + V.base, F.iva + V.iva), impEur(F.tot + V.tot)]];   // V13.65 (Daniel 06/11): dos previsiones, sin coger sus palabras del chat como rótulos
   const linea = (l, v, cls) => `<div class="imp-sim-f"><span>${l}</span><b class="mono ${cls || ''}">${v}</b></div>`;
   const fmtF = f => f ? f.slice(8, 10) + '/' + f.slice(5, 7) : '';
-  box.innerHTML = `<div class="imp-sim-acu"><span>Acumulado hasta hoy</span><b class="mono n-neg">${impEur(esc(0, 0).tot)}</b></div>`
+  // V13.81 (Daniel 10/11): fuera «Acumulado hasta hoy» (sumaba los ingresos de prueba; lo real es «A pagar ahora», justo encima) y se dice de qué fecha a qué fecha es la simulación
+  const fAa = f => f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(2, 4), iniQ = anio + '-' + String(q * 3 - 2).padStart(2, '0') + '-01';
+  box.innerHTML = `<div class="s" style="margin-bottom:8px;">Del ${fAa(iniQ)} al ${fAa(fin)}${fin > hoyS && hoyS >= iniQ ? ' · lo previsto, desde hoy ' + fAa(hoyS) : ''}</div>`
     + `<div class="imp-sim-tit">Ingresos previstos</div><div id="imp-sim-fact">` + _impSimFact.map((f, i) => `<div class="imp-sim-fa"><input class="search-box" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Base" value="${f.base != null ? escHtml(String(f.base)) : ''}" onchange="impSimFact(${i}, 'base', this.value)"><button type="button" class="ps-pasar imp-sim-tipo" onclick="impSimTipo(this, ${i})">${f.tipo === 'isp' ? 'Inversión del sujeto pasivo' : 'IVA 21 %'}</button><button type="button" class="btn sm" onclick="impSimQuitar(${i})">Quitar</button></div>`).join('') + `</div>`
     + `<button type="button" class="fc-l-mas" onclick="impSimAnadir()">+ Añadir ingreso previsto</button>`
     + (fa.length ? linea('Base imponible prevista', impEur(ingExtra)) + linea('IVA repercutido previsto', impEur(ivaExtra)) : '')
