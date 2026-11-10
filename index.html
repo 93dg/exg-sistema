@@ -5228,11 +5228,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.79" defer></script>
-<script src="costes/norm.js?v=V13.79" defer></script>
-<script src="ajustes/calc.js?v=V13.79" defer></script>
+<script src="rentabilidad/rent.js?v=V13.80" defer></script>
+<script src="costes/norm.js?v=V13.80" defer></script>
+<script src="ajustes/calc.js?v=V13.80" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.79</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.80</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5384,7 +5384,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.79</div>
+        <div class="sub" id="version-badge">V13.80</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -26693,6 +26693,12 @@ async function tbSyncDoc(docId){
 document.addEventListener('exg-docs-listos', () => { if(document.getElementById('tb-lista')) tbRender(); if(document.getElementById('sl-app')) slPintar(); });   // V12.80 (Daniel 31/10): también en Pendientes, para que los contadores de las pestañas (Activo, Historial) salgan bien al recargar   // V11.85 (reporte f308b882): también Activos   // V11.77: si Trámites se pintó antes de cargar los documentos
 // V11.89 (Daniel 14/10): un trabajo en Activos es su albarán en «Trabajo activo»: al darle ✓ en Pendientes se crea ya, con el cliente y la obra puestos; «Ir al albarán» lo abre para editarlo
 async function tbEmpezar(j){
+  // V13.80 (reportes 9e77e0c3/7d60b7e2): un doble toque en ✓ creaba dos albaranes con el mismo número (A47 vacío en 0 € en Trabajo activo). Un trabajo solo se empieza una vez.
+  if(j._empezando || (TB_EST_ENMARCHA.includes(j.estado) && (j.docs || []).length)) return;
+  j._empezando = true;
+  try{ await tbEmpezarUnaVez(j); } finally { delete j._empezando; }
+}
+async function tbEmpezarUnaVez(j){
   const antes = tbFoto(j), nom = escHtml(j.cliente || j.trabajo || 'Trabajo');
   let ent = clientes.find(c => c.esCli !== false && tbNorm(c.name) === tbNorm(j.cliente)), entId = ent ? ent.id : null;
   // V12.27 (reporte 793ae2b6, Daniel: «¿por qué pone falta cliente si viene del trabajo de José Carrasca?»): el cliente del trabajo SIEMPRE pasa al albarán;
