@@ -5228,11 +5228,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.84" defer></script>
-<script src="costes/norm.js?v=V13.84" defer></script>
-<script src="ajustes/calc.js?v=V13.84" defer></script>
+<script src="rentabilidad/rent.js?v=V13.85" defer></script>
+<script src="costes/norm.js?v=V13.85" defer></script>
+<script src="ajustes/calc.js?v=V13.85" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.84</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.85</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5384,7 +5384,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.84</div>
+        <div class="sub" id="version-badge">V13.85</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -27400,7 +27400,7 @@ async function impSimPintar(){
   const suma = l => l.reduce((a, x) => { const p = parte(x); a.base += p.base; a.iva += p.iva; a.tot += Number(x.importe) || 0; return a; }, {base: 0, iva: 0, tot: 0});
   const F = suma(fijos), V = suma(varis);
   const L = impSimLineas(), fa = L.filter(f => Number(f.base) > 0), ingExtra = fa.reduce((s, f) => s + Number(f.base), 0), ivaExtra = fa.reduce((s, f) => s + (f.tipo === 'isp' ? 0 : Number(f.base) * 0.21), 0);
-  const esc = (gBase, gIva) => { const r303 = D.rep + ivaExtra - D.ded - gIva, rend = c130.R.rend + ingExtra - gBase, bruto = Math.max(0, rend * IMP_PORC_130 / 100), r130 = Math.max(0, bruto - c130.previos); return {r303, r130, tot: Math.max(0, r303) + r130}; };
+  const esc = (gBase, gIva) => { const r303 = D.rep + ivaExtra - D.ded - gIva, rend = c130.R.rend + ingExtra - gBase, bruto = Math.max(0, rend * IMP_PORC_130 / 100), r130 = Math.max(0, bruto - c130.previos); return {r303, r130, tot: (q === 4 ? r303 : Math.max(0, r303)) + r130}; };   // V13.85 (Daniel 11/11): en el 4T el IVA negativo se devuelve, así que el total es el balance (IRPF a pagar menos IVA a devolver)
   const E = [['+ Fijos', esc(F.base, F.iva), impEur(F.tot)], ['+ Fijos + Estimación', esc(F.base + V.base, F.iva + V.iva), impEur(F.tot + V.tot)]];   // V13.65 (Daniel 06/11): dos previsiones, sin coger sus palabras del chat como rótulos
   const linea = (l, v, cls) => `<div class="imp-sim-f"><span>${l}</span><b class="mono ${cls || ''}">${v}</b></div>`;
   const fmtF = f => f ? f.slice(8, 10) + '/' + f.slice(5, 7) : '';
@@ -27412,7 +27412,7 @@ async function impSimPintar(){
     + `<button type="button" class="fc-l-mas" onclick="impSimAnadir()">+ Añadir ingreso previsto</button>`
     + `<br><button type="button" class="fc-l-mas" onclick="impSimAlbAbrir()">+ Añadir desde albarán</button>` + (_impSimAlb.open ? impSimAlbHtml() : '')
     + (fa.length ? linea('Base imponible prevista', impEur(ingExtra)) + linea('IVA repercutido previsto', impEur(ivaExtra)) : '')
-    + E.map(([t, x, sub]) => `<div class="imp-sim-esc"><div class="imp-sim-et">${t}<span>${escHtml(sub)}</span></div>${linea('IVA (303)', impEur(Math.abs(x.r303)) + (x.r303 < 0 ? ' a compensar' : ''), x.r303 > 0 ? 'n-neg' : 'n-pos')}${linea('IRPF (130)', impEur(x.r130), x.r130 > 0 ? 'n-neg' : '')}${linea('Total a pagar', impEur(x.tot), 'n-neg')}</div>`).join('')
+    + E.map(([t, x, sub]) => `<div class="imp-sim-esc"><div class="imp-sim-et">${t}<span>${escHtml(sub)}</span></div>${linea('IVA (303)', impEur(Math.abs(x.r303)) + (x.r303 < 0 ? (q === 4 ? ' a devolver' : ' a compensar') : ''), x.r303 > 0 ? 'n-neg' : 'n-pos')}${linea('IRPF (130)', impEur(x.r130), x.r130 > 0 ? 'n-neg' : '')}${x.tot < 0 ? linea('Total', impEur(-x.tot) + ' a favor', 'n-pos') : linea('Total a pagar', impEur(x.tot), 'n-neg')}</div>`).join('')
     + `<details class="imp-sim-det"><summary>Gastos fijos previstos (${fijos.length})</summary>${fijos.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).map(x => linea(escHtml(x.concepto) + ' · ' + fmtF(x.fecha), impEur(x.importe))).join('') || '<div class="s">Ninguno</div>'}</details>`
     + `<details class="imp-sim-det"><summary>Estimación de gastos variables (${varis.length})</summary>${varis.map(x => linea(escHtml(x.concepto), impEur(x.importe))).join('') || '<div class="s">Ninguno</div>'}<div class="s" style="margin-top:4px;">Estimados con la media de los últimos 3 meses hasta el ${fmtF(fin)}.</div></details>`
 ;
