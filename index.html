@@ -5228,11 +5228,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.86" defer></script>
-<script src="costes/norm.js?v=V13.86" defer></script>
-<script src="ajustes/calc.js?v=V13.86" defer></script>
+<script src="rentabilidad/rent.js?v=V13.87" defer></script>
+<script src="costes/norm.js?v=V13.87" defer></script>
+<script src="ajustes/calc.js?v=V13.87" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.86</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.87</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5384,7 +5384,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.86</div>
+        <div class="sub" id="version-badge">V13.87</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -27384,6 +27384,7 @@ function impSimIva(concepto){ const c = String(concepto || ''); if(/aut[oó]nomo
 async function impSimPintar(){
   const box = document.getElementById('imp-sim'); if(!box) return;
   await impSimLeer(); if(!impSimPintar._docs && !Object.values(documentosRealesById || {}).some(d => d.type === 'albaran')){ impSimPintar._docs = true; try{ await cargarDocumentosEconomicosReales(); }catch(e){} }
+  if(!impSimPintar._cob && !Object.keys(_cobrosDoc || {}).length){ impSimPintar._cob = true; try{ await cobrosCargar(); }catch(e){} }
   const q = _impQ || (Math.floor(new Date().getMonth() / 3) + 1), anio = impAnioSel(), fd = new Date(anio, q * 3, 0);
   const fin = fd.getFullYear() + '-' + String(fd.getMonth() + 1).padStart(2, '0') + '-' + String(fd.getDate()).padStart(2, '0'), hoyS = new Date().toISOString().slice(0, 10);
   if(!_impSimPG[fin]){
@@ -27426,7 +27427,7 @@ function impSimAlbCand(){ const ya = new Set(impSimLineas().map(f => f.alb).filt
 function impSimAlbTodos(){
   const PEND = new Set(['trabajo_activo', 'trabajo_pendiente', 'pendiente_enviar', 'entregado', 'pendiente_cobrar', 'por_cobrar_otra', 'parcial', 'parcial_otra']);
   return Object.values(documentosRealesById || {}).filter(d => d.type === 'albaran' && d.fase_estado !== 'historico' && !d.documento_siguiente_id && PEND.has(controlDocsEstadoDe(d)))
-    .map(d => ({d, b: abEsB(d), imp: _o2(Number(d.total != null ? d.total : d.importe) - enOtraSuma(d)), txt: [formatFechaCorta(d.dateRaw), d.client && d.client !== '—' ? d.client : '', d.obra_texto || ''].filter(Boolean).join(' · ')}))
+    .map(d => ({d, b: abEsB(d), imp: _o2(Number(d.total != null ? d.total : d.importe) - enOtraSuma(d) - pagosDoc(d.id).enB), /* V13.87 (Daniel 12/11, A21): lo ya pagado en B no se factura ni cuenta como ingreso previsto */ txt: [formatFechaCorta(d.dateRaw), d.client && d.client !== '—' ? d.client : '', d.obra_texto || ''].filter(Boolean).join(' · ')}))
     .filter(x => x.imp > 0.005).sort((a, b) => String(b.d.dateRaw || '').localeCompare(String(a.d.dateRaw || '')));
 }
 async function impSimAlbAbrir(){
