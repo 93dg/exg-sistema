@@ -5228,11 +5228,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.92" defer></script>
-<script src="costes/norm.js?v=V13.92" defer></script>
-<script src="ajustes/calc.js?v=V13.92" defer></script>
+<script src="rentabilidad/rent.js?v=V13.93" defer></script>
+<script src="costes/norm.js?v=V13.93" defer></script>
+<script src="ajustes/calc.js?v=V13.93" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.92</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.93</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5385,7 +5385,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.92</div>
+        <div class="sub" id="version-badge">V13.93</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -15013,7 +15013,7 @@ async function pgCargar(){
   document.querySelectorAll('#pg-plazo-chips .chip-filter').forEach(c => c.classList.toggle('active', c.dataset.pg === _pgPlazo)); try{ pleg2Refrescar('pg'); }catch(e){}
   const hasta = pgHasta(_pgPlazo), {data, error} = await sb.rpc('proximos_gastos', {p_hasta: hasta}, {get: true});
   if(error){ box.innerHTML = '<div class="s" style="color:var(--red);">No se pudo calcular</div>'; return; }
-  const filas = data || [], eur = n => { const [e, d] = Math.abs(Number(n) || 0).toFixed(2).split('.'); return (Number(n) < 0 ? '−' : '') + e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + d + ' €'; }, hoy = new Date().toISOString().slice(0, 10);
+  const filas = (data || []).filter(x => !x.deuda_id), eur = n => {   /* la factura prevista de una deuda no se suma aquí: la deuda ya está */ const [e, d] = Math.abs(Number(n) || 0).toFixed(2).split('.'); return (Number(n) < 0 ? '−' : '') + e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + d + ' €'; }, hoy = new Date().toISOString().slice(0, 10);
   const suma = t => filas.filter(x => x.tipo === t).reduce((s, x) => s + Number(x.importe || 0), 0), tot = suma('deuda') + suma('fijo') + suma('estimado');
   const eur0 = n => Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €';   // los totales, sin céntimos (Daniel 12/10)
   const fFecha = f => f ? f.slice(8, 10) + '/' + f.slice(5, 7) : '';
@@ -27399,9 +27399,10 @@ async function impSimPintar(){
   const D = impDatos(q, anio), c130 = impCalc130(q, anio, D);
   // préstamo: solo deducen los intereses (los del último recibo de intereses apuntado)
   const ultInt = (() => { const g = (D.gq || []).concat(impGastosOficiales()).filter(d => /gastos financieros|pr[eé]stamo/i.test(d.categoria || '') && /inter[eé]s/i.test(String(d.concepto || ''))).sort((a, b) => String(b.dateRaw || '').localeCompare(String(a.dateRaw || '')))[0]; return g ? impGastoDeducible(g) : 0; })();
-  const parte = x => { const tot = Number(x.importe) || 0, pct = impSimIva(x.concepto); if(/pr[eé]stamo/i.test(x.concepto || '')) return {base: Math.min(tot, ultInt), iva: 0}; const base = tot / (1 + pct / 100); return {base, iva: tot - base}; };
+  const parte = x => { const tot = Number(x.importe) || 0, pct = x.iva_pct != null ? Number(x.iva_pct) : impSimIva(x.concepto); if(/pr[eé]stamo/i.test(x.concepto || '')) return {base: Math.min(tot, ultInt), iva: 0}; const base = tot / (1 + pct / 100); return {base, iva: tot - base}; };
   const suma = l => l.reduce((a, x) => { const p = parte(x); a.base += p.base; a.iva += p.iva; a.tot += Number(x.importe) || 0; return a; }, {base: 0, iva: 0, tot: 0});
   const F = suma(fijos), V = suma(varis);
+  _impSimCompensa = new Set(pg.flatMap(x => x.compensa_albaran_ids || []));   // 13/11 (Daniel): el albarán que se compensa con la deuda de Encarni no es ingreso aparte
   const L = impSimLineas(), fa = L.filter(f => Number(f.base) > 0), ingExtra = fa.reduce((s, f) => s + Number(f.base), 0), ivaExtra = fa.reduce((s, f) => s + (f.tipo === 'isp' ? 0 : Number(f.base) * 0.21), 0);
   const esc = (gBase, gIva) => { const r303 = D.rep + ivaExtra - D.ded - gIva, rend = c130.R.rend + ingExtra - gBase, bruto = Math.max(0, rend * IMP_PORC_130 / 100), r130 = Math.max(0, bruto - c130.previos); return {r303, r130, tot: (q === 4 ? r303 : Math.max(0, r303)) + r130}; };   // V13.85 (Daniel 11/11): en el 4T el IVA negativo se devuelve, así que el total es el balance (IRPF a pagar menos IVA a devolver)
   const xE = _impSimSoloF ? esc(F.base, F.iva) : esc(F.base + V.base, F.iva + V.iva);   // V13.89 (reporte 7e5410c3): un solo recuadro; tocar «Fijos» deja solo los fijos, por defecto fijos + variables   // V13.65 (Daniel 06/11): dos previsiones, sin coger sus palabras del chat como rótulos
@@ -27422,7 +27423,7 @@ async function impSimPintar(){
 }
 function impSimAnadir(){ _impSimFact.push({base: null, tipo: '21'}); impSimGuardar(); impSimPintar().then(() => { const l = document.querySelectorAll('#imp-sim-fact input'); l[l.length - 1]?.focus(); }); }
 function impSimQuitar(i){ const f = impSimLineas()[i]; if(!f) return; if(f.auto) _impSimQuit.add(f.alb); else _impSimFact.splice(f.mi, 1); impSimGuardar(); impSimPintar(); }
-let _impSimEd = null, _impSimSoloF = false;
+let _impSimEd = null, _impSimSoloF = false, _impSimCompensa = new Set();
 function impSimEditar(i){ _impSimEd = i; impSimPintar().then(() => { const e = document.querySelectorAll('#imp-sim-fact .imp-sim-fa')[i]?.querySelector('input'); if(e){ e.focus(); e.select && e.select(); } }); }
 function impSimSoloF(){ _impSimSoloF = !_impSimSoloF; impSimGuardar(); impSimPintar(); }
 function impSimVolver(id){ _impSimQuit.delete(id); impSimGuardar(); impSimPintar(); }
@@ -27431,7 +27432,7 @@ let _impSimAlb = {open: false, ab: 'A', sel: new Set()};
 function impSimAlbCand(){ const ya = new Set(impSimLineas().map(f => f.alb).filter(Boolean)); return impSimAlbTodos().filter(x => !ya.has(x.d.id)); }   // lo que se puede añadir: los de B y los de A que se han quitado
 function impSimAlbTodos(){
   const PEND = new Set(['trabajo_activo', 'trabajo_pendiente', 'pendiente_enviar', 'entregado', 'pendiente_cobrar', 'por_cobrar_otra', 'parcial', 'parcial_otra']);
-  return Object.values(documentosRealesById || {}).filter(d => d.type === 'albaran' && d.fase_estado !== 'historico' && !d.documento_siguiente_id && PEND.has(controlDocsEstadoDe(d)))
+  return Object.values(documentosRealesById || {}).filter(d => d.type === 'albaran' && d.fase_estado !== 'historico' && !d.documento_siguiente_id && PEND.has(controlDocsEstadoDe(d)) && !_impSimCompensa.has(d.id))
     .map(d => ({d, b: abEsB(d), imp: _o2(Number(d.total != null ? d.total : d.importe) - enOtraSuma(d) - pagosDoc(d.id).enB), /* V13.87 (Daniel 12/11, A21): lo ya pagado en B no se factura ni cuenta como ingreso previsto */ txt: [formatFechaCorta(d.dateRaw), d.client && d.client !== '—' ? d.client : '', d.obra_texto || ''].filter(Boolean).join(' · ')}))
     .filter(x => x.imp > 0.005).sort((a, b) => String(b.d.dateRaw || '').localeCompare(String(a.d.dateRaw || '')));
 }
