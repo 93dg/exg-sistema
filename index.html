@@ -117,7 +117,8 @@ body[data-theme="dark"] .sidebar{background:#0E1013;}
 #econ-facturas-tbody td, #clientes-tbl td, .pill, .tag, .zone-badge, select option {
   text-transform: uppercase;
 }
-html{overflow-x:hidden;width:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation;}   /* touch-action: sin zoom con doble toque */
+html{overflow-x:hidden;width:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation;overscroll-behavior-y:none;}   /* V13.98 (reporte a5017b5e): sin rebote al llegar arriba o abajo, que en el iPhone despegaba a veces la barra inferior */
+body{overscroll-behavior-y:none;}   /* touch-action: sin zoom con doble toque */
 body{
   font-family:'Inter',sans-serif;
   background:var(--concrete);
@@ -5228,11 +5229,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.97" defer></script>
-<script src="costes/norm.js?v=V13.97" defer></script>
-<script src="ajustes/calc.js?v=V13.97" defer></script>
+<script src="rentabilidad/rent.js?v=V13.98" defer></script>
+<script src="costes/norm.js?v=V13.98" defer></script>
+<script src="ajustes/calc.js?v=V13.98" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.97</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.98</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5385,7 +5386,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.97</div>
+        <div class="sub" id="version-badge">V13.98</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -8944,7 +8945,7 @@ async function bandejaContadores(forzar){
   document.addEventListener('touchstart', e => {
     if(e.touches.length !== 1){ valido = false; return; }
     const t = e.target;
-    valido = !(t.closest('input, textarea, select, canvas, .leaflet-container, #visor, .overlay.active, #rb, [data-no-swipe], .docs-tabs, .client-tabs, .dir-pest, .pleg, .filters') || (function scrollH(el){ while(el && el !== document.body){ const cs = getComputedStyle(el); if((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 4) return true; el = el.parentElement; } return false; })(t));
+    valido = !(t.closest('input, textarea, select, canvas, .leaflet-container, #visor, .overlay.active, #rb, [data-no-swipe], .docs-tabs, .client-tabs, .dir-pest, .imp-tabs, .pleg, .filters') || (function scrollH(el){ while(el && el !== document.body){ const cs = getComputedStyle(el); if((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 4) return true; el = el.parentElement; } return false; })(t));
     x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
   }, {passive: true});
   document.addEventListener('touchend', e => {
@@ -8955,7 +8956,7 @@ async function bandejaContadores(forzar){
     // V7.86 (Daniel: «en toda la web; y al llegar a la última, seguir deslizando empieza otra vez por la primera»): también las pestañas de Dirección
     // (.dir-pest), y la lista da la vuelta: después de la última va la primera y antes de la primera, la última
     // V11.44 (reporte 8361668e: «en todos los sitios donde haya pestañas»): la barra de pestañas más de dentro que se vea (la del contenido que tienes delante), también los segmentos tipo Pendientes/Activos
-    const barras = [...vista.querySelectorAll('.docs-tabs, .client-tabs, .dir-pest, .tb-seg, .fl-tabs')].filter(b => b.offsetParent && [...b.querySelectorAll(':scope > button, :scope > .client-tab, :scope > * > button')].some(x => x.classList.contains('active') || x.classList.contains('act')));
+    const barras = [...vista.querySelectorAll('.docs-tabs, .client-tabs, .dir-pest, .tb-seg, .fl-tabs, .imp-tabs')   /* V13.98 (reporte 2dd00212): también Impuestos */].filter(b => b.offsetParent && [...b.querySelectorAll(':scope > button, :scope > .client-tab, :scope > * > button')].some(x => x.classList.contains('active') || x.classList.contains('act')));
     const tabsDe = b => [...b.querySelectorAll(':scope > button, :scope > .client-tab, :scope > * > button')].filter(x => x.offsetParent), dir = dx < 0 ? 1 : -1;
     // se pasa por las pestañas de dentro; al acabarse, salta a la siguiente pestaña de la barra de fuera; en la de más fuera da la vuelta
     for(let n = barras.length - 1; n >= 0; n--){
@@ -27219,6 +27220,7 @@ function impAnioMontar(){
   try{ pleg2Crear({id: 'imp-anio', despuesDe: '#imp-anio-ancla', plegados: ['anio'], grupos: [['anio', 'Año', 'imp-anio-chips', 'unico']]}); }catch(e){}
 }
 function renderImpuestos(q){
+  if(!_impPlegLeido) impPlegLeer();   // V13.98: recuerda plegado/desplegado
   try{ impAnioMontar(); }catch(e){}
   if(q == null) q = _impQ || (Math.floor(new Date().getMonth()/3)+1);
   if(!_docsListos){ impMostrarCargando(); return; }
@@ -27352,6 +27354,11 @@ function impPendienteFactura(q, anio, D){
 // ===== IMPUESTOS DEL TRIMESTRE · APARTADOS (V6.94) =====
 // Ingresos incluidos · Gastos incluidos · incluidos mixtos · incluidos dudosos · no incluidos dudosos · no incluidos (no se mandan al gestor) · incluidos pendientes de factura · no incluidos pendientes de factura
 let _impAbiertos = new Set();
+// V13.98 (reportes 2dd00212 y 10efbf57): Impuestos recuerda en el servidor lo que se deja desplegado o plegado; el simulador sale desplegado si nunca se ha plegado
+let _impPleg = {}, _impPlegLeido = false;
+async function impPlegLeer(){ if(_impPlegLeido || !sb) return; _impPlegLeido = true; try{ const {data} = await sb.from('filtros_persistentes').select('valor').eq('container_id', 'imp-pleg').maybeSingle(); if(data && data.valor) _impPleg = JSON.parse(data.valor) || {}; }catch(e){} Object.entries(_impPleg).forEach(([k, v]) => { if(k.startsWith('ap:')){ if(v) _impAbiertos.add(k.slice(3)); else _impAbiertos.delete(k.slice(3)); } }); impPlegAplicar(); }
+function impPlegAplicar(){ document.querySelectorAll('#view-impuestos details.imp-det[id]').forEach(det => { const v = det.id in _impPleg ? _impPleg[det.id] : det.id === 'imp-det-sim'; if(det.open !== v) det.open = v; }); }
+document.addEventListener('toggle', ev => { const det = ev.target; if(!det || !det.matches || !det.matches('#view-impuestos details.imp-det')) return; const k = det.id || (det.dataset.ap ? 'ap:' + det.dataset.ap : ''); if(!k || _impPleg[k] === det.open) return; _impPleg[k] = det.open; try{ if(sb) sb.from('filtros_persistentes').upsert({container_id: 'imp-pleg', valor: JSON.stringify(_impPleg)}, {onConflict: 'container_id'}).then(() => {}); }catch(e){} }, true);
 function impPill(t, k){ return `<span class="imp-pill ${k}">${escHtml(t)}</span>`; }
 function impFilaGasto(d, pills, acciones, extra){
   const mixto = impPct(d) < 1, txtPills = String(pills || '').replace(/<[^>]+>/g, ''), motivo = /no es|inversi|en b/i.test(txtPills);   // plegada solo se ve la pastilla que dice el motivo de no incluir
@@ -27414,7 +27421,7 @@ async function impSimPintar(){
   const fAa = f => f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(2, 4), iniQ = anio + '-' + String(q * 3 - 2).padStart(2, '0') + '-01';
   box.innerHTML = (fin > hoyS && hoyS >= iniQ ? `<div class="imp-sim-desde">Estimado desde ${fAa(hoyS).slice(0, 5)}</div>` : '')   // V13.92 (reporte 7ee9c79e): el rango del trimestre va en el título; aquí solo «Estimado desde», en letra normal
     + `<div class="imp-sim-tit">Ingresos previstos</div><div id="imp-sim-fact">` + L.map((f, i) => `<div class="imp-sim-fa">${f.alb || (f.base != null && _impSimEd !== i) ? `<b class="mono imp-sim-imp n-pos"${f.alb ? '' : ` style="cursor:pointer;" onclick="impSimEditar(${i})"`}>${impEur(f.base)}</b>` : `<input class="search-box" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Base" value="${f.base != null ? escHtml(String(f.base)) : ''}" onchange="_impSimEd=null;impSimFact(${i}, 'base', this.value)" onblur="if(_impSimEd===${i}){_impSimEd=null;impSimPintar();}">`}<button type="button" class="ps-pasar imp-sim-tipo" onclick="impSimTipo(this, ${i})">${f.tipo === 'isp' ? 'Inversión del sujeto pasivo' : 'IVA 21 %'}</button><button type="button" class="imp-sim-x" aria-label="Quitar" title="Quitar" onclick="impSimQuitar(${i})">✕</button></div>${f.alb ? `<div class="imp-sim-alb-txt">Albarán · ${escHtml(f.txt || '')}</div>` : ''}`).join('') + `</div>`
-    + (() => { const q = impSimAlbTodos().filter(x => _impSimQuit.has(x.d.id)); return q.length ? `<details class="imp-sim-det"><summary>Quitados (${q.length})</summary>${q.map(x => `<div class="imp-sim-alb-f"><span class="imp-sim-alb-n">${escHtml(x.txt)}</span><b class="mono n-pos">${impEur(x.imp)}</b><button type="button" class="fc-l-mas" style="margin:0;" onclick="impSimVolver('${x.d.id}')">Poner</button></div>`).join('')}</details>` : ''; })()
+    + (() => { const q = impSimAlbTodos().filter(x => _impSimQuit.has(x.d.id)); return q.length ? `<details class="imp-sim-det"><summary>Quitados (${q.length})</summary>${q.map(x => `<div class="imp-sim-alb-f"><span class="imp-sim-alb-n">${escHtml(x.txt)}</span><b class="mono n-pos">${impEur(x.imp)}</b><button type="button" class="fc-l-mas" style="margin:0;" onclick="impSimVolver('${x.d.id}')">Añadir</button></div>`).join('')}</details>` : ''; })()
     + `<button type="button" class="fc-l-mas" onclick="impSimAnadir()">+ Añadir ingreso previsto</button>`
     + `<br><button type="button" class="fc-l-mas" onclick="impSimAlbAbrir()">+ Añadir desde albarán</button>` + (_impSimAlb.open ? impSimAlbHtml() : '')
     + (fa.length ? linea('Base imponible prevista', impEur(ingExtra), 'n-pos') + linea('IVA repercutido previsto', impEur(ivaExtra)) : '')
@@ -27477,14 +27484,14 @@ function impPintarApartados(q, anio, D){
   const fmt = f => f ? f.slice(8, 10) + '/' + f.slice(5, 7) : '';
   const filaB = (g, incluido) => { const ids = g.items.map(x => x.id).filter(Boolean), fechas = g.items.map(x => x.fecha).filter(Boolean).sort(), rango = fechas.length ? (fechas[0] === fechas[fechas.length - 1] ? fmt(fechas[0]) : fmt(fechas[0]) + ' a ' + fmt(fechas[fechas.length - 1])) : '';
     const pagos = g.items.slice().sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).map(x => `<div class="ct-g3">${escHtml(fmt(x.fecha))} · <b>${impEur(x.importe)}</b>${x.det ? ' · ' + escHtml(MAY(x.det).slice(0, 40)) : ''}</div>${fteHtml('Banco' + (x.origen === 'fintable' ? ' (Fintable)' : ''), null)}`).join('');
-    return `<div class="ct-g ct-exp" onclick="impToggleFila(event, this)"><div class="ct-g1"><span class="ct-prov">${escHtml(g.prov)}${impPill(incluido ? 'Incluido, estimado' : 'No incluido: sin factura', incluido ? 'pend' : 'no')}</span><span class="mono n-warn">${impEur(g.total)}<i class="ct-caret">▾</i></span></div><div class="ct-g2">${g.items.length} ${g.items.length === 1 ? 'pago' : 'pagos'}${rango ? ' · ' + rango : ''}${incluido ? ' · IVA 21 % estimado' : ' · sin factura: no cuenta'}</div><div class="ct-det">${pagos}</div>${ids.length ? `<div class="imp-acc">${incluido ? impBtn('Quitar', `impPendDecision('${ids.join(',')}', false)`) : impBtn('Incluir', `impPendDecision('${ids.join(',')}', true)`, 'primary')}</div>` : ''}</div>`; };
-  const filaJust = d => impFilaGasto(d, impPill('Incluido · falta justificante', 'pend'), '', null);
+    return `<div class="ct-g ct-exp" onclick="impToggleFila(event, this)"><div class="ct-g1"><span class="ct-prov">${escHtml(g.prov)}${impPill(incluido ? 'Incluido, estimado' : 'No incluido: sin factura', incluido ? 'pend' : 'no')}</span><span class="mono n-warn">${impEur(g.total)}<i class="ct-caret">▾</i></span></div><div class="ct-g2">${g.items.length} ${g.items.length === 1 ? 'pago' : 'pagos'}${rango ? ' · ' + rango : ''}${incluido ? ' · IVA 21 % estimado' : ' · sin factura: no cuenta'}</div><div class="ct-det">${pagos}</div>${ids.length ? `<div class="imp-acc">${incluido ? impBtn('No incluir', `impPendDecision('${ids.join(',')}', false)`) : impBtn('Incluir', `impPendDecision('${ids.join(',')}', true)`, 'primary')}</div>` : ''}</div>`; };
+  const filaJust = d => impFilaGasto(d, impPill('Incluido · falta justificante', 'pend'), impBtn('No incluir', `impDudoso('${d.id}','noempresa')`), null);   // V13.98 (reporte 2710cfa6): botón No incluir
   const vacio = t => `<div class="empty" style="padding:12px;">${t}</div>`;
   const S = [
     {id: 'ing', t: 'Ingresos', n: D.fq.length, nota: 'Facturas emitidas: IVA repercutido.', total: suma(D.fq, d => d.total),
       html: D.fq.length ? D.fq.slice().sort((a, b) => String(b.dateRaw||'').localeCompare(String(a.dateRaw||''))).map(d => `<div class="ct-g ct-exp" onclick="impToggleFila(event, this)"><div class="ct-g1"><span class="ct-prov">${escHtml(d.num ? 'Nº ' + d.num : 'Sin número')} · ${escHtml(d.client || '—')}</span><span class="mono">${impEur(d.total)}<i class="ct-caret">▾</i></span></div><div class="ct-det"><div class="ct-g2">${escHtml(d.dateLabel || d.dateRaw || '—')} · ${escHtml(impTratFactura(d))}${d.estado_cobro === 'cobrado' ? ' · cobrada' : ' · sin cobrar'}</div><div class="ct-g3">Base <b>${impEur(impBaseFactura(d))}</b> · IVA <b>${impEur(impIvaFactura(d))}</b></div><div class="fte"><span class="fte-t">Fuente · Emitida aquí</span><a href="#" class="fte-lnk" onclick="event.preventDefault();event.stopPropagation();${impUrlArchivo(d) ? 'visorAbrir(\'' + impUrlArchivo(d) + '\', \'Factura ' + escHtml(d.num || '') + '\')' : 'imprimirDocumento(\'' + d.id + '\')'}">Archivo</a></div></div></div>`).join('') : vacio('Ninguna factura en este trimestre.')},
     {id: 'inc', t: 'Gastos', n: incl.length, total: tot(incl), nota: 'Cuentan al 100 % y van al gestor.',
-      html: incl.length ? ordena(incl).map(d => impFilaGasto(d, impPill('Incluido', 'ok'), impBtn('Uso mixto 50 %', `impPorcentaje('${d.id}', 50)`))).join('') : vacio('Ningún gasto en este apartado.')},
+      html: incl.length ? ordena(incl).map(d => impFilaGasto(d, impPill('Incluido', 'ok'), impBtn('No incluir', `impDudoso('${d.id}','noempresa')`) + impBtn('Uso mixto 50 %', `impPorcentaje('${d.id}', 50)`))).join('') : vacio('Ningún gasto en este apartado.')},
     {id: 'mix', t: 'Mixtos', n: mixtos.length, total: tot(mixtos), nota: 'Uso mixto (Audi): se deduce solo una parte del gasto y del IVA.',
       html: mixtos.length ? ordena(mixtos).map(d => impFilaGasto(d, impPill('Uso mixto ' + impPctTxt(d) + ' %', 'mixto'), impBtn('100 %', `impPorcentaje('${d.id}', 100)`) + impBtn('50 %', `impPorcentaje('${d.id}', 50)`))).join('') : vacio('Ningún gasto de uso mixto.')},
     {id: 'dsi', t: 'Dudosos incluidos', n: dudSi.length, total: tot(dudSi), nota: 'Cuentan por ahora; falta confirmarlos.',
