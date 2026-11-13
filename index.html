@@ -5228,11 +5228,11 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V13.90" defer></script>
-<script src="costes/norm.js?v=V13.90" defer></script>
-<script src="ajustes/calc.js?v=V13.90" defer></script>
+<script src="rentabilidad/rent.js?v=V13.91" defer></script>
+<script src="costes/norm.js?v=V13.91" defer></script>
+<script src="ajustes/calc.js?v=V13.91" defer></script>
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.90</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V13.91</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5385,7 +5385,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V13.90</div>
+        <div class="sub" id="version-badge">V13.91</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -10590,6 +10590,7 @@ function navSincronizarInferior(){   // el menú lateral nunca repite lo que ya 
   try{
     document.querySelectorAll('#nav [data-en-barra]').forEach(e => e.removeAttribute('data-en-barra'));
     document.querySelectorAll('#mobile-tabbar .mobile-tab-btn[data-view]').forEach(b => {
+      if(b.style.display === 'none') return;   // V13.91: un botón oculto de la barra (Documentos para el administrador) no esconde nada del menú lateral
       const v = b.dataset.view, g = NAV_DOCS_VISTAS.includes(v) ? 'documentos' : Object.keys(NAV_GRUPOS).find(k => NAV_GRUPOS[k].some(x => x[0] === v));
       const dest = g === 'documentos' ? document.getElementById('nav-documentos-btn') : g ? document.querySelector('#nav > .nav-grupo[data-grupo="' + g + '"]') : document.querySelector('#nav > button[data-view="' + v + '"]');
       if(dest) dest.setAttribute('data-en-barra', '1');
@@ -15724,7 +15725,7 @@ async function checkSession(){
         document.querySelectorAll('.admin-only').forEach(el=>el.style.display = 'none');
       }
       try{ navGruposRefrescar(); }catch(e){}
-      if(esAdmin){ try{ bandejaVivoIniciar(); }catch(e){} document.querySelectorAll('.solo-no-admin').forEach(el => el.style.display = 'none'); }
+      if(esAdmin){ try{ bandejaVivoIniciar(); }catch(e){} document.querySelectorAll('.solo-no-admin').forEach(el => el.style.display = 'none'); try{ navSincronizarInferior(); }catch(e){} }
       const NOMBRES_USUARIO = {'dg':'Dani G','rg':'Rafa','mg':'Manolo'};
       const userLocal = (data.session.user.email||'').split('@')[0];
       const nombreEl = document.getElementById('user-badge-name');
@@ -27248,7 +27249,7 @@ function renderImpuestos(q){
   const total = futuro ? null : (!incompleto303 && c130.completo) ? (q === 4 ? r303 : Math.max(0, r303)) + c130.resultado : null;   // V13.86 (Daniel 11/11): en el 4T el IVA se devuelve, el total es el balance
   const box = $('imp-total-box');
   $('imp-total').textContent = futuro ? '—' : total != null ? (total < 0 ? '+' : total > 0 ? '−' : '') + impEur(Math.abs(total)) : 'Incompleto'; $('imp-total').classList.toggle('n-pos', total != null && total < 0); $('imp-total').classList.toggle('n-neg', total != null && total > 0);
-  $('imp-total-s').textContent = futuro ? 'este trimestre aún no ha empezado' : total != null ? ((q === 4 && r303 < 0 ? 'IVA a devolver ' + impEur(-r303) + ' · IRPF a pagar ' : 'IVA ' + impEur(Math.max(0, r303)) + ' + IRPF adelantado ') + impEur(c130.resultado) + ' · se paga antes del ' + plazo.toLocaleDateString('es-ES',{day:'numeric',month:'long'})) : ('303: ' + (incompleto303 ? 'incompleto' : (r303 >= 0 ? impEur(r303) + ' a pagar' : impEur(-r303) + (q === 4 ? ' a devolver' : ' a compensar'))) + ' · 130: ' + (c130.completo ? impEur(c130.resultado) : 'incompleto'));
+  $('imp-total-s').textContent = futuro ? 'este trimestre aún no ha empezado' : 'Se paga del 1 al ' + plazo.toLocaleDateString('es-ES', {day: 'numeric', month: 'long'});   // V13.91 (reporte 21f85b90): solo cuándo se paga, con el rango de fechas; fuera el desglose y el «puede quedar en»
   $('imp-total-l').textContent = futuro ? 'Total impuestos (303 + 130)' : 'Total (303 + 130)';
   // cuánto puede bajar y por qué (solo motivos concretos de este trimestre)
   const baja = $('imp-total-baja'); let bajaIva = 0, bajaIrpf = 0; const motivos = [];
@@ -27262,7 +27263,7 @@ function renderImpuestos(q){
     const reta = D.gq.filter(d => d.categoria === 'Seguridad Social autónomos'), meses = hoy < fin ? 3 - reta.length : 0;
     if(meses > 0 && reta.length){ const cuota = reta.reduce((s, d) => s + impTotalGasto(d), 0) / reta.length, r = Math.min(Math.max(0, (c130.resultado || 0) - bajaIrpf), meses * cuota * IMP_PORC_130 / 100); if(r > 0.5){ bajaIrpf += r; motivos.push(`IRPF −${impEur(r)} cuando entre la cuota de autónomos que falta (${meses} mes${meses === 1 ? '' : 'es'} del trimestre)`); } }
   }
-  if(baja){ if(motivos.length && !futuro){ baja.style.display = ''; baja.innerHTML = `<div style="color:var(--ink);font-weight:700;font-size:13.5px;">Puede quedar en unos ${(() => { const v = q === 4 ? total - bajaIva - bajaIrpf : Math.max(0, total - bajaIva - bajaIrpf); return (v < 0 ? '+' : v > 0 ? '−' : '') + impEur(Math.abs(v)); })()}</div>` + motivos.map(m => `<div style="margin-top:3px;">· ${escHtml(m)}</div>`).join('') + `<div style="margin-top:6px;opacity:.8;">El IRPF de aquí es un adelanto de la Renta: cuando hagas la declaración de la Renta se te resta. La Renta es aparte y no está en este total.</div>`; } else { baja.style.display = 'none'; baja.innerHTML = ''; } }
+  if(baja){ baja.style.display = 'none'; }   // V13.91 (reporte 21f85b90): fuera, innecesario y redundante
   box.style.opacity = total != null ? '1' : '.85';
   impColor($('imp-ded'), D.ded, 'ingreso');
   impColor($('imp-303'), Math.max(0, r303), (incompleto303 || futuro) ? null : 'coste');
