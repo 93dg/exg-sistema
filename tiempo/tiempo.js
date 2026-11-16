@@ -1,10 +1,10 @@
-/* EXG — Tiempo (V14.05: litros en cada día. V14.02, Daniel 16/11/2026: «sigue siendo feísima, algo que se vea moderno»)
+/* EXG — Tiempo (V14.06: cuarta fuente, Yr. V14.05: litros en cada día. V14.02, Daniel 16/11/2026: «sigue siendo feísima, algo que se vea moderno»)
    Estilo app del tiempo: cabecera con el día de hoy sobre degradado según el cielo, y la lista de 7 días con icono,
    lluvia media y barra de temperaturas de la semana. Al tocar un día se despliega ahí mismo la comparación de las fuentes.
    La misma pieza en la web (sección Tiempo) y en la app aparte tiempo.html. Datos de la función tiempo. Solo lee. */
 (function(){
   const URL_TIEMPO = 'https://sshctqnpuolawtcujxkt.supabase.co/functions/v1/tiempo';
-  const FU = [['aemet','AEMET'],['meteored','Meteored'],['accuweather','AccuWeather']];
+  const FU = [['aemet','AEMET'],['meteored','Meteored'],['yr','Yr'],['accuweather','AccuWeather']];   // V14.06: Yr (Noruega), aprobado por Daniel 16/11
   const DIAS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'], LARGOS = ['lunes','martes','miércoles','jueves','viernes','sábado','domingo'], MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   const CSS = `
 .tw{--tw-r:22px;font-family:'Inter',system-ui,sans-serif;color:#fff;border-radius:var(--tw-r);overflow:hidden;background:linear-gradient(165deg,var(--tw-a),var(--tw-b));box-shadow:0 10px 30px -12px rgba(20,40,70,.45);}
@@ -91,7 +91,7 @@
       + `<div class="tw-ll">${ICO.gota}${lluvia.length ? 'Lluvia: ' + esc(lluvia.join(', ')) : 'Sin lluvia esta semana'}</div></div>`
       + `<div class="tw-sem"><div class="tw-st">Próximos 7 días · toca un día para comparar</div>`;
     h += dias.map(x => {
-      const r = ref(x), m = media(x), t = tipo(r.cielo, m ?? 0), mm = Math.max(0, ...FU.map(([k]) => (x[k] && x[k].mm) || 0));   // litros: solo los da Meteored
+      const r = ref(x), m = media(x), t = tipo(r.cielo, m ?? 0), mmL = FU.map(([k]) => x[k] && x[k].mm).filter(v => v != null), mm = mmL.length ? Math.round(mmL.reduce((a, b) => a + b, 0) / mmL.length * 10) / 10 : 0;   // litros: media de Meteored y Yr (AEMET no los da)
       const izq = r.min != null ? (r.min - lo) / rango * 100 : 0, anc = r.max != null && r.min != null ? Math.max(6, (r.max - r.min) / rango * 100) : 0;
       const filas = FV.map(([k, n]) => {
         const v = x[k];
@@ -107,7 +107,7 @@
     }).join('');
     const f = d.fuentes || {};
     const faltan = FU.filter(([k]) => f[k] && f[k].error).map(([k, n]) => n + (k === 'accuweather' && /clave/.test(f[k].error) ? ' (falta la clave de su servicio)' : ' (no responde ahora)'));
-    h += `</div><div class="tw-pie">El % de cada día es la media de ${FV.map(x => x[1]).join(' y ')}; los litros por metro cuadrado son de Meteored (AEMET no los da por pueblo). Al tocar un día, la probabilidad de lluvia y la máxima / mínima de cada uno.${faltan.length ? '<br>Sin datos: ' + esc(faltan.join(', ')) + '.' : ''}</div></div>`;
+    h += `</div><div class="tw-pie">El % de cada día es la media de las fuentes que lo dan (Yr no da % en España); los litros por metro cuadrado, la media de Meteored y Yr (AEMET no los da por pueblo). Al tocar un día, la probabilidad de lluvia y la máxima / mínima de cada uno.${faltan.length ? '<br>Sin datos: ' + esc(faltan.join(', ')) + '.' : ''}</div></div>`;
     caja.innerHTML = h;
     caja.querySelectorAll('.tw-d').forEach(el => el.querySelector('.tw-fila').addEventListener('click', () => {
       const c = el.querySelector('.tw-cmp'), abre = c.hidden; c.hidden = !abre; el.classList.toggle('abierto', abre);
