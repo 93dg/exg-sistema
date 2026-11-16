@@ -47,7 +47,7 @@ fi
 
 # Actualizar versión en HTML
 # cache-buster de los scripts externos (rent.js, norm.js) para que el móvil cargue siempre el último
-sed -i -E "s#(rentabilidad/rent\.js\?v=)V[0-9.]+#\1${VERSION}#; s#(costes/norm\.js\?v=)V[0-9.]+#\1${VERSION}#; s#(ajustes/calc\.js\?v=)V[0-9.]+#\1${VERSION}#" index.html
+sed -i -E "s#(rentabilidad/rent\.js\?v=)V[0-9.]+#\1${VERSION}#; s#(costes/norm\.js\?v=)V[0-9.]+#\1${VERSION}#; s#(ajustes/calc\.js\?v=)V[0-9.]+#\1${VERSION}#; s#(tiempo/tiempo\.js\?v=)V[0-9.]+#\1${VERSION}#" index.html tiempo.html
 python3 -c "
 import re, sys
 with open('index.html','r',encoding='utf-8') as f: c=f.read()

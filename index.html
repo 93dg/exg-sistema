@@ -5229,11 +5229,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.00" defer></script>
-<script src="costes/norm.js?v=V14.00" defer></script>
-<script src="ajustes/calc.js?v=V14.00" defer></script>
+<script src="rentabilidad/rent.js?v=V14.01" defer></script>
+<script src="costes/norm.js?v=V14.01" defer></script>
+<script src="ajustes/calc.js?v=V14.01" defer></script>
+<script src="tiempo/tiempo.js?v=V14.01" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.00</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.01</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5386,7 +5387,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.00</div>
+        <div class="sub" id="version-badge">V14.01</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -7334,12 +7335,10 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
     <!-- V13.99 (Daniel 16/11: «una sección de tiempo que compare estos tres sitios, de 7 días, siempre»). Datos de la función tiempo. -->
     <div class="view" id="view-tiempo">
       <div class="topbar">
-        <div><h1>Tiempo</h1><div class="desc">Fuente Obejuna · próximos 7 días · AEMET, Meteored y AccuWeather</div></div>
+        <div><h1>Tiempo</h1><div class="desc">Fuente Obejuna · 7 días · <span id="tiempo-hora"></span></div></div>
+        <div class="quickactions"><button class="btn" onclick="cargarTiempo()">Actualizar</button></div>
       </div>
-      <div class="panel">
-        <div class="panel-body" id="tiempo-lista"><div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Cargando…</div></div>
-        <div class="two-col-note" id="tiempo-nota"></div>
-      </div>
+      <div id="tiempo-lista"></div>   <!-- V14.01: la misma tarjeta que la app aparte (tiempo/tiempo.js) -->
     </div>
 
     <div class="view" id="view-backup">
@@ -21818,21 +21817,8 @@ async function initWeather(){
 initWeather();
 
 /* ---------------- V13.99 SECCIÓN TIEMPO: 7 días comparando AEMET, Meteored y AccuWeather (función tiempo) ---------------- */
-async function cargarTiempo(){
-  const caja = document.getElementById('tiempo-lista'), nota = document.getElementById('tiempo-nota');
-  if(!caja) return;
-  let d;
-  try{ d = await (await fetch(SUPABASE_URL + '/functions/v1/tiempo')).json(); }
-  catch(e){ caja.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:16px 0;">Sin conexión con el tiempo ahora mismo</div>'; return; }
-  const FU = [['aemet','AEMET'],['meteored','Meteored'],['accuweather','AccuWeather']];
-  const dia = iso => { const x = new Date(iso+'T00:00:00'); const hoy = new Date(); hoy.setHours(0,0,0,0); return x.getTime()===hoy.getTime() ? 'Hoy' : DIAS_SEMANA_CORTOS[(x.getDay()+6)%7] + ' ' + x.getDate(); };
-  const val = v => { if(!v) return '—'; const p = []; p.push((v.prob==null ? '—' : v.prob + ' %')); if(v.mm) p.push(String(v.mm).replace('.', ',') + ' l/m²'); if(v.max!=null) p.push(v.max + '° / ' + v.min + '°'); return p.join(' · '); };
-  caja.innerHTML = (d.dias||[]).map(x => `<div style="font-weight:700;font-size:13px;padding:${x===d.dias[0]?'0':'10px'} 0 2px;">${dia(x.fecha)}</div>` +
-    FU.map(([k,n]) => `<div class="econ-line"><span>${n}</span><span>${val(x[k])}</span></div>`).join('')).join('');
-  const f = d.fuentes||{};
-  const faltan = FU.filter(([k]) => f[k] && f[k].error).map(([k,n]) => n + (k==='accuweather' && /clave/.test(f[k].error) ? ' (falta la clave de su servicio)' : ' (no responde ahora)'));
-  nota.textContent = 'Probabilidad de lluvia del día y temperaturas máxima / mínima.' + (faltan.length ? ' Sin datos: ' + faltan.join(', ') + '.' : '');
-}
+function cargarTiempo(){ if(window.EXGTiempo) EXGTiempo.cargar(document.getElementById('tiempo-lista'), document.getElementById('tiempo-hora')); }   // V14.01: tarjeta compartida con tiempo.html
+setInterval(() => { const v = document.getElementById('view-tiempo'); if(v && v.classList.contains('active') && !document.hidden) cargarTiempo(); }, 30 * 60000);   // cada 30 min mientras se mira
 
 /* ---------------- MAPA REAL (Leaflet + OpenStreetMap) ---------------- */
 /* Zonas reales conocidas, con su centro aproximado — añade más aquí si trabajáis en otros pueblos */
