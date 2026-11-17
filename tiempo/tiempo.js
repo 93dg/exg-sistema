@@ -1,4 +1,4 @@
-/* EXG — Tiempo (V14.07: tercera fuente ECMWF en lugar de Yr. V14.06: Yr. V14.05: litros en cada día. V14.02, Daniel 16/11/2026: «sigue siendo feísima, algo que se vea moderno»)
+/* EXG — Tiempo (V14.08: solo la lista de 7 días, más grande. V14.07: tercera fuente ECMWF en lugar de Yr. V14.06: Yr. V14.05: litros en cada día. V14.02, Daniel 16/11/2026: «sigue siendo feísima, algo que se vea moderno»)
    Estilo app del tiempo: cabecera con el día de hoy sobre degradado según el cielo, y la lista de 7 días con icono,
    lluvia media y barra de temperaturas de la semana. Al tocar un día se despliega ahí mismo la comparación de las fuentes.
    La misma pieza en la web (sección Tiempo) y en la app aparte tiempo.html. Datos de la función tiempo. Solo lee. */
@@ -21,25 +21,25 @@
 .tw-mm{font-size:14px;opacity:.85;margin-top:3px;}
 .tw-ll{display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.16);font-size:13px;font-weight:500;}
 .tw-ll svg{width:15px;height:15px;}
-.tw-sem{margin:0 12px 12px;padding:6px 14px 4px;border-radius:16px;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+.tw-sem{margin:12px 10px;padding:4px 14px;border-radius:16px;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
 .tw-st{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;opacity:.7;padding:8px 0 6px;border-bottom:1px solid rgba(255,255,255,.18);}
-.tw-fila{display:grid;grid-template-columns:48px 30px 50px 30px 1fr 32px;align-items:center;gap:6px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.14);cursor:pointer;}
+.tw-fila{display:grid;grid-template-columns:54px 36px 64px 34px 1fr 40px;align-items:center;gap:6px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.14);cursor:pointer;}
 .tw-d:last-child .tw-fila{border-bottom:none;}
 .tw-d.abierto .tw-fila{border-bottom:none;}
-.tw-dn{font-size:16px;font-weight:600;}
-.tw-ic svg{width:26px;height:26px;display:block;}
-.tw-pr{font-size:13px;font-weight:600;color:#9fd3ff;}
+.tw-dn{font-size:21px;font-weight:600;}
+.tw-ic svg{width:36px;height:36px;display:block;}
+.tw-pr{font-size:18px;font-weight:600;color:#9fd3ff;}
 .tw-pr.cero{color:transparent;}
-.tw-pr small{display:block;font-size:11px;font-weight:500;opacity:.85;margin-top:1px;}   /* V14.05 (Daniel 16/11: «me faltan los litros») */
-.tw-mn{font-size:16px;opacity:.6;text-align:right;}
-.tw-mx{font-size:16px;font-weight:600;text-align:right;}
-.tw-rg{position:relative;height:5px;border-radius:3px;background:rgba(0,0,0,.22);}
+.tw-pr small{display:block;font-size:13.5px;font-weight:500;opacity:.85;margin-top:1px;}   /* V14.05 (Daniel 16/11: «me faltan los litros») */
+.tw-mn{font-size:21px;opacity:.6;text-align:right;}
+.tw-mx{font-size:21px;font-weight:600;text-align:right;}
+.tw-rg{position:relative;height:7px;border-radius:3px;background:rgba(0,0,0,.22);}
 .tw-rg i{position:absolute;top:0;bottom:0;border-radius:3px;background:linear-gradient(90deg,#7fd1ff,#ffd36b,#ff9a4d);}
 .tw-cmp{padding:2px 0 12px;border-bottom:1px solid rgba(255,255,255,.14);}
 .tw-d:last-child .tw-cmp{border-bottom:none;}
-.tw-cd{font-size:12.5px;opacity:.8;padding:0 0 8px;}
-.tw-f{display:grid;grid-template-columns:88px 1fr 84px;align-items:center;gap:10px;padding:5px 0;font-size:13px;}
-.tw-f small{display:block;font-size:11px;opacity:.65;}
+.tw-cd{font-size:14px;opacity:.8;padding:0 0 8px;}
+.tw-f{display:grid;grid-template-columns:96px 1fr 96px;align-items:center;gap:10px;padding:7px 0;font-size:15px;}
+.tw-f small{display:block;font-size:12.5px;opacity:.65;}
 .tw-b{height:6px;border-radius:3px;background:rgba(0,0,0,.22);overflow:hidden;}
 .tw-b i{display:block;height:100%;border-radius:3px;background:#9fd3ff;}
 .tw-v{text-align:right;font-weight:600;white-space:nowrap;}
@@ -86,11 +86,8 @@
     const mins = dias.map(x => ref(x).min).filter(v => v != null), maxs = dias.map(x => ref(x).max).filter(v => v != null);
     const lo = Math.min(...mins), hi = Math.max(...maxs), rango = Math.max(1, hi - lo);
     const lluvia = dias.filter(x => (media(x) ?? 0) >= 50).map(x => dif(x.fecha) === 0 ? 'hoy' : dif(x.fecha) === 1 ? 'mañana' : LARGOS[(fechaIso(x.fecha).getDay()+6)%7]);
-    let h = `<div class="tw" data-cielo="${th}"><div class="tw-hero"><div class="tw-lugar">Fuente Obejuna</div>`
-      + `<div class="tw-gr">${rh.max != null ? rh.max : '–'}<sup>°</sup></div><div class="tw-ce">${esc(rh.cielo || '')}</div>`
-      + `<div class="tw-mm">Máx. ${rh.max ?? '–'}°  ·  Mín. ${rh.min ?? '–'}°${mmDe(hoy) ? '  ·  ' + String(mmDe(hoy)).replace('.', ',') + ' l/m²' : ''}</div>`
-      + `<div class="tw-ll">${ICO.gota}${lluvia.length ? 'Lluvia: ' + esc(lluvia.join(', ')) : 'Sin lluvia esta semana'}</div></div>`
-      + `<div class="tw-sem"><div class="tw-st">Próximos 7 días · toca un día para comparar</div>`;
+    // V14.08 (Daniel 17/11: «solo quiero ver esto y más grande; las instrucciones y eso, quítalo»): solo la lista de 7 días.
+    let h = `<div class="tw" data-cielo="${th}"><div class="tw-sem">`;
     h += dias.map(x => {
       const r = ref(x), m = media(x), t = tipo(r.cielo, m ?? 0), mm = mmDe(x);   // litros: media de Meteored y ECMWF (AEMET no los da)
       const izq = r.min != null ? (r.min - lo) / rango * 100 : 0, anc = r.max != null && r.min != null ? Math.max(6, (r.max - r.min) / rango * 100) : 0;
@@ -106,9 +103,7 @@
         + `<div class="tw-rg"><i style="left:${izq}%;width:${anc}%"></i></div><div class="tw-mx">${r.max ?? ''}°</div></div>`
         + `<div class="tw-cmp"${ab ? '' : ' hidden'}><div class="tw-cd">${esc(largo(x.fecha))}${r.cielo ? ' · ' + esc(r.cielo) : ''}</div>${filas}</div></div>`;
     }).join('');
-    const f = d.fuentes || {};
-    const faltan = FU.filter(([k]) => f[k] && f[k].error).map(([k, n]) => n + (k === 'accuweather' && /clave/.test(f[k].error) ? ' (falta la clave de su servicio)' : ' (no responde ahora)'));
-    h += `</div><div class="tw-pie">El % de cada día es la media de AEMET, Meteored y ECMWF (el modelo europeo de referencia); los litros por metro cuadrado, la media de Meteored y ECMWF (AEMET no los da por pueblo). Al tocar un día, la probabilidad de lluvia y la máxima / mínima de cada uno.${faltan.length ? '<br>Sin datos: ' + esc(faltan.join(', ')) + '.' : ''}</div></div>`;
+    h += `</div></div>`;
     caja.innerHTML = h;
     caja.querySelectorAll('.tw-d').forEach(el => el.querySelector('.tw-fila').addEventListener('click', () => {
       const c = el.querySelector('.tw-cmp'), abre = c.hidden; c.hidden = !abre; el.classList.toggle('abierto', abre);
