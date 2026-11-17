@@ -1,7 +1,6 @@
 // TIEMPO (16/11/2026, Daniel: «una sección de tiempo que compare estos tres sitios, de 7 días, siempre»).
-// 16/11 22:48 Daniel aprueba añadir Yr (servicio meteorológico de Noruega, api.met.no, gratuito y oficial; pide identificarse con User-Agent).
-// Devuelve los próximos 7 días de Fuente Obejuna según AEMET (XML público), Meteored (tiempo.com), Yr y AccuWeather
-// Yr no da probabilidad de lluvia fuera de los países nórdicos: solo litros, temperaturas y cielo.
+// 17/11: la tercera fuente es ECMWF (vía Open-Meteo) en lugar de Yr, que no daba % de lluvia en España.
+// Devuelve los próximos 7 días de Fuente Obejuna según AEMET (XML público), Meteored (tiempo.com), ECMWF y AccuWeather
 // (AccuWeather solo si hay clave ACCUWEATHER_KEY; su web bloquea la lectura directa). Solo lee; no guarda nada.
 const H = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36", "Accept-Language": "es-ES,es;q=0.9" };
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*", "Content-Type": "application/json" };
@@ -52,31 +51,18 @@ async function meteored() {
   return out;
 }
 
-const YR_TXT: Record<string, string> = { clearsky: "Despejado", fair: "Poco nuboso", partlycloudy: "Intervalos nubosos", cloudy: "Cubierto", fog: "Niebla", lightrain: "Lluvia débil", rain: "Lluvia", heavyrain: "Lluvia fuerte", lightrainshowers: "Chubascos débiles", rainshowers: "Chubascos", heavyrainshowers: "Chubascos fuertes", lightsleet: "Aguanieve", sleet: "Aguanieve", snow: "Nieve", lightsnow: "Nieve débil", heavysnow: "Nieve fuerte" };
-const yrTxt = (c: string) => { const b = String(c || "").replace(/_(day|night|polartwilight)$/, ""); if (/thunder/.test(b)) return "Tormenta"; return YR_TXT[b] || YR_TXT[b.replace(/showers$/, "")] || null; };
-async function yr() {
-  const r = await fetch("https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=38.26&lon=-5.45&altitude=590", { headers: { "User-Agent": "EXG-Tiempo/1.0 github.com/93dg/exg-sistema" } });
-  if (!r.ok) return { error: "Yr respondió " + r.status };
-  const j = await r.json();
-  const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" });
+// ECMWF (Centro Europeo de Previsión a Plazo Medio), el modelo global de referencia, servido gratis por Open-Meteo.
+// Sustituye a Yr (17/11, Daniel: «si ese motor no aporta exactitud, no lo quiero»): Yr no da probabilidad de lluvia en España.
+const WMO: Record<number, string> = { 0: "Despejado", 1: "Poco nuboso", 2: "Intervalos nubosos", 3: "Cubierto", 45: "Niebla", 48: "Niebla", 51: "Llovizna débil", 53: "Llovizna", 55: "Llovizna intensa", 61: "Lluvia débil", 63: "Lluvia", 65: "Lluvia fuerte", 66: "Lluvia helada", 67: "Lluvia helada", 71: "Nieve débil", 73: "Nieve", 75: "Nieve fuerte", 77: "Nieve", 80: "Chubascos débiles", 81: "Chubascos", 82: "Chubascos fuertes", 85: "Chubascos de nieve", 86: "Chubascos de nieve", 95: "Tormenta", 96: "Tormenta con granizo", 99: "Tormenta con granizo" };
+async function ecmwf() {
+  const u = "https://api.open-meteo.com/v1/forecast?latitude=38.26&longitude=-5.45&elevation=590&daily=precipitation_probability_max,precipitation_sum,temperature_2m_max,temperature_2m_min,weather_code&timezone=Europe%2FMadrid&forecast_days=8&models=ecmwf_ifs025";
+  const r = await fetch(u);
+  if (!r.ok) return { error: "ECMWF respondió " + r.status };
+  const d = (await r.json())?.daily ?? {};
   const out: Record<string, any> = {};
-  let cubierto = 0;
-  for (const e of j?.properties?.timeseries ?? []) {
-    const t = new Date(e.time).getTime();
-    const p = Object.fromEntries(fmt.formatToParts(new Date(t)).map((x) => [x.type, x.value]));
-    const f = `${p.year}-${p.month}-${p.day}`, hora = +p.hour;
-    const o = out[f] ||= { prob: null, mm: 0, max: null, min: null, cielo: null, _h: 99, _n: 0 };
-    const temp = e.data?.instant?.details?.air_temperature;
-    if (temp != null) { o._n++; o.max = o.max == null ? temp : Math.max(o.max, temp); o.min = o.min == null ? temp : Math.min(o.min, temp); }
-    const n1 = e.data?.next_1_hours, n6 = e.data?.next_6_hours, per = n1 || n6;
-    if (per) {
-      const pr = per.details?.probability_of_precipitation; if (pr != null) o.prob = Math.max(o.prob ?? 0, pr);
-      if (t >= cubierto) { o.mm += per.details?.precipitation_amount ?? 0; cubierto = t + (n1 ? 1 : 6) * 3600e3; }
-      if (per.summary?.symbol_code && Math.abs(hora - 13) < Math.abs(o._h - 13)) { o.cielo = yrTxt(per.summary.symbol_code); o._h = hora; }
-    }
-  }
-  for (const f in out) { const o = out[f]; if (o._n < 8) { o.max = null; o.min = null; }   // día empezado: no es la máxima/mínima del día entero
-    delete o._h; delete o._n; o.max = o.max == null ? null : Math.round(o.max); o.min = o.min == null ? null : Math.round(o.min); o.mm = Math.round(o.mm * 10) / 10; if (o.prob != null) o.prob = Math.round(o.prob); }
+  (d.time ?? []).forEach((f: string, i: number) => {
+    out[f] = { prob: d.precipitation_probability_max?.[i] ?? null, mm: d.precipitation_sum?.[i] == null ? null : Math.round(d.precipitation_sum[i] * 10) / 10, max: d.temperature_2m_max?.[i] == null ? null : Math.round(d.temperature_2m_max[i]), min: d.temperature_2m_min?.[i] == null ? null : Math.round(d.temperature_2m_min[i]), cielo: WMO[d.weather_code?.[i]] ?? null };
+  });
   return out;
 }
 
@@ -97,15 +83,15 @@ async function accuweather() {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const fuentes: Record<string, any> = {};
-  const [a, m, y, w] = await Promise.allSettled([aemet(), meteored(), yr(), accuweather()]);
+  const [a, m, e, w] = await Promise.allSettled([aemet(), meteored(), ecmwf(), accuweather()]);
   const val = (r: PromiseSettledResult<any>, n: string) => { if (r.status === "rejected") { fuentes[n] = { error: String(r.reason) }; return {}; } if (r.value?.error) { fuentes[n] = { error: r.value.error }; return {}; } fuentes[n] = { ok: true, dias: Object.keys(r.value).length }; return r.value; };
-  const A = val(a, "aemet"), M = val(m, "meteored"), Y = val(y, "yr"), W = val(w, "accuweather");
+  const A = val(a, "aemet"), M = val(m, "meteored"), E = val(e, "ecmwf"), W = val(w, "accuweather");
   const hoy = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Madrid" }));
   const dias = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(hoy); d.setDate(hoy.getDate() + i);
     const f = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    dias.push({ fecha: f, aemet: A[f] ?? null, meteored: M[f] ?? null, yr: Y[f] ?? null, accuweather: W[f] ?? null });
+    dias.push({ fecha: f, aemet: A[f] ?? null, meteored: M[f] ?? null, ecmwf: E[f] ?? null, accuweather: W[f] ?? null });
   }
   return new Response(JSON.stringify({ ok: true, lugar: "Fuente Obejuna (Córdoba)", actualizado: new Date().toISOString(), fuentes, dias }), { headers: CORS });
 });
