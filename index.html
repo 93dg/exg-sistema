@@ -5164,6 +5164,7 @@ span.tp-albaran, span.tp-factura, span.tp-proforma, span.tp-presupuesto, span.tp
 .factura-card-movil .fte-acc .fc-mas-btn svg{width:16px !important;height:16px !important;}
 .factura-card-movil .fc-estado-wrap{padding-right:0 !important;}
 .factura-card-movil:not(.fc-gasto){grid-template-columns:20px minmax(0,1fr) auto !important;}
+.factura-card-movil .fc-cobro-est{margin-right:auto;align-self:flex-end;}.factura-card-movil .fc-cobro-est .estado-cobro-dd{display:block;}
 .factura-card-movil .fc-total-block{flex-wrap:wrap !important;justify-content:flex-end !important;max-width:100%;row-gap:2px !important;}
 .factura-card-movil .fc-detalle{display:none;grid-column:2 / -1;margin-top:8px;padding:8px 0 2px;border-top:1px dashed var(--line);font-size:13px;line-height:1.35;}
 .factura-card-movil.fc-abierta .fc-detalle{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 12px;}
@@ -5260,12 +5261,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.43" defer></script>
-<script src="costes/norm.js?v=V14.43" defer></script>
-<script src="ajustes/calc.js?v=V14.43" defer></script>
-<script src="tiempo/tiempo.js?v=V14.43" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.44" defer></script>
+<script src="costes/norm.js?v=V14.44" defer></script>
+<script src="ajustes/calc.js?v=V14.44" defer></script>
+<script src="tiempo/tiempo.js?v=V14.44" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.43</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.44</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5414,7 +5415,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.43</div>
+        <div class="sub" id="version-badge">V14.44</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -13294,7 +13295,7 @@ function renderizarFilaYCardFactura(doc, entidad, trabajo, alPrincipio){
       <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${doc.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
       <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
       <input type="checkbox" class="fc-check fact-sel-chk-espejo" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="sincCheckMovilFactura('${doc.id}', this.checked)">
-      <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}<span class="fc-tipo-tag tp-${doc.type || 'factura'}">${TIPO_DOC_NOMBRE[doc.type || 'factura'] || 'Factura'}</span></div>
+      <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoCobroEnLinea(doc) ? '' : estadoHtml}<span class="fc-tipo-tag tp-${doc.type || 'factura'}">${TIPO_DOC_NOMBRE[doc.type || 'factura'] || 'Factura'}</span></div>
       <div class="fc-cliente"${entidad ? ' data-cli="' + escHtml(entidad.name) + '"' : ''}>${entidad ? entidad.name : 'Falta cliente'}</div>
       ${obraHtml}
       <div class="fc-meta">${metaHtml}</div>
@@ -31845,7 +31846,7 @@ function renderControlDocs(){
           <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${d.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
           <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${d.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
           <input type="checkbox" class="fc-check ctrl-sel-chk" data-id="${d.id}" onclick="event.stopPropagation();" onchange="actualizarSeleccionDoc('ctrl-sel-chk','ctrl-borrar-sel-btn','ctrl-sel-count')">
-          <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}<span class="fc-tipo-tag tp-${d.type}">${TIPO_DOC_NOMBRE[d.type] || d.type}</span></div>
+          <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoCobroEnLinea(d) ? '' : estadoHtml}<span class="fc-tipo-tag tp-${d.type}">${TIPO_DOC_NOMBRE[d.type] || d.type}</span></div>
           <div class="fc-cliente" data-cli="${escHtml(cliente)}">${svgEsc(cliente)}</div>
           ${(d.obra_texto || d.job) ? `<div class="fc-obra">${svgEsc(d.obra_texto || d.job)}</div>` : ''}
           <div class="fc-meta">
@@ -32520,7 +32521,14 @@ async function toggleEnviadoGestor(id){
 // Línea de IVA para las tarjetas de documento — porcentaje e importe real de IVA,
 // calculado igual que el resto de la app (doc.importe es el TOTAL con IVA incluido).
 // Vacía si el documento no tiene IVA (0% o sin dato).
+// V14.44 (Daniel 26/11: «la pastilla de cobrar en la misma línea donde sale el dinero»): los estados de COBRO salen en la línea de IVA / Subtotal / Total, no arriba a la izquierda
+const ESTADOS_COBRO_LINEA = ['pendiente_cobrar', 'por_cobrar_otra', 'parcial', 'parcial_otra', 'cobrado', 'cobrado_otra'];
+function estadoCobroEnLinea(doc){ return !!doc && ['albaran', 'proforma', 'factura', 'presupuesto'].includes(doc.type || doc.tipo) && ESTADOS_COBRO_LINEA.includes(doc.estado_cobro); }
 function totalBlockHtml(doc){
+  const pillCobro = estadoCobroEnLinea(doc) ? `<div class="fc-cobro-est" onclick="event.stopPropagation();">${estadoDocumentoSelect(doc.type || doc.tipo, doc.id, doc.estado_cobro, 'tot-')}</div>` : '';
+  return pillCobro + totalBlockHtmlBase(doc);
+}
+function totalBlockHtmlBase(doc){
   const total = Number(doc.importe||0);
   const totalLabel = total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   // Solo los tipos de documento que llevan IVA (factura, proforma, presupuesto) lo enseñan aquí.
@@ -32848,7 +32856,7 @@ function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta
     <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${doc.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
     <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
     <input type="checkbox" class="fc-check ${cbClass}" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="actualizarSeleccionDoc('${cbClass}', '${cbClass}'.replace('-chk','-borrar-sel-btn'), '${cbClass}'.replace('-chk','-sel-count'))">
-    <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}<span class="fc-tipo-tag tp-${tipo}">${TIPO_DOC_NOMBRE[tipo] || tipo}</span></div>
+    <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoCobroEnLinea(doc) ? '' : estadoHtml}<span class="fc-tipo-tag tp-${tipo}">${TIPO_DOC_NOMBRE[tipo] || tipo}</span></div>
     <div class="fc-cliente"${entidad ? ' data-cli="' + escHtml(entidad.name) + '"' : ''}>${entidad ? entidad.name : 'Falta cliente'}</div>
     ${obraHtml}
     <div class="fc-meta">${metaHtml}</div>
