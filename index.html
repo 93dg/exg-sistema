@@ -5262,12 +5262,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.51" defer></script>
-<script src="costes/norm.js?v=V14.51" defer></script>
-<script src="ajustes/calc.js?v=V14.51" defer></script>
-<script src="tiempo/tiempo.js?v=V14.51" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.52" defer></script>
+<script src="costes/norm.js?v=V14.52" defer></script>
+<script src="ajustes/calc.js?v=V14.52" defer></script>
+<script src="tiempo/tiempo.js?v=V14.52" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.51</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.52</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5416,7 +5416,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.51</div>
+        <div class="sub" id="version-badge">V14.52</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -31927,20 +31927,20 @@ const PAGO_PRUEBA_IDS = ['c864593e-b23f-4b83-9663-de29bbb2815a'];
 function pagoDe(d){ if(PAGO_ETQ[d?.estado_pago]) return d.estado_pago; const t = Number(d?.importe ?? d?.total ?? 0), c = Number(d?.cobrado_importe || 0); return c <= 0 ? 'sin' : (t > 0 && c >= t - 0.005 ? 'cobrado' : 'parcial'); }
 const PAGO_ETQ = {sin:'–', por_cobrar:'Por cobrar', por_cobrar_otra:'Por cobrar en otra', parcial:'Cobrado parcial', parcial_otra:'Parcial en otra', cobrado:'Cobrado', cobrado_otra:'Cobrada en otra'};
 const PAGO_CLS = {sin:'borrador', por_cobrar:'pendiente_cobrar'};
-const ENTREGA_ETQ = {por_entregar:'Por entregar', por_entregar_rg:'Por entregar RG', entregada:'Entregada', entregada_rg:'Entregada RG'};
-function entregaDe(d){ return ENTREGA_ETQ[d?.estado_entrega] ? d.estado_entrega : 'por_entregar'; }
+const ENTREGA_ETQ = {sin:'–', repasar:'Repasar', por_entregar:'Por entregar', por_entregar_rg:'Por entregar RG', entregada:'Entregada', entregada_rg:'Entregada RG'};   // V14.52: guion por defecto (aún no toca), Repasar antes de Por entregar
+function entregaDe(d){ return ENTREGA_ETQ[d?.estado_entrega] ? d.estado_entrega : 'sin'; }
 function entregaPillHtml(id, ddId){
   if(!PAGO_PRUEBA_IDS.includes(id)) return '';
-  const e = entregaDe(documentosRealesById?.[id]), pid = 'entrega-dd-' + ddId, cl = v => v.startsWith('entregada') ? 'entregado' : 'pendiente_enviar';
+  const e = entregaDe(documentosRealesById?.[id]), pid = 'entrega-dd-' + ddId, cl = v => v.startsWith('entregada') ? 'entregado' : (v === 'sin' ? 'borrador' : (v === 'repasar' ? 'revisar' : 'pendiente_enviar'));
   return `<div class="estado-cobro-dd pago-dd" id="${pid}" data-doc-id="${id}"><span class="pill ${cl(e)}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${pid}',this)">${ENTREGA_ETQ[e]}</span><div class="estado-cobro-menu">${Object.keys(ENTREGA_ETQ).map(v => `<span class="pill ${cl(v)}" onclick="event.stopPropagation();cambiarEntregaDocumento('${id}','${v}')">${ENTREGA_ETQ[v]}</span>`).join('')}</div></div>`;
 }
 async function cambiarEntregaDocumento(id, v){
   if(!exigirNivelDoc(id,'editar') || !sb) return;
   const d = documentosRealesById[id]; if(!d || !ENTREGA_ETQ[v]) return;
   document.querySelectorAll('.pago-dd.open').forEach(e => e.classList.remove('open'));
-  const {error} = await sb.from('documentos_economicos').update({estado_entrega: v}).eq('id', id);
+  const {error} = await sb.from('documentos_economicos').update({estado_entrega: v === 'sin' ? null : v}).eq('id', id);
   if(error){ mostrarToast('Error: ' + errText(error), 'err'); return; }
-  d.estado_entrega = v;
+  d.estado_entrega = v === 'sin' ? null : v;
   try{ renderControlDocs(); }catch(e){}
 }
 function pagoPillHtml(id, ddId){
