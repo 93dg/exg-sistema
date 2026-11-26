@@ -5262,12 +5262,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.54" defer></script>
-<script src="costes/norm.js?v=V14.54" defer></script>
-<script src="ajustes/calc.js?v=V14.54" defer></script>
-<script src="tiempo/tiempo.js?v=V14.54" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.55" defer></script>
+<script src="costes/norm.js?v=V14.55" defer></script>
+<script src="ajustes/calc.js?v=V14.55" defer></script>
+<script src="tiempo/tiempo.js?v=V14.55" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.54</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.55</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5416,7 +5416,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.54</div>
+        <div class="sub" id="version-badge">V14.55</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -31943,12 +31943,17 @@ async function cambiarEntregaDocumento(id, v){
   if(!exigirNivelDoc(id,'editar') || !sb) return;
   const d = documentosRealesById[id]; if(!d || !ENTREGA_ETQ[v]) return;
   document.querySelectorAll('.pago-dd.open').forEach(e => e.classList.remove('open'));
+  const _ea = d.estado_entrega ?? null;
   const {error} = await sb.from('documentos_economicos').update({estado_entrega: v === 'sin' ? null : v}).eq('id', id);
   if(error){ mostrarToast('Error: ' + errText(error), 'err'); return; }
   d.estado_entrega = v === 'sin' ? null : v;
   const ce = x => x.startsWith('entregada') ? 'entregado' : (x === 'sin' ? 'borrador' : (x === 'repasar' ? 'revisar' : 'pendiente_enviar'));
   document.querySelectorAll(`[id^="entrega-dd-"][data-doc-id="${id}"] > .pill`).forEach(el => { el.className = 'pill ' + ce(v); el.innerHTML = entregaEtqHtml(v); });
   try{ renderControlDocs(); }catch(e){}
+  avisoDeshacer('Entrega: ahora en <b>' + escHtml(v === 'sin' ? '–' : ENTREGA_ETQ[v]) + '</b>', async () => {
+    const {error: e2} = await sb.from('documentos_economicos').update({estado_entrega: _ea}).eq('id', id); if(e2) throw e2;
+    d.estado_entrega = _ea; document.querySelectorAll(`[id^="entrega-dd-"][data-doc-id="${id}"] > .pill`).forEach(el => { el.className = 'pill ' + ce(entregaDe(d)); el.innerHTML = entregaEtqHtml(entregaDe(d)); });
+  }, 6);
 }
 function pagoPillHtml(id, ddId){
   if(!PAGO_PRUEBA_IDS.includes(id)) return '';
@@ -31974,6 +31979,7 @@ async function cambiarPagoDocumento(id, v){
     nuevo = Math.round(Number(String(r.importe).replace(',', '.')) * 100) / 100; fecha = r.fecha || hoy;
     if(!(nuevo > 0)){ mostrarToast('Escribe lo cobrado, más de 0 €.', 'err'); return; }
   }
+  const _pa = {estado_pago: d.estado_pago ?? null, cobrado_importe: ya, cobrado_en: d.cobrado_en ?? null};
   const {data: g, error} = await sb.from('documentos_economicos').update({...upd, cobrado_importe: nuevo}).eq('id', id).select('estado_cobro,cobrado_importe,estado_pago,cobrado_en').single();
   if(error){ mostrarToast('Error: ' + errText(error), 'err'); return; }
   try{ if(nuevo - ya > 0) cobroRegistrar(d, Math.round((nuevo - ya) * 100) / 100, fecha); }catch(e){ console.error(e); }
@@ -31981,6 +31987,11 @@ async function cambiarPagoDocumento(id, v){
   const pv = pagoDe(d);
   document.querySelectorAll(`[id^="pago-dd-"][data-doc-id="${id}"] > .pill`).forEach(el => { el.className = 'pill ' + (PAGO_CLS[pv] || pv); el.innerHTML = pagoEtqHtml(pv); });
   try{ renderControlDocs(); }catch(e){}
+  avisoDeshacer('Cobro: ahora en <b>' + escHtml(pv === 'sin' ? '–' : PAGO_ETQ[pv]) + '</b>', async () => {
+    const {data: g2, error: e2} = await sb.from('documentos_economicos').update(_pa).eq('id', id).select('estado_cobro,cobrado_importe,estado_pago,cobrado_en').single(); if(e2) throw e2;
+    Object.assign(d, {cobrado_importe: Number(g2.cobrado_importe || 0), estado_cobro: g2.estado_cobro, estado_pago: g2.estado_pago, cobrado_en: g2.cobrado_en});
+    const pv2 = pagoDe(d); document.querySelectorAll(`[id^="pago-dd-"][data-doc-id="${id}"] > .pill`).forEach(el => { el.className = 'pill ' + (PAGO_CLS[pv2] || pv2); el.innerHTML = pagoEtqHtml(pv2); });
+  }, 6);
 }
 function toggleEstadoCobroDropdown(ddId, el){
   const dd = (el && el.closest && el.closest('.estado-cobro-dd')) || document.getElementById(ddId);   // V10.07: la tarjeta abierta repite el estado con el mismo id; se abre el menú del que se toca
@@ -32231,6 +32242,7 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   if(!sb) return;
   const docAct = documentosRealesById[id];
   const totalDoc = Number(docAct?.importe ?? docAct?.total ?? 0), yaCobrado = Number(docAct?.cobrado_importe || 0);
+  const _antes = ddId ? {estado_cobro: docAct?.estado_cobro, cobrado_importe: yaCobrado, cobrado_en: docAct?.cobrado_en ?? null, jobs: (typeof _tbJobs !== 'undefined' && Array.isArray(_tbJobs)) ? _tbJobs.filter(x => (x.docs || []).includes(id)).map(x => [x, tbFoto(x)]) : []} : null;   // V14.54 (Daniel 26/11): desde las pastillas, todo cambio lleva su botón Deshacer
   const eur = n => Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
   const cerrarMenus = () => document.querySelectorAll(`.estado-cobro-dd[data-doc-id="${id}"]`).forEach(dd => dd.classList.remove('open'));
   const enPausa = valor === 'en_pausa'; if(enPausa) valor = 'trabajo_activo';   // V12.87: «En pausa» = albarán en Trabajo activo + su trabajo en pausa
@@ -32297,6 +32309,15 @@ async function cambiarEstadoDocumento(tipo, id, valor, ddId){
   refrescarChipsOtraEnPantalla(id); refrescarIncluidosTodas();
   if(pedido !== valor){ const nom = ESTADOS_DOCUMENTO.find(o=>o[0]===valor)?.[1] || valor; mostrarToast('Quedó como ' + nom + ' porque hay ' + eur(payload.cobrado_importe) + ' cobrados de ' + eur(totalDoc) + '.', 'ok'); }
   else if(valor==='parcial'){ mostrarToast('Cobrado parcial guardado: ' + eur(payload.cobrado_importe) + ' cobrados, faltan ' + eur(Math.max(0, totalDoc - payload.cobrado_importe)) + ' ✓', 'ok'); }
+  else if(_antes){
+    const nomN = ESTADOS_DOCUMENTO.find(o=>o[0]===valor)?.[1] || valor;
+    avisoDeshacer(escHtml(docAct?.numero || 'Documento') + ': ahora en <b>' + escHtml(nomN) + '</b>', async () => {
+      const {error: e2} = await sb.from('documentos_economicos').update({estado_cobro: _antes.estado_cobro, cobrado_importe: _antes.cobrado_importe, cobrado_en: _antes.cobrado_en}).eq('id', id); if(e2) throw e2;
+      if(documentosRealesById[id]) Object.assign(documentosRealesById[id], {estado_cobro: _antes.estado_cobro, cobrado_importe: _antes.cobrado_importe, cobrado_en: _antes.cobrado_en});
+      for(const [jb, f] of _antes.jobs) await tbVolver(jb, f);
+      renderControlDocs();
+    }, 6);
+  }
   else mostrarToast('Estado actualizado ✓', 'ok');
   renderControlDocs();
 }
