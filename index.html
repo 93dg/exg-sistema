@@ -5257,12 +5257,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.33" defer></script>
-<script src="costes/norm.js?v=V14.33" defer></script>
-<script src="ajustes/calc.js?v=V14.33" defer></script>
-<script src="tiempo/tiempo.js?v=V14.33" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.34" defer></script>
+<script src="costes/norm.js?v=V14.34" defer></script>
+<script src="ajustes/calc.js?v=V14.34" defer></script>
+<script src="tiempo/tiempo.js?v=V14.34" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.33</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.34</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5411,7 +5411,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.33</div>
+        <div class="sub" id="version-badge">V14.34</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -26454,6 +26454,19 @@ const TB_RELOJ = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" st
 const TB_TINTE_DIF = {'Fácil': '#EAF3DE', 'Medio': '#FAEEDA', 'Difícil': '#FCEBEB'};
 // V8.00: la tarjeta de un trabajo es una sola para toda la web (Lista y Calendario). botonesHtml y extraHtml permiten cambiar los botones
 // de la derecha y añadir una línea debajo sin hacer otra tarjeta distinta
+// V14.34 (Daniel 26/11: «la fecha estimada automática, por la duración, los pendientes y los activos; abreviada, 28/12; y según lo desplace se va cambiando»):
+// cola = primero lo que está en marcha, luego los pendientes en el orden de la lista; 8 h por día laborable (lun-vie), un trabajo detrás de otro. Se calcula al pintar: NO se guarda como fecha del trabajo
+function tbFechasEstimadas(){
+  const act = tbActivos(), cola = [...act.filter(j => TB_EST_ENMARCHA.includes(j.estado)), ...act.filter(j => TB_EST_PENDIENTES.includes(j.estado))];
+  const d = new Date(); d.setHours(12, 0, 0, 0); while(d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  const res = {}; let h = 0;
+  cola.forEach(j => {
+    const dias = Math.floor(h / 8 + 1e-9), f = new Date(d); let n = dias; while(n > 0){ f.setDate(f.getDate() + 1); if(f.getDay() !== 0 && f.getDay() !== 6) n--; }
+    res[j.id] = String(f.getDate()).padStart(2, '0') + '/' + String(f.getMonth() + 1).padStart(2, '0');
+    const hh = tbDurHoras(j.duracion); h += hh == null ? 8 : hh;
+  });
+  return res;
+}
 function tbCartaHtml(j, esHis, botonesHtml, extraHtml){
     const pr = tbPrioridades(j), nota = j.nota ? `<div class="tb-nota">📝 ${escHtml(j.nota)}</div>` : '';
     const titulo = j.cliente ? `${escHtml(j.cliente)}${j.trabajo ? ` <span class="t">· ${escHtml(j.trabajo)}</span>` : ''}` : escHtml(j.trabajo || 'Sin nombre');
@@ -26466,7 +26479,8 @@ function tbCartaHtml(j, esHis, botonesHtml, extraHtml){
       (j.duracion ? `<span class="tb-chip cc ${di >= 0 ? 'cc-h' : 'cc-gray'}" ${di >= 0 ? `style="--h:${TB_DUR_HUE[di]}"` : ''}>⏱ ${escHtml(j.duracion)}</span>` : '') +
       (nombresFlota.length ? `<span class="tb-chip cc cc-purple">${nombresFlota.join(' + ')}</span>` : '') +
       tbAlternativas(j).map(g => `<span class="tb-chip cc cc-purple tb-alt" style="background:${tbFondoFusion(g.length)}">${g.map(t => TB_MAQ_NOM[t]).join(' / ')}</span>`).join('') +
-      (j.lugar ? `<span class="tb-chip">${escHtml(tbLugarTxt(j))}</span>` : '');
+      (j.lugar ? `<span class="tb-chip">${escHtml(tbLugarTxt(j))}</span>` : '') +
+      (!esHis && TB_EST_PENDIENTES.includes(j.estado) && !(j.plan && j.plan.fecha) && tbFechasEstimadas()[j.id] ? `<span class="tb-chip" title="Fecha estimada">${tbFechasEstimadas()[j.id]}</span>` : '');
     const botones = botonesHtml != null ? botonesHtml : (esHis ? '<button type="button" class="tb-ok tb-reabrir" data-a="reabrir" title="Volver a pendientes">↩</button>' : `${TB_EST_PENDIENTES.includes(j.estado) ? '' : '<button type="button" class="tb-ok tb-eur" data-a="cobrar" title="Cobro, albarán o factura">€</button>'}<button type="button" class="tb-ok" data-a="fin" title="${TB_EST_PENDIENTES.includes(j.estado) ? 'Empezar: a Activo' : 'Terminado: a Trámite'}">✓</button><button type="button" class="tb-ok tb-x" data-a="cancelar" title="Cancelar este trabajo">✕</button>`);
     const extraCancel = j.estado === 'Cancelado' && j.cancelado ? `<div class="tb-nota">Cancelado: ${escHtml((j.cancelado.motivos || []).join(' · '))}</div>` : j.cobro && j.cobro.forma ? `<div class="tb-nota">€ ${escHtml(j.cobro.importe != null ? Number(j.cobro.importe).toLocaleString('es-ES', {minimumFractionDigits: 2}) + ' € cobrados' : j.cobro.forma)}</div>` : '';
     // V11.76 (reporte 4558734e): en Trámites, hacer el albarán o la factura directamente desde la tarjeta
