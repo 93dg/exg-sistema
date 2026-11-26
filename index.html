@@ -5261,12 +5261,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.48" defer></script>
-<script src="costes/norm.js?v=V14.48" defer></script>
-<script src="ajustes/calc.js?v=V14.48" defer></script>
-<script src="tiempo/tiempo.js?v=V14.48" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.49" defer></script>
+<script src="costes/norm.js?v=V14.49" defer></script>
+<script src="ajustes/calc.js?v=V14.49" defer></script>
+<script src="tiempo/tiempo.js?v=V14.49" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.48</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.49</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5415,7 +5415,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.48</div>
+        <div class="sub" id="version-badge">V14.49</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -31906,17 +31906,18 @@ function docTrabajoEnPausa(id){ try{ return typeof _tbJobs !== 'undefined' && Ar
 function estadosConPausa(tipo, doc){ const l = estadosDeTipo(tipo, doc).slice(), i = l.findIndex(o => o[0] === 'trabajo_activo'); if((tipo === 'albaran' || tipo === 'proforma') && i >= 0) l.splice(i + 1, 0, ['en_pausa', 'En pausa']); return l; }
 function estadoDocumentoSelect(tipo, id, actual, contexto){
   const act = actual || 'pendiente_enviar', pausa = act === 'trabajo_activo' && docTrabajoEnPausa(id);
-  const label = pausa ? 'En pausa' : estadosDeTipo(tipo, documentosRealesById?.[id]).concat(ESTADOS_DOCUMENTO).find(o=>o[0]===act)?.[1] || stateLabels[act] || act;
+  const _prueba = PAGO_PRUEBA_IDS.includes(id);
+  const label = pausa ? 'En pausa' : (_prueba && act === 'pendiente_enviar') ? 'Terminado' : estadosDeTipo(tipo, documentosRealesById?.[id]).concat(ESTADOS_DOCUMENTO).find(o=>o[0]===act)?.[1] || stateLabels[act] || act;
   // ddId único por tabla/contexto donde se renderiza (el mismo documento puede aparecer
   // a la vez en varias tablas — Centro de control, Facturas, la fila "standalone" de
   // Presupuestos... — un id de DOM repetido hacía que solo la primera copia funcionara
   // y las demás se quedaran "atascadas" sin dejar cambiar el estado otra vez).
   const ddId = 'estado-doc-dd-'+(contexto||'')+id;
-  const _pg = pagoPillHtml(id, ddId);
+  const _pg = pagoPillHtml(id, ddId) + entregaPillHtml(id, ddId);
   return (_pg ? '<span class="est-dos">' : '') + `<div class="estado-cobro-dd" id="${ddId}" data-doc-id="${id}">
     <span class="pill ${pausa ? 'en_pausa' : act}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${ddId}',this)">${label}</span>
     <div class="estado-cobro-menu">
-      ${estadosConPausa(tipo, documentosRealesById?.[id]).map(([v,l])=>`<span class="pill ${v}" onclick="event.stopPropagation();cambiarEstadoDocumento('${tipo}','${id}','${v}','${ddId}')">${l}</span>`).join('')}
+      ${estadosConPausa(tipo, documentosRealesById?.[id]).filter(([v]) => !_prueba || ['trabajo_activo','en_pausa','pendiente_enviar'].includes(v)).map(([v,l])=>_prueba && v === 'pendiente_enviar' ? ['pendiente_enviar','Terminado'] : [v,l]).map(([v,l])=>`<span class="pill ${v}" onclick="event.stopPropagation();cambiarEstadoDocumento('${tipo}','${id}','${v}','${ddId}')">${l}</span>`).join('')}
     </div>
   </div>${_pg}${_pg ? '</span>' : ''}${enOtraChipsHtml(documentosRealesById?.[id])}`;
 }
@@ -31924,6 +31925,22 @@ function estadoDocumentoSelect(tipo, id, actual, contexto){
 const PAGO_PRUEBA_IDS = ['c864593e-b23f-4b83-9663-de29bbb2815a'];
 function pagoDe(d){ const t = Number(d?.importe ?? d?.total ?? 0), c = Number(d?.cobrado_importe || 0); return c <= 0 ? 'sin' : (t > 0 && c >= t - 0.005 ? 'cobrado' : 'parcial'); }
 const PAGO_ETQ = {sin:'Sin cobrar', parcial:'Cobrado parcial', cobrado:'Cobrado'};
+const ENTREGA_ETQ = {por_entregar:'Por entregar', por_entregar_rg:'Por entregar RG', entregada:'Entregada', entregada_rg:'Entregada RG'};
+function entregaDe(d){ return ENTREGA_ETQ[d?.estado_entrega] ? d.estado_entrega : 'por_entregar'; }
+function entregaPillHtml(id, ddId){
+  if(!PAGO_PRUEBA_IDS.includes(id)) return '';
+  const e = entregaDe(documentosRealesById?.[id]), pid = 'entrega-dd-' + ddId, cl = v => v.startsWith('entregada') ? 'entregado' : 'pendiente_enviar';
+  return `<div class="estado-cobro-dd pago-dd" id="${pid}" data-doc-id="${id}"><span class="pill ${cl(e)}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${pid}',this)">${ENTREGA_ETQ[e]}</span><div class="estado-cobro-menu">${Object.keys(ENTREGA_ETQ).map(v => `<span class="pill ${cl(v)}" onclick="event.stopPropagation();cambiarEntregaDocumento('${id}','${v}')">${ENTREGA_ETQ[v]}</span>`).join('')}</div></div>`;
+}
+async function cambiarEntregaDocumento(id, v){
+  if(!exigirNivelDoc(id,'editar') || !sb) return;
+  const d = documentosRealesById[id]; if(!d || !ENTREGA_ETQ[v]) return;
+  document.querySelectorAll('.pago-dd.open').forEach(e => e.classList.remove('open'));
+  const {error} = await sb.from('documentos_economicos').update({estado_entrega: v}).eq('id', id);
+  if(error){ mostrarToast('Error: ' + errText(error), 'err'); return; }
+  d.estado_entrega = v;
+  try{ renderControlDocs(); }catch(e){}
+}
 function pagoPillHtml(id, ddId){
   if(!PAGO_PRUEBA_IDS.includes(id)) return '';
   const p = pagoDe(documentosRealesById?.[id]), pid = 'pago-dd-' + ddId;
