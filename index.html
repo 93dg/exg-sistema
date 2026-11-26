@@ -5262,12 +5262,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.55" defer></script>
-<script src="costes/norm.js?v=V14.55" defer></script>
-<script src="ajustes/calc.js?v=V14.55" defer></script>
-<script src="tiempo/tiempo.js?v=V14.55" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.56" defer></script>
+<script src="costes/norm.js?v=V14.56" defer></script>
+<script src="ajustes/calc.js?v=V14.56" defer></script>
+<script src="tiempo/tiempo.js?v=V14.56" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.55</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.56</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5416,7 +5416,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.55</div>
+        <div class="sub" id="version-badge">V14.56</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -8456,6 +8456,7 @@ En Supabase (proyecto EXG, ref sshctqnpuolawtcujxkt) ejecuta select sistema_paso
           <button type="button" class="btn primary sm" id="ie-sel-pasar" onclick="selLineasPasarAFactura()">Pasar a factura</button>
         </div>
         <div class="ie-totals" style="margin-bottom:10px;">
+          <div class="econ-line oculto" id="ie-dsc-row"><span id="ie-dsc-txt">Descuento</span><span class="v mono" id="ie-dsc">0,00 €</span></div>
           <div class="econ-line"><span>Base imponible</span><span class="v mono" id="ie-base">0,00 €</span></div>
           <div class="econ-line" id="ie-iva-row"><span>IVA
             <!-- V12.32 (Daniel: «lo del IVA, en un solo desplegable»): tipo y porcentaje en un solo selector; los dos de antes quedan ocultos y siguen mandando en los cálculos -->
@@ -25319,6 +25320,11 @@ function recalcTotals(){
     base += lineTotal;
     if(tr.id) actualizarResumenLinea(tr.id);
   });
+  // V14.56 (Daniel 26/11): un descuento del documento va encima del subtotal (no es una línea de concepto): base = líneas - descuento
+  const dscImp = Math.round(Number(window._niDescuento?.importe || 0) * 100) / 100;
+  base = Math.round((base - dscImp) * 100) / 100;
+  const dscRow = document.getElementById('ie-dsc-row');
+  if(dscRow){ dscRow.classList.toggle('oculto', !(dscImp > 0)); const dt = document.getElementById('ie-dsc-txt'); if(dt) dt.textContent = dscImp > 0 ? String(window._niDescuento.texto || 'Descuento') + (window._niDescuento.horas ? ' (' + window._niDescuento.horas + ' h)' : '') : 'Descuento'; const dv = document.getElementById('ie-dsc'); if(dv) dv.textContent = '-' + formatMoneda(dscImp); }
   const tratamientoIva = document.getElementById('ie-tratamiento-iva')?.value || 'normal';
   const ivaPct = hasIva ? (Number(document.getElementById('ie-iva-pct').value) || 0) : 0;
   const {iva, total} = hasIva ? calcularIva(base, tratamientoIva, ivaPct) : {iva:0, total:base};
@@ -25834,6 +25840,7 @@ function generarPDFDocumento(accion, modoForzado, portadaForzada){
       doc.text('TOTALES', 195, yDer, {align:'right'}); yDer += 6.5;
       doc.setFont('helvetica','normal'); doc.setFontSize(9);
       if(cfg.hasBaseIva){
+        if(window._niDescuento && Number(window._niDescuento.importe) > 0){ doc.text('Dto. tiempo a disposición (' + (window._niDescuento.horas || '') + ' h):', 150, yDer, {align:'right'}); doc.text('-' + formatMoneda(Number(window._niDescuento.importe)), 195, yDer, {align:'right'}); yDer += 5.5; }
         doc.text('Base imponible:', 150, yDer, {align:'right'}); doc.text(formatMoneda(base), 195, yDer, {align:'right'}); yDer += 5.5;
         if(cfg.hasIva){
           if(tratamientoIvaPdf==='isp'){
@@ -25965,6 +25972,7 @@ function togglePreview(){
         ${cfg.hasBank && payment==='TRANSFERENCIA' ? `<div><b>IBAN:</b> ${iban.toUpperCase()}</div><div><b>Titular:</b> ${titular}</div><div><b>Concepto:</b> ${concepto}</div>` : ''}
       </div>
       ${cfg.hasTotales ? `<div class="ie-totals">
+        ${cfg.hasBaseIva && window._niDescuento && Number(window._niDescuento.importe) > 0 ? `<div class="econ-line"><span>${escHtml(String(window._niDescuento.texto || 'Descuento'))} (${window._niDescuento.horas || ''} h)</span><span class="v mono">-${formatMoneda(Number(window._niDescuento.importe))}</span></div>` : ''}
         ${cfg.hasBaseIva ? `<div class="econ-line"><span>Base imponible</span><span class="v mono">${formatMoneda(base)}</span></div>` : ''}
         ${cfg.hasBaseIva && cfg.hasIva ? `<div class="econ-line"><span>IVA</span><span class="v mono">${formatMoneda(iva)}</span></div>` : ''}
         <div class="econ-line"><span>TOTAL</span><span class="v mono">${formatMoneda(total)}</span></div>
@@ -30677,6 +30685,7 @@ function openNewInvoiceModal(contexto, forzarEditorCompleto){
   document.getElementById('ie-items-body').innerHTML = ''; ieResetOrdenFecha();
   document.getElementById('ie-iva-pct').value = 21;
   document.getElementById('ie-tratamiento-iva').value = 'normal';
+  window._niDescuento = null;
   cambiarTratamientoIva();
   setClientPickerValue('ni', '');
   document.getElementById('ni-client-fiscal').style.display = 'none';
@@ -31133,6 +31142,7 @@ function selLineasPasarAFactura(){
   document.getElementById('ie-items-body').innerHTML = ''; ieResetOrdenFecha();
   document.getElementById('ie-iva-pct').value = origen.ivaPct ?? 21;
   document.getElementById('ie-tratamiento-iva').value = origen.tratamientoIva || 'normal';
+  window._niDescuento = origen.descuento || null;   // V14.56: el descuento del documento viaja con la conversión
   cambiarTratamientoIva();
   setClientPickerValue('ni', origen.client);
   document.getElementById('ni-job').value = origen.obra_texto || (origen.job === '—' ? '' : origen.job);
@@ -31187,7 +31197,7 @@ function convertirDocumento(){
   document.getElementById('ni-doctype').disabled = false;
   document.getElementById('ie-items-body').innerHTML = ''; ieResetOrdenFecha();
   document.getElementById('ie-iva-pct').value = (siguienteTipo === 'proforma' && (origen.tratamientoIva || 'normal') === 'normal' && !Number(origen.ivaPct)) ? 21 : (origen.ivaPct ?? 21);   // V12.34 (Daniel): las proformas llevan IVA por defecto
-  document.getElementById('ie-tratamiento-iva').value = origen.tratamientoIva || 'normal'; cambiarTratamientoIva();
+  document.getElementById('ie-tratamiento-iva').value = origen.tratamientoIva || 'normal'; window._niDescuento = origen.descuento || null; cambiarTratamientoIva();
   setClientPickerValue('ni', origen.client);
   document.getElementById('ni-job').value = origen.job==='—' ? '' : origen.job;
   document.getElementById('ni-date').value = new Date().toISOString().slice(0,10);
@@ -31269,6 +31279,7 @@ function openDocumentViewer(id){
   document.getElementById('ie-items-body').innerHTML = ''; ieResetOrdenFecha();
   document.getElementById('ie-iva-pct').value = doc.ivaPct;
   document.getElementById('ie-tratamiento-iva').value = doc.tratamientoIva || 'normal';
+  window._niDescuento = doc.descuento || null;
   cambiarTratamientoIva();
   setClientPickerValue('ni', doc.client);
   // Campo obra: solo lo que está guardado de verdad (obra_texto). Si el usuario lo dejó vacío a propósito,
@@ -31578,7 +31589,7 @@ async function submitNewInvoice(ev, isDraft){
     // trabajo_id, aunque el usuario lo hubiera escrito o lo hubiera sugerido el asistente
     obra_texto: (!trabajo && job && job !== '—') ? job : null,
     cliente_datos_doc: typeof clienteDatosDoc !== 'undefined' ? clienteDatosDoc : null,
-    importe: total, concepto: conceptoResumen, conceptos,
+    importe: total, concepto: conceptoResumen, conceptos, descuento: (window._niDescuento && Number(window._niDescuento.importe) > 0) ? window._niDescuento : null,
     contabilidad: 'oficial',
     iva_pct: tratamientoIva==='isp' ? 0 : ivaPct,
     tratamiento_iva: tratamientoIva,
