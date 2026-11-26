@@ -5261,12 +5261,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.49" defer></script>
-<script src="costes/norm.js?v=V14.49" defer></script>
-<script src="ajustes/calc.js?v=V14.49" defer></script>
-<script src="tiempo/tiempo.js?v=V14.49" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.50" defer></script>
+<script src="costes/norm.js?v=V14.50" defer></script>
+<script src="ajustes/calc.js?v=V14.50" defer></script>
+<script src="tiempo/tiempo.js?v=V14.50" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.49</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.50</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5415,7 +5415,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.49</div>
+        <div class="sub" id="version-badge">V14.50</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -31923,8 +31923,9 @@ function estadoDocumentoSelect(tipo, id, actual, contexto){
 }
 // V14.47 (Daniel 26/11): PRUEBA en una sola tarjeta (A25): segunda pastilla de cobro, independiente de la del trabajo. Se calcula de lo cobrado; no toca el estado del trabajo.
 const PAGO_PRUEBA_IDS = ['c864593e-b23f-4b83-9663-de29bbb2815a'];
-function pagoDe(d){ const t = Number(d?.importe ?? d?.total ?? 0), c = Number(d?.cobrado_importe || 0); return c <= 0 ? 'sin' : (t > 0 && c >= t - 0.005 ? 'cobrado' : 'parcial'); }
-const PAGO_ETQ = {sin:'Sin cobrar', parcial:'Cobrado parcial', cobrado:'Cobrado'};
+function pagoDe(d){ if(PAGO_ETQ[d?.estado_pago]) return d.estado_pago; const t = Number(d?.importe ?? d?.total ?? 0), c = Number(d?.cobrado_importe || 0); return c <= 0 ? 'sin' : (t > 0 && c >= t - 0.005 ? 'cobrado' : 'parcial'); }
+const PAGO_ETQ = {sin:'–', por_cobrar:'Por cobrar', por_cobrar_otra:'Por cobrar en otra', parcial:'Cobrado parcial', parcial_otra:'Parcial en otra', cobrado:'Cobrado', cobrado_otra:'Cobrada en otra'};
+const PAGO_CLS = {sin:'borrador', por_cobrar:'pendiente_cobrar'};
 const ENTREGA_ETQ = {por_entregar:'Por entregar', por_entregar_rg:'Por entregar RG', entregada:'Entregada', entregada_rg:'Entregada RG'};
 function entregaDe(d){ return ENTREGA_ETQ[d?.estado_entrega] ? d.estado_entrega : 'por_entregar'; }
 function entregaPillHtml(id, ddId){
@@ -31944,14 +31945,20 @@ async function cambiarEntregaDocumento(id, v){
 function pagoPillHtml(id, ddId){
   if(!PAGO_PRUEBA_IDS.includes(id)) return '';
   const p = pagoDe(documentosRealesById?.[id]), pid = 'pago-dd-' + ddId;
-  return `<div class="estado-cobro-dd pago-dd" id="${pid}" data-doc-id="${id}"><span class="pill ${p === 'sin' ? 'pendiente_cobrar' : p}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${pid}',this)">${PAGO_ETQ[p]}</span><div class="estado-cobro-menu">${['sin','parcial','cobrado'].map(v => `<span class="pill ${v === 'sin' ? 'pendiente_cobrar' : v}" onclick="event.stopPropagation();cambiarPagoDocumento('${id}','${v}')">${PAGO_ETQ[v]}</span>`).join('')}</div></div>`;
+  return `<div class="estado-cobro-dd pago-dd" id="${pid}" data-doc-id="${id}"><span class="pill ${PAGO_CLS[p] || p}" onclick="event.stopPropagation();toggleEstadoCobroDropdown('${pid}',this)">${PAGO_ETQ[p]}</span><div class="estado-cobro-menu">${Object.keys(PAGO_ETQ).map(v => `<span class="pill ${PAGO_CLS[v] || v}" onclick="event.stopPropagation();cambiarPagoDocumento('${id}','${v}')">${PAGO_ETQ[v]}</span>`).join('')}</div></div>`;
 }
 async function cambiarPagoDocumento(id, v){
   if(!exigirNivelDoc(id,'editar') || !sb) return;
   const d = documentosRealesById[id]; if(!d) return;
   const tot = Number(d.importe ?? d.total ?? 0), ya = Number(d.cobrado_importe || 0);
   document.querySelectorAll('.pago-dd.open').forEach(e => e.classList.remove('open'));
-  let nuevo = v === 'cobrado' ? tot : 0, fecha = null;
+  let nuevo = v === 'cobrado' ? tot : (['por_cobrar','por_cobrar_otra'].includes(v) ? ya : 0), fecha = null;
+  const upd = {estado_pago: v === 'sin' ? null : v};
+  if(v === 'sin') nuevo = 0;
+  if(v === 'parcial_otra' || v === 'cobrado_otra'){
+    const r = await pedirFacturaOtra(d, v); if(!r) return;
+    upd.cobrado_en = r.lista; upd.estado_pago = r.estado || v;
+  }
   if(v === 'parcial'){
     const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
     const r = await pedirCampos('Cobrado parcial · ' + (d.client || 'documento'), [{id:'importe', label:'Cobrado en total (de ' + tot.toLocaleString('es-ES') + ' €)', tipo:'number', valor: ya > 0 ? ya : '', requerido:true}, {id:'fecha', label:'Fecha del cobro', tipo:'date', valor:hoy, requerido:true}]);
@@ -31959,10 +31966,10 @@ async function cambiarPagoDocumento(id, v){
     nuevo = Math.round(Number(String(r.importe).replace(',', '.')) * 100) / 100; fecha = r.fecha || hoy;
     if(!(nuevo > 0)){ mostrarToast('Escribe lo cobrado, más de 0 €.', 'err'); return; }
   }
-  const {data: g, error} = await sb.from('documentos_economicos').update({cobrado_importe: nuevo}).eq('id', id).select('estado_cobro,cobrado_importe').single();
+  const {data: g, error} = await sb.from('documentos_economicos').update({...upd, cobrado_importe: nuevo}).eq('id', id).select('estado_cobro,cobrado_importe,estado_pago,cobrado_en').single();
   if(error){ mostrarToast('Error: ' + errText(error), 'err'); return; }
   try{ if(nuevo - ya > 0) cobroRegistrar(d, Math.round((nuevo - ya) * 100) / 100, fecha); }catch(e){ console.error(e); }
-  if(g) Object.assign(d, {cobrado_importe: Number(g.cobrado_importe || 0), estado_cobro: g.estado_cobro});
+  if(g) Object.assign(d, {cobrado_importe: Number(g.cobrado_importe || 0), estado_cobro: g.estado_cobro, estado_pago: g.estado_pago, cobrado_en: g.cobrado_en});
   try{ renderControlDocs(); }catch(e){}
 }
 function toggleEstadoCobroDropdown(ddId, el){
