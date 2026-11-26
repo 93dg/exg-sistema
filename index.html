@@ -5291,12 +5291,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.67" defer></script>
-<script src="costes/norm.js?v=V14.67" defer></script>
-<script src="ajustes/calc.js?v=V14.67" defer></script>
-<script src="tiempo/tiempo.js?v=V14.67" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.68" defer></script>
+<script src="costes/norm.js?v=V14.68" defer></script>
+<script src="ajustes/calc.js?v=V14.68" defer></script>
+<script src="tiempo/tiempo.js?v=V14.68" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.67</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.68</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5445,7 +5445,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.67</div>
+        <div class="sub" id="version-badge">V14.68</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -32029,7 +32029,8 @@ async function cambiarPagoDocumento(id, v){
   const tot = Number(d.importe ?? d.total ?? 0), ya = Number(d.cobrado_importe || 0);
   document.querySelectorAll('.pago-dd.open').forEach(e => e.classList.remove('open'));
   let nuevo = v === 'cobrado' ? tot : (['por_cobrar','por_cobrar_otra'].includes(v) ? ya : 0), fecha = null;
-  const upd = {estado_pago: v === 'sin' ? null : v};
+  const upd = {estado_pago: v};   // V14.68 (Daniel 26/11: «de Por cobrar a € se queda en Por cobrar»): el guion se guarda como 'sin'; si no, se volvía a leer el estado antiguo
+  if(typeof PAGO_DE_ANTIGUO !== 'undefined' && PAGO_DE_ANTIGUO[d.estado_cobro]){ upd.estado_cobro = 'pendiente_enviar'; if(!d.estado_entrega) upd.estado_entrega = 'entregada'; }   // el estado antiguo de cobro pasa a su pastilla: el trabajo queda Terminado
   if(v === 'sin') nuevo = 0;
   if(v === 'parcial_otra' || v === 'cobrado_otra'){
     const r = await pedirFacturaOtra(d, v); if(!r) return;
@@ -32042,17 +32043,18 @@ async function cambiarPagoDocumento(id, v){
     nuevo = Math.round(Number(String(r.importe).replace(',', '.')) * 100) / 100; fecha = r.fecha || hoy;
     if(!(nuevo > 0)){ mostrarToast('Escribe lo cobrado, más de 0 €.', 'err'); return; }
   }
-  const _pa = {estado_pago: d.estado_pago ?? null, cobrado_importe: ya, cobrado_en: d.cobrado_en ?? null};
+  const _pa = {estado_pago: d.estado_pago ?? null, cobrado_importe: ya, cobrado_en: d.cobrado_en ?? null, estado_cobro: d.estado_cobro, estado_entrega: d.estado_entrega ?? null};
   const {data: g, error} = await sb.from('documentos_economicos').update({...upd, cobrado_importe: nuevo}).eq('id', id).select('estado_cobro,cobrado_importe,estado_pago,cobrado_en').single();
   if(error){ mostrarToast('Error: ' + errText(error), 'err'); return; }
   try{ if(nuevo - ya > 0) cobroRegistrar(d, Math.round((nuevo - ya) * 100) / 100, fecha); }catch(e){ console.error(e); }
   if(g) Object.assign(d, {cobrado_importe: Number(g.cobrado_importe || 0), estado_cobro: g.estado_cobro, estado_pago: g.estado_pago, cobrado_en: g.cobrado_en});
+  if(upd.estado_entrega) d.estado_entrega = upd.estado_entrega;
   const pv = pagoDe(d);
   document.querySelectorAll(`[id^="pago-dd-"][data-doc-id="${id}"] > .pill`).forEach(el => { el.className = 'pill ' + (PAGO_CLS[pv] || pv); el.innerHTML = pagoEtqHtml(pv); });
   try{ renderControlDocs(); }catch(e){}
   avisoDeshacer('Cobro: ahora en <b>' + escHtml(pv === 'sin' ? '–' : PAGO_ETQ[pv]) + '</b>', async () => {
     const {data: g2, error: e2} = await sb.from('documentos_economicos').update(_pa).eq('id', id).select('estado_cobro,cobrado_importe,estado_pago,cobrado_en').single(); if(e2) throw e2;
-    Object.assign(d, {cobrado_importe: Number(g2.cobrado_importe || 0), estado_cobro: g2.estado_cobro, estado_pago: g2.estado_pago, cobrado_en: g2.cobrado_en});
+    Object.assign(d, {cobrado_importe: Number(g2.cobrado_importe || 0), estado_cobro: g2.estado_cobro, estado_pago: g2.estado_pago, cobrado_en: g2.cobrado_en, estado_entrega: _pa.estado_entrega});
     const pv2 = pagoDe(d); document.querySelectorAll(`[id^="pago-dd-"][data-doc-id="${id}"] > .pill`).forEach(el => { el.className = 'pill ' + (PAGO_CLS[pv2] || pv2); el.innerHTML = pagoEtqHtml(pv2); });
   }, 6);
 }
@@ -32742,7 +32744,7 @@ function filaCompactaDocHtml(doc, tipo, estadoHtml, cliente, obra){
   const lbl = formatMoneda(falta) + docPagadoHtml(doc);
   const cli = cliente || 'Sin cliente', ob = obra && obra !== '—' ? `<span class="cc-fc-obra">${svgEsc(obra)}</span>` : '';
   if(typeof PAGO_PRUEBA_IDS !== 'undefined' && PAGO_PRUEBA_IDS.includes(doc.id)){   // V14.63 (Daniel 26/11: «no está bien espaciado ni colocado»): rejilla de 3 columnas alineada por filas — cliente con el tipo, obra con el dinero
-    return `<div class="cc-fila-compacta cc-v2"><span class="cc-fc-est v2-est" onclick="event.stopPropagation();">${estadoHtml}</span><span class="v2-mid"><span class="cc-fc-cli v2-cli" data-cli="${escHtml(cli)}">${svgEsc(cli)}</span>${obra && obra !== '—' ? `<span class="v2-obra">${svgEsc(obra)}</span>` : ''}</span><span class="v2-der"><span class="v2-tipo tp-${t}">${verChipHtml(doc)}${TIPO_DOC_NOMBRE[t] || t} <b>${svgEsc(doc.numero || doc.num || '—')}</b></span><span class="cc-fc-imp v2-imp"><span class="cc-fc-lbl">${formatMoneda(falta)}</span></span><span class="cc-fc-pg v2-pg">${pagoPillHtml(doc.id, 'cc-')}</span></span></div>`;
+    return `<div class="cc-fila-compacta cc-v2"><span class="cc-fc-est v2-est" onclick="event.stopPropagation();">${estadoHtml}</span><span class="v2-mid"><span class="cc-fc-cli v2-cli" data-cli="${escHtml(cli)}">${svgEsc(cli)}</span>${obra && obra !== '—' ? `<span class="v2-obra">${svgEsc(obra)}</span>` : ''}</span><span class="v2-der"><span class="v2-tipo tp-${t}">${TIPO_DOC_NOMBRE[t] || t} <b>${svgEsc(doc.numero || doc.num || '—')}</b></span><span class="cc-fc-imp v2-imp"><span class="cc-fc-lbl">${formatMoneda(falta)}</span></span><span class="cc-fc-pg v2-pg">${pagoPillHtml(doc.id, 'cc-')}</span></span></div>`;
   }
   return `<div class="cc-fila-compacta"><span class="cc-fc-te"><span class="cc-fc-est" onclick="event.stopPropagation();">${estadoHtml}</span><span class="cc-fc-l1"><span class="fc-tipo-tag tp-${t}">${TIPO_DOC_NOMBRE[t] || t}</span><span class="cc-fc-num">${svgEsc(doc.numero || doc.num || '—')}</span></span></span><span class="cc-fc-bloque"><span class="cc-fc-cli" data-cli="${escHtml(cli)}">${svgEsc(cli)}</span>${ob}</span><span class="cc-fc-imp">${lbl}</span></div>`;
 }
@@ -33020,7 +33022,7 @@ function construirCardMovil(doc, tipo, listaId, cbClass, amountLabel, fechaCorta
     <button type="button" class="fc-mas-btn fc-pdf-btn" onclick="event.stopPropagation();imprimirDocumento('${doc.id}')" title="Ver PDF" aria-label="Ver PDF">${ICO_PRINT}</button>
     <button type="button" class="fc-mas-btn" onclick="event.stopPropagation();abrirMenuAccionesMovil('${doc.id}', event)" title="Más acciones" aria-label="Más acciones">⋯</button>
     <input type="checkbox" class="fc-check ${cbClass}" data-id="${doc.id}" onclick="event.stopPropagation();" onchange="actualizarSeleccionDoc('${cbClass}', '${cbClass}'.replace('-chk','-borrar-sel-btn'), '${cbClass}'.replace('-chk','-sel-count'))">
-    <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}<span class="fc-tipo-tag tp-${tipo}">${TIPO_DOC_NOMBRE[tipo] || tipo}${verChipHtml(doc)}</span></div>
+    <div class="fc-estado-wrap" onclick="event.stopPropagation();">${estadoHtml}<span class="fc-tipo-tag tp-${tipo}">${verChipHtml(doc)}${TIPO_DOC_NOMBRE[tipo] || tipo}</span></div>
     <div class="fc-cliente"${entidad ? ' data-cli="' + escHtml(entidad.name) + '"' : ''}>${entidad ? entidad.name : 'Falta cliente'}</div>
     ${obraHtml}
     <div class="fc-meta">${metaHtml}</div>
