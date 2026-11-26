@@ -51,7 +51,7 @@
   });
   // 6) botones de solo icono sin círculo ni borde alrededor (Daniel 13/10/2026)
   document.querySelectorAll('button,[role=button],.cli-icon-btn').forEach(e => {
-    if (!e.offsetParent || e.closest('.bottom-nav,.mobile-nav,#sel-flotante,#busq-ov,.busq-linea,.modal,.drawer') || /fab|report-bug|ai-fab|asist/i.test(e.id + ' ' + e.className)) return;
+    if (!e.offsetParent || e.closest('.bottom-nav,.mobile-nav,#sel-flotante,#busq-ov,.busq-linea,.modal,.drawer,.tb-seg') || /fab|report-bug|ai-fab|asist/i.test(e.id + ' ' + e.className)) return;
     const t = (e.innerText || '').trim(); if (t.length > 2 || /[a-z0-9áéíóúñ]/i.test(e.textContent || '') || e.matches('.dir-check,[role=checkbox]')) return;
     const s2 = getComputedStyle(e), bw = parseFloat(s2.borderTopWidth) || 0, bc = s2.borderTopColor, bg = s2.backgroundColor;
     const conBorde = bw > 0 && !/rgba\(.*,\s*0\)$/.test(bc) && bc !== 'transparent', conFondo = bg && !/rgba\(.*,\s*0\)$/.test(bg) && bg !== 'transparent' && bg !== getComputedStyle(e.parentElement).backgroundColor;
