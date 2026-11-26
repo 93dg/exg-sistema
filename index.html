@@ -5257,12 +5257,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.31" defer></script>
-<script src="costes/norm.js?v=V14.31" defer></script>
-<script src="ajustes/calc.js?v=V14.31" defer></script>
-<script src="tiempo/tiempo.js?v=V14.31" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.32" defer></script>
+<script src="costes/norm.js?v=V14.32" defer></script>
+<script src="ajustes/calc.js?v=V14.32" defer></script>
+<script src="tiempo/tiempo.js?v=V14.32" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.31</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.32</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5411,7 +5411,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.31</div>
+        <div class="sub" id="version-badge">V14.32</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -9206,14 +9206,15 @@ document.addEventListener('click', e => { if(e.target.closest && e.target.closes
 
 // ===== ESTADÍSTICAS DE TRABAJOS (V7.72, Daniel: «tercera pestaña con un queso de los trabajos pendientes por prioridad, por flota…,
 // que recuerde lo último elegido, y cuánto dinero y cuánto tiempo hay pendiente, en días y meses») =====
-const TE = {por: 'prioridad', medida: 'n', sub: 'graficos'};
-try{ Object.assign(TE, JSON.parse(localStorage.getItem('te-sel') || '{}')); }catch(e){}
+const TE = {por: 'tiempo', medida: 'e', sub: 'graficos'};
+// V14.32 (Daniel 26/11: «el queso lo quiero con esas opciones predeterminadas»): siempre abre en Por tiempo + Dinero; no se recuerda la última elección
+try{ const _t = JSON.parse(localStorage.getItem('te-sel') || '{}'); if(_t.sub) TE.sub = _t.sub; }catch(e){}
 const TE_COLORES = ['#D9541E', '#2B5C8F', '#3B6D11', '#BA7517', '#7B4FA0', '#A32D2D', '#1E8A8A', '#8A6D3B', '#5A5A5A', '#C2185B', '#558B2F', '#6D4C41'];
 function teGuardar(){ try{ localStorage.setItem('te-sel', JSON.stringify(TE)); }catch(e){} try{ if(sb) sb.from('filtros_persistentes').upsert({container_id: 'te-sel', valor: JSON.stringify(TE)}, {onConflict: 'container_id'}).then(()=>{}); }catch(e){} }
 async function teCargar(){
   if(!_tbCargado && typeof tbCargar === 'function'){ try{ await tbCargar(); }catch(e){} }
   if(typeof tbCargarExtras === 'function' && !(_tbTarifas && Object.keys(_tbTarifas).length)){ try{ await tbCargarExtras(); }catch(e){} }
-  if(sb && !TE._leido){ TE._leido = true; try{ const {data} = await sb.from('filtros_persistentes').select('valor').eq('container_id', 'te-sel').maybeSingle(); if(data && data.valor){ const v = JSON.parse(data.valor); TE.por = v.por || TE.por; TE.medida = v.medida || TE.medida; } }catch(e){} }
+  if(sb && !TE._leido){ TE._leido = true; try{ const {data} = await sb.from('filtros_persistentes').select('valor').eq('container_id', 'te-sel').maybeSingle(); if(data && data.valor){ const v = JSON.parse(data.valor); } }catch(e){} }
   teRender();
 }
 function teGrupos(lista){
