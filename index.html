@@ -5260,12 +5260,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.38" defer></script>
-<script src="costes/norm.js?v=V14.38" defer></script>
-<script src="ajustes/calc.js?v=V14.38" defer></script>
-<script src="tiempo/tiempo.js?v=V14.38" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.39" defer></script>
+<script src="costes/norm.js?v=V14.39" defer></script>
+<script src="ajustes/calc.js?v=V14.39" defer></script>
+<script src="tiempo/tiempo.js?v=V14.39" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.38</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.39</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5414,7 +5414,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.38</div>
+        <div class="sub" id="version-badge">V14.39</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -26469,13 +26469,16 @@ const TB_TINTE_DIF = {'Fácil': '#EAF3DE', 'Medio': '#FAEEDA', 'Difícil': '#FCE
 // V14.34 (Daniel 26/11: «la fecha estimada automática, por la duración, los pendientes y los activos; abreviada, 28/12; y según lo desplace se va cambiando»):
 // cola = primero lo que está en marcha, luego los pendientes en el orden de la lista; 8 h por día laborable (lun-vie), un trabajo detrás de otro. Se calcula al pintar: NO se guarda como fecha del trabajo
 function tbFechasEstimadas(){
-  const act = tbActivos(), cola = [...act.filter(j => TB_EST_ENMARCHA.includes(j.estado)), ...act.filter(j => TB_EST_PENDIENTES.includes(j.estado))];
-  const d = new Date(); d.setHours(12, 0, 0, 0); while(d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
-  const res = {}; let h = 0;
-  cola.forEach(j => {
-    const dias = Math.floor(h / 8 + 1e-9), f = new Date(d); let n = dias; while(n > 0){ f.setDate(f.getDate() + 1); if(f.getDay() !== 0 && f.getDay() !== 6) n--; }
-    res[j.id] = String(f.getDate()).padStart(2, '0') + '/' + String(f.getMonth() + 1).padStart(2, '0');
-    const hh = tbDurHoras(j.duracion); h += hh == null ? 8 : hh;
+  // V14.39 (Daniel 26/11: «el primero sale el 31/12, tendría que ser el 26 de noviembre»): la fecha es el día del calendario del trabajo (plan.fecha: cambia al arrastrarlo).
+  // Los pendientes sin día se calculan detrás del último con día: 8 h por día laborable (lun-vie), uno detrás de otro. Nada se guarda
+  const fmt = d => String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0'), fin = d => d.getDay() === 0 || d.getDay() === 6;
+  const pend = tbPendientes(), res = {}; let ult = null;
+  pend.forEach(j => { const f = j.plan && j.plan.fecha; if(f){ res[j.id] = fmt(new Date(f + 'T12:00:00')); const d = new Date(f + 'T12:00:00'); if(!ult || d > ult) ult = d; } });
+  const d0 = ult ? new Date(ult) : new Date(); d0.setHours(12, 0, 0, 0); if(ult) d0.setDate(d0.getDate() + 1); while(fin(d0)) d0.setDate(d0.getDate() + 1);
+  let h = 0;
+  pend.filter(j => !(j.plan && j.plan.fecha)).forEach(j => {
+    let n = Math.floor(h / 8 + 1e-9); const f = new Date(d0); while(n > 0){ f.setDate(f.getDate() + 1); if(!fin(f)) n--; }
+    res[j.id] = fmt(f); const hh = tbDurHoras(j.duracion); h += hh == null ? 8 : hh;
   });
   return res;
 }
