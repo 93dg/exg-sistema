@@ -5253,12 +5253,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.23" defer></script>
-<script src="costes/norm.js?v=V14.23" defer></script>
-<script src="ajustes/calc.js?v=V14.23" defer></script>
-<script src="tiempo/tiempo.js?v=V14.23" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.24" defer></script>
+<script src="costes/norm.js?v=V14.24" defer></script>
+<script src="ajustes/calc.js?v=V14.24" defer></script>
+<script src="tiempo/tiempo.js?v=V14.24" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.23</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.24</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5411,7 +5411,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.23</div>
+        <div class="sub" id="version-badge">V14.24</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -8936,12 +8936,15 @@ async function vivoAplicar(){
     _e2 = null; _c3Alb = null; _costeBase = null; _sociosCache = null; _costeHora = null; _dirVivo = null; _gpBanco = null; _deudas = null;
     _tbCliNombres = null; _tbTarifas = null; _valFlota = null; _asis = null; _flAsis = null; if(toca('polizas_seguro')) _flPolGrid = null; _impPagosCargados = false; if(toca('sistema')) _combProv = null;
     if(_impBanco) _impBanco.cargado = false;
-    if(toca('sistema')) _tbCargado = false;
+    // V14.24 (Daniel 26/11): antes aquí se ponía _tbCargado=false y Trabajos se vaciaba («Cargando…») tras CADA cambio suyo y tardaba un siglo.
+    // Ahora lo suyo ya está en memoria (no se toca) y lo de otros se lee en segundo plano y se repinta sin vaciar la pantalla.
+    if(toca('sistema') && !propio && typeof tbCargar === 'function' && _tbCargado){ tbCargar().then(() => { try{ if(document.getElementById('tb-lista')?.offsetParent) tbRender(); }catch(e){} }).catch(() => {}); }
+    else if(toca('sistema') && !_tbCargado) _tbCargado = false;
     try{ if(window.RENT) window.RENT.invalidar(); if(window.COSTES) window.COSTES.D = null; }catch(e){}
     try{ e2DeudaCargar(); }catch(e){}
     if(propio) return;
     const v = localStorage.getItem('vista_activa'), b = v && document.querySelector('.nav button[data-view="' + v + '"]');
-    if(b) b.click();
+    if(b && !document.getElementById('tb-lista')?.offsetParent) b.click();   // V14.24: en Trabajos no se recarga la sección entera
     try{ if(window.RENT && window.RENT.el && window.RENT.el.offsetParent) window.RENT.pintar(window.RENT.el, true); if(window.COSTES && window.COSTES.el && window.COSTES.el.offsetParent) window.COSTES.pintar(window.COSTES.el, true); }catch(e){}
   }catch(e){ console.warn('Datos al día', e); }
 }
@@ -26604,8 +26607,24 @@ function tbColocarLupa(){
   else if(vis && enc){ enc.insertBefore(b, enc.firstChild); b.style.gridColumn = ''; }
   else { const bar = document.getElementById('tb-barra'); if(bar) bar.insertBefore(b, bar.firstChild); b.style.gridColumn = ''; }
 }
+// V14.24 (Daniel 26/11): en Activo no puede haber un trabajo con formato de Pendientes. Si el albarán de un trabajo Activo se borró (o ya no existe),
+// el trabajo vuelve a Pendientes (sin ese albarán enlazado) en vez de quedarse en Activo con su tarjeta de pendiente.
+let _tbReconc = false;
+function tbReconciliar(){
+  if(_tbReconc || !_tbCargado || !_docsListos || !Array.isArray(_tbJobs) || typeof documentosRealesById === 'undefined') return false;
+  const huer = _tbJobs.filter(j => TB_EST_ENMARCHA.includes(j.estado) && (j.docs || []).length && !(j.docs || []).some(id => documentosRealesById[id]));
+  if(!huer.length) return false;
+  _tbReconc = true;
+  (async () => {
+    try{ for(const j of huer){ j.docs = null; j.estado = 'Pendiente'; j.terminado_at = null; j.orden = ((tbActivos()[0] || {}).orden || 1000) - 1000; await tbPersistir(j); }
+      mostrarToast(huer.length === 1 ? 'Un trabajo se quedó sin albarán: vuelve a Pendientes.' : huer.length + ' trabajos se quedaron sin albarán: vuelven a Pendientes.', 'ok'); }
+    finally { _tbReconc = false; try{ tbRender(); }catch(e){} }
+  })();
+  return true;
+}
 function tbRender(){
   const lista = document.getElementById('tb-lista'); if(!lista) return;
+  try{ if(tbReconciliar()) return; }catch(e){ console.error('Trabajos: reconciliar', e); }   // V14.24
   // V12.83 (Daniel: «mientras carga sale ahí y luego se cambia; no quiero chapuzas»): hasta tener los trabajos Y los documentos no se pinta nada a medias
   // (ni números de las pestañas, ni la lupa, ni filtros): solo «Cargando…»; después todo sale ya en su sitio y con sus números buenos
   if(!_tbCargado || !_docsListos){
