@@ -3989,6 +3989,10 @@ body.editor-mode-on .layout-block:hover .layout-toolbar{display:flex;}
 .tb-flota{position:fixed;z-index:10000;margin:0 !important;box-shadow:0 12px 30px rgba(0,0,0,.35);transform:scale(1.02);pointer-events:none;opacity:.98;}
 body.tb-arrastrando{overflow-x:hidden;-webkit-user-select:none;user-select:none;}
 body.tb-modal{overflow:hidden;}
+/* V14.29 (Daniel 26/11): con el pop-up de Trabajos abierto, nada flota por encima (lupa, reportar, asistente) y la flota cabe en una sola línea */
+body.tb-modal #busq-fab, body.tb-modal #report-bug-btn, body.tb-modal #asistente-ia-fab, body.tb-modal #mob-menu-btn, body.tb-modal #global-add-fab{visibility:hidden !important;}
+#tb-hoja .tb-pills[data-campo="flota"]{flex-wrap:nowrap;gap:4px;}
+#tb-hoja .tb-pills[data-campo="flota"] button{padding:10px 7px;font-size:13px;white-space:nowrap;min-width:0;flex:0 1 auto;}
 .tb-fondo{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:flex-end;justify-content:center;}
 .tb-hoja{background:var(--paper);width:100%;max-width:560px;max-height:90vh;overflow-y:auto;border-radius:18px 18px 0 0;padding:10px 16px calc(18px + env(safe-area-inset-bottom,0px));box-sizing:border-box;}
 .tb-hoja-asa{width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 10px;}
@@ -5253,12 +5257,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.28" defer></script>
-<script src="costes/norm.js?v=V14.28" defer></script>
-<script src="ajustes/calc.js?v=V14.28" defer></script>
-<script src="tiempo/tiempo.js?v=V14.28" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.29" defer></script>
+<script src="costes/norm.js?v=V14.29" defer></script>
+<script src="ajustes/calc.js?v=V14.29" defer></script>
+<script src="tiempo/tiempo.js?v=V14.29" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.28</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.29</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5407,7 +5411,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.28</div>
+        <div class="sub" id="version-badge">V14.29</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -26709,6 +26713,7 @@ function tbAbrirEditor(id){
   _tbEditando = id || null; const j = id ? _tbJobs.find(x => x.id === id) : {prioridad: 'Media', prioridades: ['Media'], estado: 'Pendiente', dificultad: '', flota: [], lugar: '', cliente: '', trabajo: '', duracion: '', nota: ''};
   if(!j) return;
   const fondo = document.getElementById('tb-fondo'), hoja = document.getElementById('tb-hoja');
+  if(fondo.parentElement !== document.body) document.body.appendChild(fondo);   // V14.29: dentro de la pantalla de Trabajos su z-index no llegaba por encima del menú inferior; en el body sí
   const pr = tbPrioridades(j), fl = tbFlota(j), nM = fl.filter(x => x === 'mixta').length;
   const modeloFlota = tbFlotaDesdeTrabajo(j);
   const pill = (v, txt, cls, activo, style) => `<button type="button" data-v="${escHtml(v)}" class="cc ${cls} ${activo ? 'active' : ''}" ${style ? `style="${style}"` : ''}>${escHtml(txt)}</button>`;
