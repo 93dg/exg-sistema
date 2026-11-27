@@ -4480,6 +4480,9 @@ body.tb-compacto #tb-panel .tb-card .tb-cuerpo > :not(.tb-l1){display:none !impo
 .fc-tot-col .fc-dsc{align-items:flex-end;text-align:right;}
 html.no-admin body #report-bug-btn{display:none !important;}
 .fc-l-ref{cursor:pointer;}.fc-l-ref .fc-l-t span{color:var(--accent);}
+.cc-fila-compacta.cc-v2 .v2-est [id^="entrega-dd"] > .pill{font-size:7px !important;padding:2px 5px !important;letter-spacing:0 !important;max-width:78px;overflow:hidden;text-overflow:ellipsis;}
+/* V14.71 (reporte de Daniel 27/11: «no soporto esos fondos grises, es horroso y se ve antiguo»): cabeceras y totales de Trabajos sin fondo, con una línea fina debajo */
+.tb-grp-cab, .tb-grp-cab.tb-cnt-tot{background:transparent !important;border-radius:0 !important;border-bottom:1px solid var(--line) !important;padding:12px 4px 6px !important;margin:4px 0 6px !important;}
 </style>
 <style>
 /* required styles */
@@ -5292,12 +5295,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.70" defer></script>
-<script src="costes/norm.js?v=V14.70" defer></script>
-<script src="ajustes/calc.js?v=V14.70" defer></script>
-<script src="tiempo/tiempo.js?v=V14.70" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.71" defer></script>
+<script src="costes/norm.js?v=V14.71" defer></script>
+<script src="ajustes/calc.js?v=V14.71" defer></script>
+<script src="tiempo/tiempo.js?v=V14.71" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.70</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.71</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5446,7 +5449,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.70</div>
+        <div class="sub" id="version-badge">V14.71</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -31993,15 +31996,15 @@ function estadoDocumentoSelect(tipo, id, actual, contexto){
 // V14.47 (Daniel 26/11): PRUEBA en una sola tarjeta (A25): segunda pastilla de cobro, independiente de la del trabajo. Se calcula de lo cobrado; no toca el estado del trabajo.
 // V14.61 (Daniel 26/11: «aplica ya esto a todas»): las 3 pastillas valen para todos los albaranes y proformas cuyo estado es de trabajo; los que ya tienen un estado de cobro antiguo siguen como estaban hasta pasarlos
 const PAGO_PRUEBA_IDS = {includes(id){ if(id === 'c864593e-b23f-4b83-9663-de29bbb2815a') return true; const d = (typeof documentosRealesById !== 'undefined') && documentosRealesById[id]; return !!d && ['albaran','proforma'].includes(d.type) && !['nula', 'anulado', 'cancelado', 'rectificativa'].includes(d.estado_cobro); }};   // V14.64 (Daniel: «unas tarjetas tienen unas opciones y otras no»): todas, también las de estado de cobro antiguo (se leen sin tocar los datos)
-const PAGO_DE_ANTIGUO = {pendiente_cobrar:'por_cobrar', por_cobrar_otra:'por_cobrar_otra', parcial:'parcial', parcial_otra:'parcial_otra', cobrado:'cobrado', cobrado_efectivo:'cobrado', cobrado_otra:'cobrado_otra'};
+const PAGO_DE_ANTIGUO = {pendiente_cobrar:'por_cobrar', por_cobrar_otra:'por_cobrar_otra', parcial:'parcial', parcial_otra:'parcial_otra', cobrado:'cobrado', cobrado_efectivo:'cobrado', cobrado_otra:'cobrado_otra', revisar:'revisar'};
 function pagoDe(d){ if(PAGO_ETQ[d?.estado_pago]) return d.estado_pago; if(PAGO_DE_ANTIGUO[d?.estado_cobro]) return PAGO_DE_ANTIGUO[d.estado_cobro]; const t = Number(d?.importe ?? d?.total ?? 0), c = Number(d?.cobrado_importe || 0); return c <= 0 ? 'sin' : (t > 0 && c >= t - 0.005 ? 'cobrado' : 'parcial'); }
-const PAGO_ETQ = {sin:'–', por_cobrar:'Por cobrar', por_cobrar_otra:'Por cobrar en otra', parcial:'Cobrado parcial', parcial_otra:'Parcial en otra', cobrado:'Cobrado', cobrado_otra:'Cobrada en otra'};
-const PAGO_CLS = {sin:'borrador', por_cobrar:'pendiente_cobrar'};
+const PAGO_ETQ = {sin:'–', por_cobrar:'Por cobrar', por_cobrar_otra:'Por cobrar en otra', parcial:'Cobrado parcial', parcial_otra:'Parcial en otra', cobrado:'Cobrado', cobrado_otra:'Cobrada en otra', revisar:'Revisar'};   // V14.71 (Daniel 27/11): Revisar va en la pastilla del cobro y no cuenta en ninguna cifra
+const PAGO_CLS = {sin:'borrador', por_cobrar:'pendiente_cobrar', revisar:'revisar'};
 const _ICO = d => `<svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="${d}"/></svg>`;
 const ICO_EUR_PILL = _ICO('M12 4.2A4.5 4.5 0 1 0 12 11.8M3 6.6h6.5M3 9.4h6.5'), ICO_CAJA_PILL = _ICO('M2.5 5 8 2l5.5 3v6L8 14l-5.5-3zM2.5 5 8 8l5.5-3M8 8v6');
 const pagoEtqHtml = v => v === 'sin' ? ICO_EUR_PILL : PAGO_ETQ[v];
 const ENTREGA_ETQ = {sin:'–', repasar:'Repasar', por_entregar:'Por entregar', por_entregar_rg:'Por entregar RG', entregada:'Entregada', entregada_rg:'Entregada RG'};   // V14.52: guion por defecto (aún no toca), Repasar antes de Por entregar
-function entregaDe(d){ return ENTREGA_ETQ[d?.estado_entrega] ? d.estado_entrega : (d?.estado_cobro === 'entregado' || PAGO_DE_ANTIGUO[d?.estado_cobro] ? 'entregada' : 'sin'); }
+function entregaDe(d){ return ENTREGA_ETQ[d?.estado_entrega] ? d.estado_entrega : (d?.estado_cobro === 'entregado' || (PAGO_DE_ANTIGUO[d?.estado_cobro] && d.estado_cobro !== 'revisar') ? 'entregada' : 'sin'); }
 const entregaEtqHtml = v => v === 'sin' ? ICO_CAJA_PILL : ENTREGA_ETQ[v];
 function entregaPillHtml(id, ddId){
   if(!PAGO_PRUEBA_IDS.includes(id)) return '';
@@ -32034,9 +32037,10 @@ async function cambiarPagoDocumento(id, v){
   const d = documentosRealesById[id]; if(!d) return;
   const tot = Number(d.importe ?? d.total ?? 0), ya = Number(d.cobrado_importe || 0);
   document.querySelectorAll('.pago-dd.open').forEach(e => e.classList.remove('open'));
-  let nuevo = v === 'cobrado' ? tot : (['por_cobrar','por_cobrar_otra'].includes(v) ? ya : 0), fecha = null;
+  let nuevo = v === 'cobrado' ? tot : (['por_cobrar','por_cobrar_otra','revisar'].includes(v) ? ya : 0), fecha = null;
   const upd = {estado_pago: v};   // V14.68 (Daniel 26/11: «de Por cobrar a € se queda en Por cobrar»): el guion se guarda como 'sin'; si no, se volvía a leer el estado antiguo
-  if(typeof PAGO_DE_ANTIGUO !== 'undefined' && PAGO_DE_ANTIGUO[d.estado_cobro]){ upd.estado_cobro = 'pendiente_enviar'; if(!d.estado_entrega) upd.estado_entrega = 'entregada'; }   // el estado antiguo de cobro pasa a su pastilla: el trabajo queda Terminado
+  if(typeof PAGO_DE_ANTIGUO !== 'undefined' && PAGO_DE_ANTIGUO[d.estado_cobro]){ upd.estado_cobro = 'pendiente_enviar'; if(!d.estado_entrega && d.estado_cobro !== 'revisar') upd.estado_entrega = 'entregada'; }
+  if(v === 'revisar') upd.estado_cobro = 'revisar';   // Revisar no cuenta en ninguna cifra (las cuentas miran estado_cobro = 'revisar')   // el estado antiguo de cobro pasa a su pastilla: el trabajo queda Terminado
   if(v === 'sin') nuevo = 0;
   if(v === 'parcial_otra' || v === 'cobrado_otra'){
     const r = await pedirFacturaOtra(d, v); if(!r) return;
