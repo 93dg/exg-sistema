@@ -5296,12 +5296,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.77" defer></script>
-<script src="costes/norm.js?v=V14.77" defer></script>
-<script src="ajustes/calc.js?v=V14.77" defer></script>
-<script src="tiempo/tiempo.js?v=V14.77" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.78" defer></script>
+<script src="costes/norm.js?v=V14.78" defer></script>
+<script src="ajustes/calc.js?v=V14.78" defer></script>
+<script src="tiempo/tiempo.js?v=V14.78" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.77</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.78</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5450,7 +5450,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.77</div>
+        <div class="sub" id="version-badge">V14.78</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -8991,8 +8991,11 @@ async function vivoAplicar(){
     if(_impBanco) _impBanco.cargado = false;
     // V14.24 (Daniel 26/11): antes aquí se ponía _tbCargado=false y Trabajos se vaciaba («Cargando…») tras CADA cambio suyo y tardaba un siglo.
     // Ahora lo suyo ya está en memoria (no se toca) y lo de otros se lee en segundo plano y se repinta sin vaciar la pantalla.
-    if(toca('sistema') && !propio && typeof tbCargar === 'function' && _tbCargado){ tbCargar().then(() => { try{ if(document.getElementById('tb-lista')?.offsetParent) tbRender(); }catch(e){} }).catch(() => {}); }
+    // V14.78 (Daniel 27/11: «la reactividad es la asignatura número uno»): también tras un cambio propio se releen los trabajos en segundo plano y se repintan,
+    // porque la base cambia cosas por su cuenta (enlaces documento-trabajo, números, estados) que esta pantalla no sabe; sin vaciar la pantalla
+    if(toca('sistema', 'documentos_economicos') && typeof tbCargar === 'function' && _tbCargado){ tbCargar().then(() => { try{ if(document.getElementById('tb-lista')?.offsetParent) tbRender(); if(typeof c2Pintar === 'function' && document.querySelector('.c2-wrap, #c2-lista')?.offsetParent) c2Pintar(); setTimeout(fcReabrir, 60); }catch(e){} }).catch(() => {}); }
     else if(toca('sistema') && !_tbCargado) _tbCargado = false;
+    if(toca('documentos_economicos')){ try{ renderControlDocs(); setTimeout(fcReabrir, 60); }catch(e){} }
     try{ if(window.RENT) window.RENT.invalidar(); if(window.COSTES) window.COSTES.D = null; }catch(e){}
     try{ e2DeudaCargar(); }catch(e){}
     if(propio) return;
