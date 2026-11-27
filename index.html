@@ -4479,6 +4479,7 @@ body.tb-compacto #tb-panel .tb-card .tb-cuerpo > :not(.tb-l1){display:none !impo
 .factura-card-movil.factura-card-movil:not(.fc-gasto) .fc-cliente{margin-top:8px !important;}
 .fc-tot-col .fc-dsc{align-items:flex-end;text-align:right;}
 html.no-admin body #report-bug-btn{display:none !important;}
+.fc-l-ref{cursor:pointer;}.fc-l-ref .fc-l-t span{color:var(--accent);}
 </style>
 <style>
 /* required styles */
@@ -5291,12 +5292,12 @@ window.addEventListener('load', () => { const ya = () => { exgLibLocal('jspdf').
 </script>
 <script src="escaner/escaner.js?v=V11.17" defer></script>
 <script src="marcar/marcar.js?v=V11.17" defer></script>
-<script src="rentabilidad/rent.js?v=V14.69" defer></script>
-<script src="costes/norm.js?v=V14.69" defer></script>
-<script src="ajustes/calc.js?v=V14.69" defer></script>
-<script src="tiempo/tiempo.js?v=V14.69" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
+<script src="rentabilidad/rent.js?v=V14.70" defer></script>
+<script src="costes/norm.js?v=V14.70" defer></script>
+<script src="ajustes/calc.js?v=V14.70" defer></script>
+<script src="tiempo/tiempo.js?v=V14.70" defer></script>   <!-- V14.01: tarjeta del tiempo (también la usa tiempo.html) -->
 <script src="lib/supabase-2.117.2.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js&quot;><\/script>')"></script>
-<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.69</div>
+<div id="version-float" title="Tocar para recargar" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 24px);right:0;padding:0 8px 4px 14px;z-index:9999;font-size:7px;line-height:9px;color:var(--ink-soft);opacity:0.45;cursor:pointer;font-family:monospace;">V14.70</div>
 <!-- Escritorio: botones individuales -->
 
 <button id="editor-mode-btn" onclick="toggleEditorMode()" title="Modo editor">✏️<span class="rb-label"> Modo editor</span></button>
@@ -5445,7 +5446,7 @@ body.rb-oculta-fab #busq-fab{transform:translateY(170px) !important;opacity:0;po
     <div class="brand">
       <div class="brand-text">
         <div class="name">EXG</div>
-        <div class="sub" id="version-badge">V14.69</div>
+        <div class="sub" id="version-badge">V14.70</div>
       </div>
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Contraer menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/><path class="sbt-fl" d="M15.5 10l-2 2 2 2"/></svg></button>
       <button class="sidebar-toggle" id="sidebar-tema" onclick="toggleTema()" title="Cambiar tema claro/oscuro" style="margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
@@ -8908,7 +8909,11 @@ let _bandejaCorreoN = 0, _bandejaVivo = null, _bandejaDeb = null;
 // V14.35 (Daniel 26/11: «la bandeja va fatal: el círculo, el correo y las tareas no coinciden»): MISMOS números en todos lados.
 // Correo = sin leer en Gmail; Tareas = las que enseña el panel «Tareas y recordatorios»; el círculo = Correo + Reportes + Subir + Tareas
 function bandejaTareasN(){ return Number(document.getElementById('alertas-count')?.textContent) || 0; }
-function bandejaTotal(){ return Object.values(_bandejaCuentas.v).reduce((s, x) => s + (x || 0), 0) + (_bandejaCorreoN || 0) + bandejaTareasN(); }
+function bandejaTotal(){   // V14.70 (Daniel 27/11: «que cuente lo mismo que en el servidor»): correo + reportes + subir + tareas por revisar, de la función bandeja del servidor
+  let j = null; try{ j = JSON.parse(localStorage.getItem('bandeja-cifras') || 'null'); }catch(e){}
+  if(j && j.ok) return ['correo', 'reportes', 'subir', 'tareas_por_revisar'].reduce((s, k) => s + (Number(j[k]) || 0), 0);
+  return 0;
+}
 function bandejaBloquePintar(){
   [['bandeja-correo', _bandejaCorreoN || 0], ['bandeja-tareas', bandejaTareasN()]].forEach(([i, v]) => { const e = document.getElementById(i); if(e && e.textContent !== '—' && e.textContent !== '…'){ e.textContent = v; e.className = v ? '' : 'cero'; } });
 }
@@ -20528,6 +20533,7 @@ function fcLineasHtml(d){
   const MAX = 6;   // V13.34 (Daniel 02/11): se ven 6 líneas; «Mostrar 6 más» va de 6 en 6 y «Mostrar todas» las despliega todas, ahí mismo (nunca abre el editor)
   const filas = cs.map((x, i) => { const q = x.cantidad != null && x.cantidad !== '' ? num(x.cantidad) + (x.unidad ? ' ' + x.unidad : '') : '', pu = precioLinea(x) != null ? eur(precioLinea(x)) : '';
     const sub = [q && pu ? q + ' × ' + pu : (q || pu), corta(x.fecha), x.maquina || ''].filter(Boolean).join(' · ');
+    if(x.doc_pendiente_id) return '<div class="fc-l fc-l-ref" onclick="event.stopPropagation();abrirDocumentoParaVerlo(\'' + e(x.doc_pendiente_id) + '\')"><div class="fc-l-t"><span>' + e(x.descripcion) + ' ›</span><b>' + e(eur(x.importe)) + '</b></div><div class="fc-l-s">Lo que falta por cobrar de ese albarán · se actualiza solo</div></div>';   // V14.70 (Daniel 27/11): línea enlazada a otro albarán; al tocarla se abre
     return '<div class="fc-l' + (i >= MAX ? ' fc-l-oc' : '') + (ed ? ' fc-l-ed' : '') + '" data-i="' + idx[i] + '"><div class="fc-l-t"><span>' + e(x.descripcion || x.desc || x.concepto) + '</span><b>' + (x.importe != null && x.importe !== '' ? e(eur(x.importe)) : '') + '</b></div>' + ((sub || x.operario) ? '<div class="fc-l-s">' + e(sub) + (x.operario && x.unidad === 'h' ? (sub ? ' · ' : '') + quienColorHtml(x.operario, x.reparto) : '') + '</div>' : '') + '</div>'; }).join('');
   const mas = cs.length > MAX ? '<div class="fc-l-btns"><button type="button" class="fc-l-mas" onclick="event.stopPropagation();fcLineasMas(this, 6)">Mostrar más</button><button type="button" class="fc-l-mas" onclick="event.stopPropagation();fcLineasMas(this, 0)">Mostrar todas (' + cs.length + ')</button></div>' : '';
   return '<div class="fc-lineas">' + (anadir ? '<div class="fc-l-btns fc-l-btns-add">' + anadir + '</div>' : '') + filas + mas + '</div>';
